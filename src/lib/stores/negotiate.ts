@@ -37,12 +37,16 @@ function clampRank(r: unknown): Rank {
   return r === "yes" || r === "maybe" || r === "no" ? r : "no";
 }
 
-function lockItems(items: NegItem[]): NegItem[] {
-  const mapped = items.slice(0, 40).map((i) => ({
-    id: String(i.id).slice(0, 80),
-    label: String(i.label).slice(0, 80),
-    rank: LOCKED_NO.has(i.id) ? ("no" as Rank) : clampRank(i.rank),
-  }));
+export function lockItems(items: NegItem[]): NegItem[] {
+  const mapped = items
+    .filter((i): i is NegItem => !!i && typeof i === "object")
+    .slice(0, 40)
+    .map((i) => ({
+      id: String(i.id ?? "").slice(0, 80),
+      label: String(i.label ?? "").slice(0, 80),
+      rank: LOCKED_NO.has(String(i.id)) ? ("no" as Rank) : clampRank(i.rank),
+    }))
+    .filter((i) => i.id && i.label);
   const have = new Set(mapped.map((i) => i.id));
   for (const seed of STARTER) {
     if (LOCKED_NO.has(seed.id) && !have.has(seed.id)) mapped.push({ ...seed, rank: "no" });

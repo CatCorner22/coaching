@@ -14,15 +14,22 @@ type PlannerState = {
 
 adoptPersistKey("knotty-plan", "musubi-plan");
 
+export function normalizePlannerSlugs(persisted: unknown, fallback: string[]): string[] {
+  if (!Array.isArray(persisted)) return fallback;
+  return persisted
+    .filter((slug): slug is string => typeof slug === "string" && slug.trim().length > 0)
+    .slice(0, 40);
+}
+
 export const usePlanner = create<PlannerState>()(
   persist(
     (set, get) => ({
       slugs: [...SEQUENCES[0].steps],
-      setSlugs: (slugs) => set({ slugs }),
+      setSlugs: (slugs) => set({ slugs: normalizePlannerSlugs(slugs, []) }),
       add: (slug) => {
         const next = slug.trim();
         if (!next) return;
-        const slugs = get().slugs;
+        const slugs = Array.isArray(get().slugs) ? get().slugs : [];
         if (slugs.includes(next)) return;
         set({ slugs: [...slugs, next] });
       },
@@ -33,6 +40,12 @@ export const usePlanner = create<PlannerState>()(
       },
       clear: () => set({ slugs: [] }),
     }),
-    { name: "knotty-plan" },
+    {
+      name: "knotty-plan",
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<PlannerState>;
+        return { ...current, slugs: normalizePlannerSlugs(p.slugs, current.slugs) };
+      },
+    },
   ),
 );

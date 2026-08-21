@@ -40,6 +40,7 @@ Four independent multi-agent rounds, followed by a separate merge-adversary pass
 - `npm run lint`: **pass** (zero warnings).
 - `npm run build`: **pass** — production bundle excludes PGLite WASM/data loaders.
 - Dev browser smoke (desktop 1280×800 + mobile 390×844): **pass** — visible consent gate content, clean console, no brand warnings.
+- Consented deep walkthrough of 26 routes (library, ties, knots, studio, tools, emergency, unknown slugs): **pass** — no console or page errors; home mobile scroll width no longer overflows after featured-card and decorative-SVG clipping.
 - Production preview smoke (`127.0.0.1:8081`, baseline compared to dev): **pass** — no divergence, clean console.
 - Isolated platform PWA fixture (`scripts/grok-pwa-plugin.test.mjs` in temp cwd): **47/47 passed**.
 - Brand assets: `public/og.jpg`, `public/x-banner.jpg`, `public/__grok/icon-180.png`, and `src/lib/og/site.json` with `"card": "custom"` and `"type": "x:game"` — all present.

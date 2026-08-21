@@ -16,7 +16,7 @@ function Home() {
     <div>
       <section className="relative isolate overflow-hidden">
         <div className="absolute inset-0 bg-bg" aria-hidden>
-          <svg viewBox="0 0 400 300" className="absolute -right-8 top-8 h-[120%] w-auto text-rope/25" aria-hidden>
+            <svg viewBox="0 0 400 300" className="absolute -right-8 top-8 h-[120%] w-auto max-w-[70%] text-rope/25" aria-hidden>
             <path
               d="M80 150 C80 70 160 70 200 150 C240 230 320 230 320 150 C320 70 240 70 200 150 C160 230 80 230 80 150"
               fill="none"
@@ -133,19 +133,19 @@ function Home() {
             All ties <ArrowRight className="size-3.5" />
           </Link>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2">
           {featured.map((t) => (
             <Link
               key={t.slug}
               to="/tie/$slug"
               params={{ slug: t.slug }}
-              className="flex gap-4 rounded-lg border border-border bg-surface p-3 hover:border-border-strong"
+              className="flex min-w-0 max-w-full gap-4 overflow-hidden rounded-lg border border-border bg-surface p-3 hover:border-border-strong"
             >
               <MiniTie wraps={t.steps.at(-1)?.wraps ?? []} pose={t.steps.at(-1)?.expected.pose} />
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="font-display text-2xl">{t.name}</p>
-                  <Badge>{t.level}</Badge>
+                <div className="flex min-w-0 items-center gap-2">
+                  <p className="min-w-0 truncate font-display text-2xl">{t.name}</p>
+                  <Badge className="shrink-0">{t.level}</Badge>
                 </div>
                 <p className="text-xs text-subtle">{t.jp}</p>
                 <p className="mt-2 line-clamp-3 text-sm text-muted">{t.summary}</p>

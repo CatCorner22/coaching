@@ -42,7 +42,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
   return (
     <ConsentGate>
-      <div className="min-h-dvh bg-bg text-fg">
+      <div className="min-h-dvh overflow-x-hidden bg-bg text-fg">
         <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 flex-col border-r border-border bg-surface/80 px-4 py-6 md:flex">
           <Link to="/" className="px-2">
             <p className="text-[11px] uppercase tracking-[0.28em] text-muted">Rope studio</p>

@@ -48,12 +48,14 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
   }
 
   body {
     background: var(--color-bg);
     color: var(--color-fg);
     min-height: 100dvh;
+    overflow-x: hidden;
   }
 
   h1,
