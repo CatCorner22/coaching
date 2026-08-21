@@ -14,8 +14,8 @@
  * The read is non-recursive, so migrations/auth/ remains a source copy; auth is
  * active only when its schema is copied into the root migrations directory.
  *
- * No DATABASE_URL (local / preview builds) -> skip; the PGLite fallback applies
- * the same files at startup instead (see src/lib/db.ts).
+ * No DATABASE_URL -> skip. Only the live Vite dev server owns an embedded
+ * PGLite fallback; production and built previews require Postgres for DB use.
  */
 import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -174,7 +174,7 @@ async function main() {
   const databaseUrl = process.env.DATABASE_URL?.trim();
   if (!databaseUrl) {
     console.log(
-      "[migrate] DATABASE_URL not set — skipping (the PGLite fallback migrates itself).",
+      "[migrate] DATABASE_URL not set — skipping (production DB use requires Postgres; vite dev migrates PGLite itself).",
     );
     return;
   }

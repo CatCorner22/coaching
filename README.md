@@ -30,6 +30,10 @@ npm test
 
 Camera and media behavior still requires real-device checks on current iOS Safari, Android Chrome, desktop Chromium, Firefox, and Safari. Unit tests cannot establish camera permissions, decoder support, MediaRecorder interoperability, accessibility, or safe real-world use.
 
+PGLite is a `npm run dev` convenience only. Production builds, `npm run preview`,
+and `npm run build:dev` do not use an embedded database; configure
+`DATABASE_URL` before exercising any server-side database path in those modes.
+
 ## Deployment requirements
 
 - Serve production over HTTPS. Live camera APIs are unavailable in an insecure context; `localhost` is the development exception.

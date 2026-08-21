@@ -47,6 +47,14 @@ jobs:
             fi
           done < <(find .vercel/output/functions -type f \( -name '*.mjs' -o -name '*.js' \) -print0)
 
+      - name: Verify production excludes embedded-database artifacts
+        shell: bash
+        run: |
+          if rg --line-number 'pglite\.(data|wasm)|initdb\.wasm' .vercel/output/functions; then
+            echo "Production server output retained a PGLite WASM/data loader."
+            exit 1
+          fi
+
       - name: Upload invalid server-module diagnostics
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -88,7 +96,9 @@ jobs:
         run: |
           sudo mkdir -p /workspace/screenshots
           sudo chown "$(id -u):$(id -g)" /workspace /workspace/screenshots
-          npm run preview > /workspace/screenshots/production-preview.log 2>&1 &
+          # Runtime NODE_ENV is deliberately hostile: the compiled dev-server
+          # boundary, not this mutable variable, must keep PGLite disabled.
+          NODE_ENV=development npm run preview > /workspace/screenshots/production-preview.log 2>&1 &
           preview_pid=$!
           trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
 
@@ -104,6 +114,17 @@ jobs:
             echo "Production preview did not become healthy within 60 seconds."
             exit 1
           fi
+
+          auth_body="${RUNNER_TEMP}/auth-session.json"
+          auth_status=$(curl --silent --show-error \
+            --output "$auth_body" --write-out '%{http_code}' \
+            http://127.0.0.1:8081/api/auth/get-session)
+          if [[ "$auth_status" != "200" ]]; then
+            echo "Auth-off session probe returned HTTP $auth_status."
+            sed -n '1,40p' "$auth_body"
+            exit 1
+          fi
+          curl --silent --show-error --fail http://127.0.0.1:8081/ > /dev/null
 
           node scripts/browser-smoke.mjs \
             http://127.0.0.1:8081/ \

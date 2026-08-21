@@ -387,6 +387,9 @@ test("browser-smoke wires the guard and verdict helpers", () => {
   assert.match(src, /baselineComparison\(/);
   assert.match(src, /process\.exitCode = exitCodeFor\(viewports\)/);
   assert.match(src, /waitUntil: "domcontentloaded"/);
+  assert.match(src, /APP_LOADING_TEXT/);
+  assert.match(src, /getByText\(APP_LOADING_TEXT,[\s\S]*?state: "hidden"/);
+  assert.match(src, /APP_READY_TIMEOUT_MS = 10_000/);
   assert.doesNotMatch(
     src,
     /waitUntil:\s*["']networkidle["']/,

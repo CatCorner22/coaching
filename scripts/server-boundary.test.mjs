@@ -35,24 +35,39 @@ test("auth routes, production validation, and provider capability discovery are 
   const login = read("src/routes/login.tsx");
   assert.match(route, /GET:[\s\S]*?auth\.handler\(request\)/);
   assert.match(route, /POST:[\s\S]*?auth\.handler\(request\)/);
-  assert.match(server, /assertProductionAuthEnvironment\(process\.env/);
+  assert.match(server, /assertProductionAuthEnvironment\(\s*process\.env/);
   assert.match(capability, /gateIdentityEnabled\(\)/);
   assert.match(capability, /oauthProviders: authConfigured/);
   assert.match(login, /capabilities\.oauthProviders/);
 });
 
-test("PGLite is development-only and production imports do not bootstrap a database", () => {
+test("the compile-time dev-server boundary owns PGLite and preview credentials", () => {
   const db = read("src/lib/db.ts");
   const auth = read("src/lib/auth/server.ts");
+  const aiGuard = read("src/lib/ai/guard.server.ts");
+  const connector = read("src/lib/app-data/client.server.ts");
   const config = read("src/lib/auth/config.ts");
   const vite = read("vite.config.ts");
+  const workflow = read(".github/workflows/ci.yml");
 
-  assert.match(db, /production[\s\S]*?\? "unconfigured"[\s\S]*?: "pglite"/);
+  assert.match(vite, /__KNOTTY_DEV_SERVER__:[\s\S]*?command === "serve" && isPreview !== true/);
+  assert.match(db, /selectDatabaseSource\([\s\S]*?viteDevServer/);
   assert.match(db, /DATABASE_URL is required for server-side database use in production/);
+  assert.match(db, /if \(viteDevServer\) return createPgliteSql\(\)/);
   assert.doesNotMatch(db, /__pgBootstrapPromise__/);
   assert.doesNotMatch(auth, /void ensureDbReady\(\)/);
+  assert.match(auth, /const production = !viteDevServer/);
+  assert.match(auth, /: viteDevServer[\s\S]*?pgliteDialect/);
+  assert.match(aiGuard, /userId === DEV_USER_ID && !viteDevServer/);
+  assert.match(connector, /const envToken = viteDevServer/);
+  for (const source of [db, auth, aiGuard, connector]) {
+    assert.doesNotMatch(source, /NODE_ENV/);
+  }
   assert.match(vite, /await mod\.ensureDbReady\(\)/);
   assert.match(config, /problems\.push\("DATABASE_URL is required"\)/);
+  assert.match(workflow, /pglite\\\.\(data\|wasm\)\|initdb\\\.wasm/);
+  assert.match(workflow, /NODE_ENV=development npm run preview/);
+  assert.match(workflow, /api\/auth\/get-session/);
 });
 
 test("hosting-gate session rotation rejects invalid identity and adapter failures", () => {

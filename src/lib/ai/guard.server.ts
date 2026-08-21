@@ -1,5 +1,6 @@
 import { getRequest } from "@tanstack/react-start/server";
 import { DEV_USER_ID, UnauthorizedError, requireUserId } from "@/lib/auth/verify.server";
+import { viteDevServer } from "@/lib/runtime-mode";
 
 export class AiRequestDeniedError extends Error {
   readonly status = 403;
@@ -27,7 +28,7 @@ export async function authorizeAiRequest(verifiedUserId?: string): Promise<{ use
   // the same-origin session cookie or the live-preview bearer token. Retain the
   // direct resolver only for server-only callers that do not use middleware.
   const userId = verifiedUserId?.trim() || await requireUserId();
-  if (userId === DEV_USER_ID && process.env.NODE_ENV === "production") {
+  if (userId === DEV_USER_ID && !viteDevServer) {
     throw new UnauthorizedError();
   }
   const request = getRequest();

@@ -1,17 +1,19 @@
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
+import {
+  normalizedDatabaseUrl,
+  selectDatabaseSource,
+  type RuntimeDbSource,
+  viteDevServer,
+} from "./runtime-mode";
 
 /** Which database backend is active. */
-export type DbSource = "neon" | "pglite" | "unconfigured";
+export type DbSource = RuntimeDbSource;
 
 // An empty/whitespace DATABASE_URL (an easy misconfig in deploy UIs) must mean
 // "unset" — otherwise production would silently run on the PGLite fallback.
-const rawDatabaseUrl =
-  typeof process !== "undefined" ? process.env.DATABASE_URL : undefined;
-const databaseUrl =
-  rawDatabaseUrl && rawDatabaseUrl.trim() ? rawDatabaseUrl : undefined;
-
-const production =
-  typeof process !== "undefined" && process.env.NODE_ENV === "production";
+const databaseUrl = normalizedDatabaseUrl(
+  typeof process !== "undefined" ? process.env.DATABASE_URL : undefined,
+);
 
 /**
  * Active backend: real **Neon** when `DATABASE_URL` is set, or embedded PGLite
@@ -19,11 +21,10 @@ const production =
  * in-memory, per-instance database: it would lose reservations and sessions on
  * restart and its WASM data files are not part of the serverless function.
  */
-export const dbSource: DbSource = databaseUrl
-  ? "neon"
-  : production
-    ? "unconfigured"
-    : "pglite";
+export const dbSource: DbSource = selectDatabaseSource(
+  databaseUrl,
+  viteDevServer,
+);
 
 /**
  * Minimal shared SQL surface, satisfied by both Neon and PGLite. Both the
@@ -202,8 +203,11 @@ async function createSql(): Promise<Sql> {
         "or a server route loader, never from client code.",
     );
   }
-  if (dbSource === "neon") return createNeonSql();
-  if (dbSource === "pglite") return createPgliteSql();
+  // Keep the compile-time dev sentinel in this branch (rather than only the
+  // exported label) so the production bundler can remove PGLite and its WASM
+  // asset loader from the serverless graph.
+  if (databaseUrl) return createNeonSql();
+  if (viteDevServer) return createPgliteSql();
   throw new Error(
     "DATABASE_URL is required for server-side database use in production",
   );
@@ -230,7 +234,7 @@ export function getSql(): Promise<Sql> {
  * development previews (via a Kysely dialect). Throws outside that fallback.
  */
 export async function getPglite(): Promise<import("@electric-sql/pglite").PGlite> {
-  if (dbSource !== "pglite") {
+  if (!viteDevServer || databaseUrl) {
     throw new Error(
       "getPglite() is only available on the development PGLite fallback",
     );
@@ -253,6 +257,6 @@ export async function getPglite(): Promise<import("@electric-sql/pglite").PGlite
  * server module never starts a database or leaves a rejecting background task.
  */
 export function ensureDbReady(): Promise<void> {
-  if (dbSource !== "pglite") return Promise.resolve();
+  if (!viteDevServer || databaseUrl) return Promise.resolve();
   return getSql().then(() => undefined);
 }

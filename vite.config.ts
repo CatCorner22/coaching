@@ -146,6 +146,13 @@ function authPopupPlugin(): Plugin {
 // The dev server starts once `src/router.tsx` and `src/routes/` exist — see
 // AGENTS.md § "First scaffold".
 export default defineConfig(({ command, isPreview }) => ({
+  // This is a security/deployment boundary, not a mutable NODE_ENV convention:
+  // only the live Vite dev server may use preview credentials or embedded DB.
+  define: {
+    __KNOTTY_DEV_SERVER__: JSON.stringify(
+      command === "serve" && isPreview !== true,
+    ),
+  },
   server: {
     host: "0.0.0.0",
     port: 8080,
