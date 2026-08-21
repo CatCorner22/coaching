@@ -29,6 +29,7 @@ function JournalPage() {
             a.href = URL.createObjectURL(blob);
             a.download = "knotty-journal.json";
             a.click();
+            window.setTimeout(() => URL.revokeObjectURL(a.href), 1000);
           }}
         >
           Export notes

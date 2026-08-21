@@ -1,5 +1,7 @@
 /** Camera skill: score stills so the coach sees rope, not blur. */
 
+import { isDarkFiber, isHandTone, isRope, isSkin } from "@/lib/ml/color";
+
 export type FrameQuality = {
   sharpness: number;
   exposure: number;
@@ -51,6 +53,25 @@ export function exposureScore(data: ImageData): number {
   return Math.max(0, 1 - crush * 1.6);
 }
 
+/** Dark brown hemp that misses isRope (r ≤ 70) and isDarkFiber (too saturated). */
+function isDarkJute(r: number, g: number, b: number) {
+  if (isSkin(r, g, b) || isHandTone(r, g, b)) return false;
+  const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const s = max === 0 ? 0 : (max - min) / max;
+  return (
+    y >= 18 &&
+    y < 70 &&
+    r < 95 &&
+    r >= g - 2 &&
+    g >= b - 8 &&
+    r - b > 10 &&
+    s > 0.12 &&
+    s < 0.85
+  );
+}
+
 export function ropeHint(data: ImageData): number {
   const buf = data.data;
   let rope = 0;
@@ -59,10 +80,7 @@ export function ropeHint(data: ImageData): number {
     const r = buf[i]!;
     const g = buf[i + 1]!;
     const b = buf[i + 2]!;
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    const s = max === 0 ? 0 : (max - min) / max;
-    if (r > 70 && r > g && g >= b - 8 && s > 0.12 && r - b > 18) rope++;
+    if (isRope(r, g, b) || isDarkFiber(r, g, b) || isDarkJute(r, g, b)) rope++;
     n++;
   }
   return n ? rope / n : 0;
@@ -86,16 +104,14 @@ export function pickBest<T>(
 ): T[] {
   const danger = items.filter((x) => (x.neck ?? 0) > 0.08 || (x.paleness ?? 0) > 0.45);
   const pool = danger.length ? danger : items;
-  return [...pool]
-    .sort((a, b) => {
-      const qa = scoreFrame(a.data);
-      const qb = scoreFrame(b.data);
-      const sa = qa.score + (a.neck ?? 0) * 0.8 + (a.paleness ?? 0) * 0.4;
-      const sb = qb.score + (b.neck ?? 0) * 0.8 + (b.paleness ?? 0) * 0.4;
-      return sb - sa;
+  return pool
+    .map((x) => {
+      const q = scoreFrame(x.data);
+      return { x, s: q.score + (x.neck ?? 0) * 0.8 + (x.paleness ?? 0) * 0.4 };
     })
+    .sort((a, b) => b.s - a.s)
     .slice(0, keep)
-    .map((x) => x.item);
+    .map((row) => row.x.item);
 }
 
 export function enhanceContrast(data: ImageData): ImageData {

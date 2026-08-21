@@ -155,6 +155,9 @@ export async function extractVideoFrames(
     }
     return frames;
   } finally {
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
     URL.revokeObjectURL(url);
   }
 }

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { isCameraDataUrl } from "@/lib/ml/sanitize";
+import { adoptPersistKey } from "./persist";
 
 export type JournalEntry = {
   id: string;
@@ -19,6 +20,8 @@ type JournalState = {
   add: (e: Omit<JournalEntry, "id" | "at">) => string;
   remove: (id: string) => void;
 };
+
+adoptPersistKey("knotty-journal", "musubi-journal");
 
 export const useJournal = create<JournalState>()(
   persist(
@@ -39,7 +42,7 @@ export const useJournal = create<JournalState>()(
         set({ entries: get().entries.filter((x) => x.id !== id) });
       },
     }),
-    { name: "musubi-journal" },
+    { name: "knotty-journal" },
   ),
 );
 

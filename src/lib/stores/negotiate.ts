@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { adoptPersistKey } from "./persist";
 
 export type Rank = "yes" | "maybe" | "no";
 
@@ -57,6 +58,8 @@ type State = {
   add: (label: string) => void;
 };
 
+adoptPersistKey("knotty-negotiate", "musubi-negotiate");
+
 export const useNegotiate = create<State>()(
   persist(
     (set, get) => ({
@@ -72,6 +75,7 @@ export const useNegotiate = create<State>()(
       add: (label) => {
         const clean = label.trim().slice(0, 80);
         if (!clean) return;
+        if (get().items.some((i) => i.label.toLowerCase() === clean.toLowerCase())) return;
         set({
           items: [
             ...get().items,
@@ -81,7 +85,7 @@ export const useNegotiate = create<State>()(
       },
     }),
     {
-      name: "musubi-negotiate",
+      name: "knotty-negotiate",
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<State>;
         const items = Array.isArray(p.items) && p.items.length ? lockItems(p.items as NegItem[]) : current.items;

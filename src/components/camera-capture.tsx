@@ -1,5 +1,5 @@
 import { Camera, Flashlight, ImagePlus, SwitchCamera, Video } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { openRopeCamera, setTorch, startClip, torchAvailable } from "@/lib/camera/stream";
 import { pickBest, scoreFrame, type FrameQuality } from "@/lib/camera/quality";
@@ -26,6 +26,7 @@ export function CameraCapture({
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const clipRef = useRef<{ stop: () => Promise<Blob> } | null>(null);
+  const mountedRef = useRef(true);
   const [live, setLive] = useState(false);
   const [facing, setFacing] = useState<"user" | "environment">("environment");
   const [busy, setBusy] = useState(false);
@@ -36,11 +37,34 @@ export function CameraCapture({
   const [hint, setHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  function stopLive() {
+    const clip = clipRef.current;
+    clipRef.current = null;
+    if (clip) void clip.stop().catch(() => undefined);
+    setRecording(false);
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setLive(false);
+    setTorchOn(false);
+  }
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      stopLive();
+    };
+  }, []);
+
   async function startLive(next: "user" | "environment" = facing) {
     setError(null);
     stopLive();
     try {
       const stream = await openRopeCamera(next);
+      if (!mountedRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
       streamRef.current = stream;
       setHasTorch(torchAvailable(stream));
       if (videoRef.current) {
@@ -52,15 +76,6 @@ export function CameraCapture({
     } catch {
       setError("Camera blocked in this view. Use Photo or Video — those still run the sharpness picker.");
     }
-  }
-
-  function stopLive() {
-    clipRef.current = null;
-    setRecording(false);
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-    setLive(false);
-    setTorchOn(false);
   }
 
   async function emitFromMedia(
@@ -139,6 +154,7 @@ export function CameraCapture({
     setBusy(true);
     try {
       const blob = await handle.stop();
+      if (!mountedRef.current) return;
       await ingestVideo(blob);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not record");

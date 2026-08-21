@@ -18,7 +18,7 @@ export function CoachPanel({
   refusal?: boolean;
   halted?: boolean;
 }) {
-  if (pending) {
+  if (!report && pending) {
     return (
       <div className="rounded-lg border border-border bg-elevated p-4 text-sm text-muted">
         Grok is reading the rope…
@@ -36,6 +36,9 @@ export function CoachPanel({
   const rec = report.final.recommend;
   return (
     <div className="space-y-3 rounded-lg border border-border bg-elevated p-4">
+      {pending && (
+        <p className="text-xs uppercase tracking-wide text-muted">Grok is reading the rope…</p>
+      )}
       <div className="flex items-center justify-between gap-2">
         <Badge variant={rec === "stop" ? "danger" : rec === "adjust" ? "warn" : "ok"}>
           {rec}

@@ -2,21 +2,43 @@ import { speakCoach } from "@/lib/ai/voice";
 import { scrubBannedAnswer, textIsBanned } from "@/lib/ml/audit";
 
 const cache = new Map<string, string>();
+let current: HTMLAudioElement | null = null;
+
+function cacheSet(key: string, url: string) {
+  cache.set(key, url);
+  if (cache.size > 16) {
+    const first = cache.keys().next().value;
+    if (first !== undefined) cache.delete(first);
+  }
+}
+
+function stopPlayback() {
+  if (current) {
+    current.pause();
+    current.removeAttribute("src");
+    current = null;
+  }
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+}
 
 export async function playCoachVoice(text: string) {
   const key = textIsBanned(text) ? scrubBannedAnswer(text) : text.trim();
   if (!key) return;
+  stopPlayback();
   try {
     let url = cache.get(key);
     if (!url) {
       const res = await speakCoach({ data: { text: key } });
       if (res.ok) {
         url = `data:${res.mime};base64,${res.b64}`;
-        cache.set(key, url);
+        cacheSet(key, url);
       }
     }
     if (url) {
       const audio = new Audio(url);
+      current = audio;
       await audio.play();
       return;
     }
@@ -24,7 +46,6 @@ export async function playCoachVoice(text: string) {
     /* fall through */
   }
   if ("speechSynthesis" in window) {
-    window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(key);
     u.rate = 0.95;
     u.pitch = 0.95;
@@ -46,6 +67,8 @@ export function listenForWords(
   rec.interimResults = false;
   rec.lang = "en-US";
   const last = new Map<string, number>();
+  let dead = false;
+  let fails = 0;
   rec.onresult = (ev: unknown) => {
     const e = ev as {
       resultIndex: number;
@@ -65,13 +88,26 @@ export function listenForWords(
       }
     }
   };
-  rec.onerror = () => undefined;
+  rec.onerror = (ev: unknown) => {
+    const err = (ev as { error?: string }).error;
+    if (err === "not-allowed" || err === "service-not-allowed") dead = true;
+  };
+  rec.onend = () => {
+    if (dead) return;
+    if (fails > 6) return;
+    try {
+      rec.start();
+    } catch {
+      fails++;
+    }
+  };
   try {
     rec.start();
   } catch {
     /* already started */
   }
   return () => {
+    dead = true;
     try {
       rec.stop();
     } catch {
@@ -86,6 +122,7 @@ type Rec = {
   lang: string;
   onresult: ((ev: unknown) => void) | null;
   onerror: ((ev: unknown) => void) | null;
+  onend: (() => void) | null;
   start: () => void;
   stop: () => void;
 };

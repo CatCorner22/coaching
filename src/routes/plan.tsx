@@ -53,6 +53,9 @@ function PlanPage() {
           );
         })}
       </ol>
+      {slugs.length === 0 && (
+        <p className="mt-8 text-sm text-muted">Nothing queued. Load a sequence or add a single tie.</p>
+      )}
       <p className="mt-3 text-xs text-subtle">Budget about {minutes} minutes, plus aftercare.</p>
       <select
         className="mt-6 h-11 w-full rounded-md border border-border bg-elevated px-3 text-sm"

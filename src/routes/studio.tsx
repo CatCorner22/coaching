@@ -31,7 +31,6 @@ export const Route = createFileRoute("/studio")({
 function StudioPage() {
   const search = Route.useSearch();
   const settings = useSettings();
-  const session = useSession();
   const nerveHits = useJournal((j) => j.nerveHits);
   const addEntry = useJournal((j) => j.add);
   const items = useNegotiate((s) => s.items);
@@ -44,21 +43,29 @@ function StudioPage() {
   const [refusal, setRefusal] = useState(false);
   const [saved, setSaved] = useState(false);
   const [question, setQuestion] = useState("");
-  const tie = getTie(session.tieSlug ?? "");
-
-  useEffect(() => {
-    if (search.tie) session.setTie(search.tie);
-    if (!session.startedAt) session.start();
-    const id = window.setInterval(() => session.tick(Date.now()), 1000);
-    return () => window.clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search.tie]);
+  const reportRef = useRef<CoachReport | null>(null);
+  const captureKeyRef = useRef<CaptureResult | null>(null);
 
   const stopSession = useSession((s) => s.stop);
   const setStep = useSession((s) => s.setStep);
   const checked = useSession((s) => s.checked);
+  const setTie = useSession((s) => s.setTie);
+  const setFurniture = useSession((s) => s.setFurniture);
+  const start = useSession((s) => s.start);
+  const reset = useSession((s) => s.reset);
+  const stopped = useSession((s) => s.stopped);
+  const stepIndex = useSession((s) => s.stepIndex);
+  const tieSlug = useSession((s) => s.tieSlug);
+  const furnitureSlug = useSession((s) => s.furnitureSlug);
+  const tie = getTie(tieSlug ?? "");
+
+  useEffect(() => {
+    if (search.tie) setTie(search.tie);
+    if (!useSession.getState().startedAt) start();
+    useSession.getState().tick(Date.now());
+  }, [search.tie, setTie, start]);
+
   const analyzeRef = useRef<() => void>(() => undefined);
-  const nagged = useRef(false);
 
   useEffect(() => {
     if (!settings.listen) return;
@@ -100,39 +107,42 @@ function StudioPage() {
 
   useEffect(() => {
     setSaved(false);
+    setRefusal(false);
   }, [capture]);
+
   const det = useMemo(() => {
     if (!capture) return null;
     return buildDeterministic(capture.observations, baseline);
   }, [capture, baseline]);
 
-  const stopped = useSession((s) => s.stopped);
-  const stepIndex = useSession((s) => s.stepIndex);
-  const tieSlug = useSession((s) => s.tieSlug);
-  const furnitureSlug = useSession((s) => s.furnitureSlug);
-  const elapsed = useSession((s) => s.elapsed);
-  const lastCheckAt = useSession((s) => s.lastCheckAt);
+  function commitReport(next: CoachReport | null) {
+    reportRef.current = next;
+    setReport(next);
+  }
 
   useEffect(() => {
     if (!det || !capture) return;
     if (useSession.getState().stopped) return;
+    const llm = captureKeyRef.current === capture ? (reportRef.current?.llm ?? null) : null;
+    captureKeyRef.current = capture;
     const next = fuseCoach({
       det,
       frames: capture.observations,
-      llm: null,
+      llm,
       tie,
       stepIndex,
       elapsedSec: useSession.getState().elapsed,
       priorNerveHits: nerveHits,
       hardNos: hardNos.map((n) => n.label),
     });
-    setReport(next);
+    commitReport(next);
     if (next.final.recommend === "stop") stopSession("coach");
   }, [det, capture, tie, stepIndex, nerveHits, hardNos, stopSession]);
 
   async function runAnalyze() {
     if (!capture || !det) return;
-    if (session.stopped) return;
+    const snap = useSession.getState();
+    if (snap.stopped) return;
     setPending(true);
     setRefusal(false);
     try {
@@ -142,7 +152,7 @@ function StudioPage() {
           deterministic: det,
           tieSlug,
           stepIndex,
-          elapsedSec: elapsed,
+          elapsedSec: snap.elapsed,
           question: question || undefined,
           furnitureSlug,
           hardNos: hardNos.map((n) => n.label),
@@ -156,8 +166,8 @@ function StudioPage() {
       if (res.ok) {
         if (useSession.getState().stopped) return;
         setRefusal(res.refusal);
-        setReport(res.report);
-        if (res.report.final.recommend === "stop") session.stop("coach");
+        commitReport(res.report);
+        if (res.report.final.recommend === "stop") stopSession("coach");
         if (settings.voice) void playCoachVoice(res.report.final.speak);
       }
     } finally {
@@ -171,27 +181,15 @@ function StudioPage() {
   const spoke = useRef<number | null>(null);
   useEffect(() => {
     if (spoke.current === null) {
-      spoke.current = session.stepIndex;
+      spoke.current = stepIndex;
       return;
     }
-    if (spoke.current === session.stepIndex) return;
-    spoke.current = session.stepIndex;
-    if (session.stopped) return;
-    const line = tie?.steps[session.stepIndex]?.speak;
+    if (spoke.current === stepIndex) return;
+    spoke.current = stepIndex;
+    if (useSession.getState().stopped) return;
+    const line = tie?.steps[stepIndex]?.speak;
     if (line && settings.voice) void playCoachVoice(line);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.stepIndex, tie?.slug, settings.voice]);
-
-  const dueCheck =
-    !!lastCheckAt && Date.now() - lastCheckAt > settings.circulationMins * 60 * 1000;
-
-  useEffect(() => {
-    if (dueCheck && settings.voice && !session.stopped && !nagged.current) {
-      nagged.current = true;
-      void playCoachVoice("Circulation check. Color, heat, squeeze.");
-    }
-    if (!dueCheck) nagged.current = false;
-  }, [dueCheck, settings.voice]);
+  }, [stepIndex, tie?.slug, settings.voice, tie]);
 
   async function calibrate(file: File) {
     const imageData = await toImageData(file, 240);
@@ -199,9 +197,17 @@ function StudioPage() {
     if (rgb) setBaseline(rgb);
   }
 
+  function resetStudio() {
+    captureKeyRef.current = null;
+    commitReport(null);
+    setCapture(null);
+    setPrior(null);
+    reset();
+  }
+
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
-      {session.stopped && (
+      {stopped && (
         <div className="mb-6 rounded-lg border border-danger/40 bg-danger/10 p-4">
           <p className="font-display text-3xl text-danger">Stop</p>
           <p className="mt-1 text-sm text-fg">
@@ -209,15 +215,7 @@ function StudioPage() {
             the rest. Aftercare is the scene now.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setCapture(null);
-                setPrior(null);
-                setReport(null);
-                session.reset();
-              }}
-            >
+            <Button variant="outline" onClick={resetStudio}>
               Reset studio
             </Button>
             <Button asChild variant="danger">
@@ -236,11 +234,7 @@ function StudioPage() {
         </div>
         <div className="flex items-center gap-3 text-sm">
           <Badge variant="danger">{settings.safeword}</Badge>
-          <ClockRing
-            elapsed={session.elapsed}
-            limitSec={settings.circulationMins * 60}
-            label="hands"
-          />
+          <SessionClock limitSec={settings.circulationMins * 60} />
         </div>
       </div>
       {hardNos.length > 0 && (
@@ -248,14 +242,7 @@ function StudioPage() {
           Negotiated no: {hardNos.map((n) => n.label).join(" · ")}
         </p>
       )}
-      {dueCheck && (
-        <p className="mt-4 rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-warn">
-          Circulation check is due. Color, heat, refill, squeeze, which finger.{" "}
-          <Link to="/checkin" className="underline">
-            Log it
-          </Link>
-        </p>
-      )}
+      <CirculationBanner minutes={settings.circulationMins} voice={settings.voice} />
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <div>
           <label className="text-xs uppercase tracking-wide text-subtle">Tie</label>
@@ -263,7 +250,7 @@ function StudioPage() {
             className="mt-1 h-11 w-full rounded-md border border-border bg-elevated px-3 text-sm"
             value={tieSlug ?? ""}
             disabled={stopped}
-            onChange={(e) => session.setTie(e.target.value || undefined)}
+            onChange={(e) => setTie(e.target.value || undefined)}
           >
             <option value="">Freeform</option>
             {TIES.map((t) => (
@@ -277,7 +264,7 @@ function StudioPage() {
             className="mt-1 h-11 w-full rounded-md border border-border bg-elevated px-3 text-sm"
             value={furnitureSlug ?? ""}
             disabled={stopped}
-            onChange={(e) => session.setFurniture(e.target.value || undefined)}
+            onChange={(e) => setFurniture(e.target.value || undefined)}
           >
             <option value="">Floor / bed</option>
             {DUNGEON.map((d) => (
@@ -290,15 +277,15 @@ function StudioPage() {
             <div className="mt-3">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm text-muted">
-                  Step {session.stepIndex + 1}/{tie.steps.length}: {tie.steps[session.stepIndex]?.title}
+                  Step {stepIndex + 1}/{tie.steps.length}: {tie.steps[stepIndex]?.title}
                 </p>
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={session.stopped || session.stepIndex === 0}
+                disabled={stopped || stepIndex === 0}
                 onClick={() => {
-                  if (session.stopped) return;
-                  setStep(session.stepIndex - 1);
+                  if (useSession.getState().stopped) return;
+                  setStep(stepIndex - 1);
                 }}
               >
                 Prev
@@ -306,10 +293,10 @@ function StudioPage() {
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={session.stopped || session.stepIndex >= tie.steps.length - 1}
+                disabled={stopped || stepIndex >= tie.steps.length - 1}
                 onClick={() => {
-                  if (session.stopped) return;
-                  setStep(session.stepIndex + 1);
+                  if (useSession.getState().stopped) return;
+                  setStep(stepIndex + 1);
                 }}
               >
                 Next
@@ -317,10 +304,10 @@ function StudioPage() {
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={session.stopped}
+                disabled={stopped}
                 onClick={() => {
-                  if (session.stopped) return;
-                  const line = tie.steps[session.stepIndex]?.speak;
+                  if (useSession.getState().stopped) return;
+                  const line = tie.steps[stepIndex]?.speak;
                   if (line) void playCoachVoice(line);
                 }}
               >
@@ -328,14 +315,14 @@ function StudioPage() {
               </Button>
               </div>
               <p className="mt-2 text-sm leading-relaxed text-fg">
-                {tie.steps[session.stepIndex]?.rigger}
+                {tie.steps[stepIndex]?.rigger}
               </p>
-              <p className="mt-1 text-xs text-muted">Check. {tie.steps[session.stepIndex]?.check}</p>
+              <p className="mt-1 text-xs text-muted">Check. {tie.steps[stepIndex]?.check}</p>
               <div className="mx-auto mt-3 h-64 w-36">
                 <RopeFigure
-                  pose={tie.steps[session.stepIndex]?.expected.pose}
-                  view={tie.steps[session.stepIndex]?.expected.view}
-                  wraps={tie.steps.slice(0, session.stepIndex + 1).flatMap((x) => x.wraps)}
+                  pose={tie.steps[stepIndex]?.expected.pose}
+                  view={tie.steps[stepIndex]?.expected.view}
+                  wraps={tie.steps.slice(0, stepIndex + 1).flatMap((x) => x.wraps)}
                   nerves={tie.nerves}
                   compact
                   className="text-muted"
@@ -344,7 +331,7 @@ function StudioPage() {
               {det && (
                 <p className="text-center text-xs tabular-nums text-subtle">
                   Camera sees {det.wrapCount} wrap{det.wrapCount === 1 ? "" : "s"} · this step wants{" "}
-                  {tie.steps[session.stepIndex]?.expected.wrapBands ?? "—"}
+                  {tie.steps[stepIndex]?.expected.wrapBands ?? "—"}
                 </p>
               )}
             </div>
@@ -379,7 +366,7 @@ function StudioPage() {
             voice={settings.voice}
             pending={pending}
             refusal={refusal}
-            halted={session.stopped}
+            halted={stopped}
           />
           <textarea
             className="h-20 w-full rounded-md border border-border bg-elevated p-3 text-sm"
@@ -388,13 +375,13 @@ function StudioPage() {
             onChange={(e) => setQuestion(e.target.value)}
           />
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => void runAnalyze()} disabled={!capture || pending || session.stopped}>
+            <Button onClick={() => void runAnalyze()} disabled={!capture || pending || stopped}>
               Ask Grok
             </Button>
-            <Button variant="outline" onClick={() => session.checked()}>
+            <Button variant="outline" onClick={() => checked()}>
               Hands checked
             </Button>
-            <Button variant="danger" onClick={() => session.stop("manual")}>
+            <Button variant="danger" onClick={() => stopSession("manual")}>
               {settings.safeword}
             </Button>
           </div>
@@ -417,9 +404,10 @@ function StudioPage() {
             disabled={!report}
             onClick={() => {
               if (!report) return;
+              const snap = useSession.getState();
               const id = addEntry({
-                tieSlug: session.tieSlug,
-                minutes: Math.round(session.elapsed / 60),
+                tieSlug: snap.tieSlug,
+                minutes: Math.round(snap.elapsed / 60),
                 notes: report.final.coaching.slice(0, 280),
                 rating: report.final.recommend === "stop" ? 1 : 4,
                 flags: report.final.flags.map((f) => f.code),
@@ -439,5 +427,35 @@ function StudioPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function SessionClock({ limitSec }: { limitSec: number }) {
+  const elapsed = useSession((s) => s.elapsed);
+  return <ClockRing elapsed={elapsed} limitSec={limitSec} label="hands" />;
+}
+
+function CirculationBanner({ minutes, voice }: { minutes: number; voice: boolean }) {
+  const lastCheckAt = useSession((s) => s.lastCheckAt);
+  const elapsed = useSession((s) => s.elapsed);
+  const stopped = useSession((s) => s.stopped);
+  const nagged = useRef(false);
+  const due = !!lastCheckAt && Date.now() - lastCheckAt > minutes * 60 * 1000;
+  void elapsed;
+  useEffect(() => {
+    if (due && voice && !stopped && !nagged.current) {
+      nagged.current = true;
+      void playCoachVoice("Circulation check. Color, heat, squeeze.");
+    }
+    if (!due) nagged.current = false;
+  }, [due, voice, stopped]);
+  if (!due) return null;
+  return (
+    <p className="mt-4 rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-warn">
+      Circulation check is due. Color, heat, refill, squeeze, which finger.{" "}
+      <Link to="/checkin" className="underline">
+        Log it
+      </Link>
+    </p>
   );
 }
