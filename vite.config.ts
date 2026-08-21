@@ -23,8 +23,8 @@ function hasGlobbedMigrations(root: string): boolean {
 
 /**
  * Finish PGLite bootstrap during dev-server setup (before traffic). Vite awaits
- * async `configureServer` hooks. Production: `src/lib/db` kicks `ensureDbReady`
- * on import.
+ * async `configureServer` hooks. Production stays lazy and requires Postgres
+ * before any server-side database operation; module imports have no DB effects.
  *
  * Vite awaiting the hook puts this on time-to-first-render, so an app with no
  * migrations — no schema to apply — skips it entirely rather than paying for a
@@ -146,6 +146,13 @@ function authPopupPlugin(): Plugin {
 // The dev server starts once `src/router.tsx` and `src/routes/` exist — see
 // AGENTS.md § "First scaffold".
 export default defineConfig(({ command, isPreview }) => ({
+  // This is a security/deployment boundary, not a mutable NODE_ENV convention:
+  // only the live Vite dev server may use preview credentials or embedded DB.
+  define: {
+    __KNOTTY_DEV_SERVER__: JSON.stringify(
+      command === "serve" && isPreview !== true,
+    ),
+  },
   server: {
     host: "0.0.0.0",
     port: 8080,
@@ -171,6 +178,9 @@ export default defineConfig(({ command, isPreview }) => ({
       ? [
           nitro({
             preset: "vercel",
+            // Keep the Vercel function in one server bundle. Splitting this
+            // graph can create a circular namespace chunk that Node rejects.
+            inlineDynamicImports: true,
             // Auto-registers server/middleware/* (the PWA install page +
             // manifest + head-tag middleware). Nitro v3 defaults serverDir to
             // false, so removing this silently unwires /?install=1 on deploys.

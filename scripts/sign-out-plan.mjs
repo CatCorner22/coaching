@@ -135,13 +135,13 @@ export async function runSignOut({
  * Drop any prior session before a new sign-in starts, so switching providers
  * actually switches identity.
  *
- * Deliberately BEST EFFORT — unlike `runSignOut` this never throws. It also
- * runs when there is no prior session at all, so treating a failure as fatal
- * would block first-time sign-in on a transport hiccup, for a visitor with no
- * session to protect. The subsequent OAuth flow issues a fresh session either
- * way. Only the wait is bounded, and by the same per-environment rule as
- * `runSignOut`: a deployed session dies server-side, so it gets the full
- * window rather than the preview's aggressive one.
+ * A deployed session is carried by an HttpOnly cookie. Starting OAuth after a
+ * rejected or timed-out sign-out could silently preserve the old identity, so
+ * deployed preparation is fail closed. Live preview is different: its bearer
+ * in sessionStorage is the usable session credential, so deleting that bearer
+ * completes the local sign-out even when server invalidation is unavailable.
+ * A preview without a bearer has no readable session to invalidate and skips
+ * the request entirely.
  * @param {PreSignInSteps} steps
  * @returns {Promise<void>}
  */
@@ -152,9 +152,59 @@ export async function runPreSignInSignOut({
   clearToken,
   timeoutMs,
 }) {
-  // In the preview a missing bearer means there is nothing to clear.
-  if (hasBearer || !livePreview) {
-    await settleWithin(requestSignOut, timeoutMs ?? signOutTimeoutMs(livePreview));
+  if (livePreview) {
+    // In the preview a missing bearer means there is nothing to invalidate.
+    // With one, server invalidation remains best effort; removing the bearer
+    // itself is the fail-closed local boundary.
+    if (hasBearer) {
+      await settleWithin(
+        requestSignOut,
+        timeoutMs ?? signOutTimeoutMs(livePreview),
+      );
+    }
+    clearToken();
+    return;
+  }
+
+  const outcome = await settleWithin(
+    requestSignOut,
+    timeoutMs ?? signOutTimeoutMs(livePreview),
+  );
+  if (outcome !== "ok") {
+    throw new Error(
+      outcome === "timeout"
+        ? "The prior session sign-out timed out. Sign-in was not started. Please try again."
+        : "The prior session could not be signed out. Sign-in was not started. Please try again.",
+    );
   }
   clearToken();
+}
+
+/**
+ * @typedef {object} PreviewSessionResult
+ * @property {{ user?: { id?: unknown } } | null} [data]
+ * @property {{ message?: string } | null} [error]
+ */
+
+/**
+ * Confirm that a newly stored preview bearer resolves to an identified user.
+ * A rejected request, an error-shaped response, or a session without a user is
+ * fail-closed: the bearer is removed before the error is returned to the UI.
+ *
+ * @param {object} steps
+ * @param {() => Promise<PreviewSessionResult>} steps.requestSession
+ * @param {() => void} steps.clearToken
+ * @returns {Promise<string>} The verified application user id.
+ */
+export async function verifyPreviewSession({ requestSession, clearToken }) {
+  try {
+    const { data, error } = await requestSession();
+    if (error || !data?.user?.id) {
+      throw new Error(error?.message ?? "No authenticated user was returned");
+    }
+    return String(data.user.id);
+  } catch (cause) {
+    clearToken();
+    throw new Error("Preview sign-in could not be verified. Please try again.", { cause });
+  }
 }

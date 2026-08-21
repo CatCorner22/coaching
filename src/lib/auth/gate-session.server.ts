@@ -1,5 +1,9 @@
 import type { BetterAuthPlugin } from "better-auth";
-import { createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
+import {
+  APIError,
+  createAuthMiddleware,
+  getSessionFromCtx,
+} from "better-auth/api";
 import {
   parseSetCookieHeader,
   setRequestCookie,
@@ -163,62 +167,64 @@ export function gateIdentitySessions() {
               console.error(`${LOG} no request headers on /get-session`);
               return;
             }
-            // Bearer auth (live-preview popup) already carries a session — leave it alone.
-            if (inbound.get("authorization")) return;
-            if (!inbound.get(GATE_IDENTITY_HEADER)) return;
+            if (!inbound.has(GATE_IDENTITY_HEADER)) return;
 
             const identity = await gateIdentityFromHeaders(inbound);
             if (!identity) {
               console.error(
                 `${LOG} ${GATE_IDENTITY_HEADER} present but verification failed`,
               );
-              return;
+              throw new APIError("UNAUTHORIZED", {
+                message: "The hosting identity assertion could not be verified.",
+              });
             }
 
-            const sessionCookieName = ctx.context.authCookies.sessionToken.name;
-            const cookieHeader = inbound.get("cookie") ?? "";
-            if (cookieHeader.includes(`${sessionCookieName}=`)) {
-              const existing = await getSessionFromCtx(ctx).catch((err) => {
-                console.error(`${LOG} getSessionFromCtx failed`, err);
-                return null;
-              });
-              if (existing?.session && existing.user) {
-                const accounts = await ctx.context.internalAdapter
-                  .findAccounts(existing.user.id)
-                  .catch((err) => {
-                    console.error(`${LOG} findAccounts failed`, err);
-                    return null;
-                  });
-                if (!accounts) {
-                  console.error(
-                    `${LOG} could not load accounts for existing session user`,
-                    { userId: existing.user.id },
-                  );
-                  return;
-                }
-                if (
-                  sessionBoundToGateIdentity(
-                    accounts,
-                    identity.sub,
-                    GATE_PROVIDER_ID,
-                  )
-                ) {
-                  // Already signed in as this gate identity — nothing to do.
-                  return;
-                }
-                await ctx.context.internalAdapter
-                  .deleteSession(existing.session.token)
-                  .catch((err) => {
-                    console.error(
-                      `${LOG} deleteSession (stale non-gate session) failed`,
-                      err,
-                    );
-                    return null;
-                  });
-              }
-            }
+            // Bearer auth (live-preview popup) already carries a session. Still
+            // validate any present gate assertion first: an attacker or broken
+            // proxy must not be able to smuggle an invalid assertion beside a
+            // valid cookie/bearer and have it silently ignored.
+            if (inbound.get("authorization")) return;
 
             try {
+              const sessionCookieName =
+                ctx.context.authCookies.sessionToken.name;
+              const cookieHeader = inbound.get("cookie") ?? "";
+              if (cookieHeader.includes(`${sessionCookieName}=`)) {
+                // These adapter operations intentionally have no local catch.
+                // If inspection or deletion fails, the outer APIError path
+                // rejects /get-session before handleOAuthUserInfo can mint a
+                // second valid identity alongside the stale session.
+                const existing = await getSessionFromCtx(ctx);
+                if (existing?.session && existing.user) {
+                  const accounts =
+                    await ctx.context.internalAdapter.findAccounts(
+                      existing.user.id,
+                    );
+                  if (!accounts) {
+                    throw new Error(
+                      "The existing session account bindings were unavailable.",
+                    );
+                  }
+                  if (
+                    sessionBoundToGateIdentity(
+                      accounts,
+                      identity.sub,
+                      GATE_PROVIDER_ID,
+                    )
+                  ) {
+                    // Already signed in as this gate identity — nothing to do.
+                    return;
+                  }
+                  await ctx.context.internalAdapter.deleteSession(
+                    existing.session.token,
+                  );
+                } else if (existing) {
+                  throw new Error(
+                    "The existing session response was incomplete.",
+                  );
+                }
+              }
+
               const result = await handleOAuthUserInfo(ctx, {
                 userInfo: {
                   id: identity.sub,
@@ -240,7 +246,9 @@ export function gateIdentitySessions() {
                   hasData: Boolean(result.data),
                   sub: identity.sub,
                 });
-                return;
+                throw new APIError("INTERNAL_SERVER_ERROR", {
+                  message: "The hosting identity session could not be created.",
+                });
               }
 
               // Persist session rows + internal newSession state.
@@ -259,7 +267,9 @@ export function gateIdentitySessions() {
                   `${LOG} session created in DB but cookie was not emitted`,
                   { userId: result.data.user.id },
                 );
-                return;
+                throw new APIError("INTERNAL_SERVER_ERROR", {
+                  message: "The hosting identity session cookie could not be issued.",
+                });
               }
 
               const sessionDataCookie = ctx.context.authCookies.sessionData;
@@ -275,7 +285,11 @@ export function gateIdentitySessions() {
               return { context: { headers } };
             } catch (err) {
               console.error(`${LOG} gate identity session hook threw`, err);
-              return;
+              if (err instanceof APIError) throw err;
+              throw new APIError("INTERNAL_SERVER_ERROR", {
+                message:
+                  "The prior session could not be safely rotated to the hosting identity.",
+              });
             }
           }),
         },

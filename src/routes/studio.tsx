@@ -7,6 +7,8 @@ import { CoachPanel } from "@/components/coach-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { analyzeRope } from "@/lib/ai/analyze";
+import { authEnabled } from "@/lib/auth/client";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { DUNGEON, TIES, getTie } from "@/lib/kb";
 import { fuseCoach } from "@/lib/ml/fuse";
 import type { CoachReport } from "@/lib/ml/types";
@@ -15,6 +17,7 @@ import { useNegotiate } from "@/lib/stores/negotiate";
 import { useSession } from "@/lib/stores/session";
 import { useSettings } from "@/lib/stores/settings";
 import { listenForWords, playCoachVoice, stopCoachVoice } from "@/lib/voice/play";
+import { DIRECT_CHECK_REMINDER } from "@/lib/voice/reviewed-lines";
 import { buildDeterministic } from "@/lib/ml/predict";
 import {
   buildObservationReport,
@@ -63,6 +66,7 @@ function blockedByIds(slug: string | undefined, table: Record<string, string[]>,
 function StudioPage() {
   const search = Route.useSearch();
   const settings = useSettings();
+  const { user: currentUser, isPending: authPending } = useCurrentUserState();
   const nerveHits = useJournal((j) => j.nerveHits);
   const addEntry = useJournal((j) => j.add);
   const items = useNegotiate((s) => s.items);
@@ -245,6 +249,10 @@ function StudioPage() {
 
   async function runAnalyze() {
     if (!capture || !det) return;
+    if (authEnabled && !currentUser) {
+      setAnalysisError("Sign in before sending selected stills to xAI.");
+      return;
+    }
     if (captureContextAtCommitRef.current !== currentContextRef.current) return;
     const sessionSnapshot = useSession.getState();
     if (sessionSnapshot.stopped || mediaBlocked || analysisConsumed || triage !== "none") return;
@@ -287,7 +295,11 @@ function StudioPage() {
         setReport(res.report);
         setObservationReport(res.observationReport);
         setModelStatus(res.modelStatus);
-        if (res.observationReport.urgent_stop || res.observationReport.disposition === "do_not_proceed" || res.selfAudit.hardLimit) {
+        if (
+          res.observationReport.urgent_stop ||
+          res.observationReport.disposition === "do_not_proceed" ||
+          res.selfAudit.hardLimit
+        ) {
           stopSession("observation");
         } else if (settings.voice && !micArmed) {
           void playCoachVoice(res.report.final.speak, settings.voice);
@@ -607,20 +619,31 @@ function StudioPage() {
           />
           {analysisError && <p className="text-sm text-danger" role="alert">{analysisError}</p>}
           <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={() => void runAnalyze()}
-              disabled={
-                !capture ||
-                !captureMatchesContext ||
-                pending ||
-                stopped ||
-                mediaBlocked ||
-                triage !== "none" ||
-                analysisConsumed
-              }
-            >
-              {analysisConsumed ? "Batch already submitted" : "Analyze selected stills once"}
-            </Button>
+            {authEnabled && !currentUser && !authPending ? (
+              <Button asChild>
+                <Link to="/login">Sign in to analyze selected stills</Link>
+              </Button>
+            ) : (
+              <Button
+                onClick={() => void runAnalyze()}
+                disabled={
+                  authPending ||
+                  !capture ||
+                  !captureMatchesContext ||
+                  pending ||
+                  stopped ||
+                  mediaBlocked ||
+                  triage !== "none" ||
+                  analysisConsumed
+                }
+              >
+                {authPending
+                  ? "Checking sign-in…"
+                  : analysisConsumed
+                    ? "Batch already submitted"
+                    : "Analyze selected stills once"}
+              </Button>
+            )}
             <Button asChild variant="outline">
               <Link to="/checkin">Open direct check-in</Link>
             </Button>
@@ -689,7 +712,7 @@ function CirculationBanner({
     if (due && voice && !micArmed && !stopped && !nagged.current) {
       nagged.current = true;
       void playCoachVoice(
-        "Direct-check reminder. Ask about comfort, sensation, motion, and change. Release for concern.",
+        DIRECT_CHECK_REMINDER,
         voice,
       );
     }

@@ -1,7 +1,6 @@
 {
   "name": "app-builder-workspace",
   "private": true,
-  "sideEffects": false,
   "type": "module",
   "engines": {
     "node": ">=22 <23"
@@ -17,10 +16,12 @@
     "preview": "node scripts/with-app-env.mjs vite preview",
     "typecheck": "tsc --noEmit",
     "check:auth": "node scripts/check-auth-invariant.mjs",
-    "test:core": "node --test scripts/ai-boundary.test.mjs scripts/camera-media.test.mjs scripts/check-auth-invariant.test.mjs scripts/integration-contracts.test.mjs scripts/media-replay.test.mjs scripts/observation-report.test.mjs scripts/privacy-emergency.test.mjs scripts/rate-limit.test.mjs scripts/safety-copy.test.mjs scripts/server-boundary.test.mjs scripts/with-app-env.test.mjs && node --experimental-strip-types --import ./scripts/register-ts.mjs --test src/lib/ml/adversarial.test.ts src/lib/ml/signal.test.ts src/lib/kb/kb.test.ts src/lib/camera/quality.test.ts",
+    "test:scripts": "node --test scripts/ai-boundary.test.mjs scripts/brand-check.test.mjs scripts/browser-smoke-verdict.test.mjs scripts/camera-media.test.mjs scripts/check-auth-invariant.test.mjs scripts/integration-contracts.test.mjs scripts/media-replay.test.mjs scripts/migrate.test.mjs scripts/migration-plan.test.mjs scripts/observation-report.test.mjs scripts/privacy-emergency.test.mjs scripts/rate-limit.test.mjs scripts/safety-copy.test.mjs scripts/server-boundary.test.mjs scripts/sign-out-plan.test.mjs scripts/with-app-env.test.mjs",
+    "test:typed-core": "node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/auth/config.test.ts src/lib/auth/gate-identity.test.ts && node --experimental-strip-types --import ./scripts/register-ts.mjs --test src/lib/runtime-mode.test.ts src/lib/ml/adversarial.test.ts src/lib/ml/signal.test.ts src/lib/kb/kb.test.ts src/lib/camera/quality.test.ts src/lib/voice/reviewed.test.ts",
+    "test:core": "npm run test:scripts && npm run test:typed-core",
     "test:stores": "node --experimental-strip-types --import ./scripts/register-ts.mjs --test src/lib/stores/session.test.ts src/lib/stores/planner.test.ts src/lib/stores/settings-migration.test.ts",
-    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/auth/gate-identity.test.ts && node --experimental-strip-types --import ./scripts/register-ts.mjs --test src/lib/ml/adversarial.test.ts src/lib/ml/signal.test.ts src/lib/kb/kb.test.ts src/lib/stores/session.test.ts src/lib/stores/planner.test.ts src/lib/stores/settings-migration.test.ts src/lib/camera/quality.test.ts",
-    "lint": "eslint .",
+    "test": "npm run test:core && npm run test:stores",
+    "lint": "eslint . --max-warnings=0",
     "format": "prettier --write ."
   },
   "dependencies": {

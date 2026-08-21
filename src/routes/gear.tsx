@@ -13,7 +13,7 @@ function GearPage() {
       </p>
       <ul className="mt-8 space-y-3">
         {GEAR.map((g) => (
-          <li key={g.slug} className="rounded-lg border border-border bg-surface p-4">
+          <li id={g.slug} key={g.slug} className="scroll-mt-4 rounded-lg border border-border bg-surface p-4">
             <p className="text-[11px] uppercase tracking-wide text-subtle">{g.kind}</p>
             <h2 className="font-display text-2xl">{g.name}</h2>
             <p className="mt-2 text-sm text-muted">{g.summary}</p>

@@ -3,6 +3,8 @@ import { BookOpen, Camera, House, Library, Shield } from "lucide-react";
 import { useEffect } from "react";
 import { ConsentGate } from "@/components/consent-gate";
 import { subscribeToLocalDataErase } from "@/lib/privacy/local-data";
+import { authEnabled } from "@/lib/auth/client";
+import { SignedIn, SignedOut, UserButton } from "@/lib/auth/gates";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -76,6 +78,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
           </nav>
+          {authEnabled && (
+            <div className="mb-4 border-t border-border px-3 pt-4">
+              <SignedOut>
+                <Link to="/login" className="text-sm text-muted underline-offset-4 hover:underline">
+                  Sign in for cloud analysis
+                </Link>
+              </SignedOut>
+              <SignedIn>
+                <UserButton />
+              </SignedIn>
+            </div>
+          )}
           <p className="px-3 text-[11px] leading-relaxed text-subtle">
             Local notes are unencrypted. Analyze uses cloud services. Shears before rope.
           </p>
@@ -85,9 +99,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Link to="/" className="font-display text-2xl leading-none">
               Knotty
             </Link>
-            <Link to="/studio" className="text-xs uppercase tracking-[0.18em] text-muted">
-              Studio
-            </Link>
+            <div className="flex items-center gap-3">
+              {authEnabled && (
+                <>
+                  <SignedOut>
+                    <Link to="/login" className="text-xs uppercase tracking-[0.18em] text-muted">
+                      Sign in
+                    </Link>
+                  </SignedOut>
+                  <SignedIn>
+                    <UserButton compact />
+                  </SignedIn>
+                </>
+              )}
+              <Link to="/studio" className="text-xs uppercase tracking-[0.18em] text-muted">
+                Studio
+              </Link>
+            </div>
           </header>
           <main className="pb-24 md:pb-10">{children}</main>
         </div>

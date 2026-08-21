@@ -1,4 +1,4 @@
-export const EMERGENCY_NUMBER_KEY = "knotty-emergency-number";
+const LEGACY_EMERGENCY_NUMBER_KEY = "knotty-emergency-number";
 
 export const LOCAL_DATA_KEYS = [
   "knotty-settings",
@@ -11,7 +11,7 @@ export const LOCAL_DATA_KEYS = [
   "musubi-journal",
   "knotty-kit",
   "knotty-checkin",
-  EMERGENCY_NUMBER_KEY,
+  LEGACY_EMERGENCY_NUMBER_KEY,
 ] as const;
 
 const ERASE_SIGNAL_KEY = "knotty-local-data-erase-signal";
@@ -20,54 +20,42 @@ const LEGACY_PHOTO_DB = "musubi-photos";
 const LEGACY_PURGE_ATTEMPTS = 2;
 const LEGACY_PURGE_TIMEOUT_MS = 1_500;
 
+/**
+ * Deliberately NOT part of `LOCAL_DATA_KEYS`: it records which authenticated
+ * subject the now-empty origin storage is bound to. Keeping it across an erase
+ * lets the auth boundary detect an automatic hosting-gate account swap before
+ * any app children can render data hydrated for the previous subject.
+ */
+export const ACCOUNT_MARKER_KEY = "knotty-account-marker-v1";
+
+/** A collision-free, synchronous marker so render-time checks cannot flash. */
+export function accountMarkerFor(userId: string | null): string {
+  return JSON.stringify(userId === null ? [1, "signed-out"] : [1, "account", userId]);
+}
+
+/** Read the durable account binding. Storage failures intentionally throw. */
+export function readAccountMarker(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(ACCOUNT_MARKER_KEY);
+}
+
+/** Write and read back the binding so a silent/no-op storage shim fails closed. */
+export function writeAccountMarker(marker: string): void {
+  if (typeof window === "undefined") {
+    throw new Error("Browser storage is unavailable.");
+  }
+  window.localStorage.setItem(ACCOUNT_MARKER_KEY, marker);
+  if (window.localStorage.getItem(ACCOUNT_MARKER_KEY) !== marker) {
+    throw new Error("The account data boundary could not be persisted.");
+  }
+}
+
 export type LocalEraseResult = {
   browserStorageCleared: boolean;
-  memoryCacheCleared: boolean;
+  voiceCacheCleared: boolean;
   legacyStills: "deleted_or_absent" | "not_confirmed";
   warnings: string[];
 };
-
-/**
- * Normalize a user-supplied emergency-services number without guessing it from
- * browser locale. Spaces and common visual separators are removed; arbitrary
- * dial strings and extensions are rejected.
- */
-export function normalizeEmergencyNumber(value: string): string | null {
-  const trimmed = String(value ?? "").trim();
-  if (!trimmed) return null;
-  const compact = trimmed.replace(/[\s().-]/g, "");
-  return /^\+?[0-9]{2,15}$/.test(compact) ? compact : null;
-}
-
-export function readEmergencyNumber(): string {
-  if (typeof window === "undefined") return "";
-  try {
-    return normalizeEmergencyNumber(window.localStorage.getItem(EMERGENCY_NUMBER_KEY) ?? "") ?? "";
-  } catch {
-    return "";
-  }
-}
-
-/** Save a verified number in this browser profile. An empty value removes it. */
-export function saveEmergencyNumber(value: string): string {
-  if (typeof window === "undefined") throw new Error("Browser storage is unavailable.");
-  const trimmed = value.trim();
-  if (!trimmed) {
-    window.localStorage.removeItem(EMERGENCY_NUMBER_KEY);
-    return "";
-  }
-  const normalized = normalizeEmergencyNumber(trimmed);
-  if (!normalized) {
-    throw new Error("Enter 2–15 digits, optionally starting with +. Verify the number locally.");
-  }
-  window.localStorage.setItem(EMERGENCY_NUMBER_KEY, normalized);
-  return normalized;
-}
-
-export function emergencyNumberHref(value: string): string | null {
-  const normalized = normalizeEmergencyNumber(value);
-  return normalized ? `tel:${normalized}` : null;
-}
 
 /**
  * Reload this tab when another Knotty tab erases data. Reloading drops
@@ -106,34 +94,28 @@ export function subscribeToLocalDataErase(onErase: () => void): () => void {
  * cannot remove authentication cookies, downloaded exports, device backups,
  * browser/provider logs, or requests already transmitted to cloud services.
  */
-export async function eraseAllLocalData(): Promise<LocalEraseResult> {
+export async function eraseAllLocalData(
+  options: { broadcastToCurrentContext?: boolean } = {},
+): Promise<LocalEraseResult> {
   if (typeof window === "undefined") {
     return {
       browserStorageCleared: false,
-      memoryCacheCleared: false,
+      voiceCacheCleared: false,
       legacyStills: "not_confirmed",
       warnings: ["Browser storage is unavailable."],
     };
   }
 
   const warnings: string[] = [];
-  let browserStorageCleared = true;
-  for (const key of LOCAL_DATA_KEYS) {
-    try {
-      window.localStorage.removeItem(key);
-    } catch {
-      browserStorageCleared = false;
-    }
-  }
-  if (!browserStorageCleared) warnings.push("Some browser storage could not be removed.");
+  let browserStorageCleared = clearAndVerifyBrowserStorage();
 
-  publishEraseSignal();
+  publishEraseSignal(options.broadcastToCurrentContext !== false);
 
-  let memoryCacheCleared = false;
+  let voiceCacheCleared = false;
   try {
     const { clearCoachVoiceCache } = await import("@/lib/voice/play");
     clearCoachVoiceCache();
-    memoryCacheCleared = true;
+    voiceCacheCleared = true;
   } catch {
     warnings.push("The in-memory voice cache could not be confirmed cleared; reload this tab.");
   }
@@ -143,10 +125,29 @@ export async function eraseAllLocalData(): Promise<LocalEraseResult> {
     warnings.push("Legacy photo storage could not be confirmed deleted. Close other Knotty tabs and erase again.");
   }
 
-  return { browserStorageCleared, memoryCacheCleared, legacyStills, warnings };
+  // IndexedDB retries and the dynamic cache import create await points. Make a
+  // final removal/verification pass in case a store that was hydrated before
+  // the auth gate wrote its stale snapshot back while those operations ran.
+  browserStorageCleared = clearAndVerifyBrowserStorage() && browserStorageCleared;
+  if (!browserStorageCleared) warnings.push("Some browser storage could not be removed.");
+
+  return { browserStorageCleared, voiceCacheCleared, legacyStills, warnings };
 }
 
-function publishEraseSignal() {
+function clearAndVerifyBrowserStorage(): boolean {
+  let cleared = true;
+  for (const key of LOCAL_DATA_KEYS) {
+    try {
+      window.localStorage.removeItem(key);
+      if (window.localStorage.getItem(key) !== null) cleared = false;
+    } catch {
+      cleared = false;
+    }
+  }
+  return cleared;
+}
+
+function publishEraseSignal(useBroadcastChannel: boolean) {
   const nonce = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   try {
     window.localStorage.setItem(ERASE_SIGNAL_KEY, nonce);
@@ -154,7 +155,7 @@ function publishEraseSignal() {
   } catch {
     /* BroadcastChannel remains as a fallback when storage is unavailable. */
   }
-  if (typeof BroadcastChannel !== "undefined") {
+  if (useBroadcastChannel && typeof BroadcastChannel !== "undefined") {
     try {
       const channel = new BroadcastChannel(ERASE_CHANNEL);
       channel.postMessage(nonce);

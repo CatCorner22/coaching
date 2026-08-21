@@ -60,6 +60,8 @@ if (baselineRequested) {
 }
 
 const timeoutMs = Number(process.env.BROWSER_SMOKE_TIMEOUT_MS || 45000);
+const APP_LOADING_TEXT = "Loading your consent on this device…";
+const APP_READY_TIMEOUT_MS = 10_000;
 
 const VIEWPORTS = [
   { name: "desktop", width: 1280, height: 800, screenshot: outPng },
@@ -109,7 +111,16 @@ try {
     // networkidle never settles and would burn the whole timeout.
     const resp = await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
     const status = resp?.status() ?? 0;
-    await page.waitForTimeout(1000);
+    // Do not accept a successful navigation while the first client render is
+    // still the SSR hydration placeholder. The old fixed delay captured the
+    // loading shell on desktop and the ready app on mobile in the same run.
+    // `hidden` also resolves when a previously-consented device never renders
+    // this placeholder.
+    await page.getByText(APP_LOADING_TEXT, { exact: true }).waitFor({
+      state: "hidden",
+      timeout: APP_READY_TIMEOUT_MS,
+    });
+    await page.waitForTimeout(250);
 
     const title = await page.title();
     const hasCanvas = (await page.locator("canvas").count()) > 0;

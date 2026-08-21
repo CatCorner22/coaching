@@ -17,9 +17,10 @@ const files = Object.fromEntries(
 test("emergency call action never assumes a US emergency number", () => {
   const copy = `${files["src/routes/emergency.tsx"]}\n${files["src/routes/settings.tsx"]}`;
   assert.doesNotMatch(copy, /tel:911|call 911/i);
-  assert.match(copy, /does not infer your location|will not\s+guess from browser language or location/i);
-  assert.match(copy, /emergencyNumberHref\(emergencyNumber\)/);
+  assert.match(copy, /will not guess a number from browser language or location/i);
   assert.match(copy, /Call your local emergency-services number now/i);
+  assert.doesNotMatch(files["src/routes/emergency.tsx"], /local-data|localStorage|useEffect|tel:/);
+  assert.match(files["src/routes/emergency.tsx"], /deliberately reads no saved account\s+data/i);
 });
 
 test("privacy copy distinguishes browser, app-server, provider, and unerased data", () => {
@@ -38,30 +39,66 @@ test("local erase signals other tabs and treats blocked legacy deletion as a war
   assert.match(files["src/components/app-shell.tsx"], /subscribeToLocalDataErase\(\(\) => window\.location\.reload\(\)\)/);
   assert.match(source, /LEGACY_PURGE_ATTEMPTS = 2/);
   assert.match(source, /legacyStills: "deleted_or_absent" \| "not_confirmed"/);
-  assert.match(source, /EMERGENCY_NUMBER_KEY/);
+  assert.match(source, /LEGACY_EMERGENCY_NUMBER_KEY/);
   for (const key of ["knotty-settings", "knotty-negotiate", "knotty-plan", "knotty-journal"]) {
     assert.match(source, new RegExp(`"${key}"`), `${key} must be included in all-data erase`);
   }
 });
 
-test("emergency number normalizer rejects arbitrary dial strings", async () => {
-  const { emergencyNumberHref, normalizeEmergencyNumber } = await import("../src/lib/privacy/local-data.ts");
-  assert.equal(normalizeEmergencyNumber(" 112 "), "112");
-  assert.equal(normalizeEmergencyNumber("+1 (202) 555-0100"), "+12025550100");
-  assert.equal(normalizeEmergencyNumber("911,123"), null);
-  assert.equal(normalizeEmergencyNumber("call police"), null);
-  assert.equal(normalizeEmergencyNumber("+"), null);
-  assert.equal(emergencyNumberHref("999"), "tel:999");
-  assert.equal(emergencyNumberHref(""), null);
+test("settings erase owns its reload and discloses the retained account marker", () => {
+  const settings = files["src/routes/settings.tsx"];
+  assert.match(settings, /eraseAllLocalData\(\{ broadcastToCurrentContext: false \}\)/);
+  assert.match(settings, /if \(erasing\)/);
+  assert.match(settings, /setErasing\(true\)/);
+  assert.doesNotMatch(settings, /setTimeout\(\(\) => window\.location\.reload/);
+  assert.match(settings, /Reload immediately; do not leave hydrated persisted/);
+  assert.match(settings, /minimal account-ID\s+marker/);
+  assert.match(settings, /marker contains no notes,\s+captures, plans, or journal text/);
+  assert.doesNotMatch(settings, />\s*Erase all Knotty local data/);
 });
 
-test("emergency number storage and cross-tab erase notification are bounded", async () => {
+test("durable account markers distinguish signed-out and every account", async () => {
   const {
-    EMERGENCY_NUMBER_KEY,
-    readEmergencyNumber,
-    saveEmergencyNumber,
-    subscribeToLocalDataErase,
+    ACCOUNT_MARKER_KEY,
+    accountMarkerFor,
+    readAccountMarker,
+    writeAccountMarker,
   } = await import("../src/lib/privacy/local-data.ts");
+  const previousWindow = globalThis.window;
+  const storage = new Map();
+  globalThis.window = {
+    localStorage: {
+      getItem: (key) => storage.get(key) ?? null,
+      setItem: (key, value) => storage.set(key, value),
+      removeItem: (key) => storage.delete(key),
+    },
+  };
+
+  try {
+    const signedOut = accountMarkerFor(null);
+    const accountA = accountMarkerFor("account-a");
+    const accountB = accountMarkerFor("account-b");
+    assert.notEqual(signedOut, accountA);
+    assert.notEqual(accountA, accountB);
+    writeAccountMarker(accountA);
+    assert.equal(storage.get(ACCOUNT_MARKER_KEY), accountA);
+    assert.equal(readAccountMarker(), accountA);
+
+    globalThis.window.localStorage.setItem = () => undefined;
+    storage.delete(ACCOUNT_MARKER_KEY);
+    assert.throws(
+      () => writeAccountMarker(accountB),
+      /boundary could not be persisted/i,
+      "a silent storage no-op must block the account transition",
+    );
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+});
+
+test("cross-tab erase notification is bounded", async () => {
+  const { subscribeToLocalDataErase } = await import("../src/lib/privacy/local-data.ts");
   const previousWindow = globalThis.window;
   const previousBroadcastChannel = globalThis.BroadcastChannel;
   const storage = new Map();
@@ -89,10 +126,6 @@ test("emergency number storage and cross-tab erase notification are bounded", as
   };
 
   try {
-    assert.equal(saveEmergencyNumber("(112)"), "112");
-    assert.equal(storage.get(EMERGENCY_NUMBER_KEY), "112");
-    assert.equal(readEmergencyNumber(), "112");
-
     let reloads = 0;
     const unsubscribe = subscribeToLocalDataErase(() => {
       reloads += 1;
@@ -112,11 +145,15 @@ test("emergency number storage and cross-tab erase notification are bounded", as
 });
 
 test("all-data erase can complete after a legacy IndexedDB blocked event", async () => {
-  const { eraseAllLocalData, LOCAL_DATA_KEYS } = await import("../src/lib/privacy/local-data.ts");
+  const { ACCOUNT_MARKER_KEY, accountMarkerFor, eraseAllLocalData, LOCAL_DATA_KEYS } = await import(
+    "../src/lib/privacy/local-data.ts"
+  );
   const previousWindow = globalThis.window;
   const previousIndexedDB = globalThis.indexedDB;
   const previousBroadcastChannel = globalThis.BroadcastChannel;
   const storage = new Map(LOCAL_DATA_KEYS.map((key) => [key, "persisted"]));
+  const marker = accountMarkerFor("account-a");
+  storage.set(ACCOUNT_MARKER_KEY, marker);
   globalThis.window = {
     localStorage: {
       getItem: (key) => storage.get(key) ?? null,
@@ -134,6 +171,7 @@ test("all-data erase can complete after a legacy IndexedDB blocked event", async
     deleteDatabase() {
       const request = {};
       setTimeout(() => request.onblocked?.(), 0);
+      setTimeout(() => storage.set(LOCAL_DATA_KEYS[0], "late-stale-write"), 2);
       setTimeout(() => request.onsuccess?.(), 5);
       return request;
     },
@@ -144,6 +182,42 @@ test("all-data erase can complete after a legacy IndexedDB blocked event", async
     assert.equal(result.browserStorageCleared, true);
     assert.equal(result.legacyStills, "deleted_or_absent");
     for (const key of LOCAL_DATA_KEYS) assert.equal(storage.has(key), false);
+    assert.equal(storage.get(ACCOUNT_MARKER_KEY), marker, "erase must preserve the boundary marker");
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+    if (previousIndexedDB === undefined) delete globalThis.indexedDB;
+    else globalThis.indexedDB = previousIndexedDB;
+    if (previousBroadcastChannel === undefined) delete globalThis.BroadcastChannel;
+    else globalThis.BroadcastChannel = previousBroadcastChannel;
+  }
+});
+
+test("all-data erase detects a storage implementation that silently keeps data", async () => {
+  const { eraseAllLocalData, LOCAL_DATA_KEYS } = await import("../src/lib/privacy/local-data.ts");
+  const previousWindow = globalThis.window;
+  const previousIndexedDB = globalThis.indexedDB;
+  const previousBroadcastChannel = globalThis.BroadcastChannel;
+  const storage = new Map(LOCAL_DATA_KEYS.map((key) => [key, "persisted"]));
+  globalThis.window = {
+    localStorage: {
+      getItem: (key) => storage.get(key) ?? null,
+      setItem: (key, value) => storage.set(key, value),
+      removeItem: () => undefined,
+    },
+    setTimeout,
+    clearTimeout,
+  };
+  globalThis.indexedDB = undefined;
+  globalThis.BroadcastChannel = class {
+    postMessage() {}
+    close() {}
+  };
+
+  try {
+    const result = await eraseAllLocalData();
+    assert.equal(result.browserStorageCleared, false);
+    assert.match(result.warnings.join(" "), /could not be removed/i);
   } finally {
     if (previousWindow === undefined) delete globalThis.window;
     else globalThis.window = previousWindow;

@@ -17,6 +17,18 @@ const consent = {
 };
 const quality = { sharpness: 0.8, exposure: 0.8, score: 0.8 };
 
+test("technical media usability does not depend on a rope-content ranking score", () => {
+  const report = buildObservationReport({
+    mediaMode: "static_photos",
+    consent,
+    matches: [{ frame_id: "F01", canonical_id: "first_aid_or_emergency_equipment_visible" }],
+    allowedFrameIds: ["F01"],
+    quality: { sharpness: 0.8, exposure: 0.8, score: 0.1 },
+  });
+  assert.equal(report.media_quality.usable_for_requested_conclusion, true);
+  assert.equal(validateObservationReport(report).success, true);
+});
+
 function reportFor(canonicalId, modelStatus = "completed") {
   const transition = canonicalId === "transition_across_frames_possible";
   return buildObservationReport({
@@ -46,6 +58,7 @@ test("every canonical category is emitted at or above its fixed consequence floo
     C4_stop_or_decline: 4,
   };
   for (const canonicalId of CANONICAL_IDS) {
+    if (canonicalId === "transition_across_frames_possible") continue;
     const report = reportFor(canonicalId);
     assert.equal(report.recognized_categories[0].canonical_id, canonicalId);
     assert.ok(
@@ -102,20 +115,19 @@ test("model failure fails closed as insufficient view and never as clearance", (
   assert.notEqual(report.next_step_id, "no_action_from_image");
 });
 
-test("procedural self-audit cannot wipe a neck category", () => {
+test("prohibited remote inference keeps high-consequence categories and halts", () => {
   const admitted = admitRemoteCategories(
     [
       { frame_id: "F01", canonical_id: "rope_restraint_unspecified" },
-      { frame_id: "F01", canonical_id: "neck_or_airway_overlap_possible" },
+      { frame_id: "F99", canonical_id: "neck_or_airway_overlap_possible" },
     ],
     ["F01"],
     { nonvisual_inference: false, exact_identification: false, procedural_content: true },
   );
   assert.equal(admitted.hardLimit, true);
-  assert.deepEqual(
-    admitted.matches.map((match) => match.canonical_id),
-    ["neck_or_airway_overlap_possible"],
-  );
+  assert.deepEqual(admitted.matches, [
+    { frame_id: "F01", canonical_id: "neck_or_airway_overlap_possible" },
+  ]);
   const report = buildObservationReport({
     mediaMode: "static_photos",
     consent,
@@ -130,18 +142,7 @@ test("procedural self-audit cannot wipe a neck category", () => {
   assert.equal(report.next_step_id, "stop_now");
 });
 
-test("C4 with a junk frame id is rebound instead of dropped", () => {
-  const admitted = admitRemoteCategories(
-    [{ frame_id: "F99", canonical_id: "neck_or_airway_overlap_possible" }],
-    ["F01"],
-    { nonvisual_inference: false, exact_identification: false, procedural_content: false },
-  );
-  assert.deepEqual(admitted.matches, [
-    { frame_id: "F01", canonical_id: "neck_or_airway_overlap_possible" },
-  ]);
-});
-
-test("procedural self-audit without a high-consequence match refuses continuation", () => {
+test("prohibited remote inference without C3/C4 still refuses continuation", () => {
   const admitted = admitRemoteCategories(
     [{ frame_id: "F01", canonical_id: "rope_restraint_unspecified" }],
     ["F01"],
@@ -156,11 +157,79 @@ test("procedural self-audit without a high-consequence match refuses continuatio
     matches: admitted.matches,
     allowedFrameIds: ["F01"],
     modelStatus: admitted.modelStatus,
-    hardLimit: true,
+    hardLimit: admitted.hardLimit,
   });
   assert.equal(report.disposition, "do_not_proceed");
   assert.equal(report.next_step_id, "do_not_proceed");
   assert.notEqual(report.disposition, "insufficient_view");
+});
+
+test("a hard-limit model failure remains valid on unusable media", () => {
+  const report = buildObservationReport({
+    mediaMode: "selected_video_stills",
+    consent,
+    quality: { sharpness: 0, exposure: 0, score: 0 },
+    matches: [],
+    allowedFrameIds: ["F01"],
+    modelStatus: "failed",
+    hardLimit: true,
+  });
+  assert.equal(report.media_quality.usable_for_requested_conclusion, false);
+  assert.equal(report.disposition, "do_not_proceed");
+  assert.equal(report.next_step_id, "do_not_proceed");
+  assert.match(report.limitations.join(" "), /violated the closed output contract/i);
+  assert.equal(validateObservationReport(report, { allowedFrameIds: ["F01"] }).success, true);
+});
+
+test("unusable media forces insufficient view and every visual observation abstains", () => {
+  const report = buildObservationReport({
+    mediaMode: "selected_video_stills",
+    consent,
+    quality: { sharpness: 0.1, exposure: 0.9, score: 0.7 },
+    matches: [{ frame_id: "F01", canonical_id: "rope_restraint_unspecified" }],
+    allowedFrameIds: ["F01"],
+    modelStatus: "completed",
+  });
+  assert.equal(report.media_quality.usable_for_requested_conclusion, false);
+  assert.equal(report.disposition, "insufficient_view");
+  assert.equal(report.observations[0].confidence, "abstain");
+  assert.equal(report.observations[0].visibility, "obscured");
+  assert.equal(validateObservationReport(report).success, true);
+
+  const falseProceed = clone(report);
+  falseProceed.disposition = "lower_consequence_learning_only";
+  assert.match(validateObservationReport(falseProceed).issues.join(" "), /unusable media/i);
+
+  const falseConfidence = clone(report);
+  falseConfidence.observations[0].confidence = "low";
+  assert.match(validateObservationReport(falseConfidence).issues.join(" "), /must abstain/i);
+});
+
+test("unusable media cannot weaken a C3 or C4 action, but its observations still abstain", () => {
+  const c3 = buildObservationReport({
+    mediaMode: "static_photos",
+    consent,
+    quality: { sharpness: 0, exposure: 0, score: 0 },
+    matches: [{ frame_id: "F01", canonical_id: "partial_load_bearing_possible" }],
+    allowedFrameIds: ["F01"],
+    modelStatus: "completed",
+  });
+  assert.equal(c3.disposition, "do_not_proceed");
+  assert.equal(c3.next_step_id, "qualified_instructor");
+  assert.equal(c3.observations[0].confidence, "abstain");
+
+  const c4 = buildObservationReport({
+    mediaMode: "static_photos",
+    consent,
+    quality: { sharpness: 0, exposure: 0, score: 0 },
+    matches: [{ frame_id: "F01", canonical_id: "neck_or_airway_overlap_possible" }],
+    allowedFrameIds: ["F01"],
+    modelStatus: "completed",
+  });
+  assert.equal(c4.disposition, "stop_now");
+  assert.equal(c4.next_step_id, "stop_now");
+  assert.equal(c4.observations[0].confidence, "abstain");
+  assert.equal(validateObservationReport(c4).success, true);
 });
 
 test("missing per-batch permission refuses media analysis", () => {
@@ -174,6 +243,34 @@ test("missing per-batch permission refuses media analysis", () => {
   assert.equal(report.disposition, "do_not_proceed");
   assert.equal(report.next_step_id, "do_not_proceed");
   assert.equal(report.output_consent_confirmed, false);
+});
+
+test("missing permission never downgrades an already-present C3 or C4 category", () => {
+  const incomplete = { ...consent, upload: false };
+  const c3 = buildObservationReport({
+    mediaMode: "static_photos",
+    consent: incomplete,
+    quality,
+    matches: [{ frame_id: "F01", canonical_id: "partial_load_bearing_possible" }],
+    allowedFrameIds: ["F01"],
+    modelStatus: "completed",
+  });
+  assert.equal(c3.disposition, "do_not_proceed");
+  assert.equal(c3.next_step_id, "qualified_instructor");
+  assert.equal(validateObservationReport(c3, { allowedFrameIds: ["F01"] }).success, true);
+
+  const c4 = buildObservationReport({
+    mediaMode: "static_photos",
+    consent: incomplete,
+    quality,
+    matches: [{ frame_id: "F01", canonical_id: "neck_or_airway_overlap_possible" }],
+    allowedFrameIds: ["F01"],
+    modelStatus: "completed",
+  });
+  assert.equal(c4.urgent_stop, true);
+  assert.equal(c4.disposition, "stop_now");
+  assert.equal(c4.next_step_id, "stop_now");
+  assert.equal(validateObservationReport(c4, { allowedFrameIds: ["F01"] }).success, true);
 });
 
 test("direct symptom and coercion triage outrank image appearance", () => {
@@ -385,17 +482,35 @@ test("validator binds sources, evidence multiplicity, and observations to the su
   );
 });
 
-test("single-frame transitions abstain and no-media non-triage reports build without visual rows", () => {
+test("transitions are suppressed without user-labeled chronology and validator enforces the boundary", () => {
   const transition = buildObservationReport({
     mediaMode: "selected_video_stills",
     consent,
     quality,
-    allowedFrameIds: ["F01"],
-    matches: [{ frame_id: "F01", canonical_id: "transition_across_frames_possible" }],
+    allowedFrameIds: ["F01", "F02"],
+    matches: [
+      { frame_id: "F01", canonical_id: "transition_across_frames_possible" },
+      { frame_id: "F02", canonical_id: "transition_across_frames_possible" },
+    ],
     modelStatus: "completed",
   });
-  assert.equal(transition.recognized_categories[0].canonical_id, "unknown_object");
-  assert.equal(transition.observations[0].confidence, "abstain");
+  assert.equal(
+    transition.recognized_categories.some(
+      (category) => category.canonical_id === "transition_across_frames_possible",
+    ),
+    false,
+  );
+  assert.ok(transition.observations.every((observation) => observation.confidence === "abstain"));
+
+  const forgedTransition = clone(transition);
+  forgedTransition.recognized_categories[0].canonical_id = "transition_across_frames_possible";
+  assert.match(
+    validateObservationReport(forgedTransition).issues.join(" "),
+    /user-labeled chronology/i,
+  );
+});
+
+test("no-media non-triage reports build without visual rows", () => {
 
   const noMedia = buildObservationReport({
     mediaMode: "no_media",

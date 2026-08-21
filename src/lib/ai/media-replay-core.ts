@@ -16,6 +16,103 @@ export class MediaBatchReplayError extends Error {
   }
 }
 
+export class MediaBatchReservationError extends Error {
+  readonly status = 503;
+  readonly code = "MEDIA_BATCH_RESERVATION_UNCERTAIN";
+
+  constructor(message = "The media batch could not be reserved reliably.", options?: ErrorOptions) {
+    super(message, options);
+    this.name = "MediaBatchReservationError";
+  }
+}
+
+export type MediaBatchSql = {
+  query<T = Record<string, unknown>>(text: string, params?: unknown[]): Promise<T[]>;
+};
+
+export type DurableMediaBatchOptions = {
+  subjectHash: string;
+  batchId: string;
+  reservationId: string;
+  ttlMs?: number;
+};
+
+const RESERVE_SQL = `
+insert into media_batch_reservation (
+  subject_hash, batch_id, reservation_id, expires_at
+) values (
+  $1, $2::uuid, $3::uuid, CURRENT_TIMESTAMP + ($4 * interval '1 millisecond')
+)
+on conflict (subject_hash, batch_id) do update
+  set reservation_id = excluded.reservation_id,
+      expires_at = excluded.expires_at,
+      created_at = CURRENT_TIMESTAMP
+  where media_batch_reservation.expires_at <= CURRENT_TIMESTAMP
+returning reservation_id::text as reservation_id
+`;
+
+const RELEASE_SQL = `
+delete from media_batch_reservation
+where subject_hash = $1 and batch_id = $2::uuid and reservation_id = $3::uuid
+`;
+
+const CLEANUP_SQL = `
+delete from media_batch_reservation
+where expires_at <= CURRENT_TIMESTAMP and reservation_id <> $1::uuid
+`;
+
+/**
+ * Atomically reserve a batch in shared storage before charging local quota.
+ * A quota rejection releases only this lease; a failed release is surfaced as
+ * uncertain so the client never retries a possibly consumed batch.
+ */
+export async function consumeDurableMediaBatchOnce(
+  sql: MediaBatchSql,
+  options: DurableMediaBatchOptions,
+  charge: () => void,
+): Promise<void> {
+  const subjectHash = options.subjectHash.trim();
+  const batchId = options.batchId.trim();
+  const reservationId = options.reservationId.trim();
+  const ttlMs = positiveInteger(options.ttlMs ?? 2 * 60 * 60_000, "ttlMs");
+  if (!/^[0-9a-f]{64}$/.test(subjectHash)) throw new Error("subjectHash must be SHA-256 hex");
+  if (!batchId || !reservationId) throw new Error("batchId and reservationId are required");
+
+  let rows: Array<{ reservation_id: string }>;
+  try {
+    rows = await sql.query<{ reservation_id: string }>(RESERVE_SQL, [
+      subjectHash,
+      batchId,
+      reservationId,
+      ttlMs,
+    ]);
+  } catch (cause) {
+    throw new MediaBatchReservationError(
+      "The media batch could not be reserved in shared storage.",
+      { cause },
+    );
+  }
+  if (rows[0]?.reservation_id !== reservationId) throw new MediaBatchReplayError();
+
+  try {
+    charge();
+  } catch (error) {
+    try {
+      await sql.query(RELEASE_SQL, [subjectHash, batchId, reservationId]);
+    } catch (releaseError) {
+      throw new MediaBatchReservationError(
+        "The request quota was rejected, but the media reservation could not be released reliably.",
+        { cause: releaseError },
+      );
+    }
+    throw error;
+  }
+
+  // Keep cleanup separate from the upsert: sibling data-modifying CTEs that
+  // touch the same row have undefined execution order in PostgreSQL.
+  await sql.query(CLEANUP_SQL, [reservationId]).catch(() => undefined);
+}
+
 /**
  * Reserve one media batch and synchronously charge its request budget.
  *

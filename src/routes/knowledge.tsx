@@ -1,43 +1,32 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { askKnowledge } from "@/lib/ai/ask";
-import { ARTICLES, searchKnowledge, type SearchHit } from "@/lib/kb";
+import {
+  ARTICLES,
+  isKnowledgeQueryUsable,
+  knowledgeAnswer,
+  searchKnowledge,
+  type SearchHit,
+} from "@/lib/kb";
 
 export const Route = createFileRoute("/knowledge")({ component: KnowledgePage });
 
 function KnowledgePage() {
   const [q, setQ] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-  const requestGeneration = useRef(0);
-  const hits = useMemo(() => (q.trim().length > 1 ? searchKnowledge(q, 8) : []), [q]);
+  const usableQuery = isKnowledgeQueryUsable(q);
+  const hits = useMemo(() => (usableQuery ? searchKnowledge(q, 8) : []), [q, usableQuery]);
   const sections = [...new Set(ARTICLES.map((a) => a.section))];
 
-  useEffect(() => {
-    requestGeneration.current += 1;
+  function updateQuery(value: string) {
+    setQ(value);
     setAnswer(null);
-    setPending(false);
-  }, [q]);
+  }
 
-  async function ask() {
-    const generation = ++requestGeneration.current;
-    setPending(true);
-    try {
-      const res = await askKnowledge({
-        data: {
-          question: q || "How do we start safely?",
-          slugs: (hits.length ? hits : searchKnowledge(q || "consent", 4)).map((h) => h.slug),
-        },
-      });
-      if (generation === requestGeneration.current) setAnswer(res.text);
-    } catch {
-      if (generation === requestGeneration.current) {
-        setAnswer("Search could not complete. The reviewed entries below remain available without AI or remote analysis.");
-      }
-    } finally {
-      if (generation === requestGeneration.current) setPending(false);
-    }
+  function ask() {
+    const question = q.trim();
+    if (!isKnowledgeQueryUsable(question)) return;
+    setAnswer(knowledgeAnswer(question));
   }
 
   return (
@@ -51,13 +40,19 @@ function KnowledgePage() {
       <div className="mt-6 flex gap-2">
         <input
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => updateQuery(e.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.nativeEvent.isComposing && usableQuery) {
+              ask();
+            }
+          }}
+          maxLength={600}
           placeholder="Radial nerve, aftercare, crotch rope…"
           aria-label="Search the knowledge base"
           className="h-11 flex-1 rounded-md border border-border bg-elevated px-3 text-sm"
         />
-        <Button onClick={() => void ask()} disabled={pending}>
-          {pending ? "Searching…" : "Find entries"}
+        <Button onClick={ask} disabled={!usableQuery}>
+          Find entries
         </Button>
       </div>
       {answer && (
@@ -73,6 +68,12 @@ function KnowledgePage() {
             </li>
           ))}
         </ul>
+      )}
+      {usableQuery && hits.length === 0 && (
+        <p className="mt-4 text-sm text-muted">
+          No reviewed entry matched that wording. Try consent, privacy, aftercare, nerves,
+          equipment, or emergency release.
+        </p>
       )}
       {sections.map((sec) => (
         <section key={sec} className="mt-10">
@@ -131,13 +132,20 @@ function HitLink({ hit }: { hit: SearchHit }) {
   }
   if (hit.kind === "dungeon") {
     return (
-      <Link to="/dungeon" className={className}>
+      <Link to="/dungeon" hash={hit.slug} className={className}>
+        {label}
+      </Link>
+    );
+  }
+  if (hit.kind === "nerve") {
+    return (
+      <Link to="/nerves" search={{ nerve: hit.slug }} className={className}>
         {label}
       </Link>
     );
   }
   return (
-    <Link to="/gear" className={className}>
+    <Link to="/gear" hash={hit.slug} className={className}>
       {label}
     </Link>
   );

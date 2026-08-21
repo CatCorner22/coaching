@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { pickBest, ropeHint, scoreFrame } from "./quality.ts";
+import {
+  pickBest,
+  privacySafeQualityHint,
+  ropeHint,
+  scoreFrame,
+  worstFrameQuality,
+} from "./quality.ts";
 
 function image(
   width: number,
@@ -54,4 +60,32 @@ test("pickBest does not promote an unlocalized pale field over a useful frame", 
     1,
   );
   assert.deepEqual(best, ["useful"]);
+});
+
+test("batch quality keeps the worst independent axis instead of masking a weak frame", () => {
+  const quality = worstFrameQuality([
+    { sharpness: 0.9, exposure: 0.2, ropeHint: 0.8, score: 0.65, notes: ["dark"] },
+    { sharpness: 0.3, exposure: 0.9, ropeHint: 0.4, score: 0.7, notes: ["soft"] },
+  ]);
+  assert.deepEqual(quality, {
+    sharpness: 0.3,
+    exposure: 0.2,
+    ropeHint: 0.4,
+    score: 0.65,
+    notes: ["dark", "soft"],
+  });
+  assert.equal(worstFrameQuality([]).score, 0);
+});
+
+test("quality hints never request a more intimate or identifying view", () => {
+  const hint = privacySafeQualityHint({
+    sharpness: 0.2,
+    exposure: 0.9,
+    ropeHint: 0.9,
+    score: 0.6,
+    notes: [],
+  });
+  assert.match(hint, /equipment-only|clothed/i);
+  assert.match(hint, /non-identifying/i);
+  assert.doesNotMatch(hint, /nudity|intimate view|whole room/i);
 });

@@ -8,8 +8,9 @@ The camera accepts photos or short clips, converts video to user-selected labele
 
 - Per batch: legal-adult attestation; separate clothed/non-explicit, non-secret, non-coerced, and all-people-consented attestations; and separate activity, recording, upload, and output permission.
 - Prefer equipment-only or clothed, non-identifying media; exclude faces, intimate contact, tattoos, screens, mail, and room details.
+- The non-explicit boundary is an operator attestation, not automatic content moderation. The app does not certify or reliably detect nudity; do not select explicit media.
 - Video stays local and is reduced to one to three stills selected by the user.
-- The current page submits a confirmed batch at most once; the running server rejects a repeated batch token on a best-effort, per-instance basis. Already-transmitted data cannot be recalled.
+- The current page submits a confirmed batch at most once. A shared Postgres reservation rejects the same verified-user batch across replicas for two hours, exceeding the one-hour permission window; this is not a permanent global exactly-once guarantee. Already-transmitted data cannot be recalled.
 - C3 categories route to qualified in-person instruction. C4 categories stop or decline. Every other result remains lower-consequence learning only or insufficient view—never clearance.
 - Directly reported symptoms and coercion bypass image analysis and route action first.
 
@@ -20,15 +21,18 @@ The project targets Node 22.
 The supported npm wrappers default standalone development to `VITE_AUTH_ENABLED=false`; production must explicitly set it to `true` and provide the configured identity service. Do not start Vite directly, because that bypasses the shared environment wrapper.
 
 ```sh
-npm install
+npm ci --ignore-scripts
+npm run build
 npm run typecheck
 npm run lint
-npm run test:core
-npm run test:stores
-npm run build
+npm test
 ```
 
 Camera and media behavior still requires real-device checks on current iOS Safari, Android Chrome, desktop Chromium, Firefox, and Safari. Unit tests cannot establish camera permissions, decoder support, MediaRecorder interoperability, accessibility, or safe real-world use.
+
+PGLite is a `npm run dev` convenience only. Production builds, `npm run preview`,
+and `npm run build:dev` do not use an embedded database; configure
+`DATABASE_URL` before exercising any server-side database path in those modes.
 
 ## Deployment requirements
 
@@ -37,8 +41,8 @@ Camera and media behavior still requires real-device checks on current iOS Safar
 - Set provider-level spend/concurrency limits in addition to the per-user, per-instance application limits.
 - Enable real authentication for production AI. Cost-bearing endpoints reject the shared development identity and require a same-origin browser request in production.
 - Confirm the applicable xAI account terms, retention configuration, and availability of Zero Data Retention before accepting personal data. The UI assumes already-transmitted requests cannot be recalled.
-- Generate and commit `package-lock.json` from a trusted network before release, then change CI and local setup to `npm ci`. This reconstruction cannot fetch the registry, so the lockfile remains an explicit release blocker.
-- Validate from a clean provider workspace with its generated `.grok/app-env.json`. The PWA icon exists on GitHub `main` but is absent from this reconstructed local snapshot; preserve it through the final tree. Focused source-owned tests run in CI now, and release remains blocked until the full template/build gates pass with the app-specific site identity.
+- Install from the committed `package-lock.json` with `npm ci --ignore-scripts`. CI uses exact Node 22.23.2 and fails if a production build changes the committed lockfile or generated route tree.
+- Validate from a clean provider workspace with its generated `.grok/app-env.json`. CI runs the app-specific PWA fixture plus production desktop/mobile browser smoke, but provider authentication and camera hardware still require environment testing.
 
 ## Camera release matrix
 

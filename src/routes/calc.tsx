@@ -15,8 +15,7 @@ function CalcPage() {
   const setFours = useKit((s) => s.setFours);
   const have = eights * 8 + fours * 4;
   const [extra, setExtra] = useState<string[]>([]);
-  const slugs = [...plan, ...extra];
-  const result = useMemo(() => metersFor(slugs), [slugs]);
+  const result = useMemo(() => metersFor([...plan, ...extra]), [plan, extra]);
   const catalog = catalogLengths();
   return (
     <div className="mx-auto max-w-xl px-5 py-10">

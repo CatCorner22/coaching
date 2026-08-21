@@ -35,20 +35,19 @@ import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { getCookie } from "@tanstack/react-start/server";
 import { randomBytes } from "node:crypto";
 import { Pool } from "pg";
-import { ensureDbReady, getPglite } from "../db";
+import { getPglite } from "../db";
+import { viteDevServer } from "../runtime-mode";
 import { emailAndPasswordEnabled } from "./email-password";
 import { GATE_PROVIDER_ID, gateIdentitySessions } from "./gate-session.server";
 import { GROK_PROVIDERS } from "./providers";
 import { pgliteDialect } from "./pglite-dialect";
+import { assertProductionAuthEnvironment } from "./config";
 import {
   GROK_ISSUER_DEFAULT,
   PREVIEW_ALLOWED_HOSTS,
   PREVIEW_CLIENT_ID,
   PREVIEW_CLIENT_SECRET,
 } from "./preview";
-
-// Kick (and share) PGLite bootstrap as soon as the auth server module loads.
-void ensureDbReady();
 
 /**
  * Preview secret must outlive module reloads: PGLite (and its session rows) is
@@ -70,6 +69,12 @@ const env = (key: string): string | undefined => {
   return value ? value : undefined;
 };
 
+const production = !viteDevServer;
+assertProductionAuthEnvironment(
+  process.env,
+  viteDevServer ? "development" : "production",
+);
+
 // Explicit off-switch. The deployer sets `VITE_AUTH_ENABLED=true` when it
 // provisions auth; set it to "false" to force auth off everywhere (dev user).
 const authDisabled = env("VITE_AUTH_ENABLED") === "false";
@@ -78,19 +83,18 @@ const authDisabled = env("VITE_AUTH_ENABLED") === "false";
 // otherwise fall back to the shared live-preview client, which the broker accepts
 // for any `*.grok-sandbox.com` callback (see `./preview`).
 const grokIssuer = env("GROK_AUTH_ISSUER") ?? GROK_ISSUER_DEFAULT;
-const grokClientId = env("GROK_AUTH_CLIENT_ID") ?? PREVIEW_CLIENT_ID;
-const grokClientSecret = env("GROK_AUTH_CLIENT_SECRET") ?? PREVIEW_CLIENT_SECRET;
+const grokClientId = env("GROK_AUTH_CLIENT_ID") ?? (!production ? PREVIEW_CLIENT_ID : undefined);
+const grokClientSecret =
+  env("GROK_AUTH_CLIENT_SECRET") ?? (!production ? PREVIEW_CLIENT_SECRET : undefined);
 
 /** True when federated sign-in is active (real auth is enforced). */
 export const authConfigured =
   !authDisabled && Boolean(grokClientId && grokClientSecret);
 
-// This app's own Better Auth origin. When deployed the deployer injects the
-// public URL. In the sandbox live preview there's no fixed URL (each preview gets
-// a dynamic `*.grok-sandbox.com` host), so we hand Better Auth a dynamic baseURL:
-// it derives the origin per-request from the (proxied) host, validated against the
-// preview allowlist, which makes the OAuth `redirect_uri` the concrete preview URL
-// the broker's preview client accepts.
+// This app's own Better Auth origin. Production uses only the deployer-injected
+// HTTPS origin validated by `assertProductionAuthEnvironment`. Dynamic preview
+// and loopback origins are a development-only convenience; they must never
+// broaden a deployed app's redirect or CSRF allowlist.
 const explicitBaseURL = env("BETTER_AUTH_URL");
 // Explicit `string[]` (not a readonly tuple) — Better Auth's DynamicBaseURLConfig
 // requires a mutable `allowedHosts: string[]`.
@@ -103,29 +107,62 @@ const LOCAL_DEV_ORIGINS: string[] = [
   "http://127.0.0.1:8080",
   "http://[::1]:8080",
 ];
-const baseURL = explicitBaseURL ?? {
-  // Include loopback hosts so dynamic baseURL resolves for local email/password
-  // (not only the preview wildcard).
-  allowedHosts: [...previewAllowedHosts, "localhost", "127.0.0.1", "[::1]"],
-  // `auto` → trust both http:// and https:// expansions of allowedHosts
-  // (preview is https; local dev is http).
-  protocol: "auto" as const,
-  fallback: "http://localhost:8080",
-};
+const baseURL =
+  explicitBaseURL ??
+  (production
+    ? // Auth-enabled production cannot reach this branch because configuration
+      // validation above requires BETTER_AUTH_URL. Keep auth-off builds inert.
+      "https://auth-disabled.invalid"
+    : {
+        // Include loopback hosts so dynamic baseURL resolves for local
+        // email/password (not only the preview wildcard).
+        allowedHosts: [
+          ...previewAllowedHosts,
+          "localhost",
+          "127.0.0.1",
+          "[::1]",
+        ],
+        // `auto` → trust both http:// and https:// expansions of allowedHosts
+        // (preview is https; local development is http).
+        protocol: "auto" as const,
+        fallback: "http://localhost:8080",
+      });
 
 // Origins Better Auth accepts on credentialed POSTs (sign-up/sign-in, etc.).
 // Missing entries here surface as FORBIDDEN "Invalid origin".
 const trustedOrigins: string[] = explicitBaseURL
-  ? [explicitBaseURL, ...LOCAL_DEV_ORIGINS]
-  : [
-      // Host wildcards (matched against Origin's host)
-      ...previewAllowedHosts,
-      // Full-origin wildcards (matched against Origin)
-      ...previewAllowedHosts.flatMap((host) => [`https://${host}`, `http://${host}`]),
-      ...LOCAL_DEV_ORIGINS,
-    ];
+  ? [explicitBaseURL, ...(!production ? LOCAL_DEV_ORIGINS : [])]
+  : production
+    ? []
+    : [
+        // Host wildcards (matched against Origin's host)
+        ...previewAllowedHosts,
+        // Full-origin wildcards (matched against Origin)
+        ...previewAllowedHosts.flatMap((host) => [
+          `https://${host}`,
+          `http://${host}`,
+        ]),
+        ...LOCAL_DEV_ORIGINS,
+      ];
 
 const databaseUrl = env("DATABASE_URL");
+
+// Better Auth owns a separate pool from application queries. Bound both so a
+// scaled serverless deployment cannot multiply the driver's default of ten
+// connections per warm instance, and make database degradation fail closed
+// within the request budget.
+const AUTH_POOL_OPTIONS = Object.freeze({
+  application_name: "knotty-auth",
+  max: 2,
+  connectionTimeoutMillis: 5_000,
+  idleTimeoutMillis: 10_000,
+  maxLifetimeSeconds: 300,
+  statement_timeout: 15_000,
+  query_timeout: 20_000,
+  lock_timeout: 5_000,
+  idle_in_transaction_session_timeout: 15_000,
+  allowExitOnIdle: true,
+});
 
 // Static broker OAuth endpoints (skip OIDC discovery on every sign-in / callback).
 // Discovery would cost an extra network hop to the broker before the popup can
@@ -141,9 +178,16 @@ const grokUserInfoUrl = `${issuerBase}/api/auth/oauth2/userinfo`;
 // SAME DB as app data, including email/password users. Both use the Better Auth
 // schema from `migrations/auth/0001_auth.sql`, copied into `migrations/` when
 // the app turns sign-in on.
-const database = databaseUrl
-  ? new Pool({ connectionString: databaseUrl })
-  : { dialect: pgliteDialect(() => getPglite()), type: "postgres" as const };
+const databaseOption = databaseUrl
+  ? { database: new Pool({ connectionString: databaseUrl, ...AUTH_POOL_OPTIONS }) }
+  : viteDevServer
+    ? {
+        database: {
+          dialect: pgliteDialect(() => getPglite()),
+          type: "postgres" as const,
+        },
+      }
+    : {};
 
 /** Session token cookie name — also read by the live-preview popup completion page. */
 export const SESSION_TOKEN_COOKIE = "__Host-grok-auth.session_token";
@@ -177,7 +221,7 @@ export const auth = betterAuth({
   // Deployed apps inject BETTER_AUTH_SECRET. Preview: process-stable secret on
   // globalThis so HMR doesn't invalidate PGLite-backed sessions (see above).
   secret: env("BETTER_AUTH_SECRET") ?? previewAuthSecret(),
-  database,
+  ...databaseOption,
 
   // CSRF / origin check for credentialed auth POSTs (email sign-up/sign-in, …).
   // See `trustedOrigins` construction above — must cover live preview hosts AND

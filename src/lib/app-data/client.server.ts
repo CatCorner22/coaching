@@ -5,6 +5,7 @@ import {
   CrossSiteRequestError,
 } from "../auth/isolation.server.ts";
 import { assertAppDataServerOnly } from "./server-only.ts";
+import { viteDevServer } from "../runtime-mode.ts";
 import {
   CONNECTOR_TOKEN_HEADER,
   ConnectorType,
@@ -65,10 +66,9 @@ function inboundContext(): InboundContext {
   const publicHost =
     (xf || req?.headers.get("host") || "").split(":")[0]?.trim() || null;
   const headerToken = req?.headers.get(CONNECTOR_TOKEN_HEADER)?.trim() || null;
-  const envToken =
-    process.env.NODE_ENV === "production"
-      ? null
-      : (env("GROK_CONNECTOR_ACCESS_TOKEN") ?? null);
+  const envToken = viteDevServer
+    ? (env("GROK_CONNECTOR_ACCESS_TOKEN") ?? null)
+    : null;
   return {
     token: headerToken ?? envToken,
     publicHost,

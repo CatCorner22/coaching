@@ -6,16 +6,16 @@ import { fuseCoach } from "@/lib/ml/fuse";
 import { clampStep, isCameraDataUrl, sanitizeDet, sanitizeQuestion } from "@/lib/ml/sanitize";
 import type { DeterministicReport, SafetyFlag } from "@/lib/ml/types";
 import {
+  admitRemoteCategories,
   buildObservationReport,
   CANONICAL_IDS,
-  admitRemoteCategories,
   type ModelCategoryMatch,
   type ModelStatus,
   type TriageState,
 } from "@/lib/observation/report";
 import { authorizeAiRequest } from "./guard.server";
 import { grokChat, parseJson } from "./grok";
-import { consumeMediaBatchOnce, MediaBatchReplayError } from "./media-replay-core";
+import { MediaBatchReplayError, MediaBatchReservationError } from "./media-replay-core";
 import { RateLimitError } from "./rate-limit-core";
 import type { AnalyzeResult } from "./schema";
 
@@ -184,8 +184,9 @@ export const analyzeRope = createServerFn({ method: "POST" })
 
     if (triage === "none") {
       const { consumeAiBudget } = await import("./rate-limit.server");
+      const { consumeMediaBatch } = await import("./media-replay.server");
       try {
-        consumeMediaBatch(authorization.userId, data.consent.batchId, () => {
+        await consumeMediaBatch(authorization.userId, data.consent.batchId, () => {
           consumeAiBudget("vision", 8, 10 * 60_000, authorization.userId);
         });
       } catch (error) {
@@ -204,6 +205,16 @@ export const analyzeRope = createServerFn({ method: "POST" })
           return {
             ok: false,
             error: "This batch was already submitted or reserved. Discard it and confirm a new batch.",
+            providerAttempted: false,
+            code: error.code,
+            status: error.status,
+            retryableBeforeProvider: false,
+          };
+        }
+        if (error instanceof MediaBatchReservationError) {
+          return {
+            ok: false,
+            error: "No media was sent. The one-use batch reservation could not be confirmed; discard this batch rather than retrying it.",
             providerAttempted: false,
             code: error.code,
             status: error.status,
@@ -238,8 +249,8 @@ export const analyzeRope = createServerFn({ method: "POST" })
         const parsed = modelResponseSchema.safeParse(candidate);
         if (!parsed.success) {
           modelStatus = "failed";
-          selfAudit.note = "Remote output failed the closed schema and was discarded.";
           selfAudit.hardLimit = true;
+          selfAudit.note = "Remote output failed the closed schema and was discarded.";
         } else {
           const admitted = admitRemoteCategories(
             parsed.data.matches,
@@ -270,6 +281,8 @@ export const analyzeRope = createServerFn({ method: "POST" })
       triage,
       hardLimit: selfAudit.hardLimit,
     });
+    // The legacy coach shape remains internal compatibility only. No free-form
+    // model action prose enters it; local rules generate its fixed stop/observe text.
     const report = fuseCoach({
       det:
         observationReport.urgent_stop || observationReport.disposition === "do_not_proceed"
@@ -294,16 +307,6 @@ export const analyzeRope = createServerFn({ method: "POST" })
       observationReport,
     };
   });
-
-type AnalyzeGlobal = typeof globalThis & { __knottyConsumedMediaBatches?: Map<string, number> };
-const analyzeGlobal = globalThis as AnalyzeGlobal;
-const consumedMediaBatches = analyzeGlobal.__knottyConsumedMediaBatches ?? new Map<string, number>();
-analyzeGlobal.__knottyConsumedMediaBatches = consumedMediaBatches;
-
-/** Best-effort per-instance replay defense; the UI also consumes each batch once. */
-function consumeMediaBatch(userId: string, batchId: string, charge: () => void): void {
-  consumeMediaBatchOnce(consumedMediaBatches, { userId, batchId, now: Date.now() }, charge);
-}
 
 function closeClientHeuristic(det: DeterministicReport): DeterministicReport {
   const stop = det.recommend === "stop" || det.flags.some((flag) => flag.severity === "stop");
