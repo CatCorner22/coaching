@@ -12,7 +12,7 @@ capture, photo/video import, observation reports, knowledge routing, provider
 contracts, authentication, build behavior, and release automation.
 
 No remaining reproducible source-level release blocker was found after the final
-camera-to-report-to-knowledge re-probe. Local validation passed all 381
+camera-to-report-to-knowledge re-probe. Local validation passed all 382
 source-owned tests, TypeScript, zero-warning ESLint, the production build,
 generated server-module syntax checks, and secret/PGLite artifact scans. The
 exact Node 22.23.2 GitHub pipeline and its production Chromium smoke remain the
@@ -160,7 +160,7 @@ cover 32,832 state combinations without an invalid report or throw.
 
 ## Verification evidence
 
-- `npm test`: 381/381 passed, zero failures (groups: 252, 40, 80, and 9).
+- `npm test`: 382/382 passed, zero failures (groups: 253, 40, 80, and 9).
 - Integrated focused corpus: 155/155 passed.
 - Final independent camera/knowledge re-probe: 107/107 passed.
 - `tsc --noEmit`: passed.

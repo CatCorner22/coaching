@@ -168,3 +168,9 @@ test("the shipped education app keeps its custom card without game-only metadata
   assert.equal(site.card, "custom");
   assert.equal(siteDeclaresOgTypeGame(site), false);
 });
+
+test("browser smoke resolves brand assets from the repository instead of a fixed checkout path", () => {
+  const smoke = readFileSync(new URL("./browser-smoke.mjs", import.meta.url), "utf8");
+  assert.match(smoke, /realpathSync\(new URL\("\.\."/);
+  assert.match(smoke, /computeBrandWarnings\(\{[\s\S]*workspaceRoot/);
+});
