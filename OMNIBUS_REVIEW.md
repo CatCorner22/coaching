@@ -35,14 +35,16 @@ Four independent multi-agent rounds, followed by a separate merge-adversary pass
 
 - `npm run test:core`: **161/161 passed** (110 dependency-free script tests plus 51 TypeScript camera/ML/knowledge tests).
 - The independent `bdsm-shibari-camera` observation-report validator: **6/6 representative C2/C3/C4/emergency/coercion reports passed**.
-- Full dependency-free script corpus: **228/235 passed**. All seven failures are isolated to the untouched platform PWA fixture: six generic-title expectations inherit this app's `Knotty` `site.json`, and the reconstructed local snapshot omits `public/__grok/icon-180.png`. The icon was verified on GitHub `main` and remains in the base tree.
-- Conflict-marker scan: clean before the concurrent-main merge; the final merge scan and Node 22 CI are required again after integration.
-- The pre-merge branch passed Node 22 typecheck in CI. Final merged typecheck, lint, store-migration tests, production build, browser smoke, and real-device checks remain pending; this reconstruction has no installed dependencies or lockfile and is running Node 24 rather than the declared Node 22 target.
+- Store and migration suite: **9/9 passed** on Node 22, including same-second timer behavior, planner idempotency, legacy-key adoption, versioned consent, and voice/microphone fail-closed migration.
+- Full dependency-free script corpus: **229/236 passed**. All seven failures are isolated to the untouched platform PWA fixture: six generic-title expectations inherit this app's `Knotty` `site.json`, and the reconstructed local snapshot omits `public/__grok/icon-180.png`. The icon was verified on GitHub `main` and remains in the branch tree.
+- GitHub Actions run 4 on Node 22: dependency install, typecheck, lint, `test:core`, and `test:stores` all passed. Lint reports four pre-existing warnings and zero errors.
+- Final conflict-marker scan: clean. GitHub reports the draft PR mergeable after the two-parent conflict-resolution commit.
+- Production build, authenticated browser smoke, and real-device checks remain pending; the repository still has no committed lockfile.
 
 ## Release blockers and residual risk
 
 - Generate and commit `package-lock.json`, switch CI to `npm ci`, restore the platform environment in a clean workspace, reconcile the generic PWA fixture with the app-specific site identity through the platform-supported path, and make the full test/build path mandatory.
-- Run typecheck, lint, build, authenticated preview, and production-like smoke tests after dependencies are available.
+- Run the production build, authenticated preview, full platform fixture suite, and production-like smoke tests in the provider environment.
 - Test current iOS Safari, Android Chrome, desktop Chromium, Firefox, and Safari with permission grant/deny/revoke, camera switching, interruption/backgrounding, photo import, native recording round-trip, MP4/MOV/WebM/HEIC support where applicable, still selection, and no-audio capture. Do not retain participants' sensitive test media.
 - The batch replay cache is per process. A durable “exactly once” promise needs a server-minted capability bound to user, consent expiry, context, and media digests, consumed atomically in shared storage.
 - Stop/discard suppresses stale UI output and server requests observe connection cancellation, but the current server-function client API has no demonstrated application-level abort handle. Provider work already in flight may continue.
