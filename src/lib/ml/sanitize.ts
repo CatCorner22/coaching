@@ -17,7 +17,7 @@ const FLAG_CODES = new Set<SafetyFlag["code"]>([
 export function foldText(s: string) {
   return String(s ?? "")
     .normalize("NFKC")
-    .replace(/[\u200B-\u200D\uFEFF\u00AD\u2060\u180E]/g, "")
+    .replace(/[\u200B-\u200D\uFEFF\u00AD\u2060\u180E\u0300-\u036f]/g, "")
     .replace(/[еэєёЕЭЄЁεΕ]/g, "e")
     .replace(/[аАαΑ]/g, "a")
     .replace(/[оОοΟ]/g, "o")
@@ -85,11 +85,14 @@ function looksLikeImage(b: Uint8Array) {
 export function sanitizeQuestion(q: unknown, max = 400) {
   const s = typeof q === "string" ? q : "";
   const withoutPromptInjection = s
-    .replace(/ignore (all |any |the |previous |prior |above |system )?instructions?/gi, "")
+    .replace(/ignore[\s\S]{0,48}(instructions?|rules?|prompts?|policies)/gi, "")
+    .replace(/disregard[\s\S]{0,40}(rules?|instructions?|safety)/gi, "")
     .replace(/you are now/gi, "")
     .replace(/jailbreak/gi, "")
     .replace(/system prompt/gi, "")
     .replace(/developer message/gi, "")
+    .replace(/override (the |all |your )?(rules?|safety|restrictions?)/gi, "")
+    .replace(/pretend you (have no|don't have|do not have) (restrictions?|rules|limits)/gi, "")
     .replace(/[\u200B-\u200D\uFEFF]/g, "");
   return Array.from(withoutPromptInjection)
     .filter((char) => {
@@ -142,14 +145,32 @@ export function sanitizeDet(raw: unknown): DeterministicReport {
           note: sanitizeQuestion(f.note, 240),
         }))
     : [];
-  if (neckRope > 0.08 && !flags.some((f) => f.code === "neck" && f.severity === "stop")) {
-    flags.push({
-      code: "neck",
-      severity: "stop",
-      note: "A two-dimensional overlap may involve the neck or airway. Stop and release; the still cannot establish clearance.",
-    });
+  const rank = { info: 0, watch: 1, stop: 2 } as const;
+  const ensure = (code: SafetyFlag["code"], severity: SafetyFlag["severity"], note: string) => {
+    const i = flags.findIndex((f) => f.code === code);
+    if (i < 0) flags.push({ code, severity, note });
+    else if (rank[severity] > rank[flags[i]!.severity]) {
+      flags[i] = { code, severity, note };
+    }
+  };
+  if (neckRope > 0.08) {
+    ensure(
+      "neck",
+      "stop",
+      "A two-dimensional overlap may involve the neck or airway. Stop and release; the still cannot establish clearance.",
+    );
   }
-  const validRecommend = report.recommend === "continue" || report.recommend === "adjust" || report.recommend === "stop";
+  if (paleness > 0.78) {
+    ensure("circulation", "stop", "Hands look too pale. Strip distal rope.");
+  } else if (paleness > 0.62) {
+    ensure(
+      "circulation",
+      "watch",
+      "Extremities look paler or cooler than they should. Check nail-bed refill and temperature.",
+    );
+  }
+  const validRecommend =
+    report.recommend === "continue" || report.recommend === "adjust" || report.recommend === "stop";
   let recommend: DeterministicReport["recommend"] = validRecommend ? report.recommend! : "stop";
   if (!validRecommend) {
     flags.push({

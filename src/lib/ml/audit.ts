@@ -28,6 +28,7 @@ const BANNED = [
   /suspend(ing)? (her|him|them|the|from)/i,
   /hang(ing)? (her|him|them|the bottom)/i,
   /hang(ing)? (from|off) (the |a |an )?/i,
+  /hanging (from|off|in)/i,
   /string (her|him|them) up/i,
   /(add|use|clip|tie|run) (an |the )?uplines?/i,
   /uplines? to the (ceiling|neck|throat|ring|beam|fan|hook)/i,
@@ -38,23 +39,42 @@ const BANNED = [
   /rope (on|around|at) (the )?(neck|throat|nape)/i,
   /neck\s*rope/i,
   /on the nape|at the nape|load the nape|nape rope/i,
+  /nape (harness|wrap|rope|tie|band|cuff)/i,
   /collar (on|around|the )?(the )?(throat|neck)/i,
+  /collar (her|him|them)\b/i,
+  /posture collar/i,
+  /collar for posture/i,
+  /\bchoker\b/i,
+  /under the jaw/i,
+  /below the ears/i,
+  /\b(thyroid|larynx|trachea)\b/i,
   /throat rope/i,
   /rope at the throat/i,
   /pressure on the throat/i,
   /gag and leave/i,
   /gag .{0,16}(leave|walk away)/i,
-  /leave (her|him|them) (tied|alone)/i,
+  /leave (her|him|them) (tied|alone|bound)/i,
   /leave (her|him|them) tied/i,
-  /around (her |his |their |the )?(neck|throat)/i,
+  /left (tied|bound) and alone/i,
+  /unattended/i,
+  /leave the (room|house|studio|apartment).{0,40}(tied|bound|gagged|rope)/i,
+  /(tied|bound|gagged).{0,40}leave the (room|house|studio|apartment)/i,
+  /go make (tea|coffee|a drink)/i,
+  /around (her |his |their |the )?(neck|throat|nape)/i,
   /full[-\s]?suspension/i,
   /restrict (her |his |their )?(air|breath|airway)/i,
   /(close|block|shut|cover) (her |his |their |the )?airway/i,
+  /steal .{0,16}(her |his |their )?(air|breath)/i,
+  /hold (her |his |their )?breath/i,
+  /rebreath/i,
+  /smother/i,
+  /bag over (her |his |their |the )?head/i,
+  /co2\s*play/i,
   /gag (her |them |him )?(and|&) leave/i,
   /collar (her |his |their |the )?(throat|neck)/i,
   /under the chin/i,
-  /cinch(ing)? (her |his |their |the )?(throat|neck)/i,
-  /wrap(ping)? (her |his |their |the )?(neck|throat)/i,
+  /cinch(ing)? (her |his |their |the )?(throat|neck|nape)/i,
+  /wrap(ping)? (her |his |their |the )?(neck|throat|nape)/i,
   /carotid/i,
   /noose/i,
   /garr?ot+e/i,
@@ -62,6 +82,13 @@ const BANNED = [
   /blood choke/i,
   /both feet (off|leave)/i,
   /invert(ed|ing)? (hang|suspension)/i,
+  /strappado/i,
+  /hair suspension/i,
+  /hoist from/i,
+  /(add|use|clip|tie|run|improvis(?:e|ing)?) (an |the |a )?up[- ]?lines?/i,
+  /up[- ]?lines? to the (ceiling|neck|throat|ring|beam|fan|hook|pole|swing)/i,
+  /pole is (your |the |an )?up[- ]?line/i,
+  /(swing|table|cross|pole|fan|hook) .{0,28}(as a hang|as an? up[- ]?line)/i,
   /[首吊縊]/,
   /窒息/,
 ];
@@ -94,6 +121,14 @@ const BANNED_COMPACT = [
   "garrotte",
   "suffocate",
   "windpipe",
+  "strappado",
+  "hairsuspension",
+  "posturecollar",
+  "rebreathing",
+  "unattended",
+  "underthejaw",
+  "napeharness",
+  "naperope",
 ];
 
 const NO_STOPWORDS = new Set([
@@ -165,26 +200,65 @@ export function textIsBanned(s: string) {
   return BANNED_COMPACT.some((p) => compact.includes(p));
 }
 
+function sentenceLooksLikeRefusal(s: string) {
+  return /\b(do not|don't|doesn't|never|will not|won't|cannot|can't|refuse|not coach|will not coach|this app will not|not a hang|not an upline)\b/i.test(
+    s,
+  );
+}
+
+/** For knowledge answers: drop coaching-ban sentences, keep refusal/lecture sentences. */
+export function scrubBannedSentences(s: string) {
+  const raw = String(s ?? "").trim();
+  if (!raw) return raw;
+  if (!textIsBanned(raw)) return raw;
+  const sentences = raw.match(/[^.!?]+(?:[.!?]+|$)/g) ?? [raw];
+  const kept = sentences
+    .map((sent) => sent.trim())
+    .filter(Boolean)
+    .map((sent) => {
+      if (!textIsBanned(sent) || sentenceLooksLikeRefusal(sent)) return sent;
+      return "";
+    })
+    .filter(Boolean);
+  if (!kept.length) return BANNED_COACH;
+  return kept.join(" ");
+}
+
 export function scrubBannedAnswer(s: string) {
   if (!textIsBanned(s)) return s;
+  if (sentenceLooksLikeRefusal(s) && !/\b(add|put|cinch|wrap|hoist|clip)\b/i.test(s)) return s;
   return BANNED_COACH;
 }
 
-const WEAK_NO = new Set(["neck", "throat", "breath", "air", "hang", "alone"]);
+const WEAK_NO = new Set(["neck", "throat", "nape", "breath", "air", "hang", "alone", "suspension"]);
+
+const KEY_ALIASES: Record<string, string[]> = {
+  neck: ["neck", "throat", "nape"],
+  throat: ["neck", "throat", "nape"],
+  nape: ["neck", "throat", "nape"],
+  breath: ["breath", "air", "airway"],
+  air: ["breath", "air", "airway"],
+  hang: ["hang", "hoist"],
+  suspension: ["suspension", "hang", "hoist"],
+  alone: ["alone", "unattended"],
+};
 
 function dangerousWeak(k: string, hay: string) {
   const h = ` ${hay} `;
-  if (k === "neck" || k === "throat") {
-    return / (on|around|at|wrap|rope|collar|cinch|pressure) (her |his |the )?(neck|throat)|(neck|throat) (rope|collar|wrap|cinch|restraint)/.test(h);
+  if (k === "neck" || k === "throat" || k === "nape") {
+    return / (on|around|at|wrap|rope|collar|cinch|pressure|harness) (her |his |the )?(neck|throat|nape)|(neck|throat|nape) (rope|collar|wrap|cinch|restraint|harness|band|choker)/.test(
+      h,
+    );
   }
   if (k === "breath" || k === "air") {
-    return /breath play|restrict .{0,12}(breath|air)|hold (her |his )?breath/.test(h);
+    return /breath play|restrict .{0,12}(breath|air)|hold (her |his )?breath|steal .{0,12}(air|breath)/.test(h);
   }
-  if (k === "hang") {
-    return /hang (her|him|them|from)/.test(h);
+  if (k === "hang") return /hang (her|him|them|from)/.test(h);
+  if (k === "suspension") {
+    return /full suspension|hang (her|him|them|from)|both feet (off|leave)|string (her|him|them) up/.test(h);
   }
   if (k === "alone") {
-    return /left (tied and )?alone|tied and alone|leave (her|him|them) alone/.test(h);
+    return /left (tied and )?alone|tied and alone|leave (her|him|them) (tied|alone|bound)|unattended/.test(h);
   }
   return false;
 }
@@ -226,7 +300,9 @@ export function hitsHardNo(token: string, hayRaw: string): boolean {
   const hayWords = hay.split(" ").map(stemWord);
   const haySet = new Set(hayWords);
   return keys.some((k) => {
-    if (!haySet.has(k)) return false;
+    const aliases = KEY_ALIASES[k] ?? [k];
+    const present = aliases.some((a) => haySet.has(a));
+    if (!present) return false;
     if (WEAK_NO.has(k)) return dangerousWeak(k, hay);
     return true;
   });
@@ -304,7 +380,7 @@ export function localAudit(opts: {
     );
   }
 
-  const originalHay = `${base.coaching} ${base.next} ${base.speak} ${base.stepGuess}`;
+  const originalHay = `${base.coaching} ${base.next} ${base.speak} ${base.stepGuess} ${(base.seen ?? []).join(" ")}`;
   for (const no of opts.hardNos ?? []) {
     if (!hitsHardNo(no, originalHay)) continue;
     droppedClaims.push(`Honored negotiated no: ${no}`);
