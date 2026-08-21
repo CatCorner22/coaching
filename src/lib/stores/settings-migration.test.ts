@@ -8,53 +8,52 @@ Object.defineProperty(globalThis, "localStorage", {
     getItem: (key: string) => memory.get(key) ?? null,
     setItem: (key: string, value: string) => memory.set(key, String(value)),
     removeItem: (key: string) => memory.delete(key),
-    clear: () => memory.clear(),
-    key: (index: number) => [...memory.keys()][index] ?? null,
-    get length() {
-      return memory.size;
-    },
   },
 });
 
-test("pre-v4 legacy consent is adopted but forced through consent again with voice and mic off", async () => {
-  localStorage.clear();
-  localStorage.setItem(
-    "musubi-settings",
-    JSON.stringify({
-      state: {
-        consented: true,
-        adults: true,
-        shears: true,
-        photosOk: true,
-        voice: true,
-        listen: true,
-      },
-      version: 0,
-    }),
-  );
+test("pre-v4 legacy consent is adopted but normalized to consent, voice, and mic off", async () => {
+  const legacy = {
+    consented: true,
+    adults: true,
+    shears: true,
+    photosOk: true,
+    voice: true,
+    listen: true,
+  };
+  localStorage.setItem("musubi-settings", JSON.stringify({ state: legacy, version: 0 }));
 
-  const { useSettings } = await import("./settings.ts");
-  await useSettings.persist.rehydrate();
-  const state = useSettings.getState();
-  assert.equal(state.consentVersion, 0);
-  assert.equal(state.consented, false);
-  assert.equal(state.voice, false);
-  assert.equal(state.listen, false);
-  assert.ok(localStorage.getItem("knotty-settings"), "legacy state should be adopted to the canonical key");
+  const { normalizePersistedSettings, useSettings } = await import("./settings.ts");
+  assert.equal(localStorage.getItem("knotty-settings"), localStorage.getItem("musubi-settings"));
+  const normalized = normalizePersistedSettings(legacy, useSettings.getState());
+  assert.equal(normalized.consentVersion, 0);
+  assert.equal(normalized.consented, false);
+  assert.equal(normalized.voice, false);
+  assert.equal(normalized.listen, false);
 });
 
-test("an existing canonical settings snapshot wins over the legacy key", async () => {
-  localStorage.setItem(
-    "musubi-settings",
-    JSON.stringify({ state: { consentVersion: 4, consented: true, adults: true, shears: true, photosOk: true }, version: 0 }),
+test("only complete v4 consent can retain explicit voice and microphone opt-ins", async () => {
+  const { normalizePersistedSettings, useSettings } = await import("./settings.ts");
+  const valid = normalizePersistedSettings(
+    {
+      consentVersion: 4,
+      consented: true,
+      adults: true,
+      shears: true,
+      photosOk: true,
+      voice: true,
+      listen: true,
+    },
+    useSettings.getState(),
   );
-  localStorage.setItem(
-    "knotty-settings",
-    JSON.stringify({ state: { consentVersion: 0, consented: false, adults: false, shears: false, photosOk: false }, version: 0 }),
-  );
+  assert.equal(valid.consented, true);
+  assert.equal(valid.voice, true);
+  assert.equal(valid.listen, true);
 
-  const { useSettings } = await import("./settings.ts");
-  await useSettings.persist.rehydrate();
-  assert.equal(useSettings.getState().consented, false);
-  assert.equal(useSettings.getState().consentVersion, 0);
+  const incomplete = normalizePersistedSettings(
+    { ...valid, photosOk: false, voice: true, listen: true },
+    useSettings.getState(),
+  );
+  assert.equal(incomplete.consented, false);
+  assert.equal(incomplete.voice, false);
+  assert.equal(incomplete.listen, false);
 });

@@ -52,6 +52,36 @@ type SettingsState = Settings & {
   enter: () => void;
 };
 
+/** Normalize an untrusted persisted snapshot without carrying unknown fields forward. */
+export function normalizePersistedSettings(persisted: unknown, current: Settings): Settings {
+  const p = (persisted ?? {}) as Partial<Settings>;
+  const adults = p.adults === true;
+  const shears = p.shears === true;
+  const photosOk = p.photosOk === true;
+  const consentVersion = p.consentVersion === 4 ? 4 : 0;
+  const consented = p.consented === true && adults && shears && photosOk && consentVersion === 4;
+  return {
+    consentVersion,
+    consented,
+    adults,
+    shears,
+    photosOk,
+    riggerName: typeof p.riggerName === "string" ? p.riggerName.slice(0, 40) : current.riggerName,
+    bottomName: typeof p.bottomName === "string" ? p.bottomName.slice(0, 40) : current.bottomName,
+    honorific: typeof p.honorific === "string" ? p.honorific.slice(0, 24) : current.honorific,
+    style: p.style === "peer" || p.style === "ds" ? p.style : current.style,
+    safeword: clampWord(p.safeword, current.safeword),
+    yellowWord: clampWord(p.yellowWord, current.yellowWord),
+    greenWord: clampWord(p.greenWord, current.greenWord),
+    voice: consented && p.voice === true,
+    listen: consented && p.listen === true,
+    circulationMins: Math.min(
+      12,
+      Math.max(2, Number(p.circulationMins) || current.circulationMins),
+    ),
+  };
+}
+
 adoptPersistKey("knotty-settings", "musubi-settings");
 
 export const useSettings = create<SettingsState>()(
@@ -74,30 +104,9 @@ export const useSettings = create<SettingsState>()(
     {
       name: "knotty-settings",
       merge: (persisted, current) => {
-        const p = (persisted ?? {}) as Partial<Settings>;
-        const adults = p.adults === true;
-        const shears = p.shears === true;
-        const photosOk = p.photosOk === true;
-        const consentVersion = p.consentVersion === 4 ? 4 : 0;
-        const consented = p.consented === true && adults && shears && photosOk && consentVersion === 4;
         return {
           ...current,
-          ...p,
-          adults,
-          shears,
-          photosOk,
-          consented,
-          consentVersion,
-          safeword: clampWord(p.safeword, current.safeword),
-          yellowWord: clampWord(p.yellowWord, current.yellowWord),
-          greenWord: clampWord(p.greenWord, current.greenWord),
-          circulationMins: Math.min(12, Math.max(2, Number(p.circulationMins) || current.circulationMins)),
-          riggerName: String(p.riggerName ?? current.riggerName).slice(0, 40),
-          bottomName: String(p.bottomName ?? current.bottomName).slice(0, 40),
-          honorific: String(p.honorific ?? current.honorific).slice(0, 24),
-          style: p.style === "peer" || p.style === "ds" ? p.style : current.style,
-          voice: consentVersion === 4 && p.voice === true,
-          listen: consentVersion === 4 && p.listen === true,
+          ...normalizePersistedSettings(persisted, current),
         };
       },
     },
