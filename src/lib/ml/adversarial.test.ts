@@ -71,9 +71,12 @@ function llm(over: Partial<LlmDraft> = {}): LlmDraft {
 }
 
 function jpegUrl() {
-  const payload = "/9j/4AAQSkZJRgABAQAAAQABAAD" + "A".repeat(84);
-  const pad = payload.length % 4 === 0 ? payload : payload + "A".repeat(4 - (payload.length % 4));
-  return "data:image/jpeg;base64," + pad;
+  const bytes = Buffer.from([
+    0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46,
+    0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00,
+    0xff, 0xd9,
+  ]);
+  return `data:image/jpeg;base64,${bytes.toString("base64")}`;
 }
 
 test("LLM cannot grade sound over a deterministic stop", () => {
@@ -403,6 +406,14 @@ test("remote image URLs and junk base64 are rejected", () => {
   assert.equal(isCameraDataUrl("data:image/jpeg;base64," + "A".repeat(80)), false);
   assert.equal(isCameraDataUrl("data:image/jpeg;charset=utf-8;base64," + "A".repeat(80)), false);
   assert.equal(isCameraDataUrl(jpegUrl()), true);
+  assert.equal(isCameraDataUrl(jpegUrl() + "!"), false);
+  const trailingByte = Buffer.concat([
+    Buffer.from(jpegUrl().split(",")[1]!, "base64"),
+    Buffer.from([0x00]),
+  ]);
+  assert.equal(isCameraDataUrl(`data:image/jpeg;base64,${trailingByte.toString("base64")}`), false);
+  const webp = Buffer.from("RIFF0000WEBP", "ascii").toString("base64");
+  assert.equal(isCameraDataUrl(`data:image/webp;base64,${webp}`), false);
 });
 
 test("fallback draft does not keep wrapping after a stop", () => {

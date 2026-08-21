@@ -6,6 +6,7 @@ export * from "./gear";
 export * from "./search";
 export * from "./nerves";
 export * from "./dungeon";
+export * from "./provenance";
 
 import { ARTICLES } from "./articles";
 import { KNOTS } from "./knots";

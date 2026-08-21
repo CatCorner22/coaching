@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Disposition, SourceId } from "@/lib/observation/report";
+import { SAFETY_SOURCE_IDS } from "@/lib/kb/sources";
 import { adoptPersistKey } from "./persist";
 
 export type JournalEntry = {
@@ -31,20 +32,7 @@ const DISPOSITIONS = new Set<Disposition>([
   "lower_consequence_learning_only",
   "no_visible_concern_not_clearance",
 ]);
-const SOURCE_IDS = new Set<SourceId>([
-  "CONSENT-1",
-  "CONSENT-2",
-  "ROPE-1",
-  "FATAL-1",
-  "NFS-1",
-  "FIRSTAID-1",
-  "VISION-1",
-  "VISION-2",
-  "VISION-3",
-  "PRIVACY-1",
-  "STRUCTURE-1",
-  "AI-SAFETY-1",
-]);
+const SOURCE_IDS = new Set<SourceId>(SAFETY_SOURCE_IDS);
 
 function normalizeJournalEntry(value: unknown, index: number): JournalEntry | null {
   if (!value || typeof value !== "object") return null;

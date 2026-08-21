@@ -113,3 +113,16 @@ test("routes present blocked categories as instructor routes rather than timed p
   assert.doesNotMatch(copy, /suspension is a primer|rope dresses her|furniture\s+holds her|next wrap/i);
   assert.doesNotMatch(dungeon, /Load in planner|Open studio/);
 });
+
+test("camera reports and saved journal entries retain visible source provenance", async () => {
+  const sourceList = await readFile("src/components/source-evidence.tsx", "utf8");
+  const coach = await readFile("src/components/coach-panel.tsx", "utf8");
+  const journal = await readFile("src/routes/journal.tsx", "utf8");
+  const safety = await readFile("src/routes/safety.tsx", "utf8");
+  assert.match(sourceList, /getSafetySource/);
+  assert.match(sourceList, /source\.title/);
+  assert.match(sourceList, /source\.note/);
+  assert.match(coach, /SourceEvidence sourceIds=\{observationReport\.source_ids\}/);
+  assert.match(journal, /SourceEvidence sourceIds=\{e\.sourceIds\}/);
+  assert.match(safety, /id=\{safetySourceAnchor\(source\.id\)\}/);
+});

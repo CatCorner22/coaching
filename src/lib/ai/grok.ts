@@ -1,12 +1,26 @@
 const MAX_GROK_RESPONSE_BYTES = 256 * 1024;
 
+export type GrokJsonSchemaFormat = {
+  type: "json_schema";
+  json_schema: {
+    name: string;
+    strict: true;
+    schema: Record<string, unknown>;
+  };
+};
+
+export function grokProviderConfigured(): boolean {
+  return Boolean(process.env.XAI_API_KEY?.trim());
+}
+
 export async function grokChat(opts: {
   messages: unknown[];
   max_tokens?: number;
   temperature?: number;
+  responseFormat?: GrokJsonSchemaFormat;
   signal?: AbortSignal;
-}): Promise<{ ok: true; text: string } | { ok: false; error: string; status?: number }> {
-  const apiKey = process.env.XAI_API_KEY;
+}): Promise<{ ok: true; text: string } | { ok: false; error: string; status?: number; refused?: boolean }> {
+  const apiKey = process.env.XAI_API_KEY?.trim();
   if (!apiKey) return { ok: false, error: "AI is not available in this environment" };
   const controller = new AbortController();
   const stopRelaying = relayAbort(opts.signal, controller);
@@ -23,12 +37,24 @@ export async function grokChat(opts: {
         temperature: opts.temperature ?? 0.25,
         max_tokens: opts.max_tokens ?? 900,
         messages: opts.messages,
+        ...(opts.responseFormat ? { response_format: opts.responseFormat } : {}),
       }),
       signal: controller.signal,
     });
     if (!res.ok) {
-      await res.body?.cancel().catch(() => undefined);
-      return { ok: false, error: `xAI API error ${res.status}`, status: res.status };
+      let refused = false;
+      try {
+        const rawError = await readTextBounded(res, MAX_GROK_RESPONSE_BYTES);
+        refused = isExplicitProviderRefusal(rawError);
+      } catch {
+        await res.body?.cancel().catch(() => undefined);
+      }
+      return {
+        ok: false,
+        error: refused ? "xAI declined this media" : `xAI API error ${res.status}`,
+        status: res.status,
+        refused,
+      };
     }
     const contentType = res.headers.get("content-type")?.toLowerCase() ?? "";
     if (!contentType.includes("application/json")) {
@@ -42,14 +68,32 @@ export async function grokChat(opts: {
     }
     const raw = await readTextBounded(res, MAX_GROK_RESPONSE_BYTES);
     let body: {
-      choices?: { message?: { content?: string | null }; finish_reason?: string }[];
+      choices?: {
+        message?: { content?: string | null; refusal?: string | null };
+        finish_reason?: string | null;
+      }[];
     };
     try {
       body = JSON.parse(raw) as typeof body;
     } catch {
       return { ok: false, error: "xAI returned invalid JSON" };
     }
-    const text = body.choices?.[0]?.message?.content ?? "";
+    const choice = body.choices?.[0];
+    const refusal = choice?.message?.refusal;
+    if (
+      (typeof refusal === "string" && refusal.trim().length > 0) ||
+      choice?.finish_reason === "content_filter" ||
+      choice?.finish_reason === "refusal"
+    ) {
+      return { ok: false, error: "xAI declined this media", refused: true };
+    }
+    // A closed JSON shape is not proof that generation completed. Partial
+    // output can omit a high-consequence match while remaining valid JSON, so
+    // only the provider's documented normal terminal state is admissible.
+    if (choice?.finish_reason !== "stop") {
+      return { ok: false, error: "xAI returned an incomplete response", refused: false };
+    }
+    const text = choice.message?.content ?? "";
     if (!text.trim()) return { ok: false, error: "empty" };
     return { ok: true, text };
   } catch (cause) {
@@ -65,6 +109,16 @@ export async function grokChat(opts: {
   } finally {
     stopRelaying();
     clearTimeout(timeout);
+  }
+}
+
+function isExplicitProviderRefusal(raw: string): boolean {
+  try {
+    const body = JSON.parse(raw) as { error?: { code?: unknown; type?: unknown } };
+    const marker = `${String(body.error?.code ?? "")} ${String(body.error?.type ?? "")}`.toLowerCase();
+    return /(?:content[_ -]?policy|moderation|safety[_ -]?(?:block|refusal)|refusal)/u.test(marker);
+  } catch {
+    return false;
   }
 }
 
@@ -86,6 +140,16 @@ export function parseJson<T>(raw: string): T | null {
   if (start < 0 || end <= start) return null;
   try {
     return JSON.parse(candidate.slice(start, end + 1)) as T;
+  } catch {
+    return null;
+  }
+}
+
+/** Parse a structured-output response without tolerating prose or fences. */
+export function parseStrictJson<T>(raw: string): T | null {
+  if (typeof raw !== "string" || raw.length > MAX_GROK_RESPONSE_BYTES) return null;
+  try {
+    return JSON.parse(raw.trim()) as T;
   } catch {
     return null;
   }

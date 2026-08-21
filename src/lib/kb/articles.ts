@@ -387,9 +387,9 @@ const CORE_ARTICLES: Article[] = [
       {
         type: "ul",
         items: [
-          "Standard starting kit: six to eight pieces of 6mm jute, 7–8 meters, plus two 4-meter pieces",
-          "Condition jute with a little camellia or jojoba, then bake or tumble — not with wax that turns it into a crayon",
-          "Retire rope that has a crunchy spot, a glossy melted nylon patch, or a memory of a previous cut",
+          "Choose practice material using the maker's documented purpose, care, and retirement guidance; a common label or dimension is not a safety rating.",
+          "Do not heat, oil, wash, or otherwise condition rope from generic app instructions. Follow the specific manufacturer's instructions and fire-safety warnings.",
+          "Retire cut, melted, contaminated, damaged, or uncertain material from body use; do not rely on appearance alone.",
         ],
       },
     ],
@@ -446,7 +446,7 @@ const CORE_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "Coil so it pays out without kinks. Inspect for broken yarns, thin spots, and anything that crunches. Jute does not love a washing machine; spot-clean, air, re-oil lightly. Synthetics can be washed and must be fully dry. Anything that has been cut, melted, or used to actually suspend a human past its working history gets demoted to decorative or trash.",
+        text: "Store, clean, dry, condition, inspect, and retire rope according to the specific manufacturer's instructions. Do not apply generic heat, oil, washing, or strength-restoration advice. Cut, melted, contaminated, damaged, or uncertain material is not cleared for body use by looking normal; retire it conservatively.",
       },
     ],
   },

@@ -40,6 +40,19 @@ test("accepting a capture preserves the committed permission ledger", () => {
   assert.match(studio, /disabled=\{stopped \|\| mediaBlocked \|\| triage !== "none"\}/);
 });
 
+test("a cancelled photo import cannot commit after its decoder resolves", () => {
+  const camera = read("src/components/camera-capture.tsx");
+  const photoImport = between(
+    camera,
+    "const { jpeg, imageData } = await processMediaFrame(file",
+    '} catch (e) {',
+  );
+  assert.match(
+    photoImport,
+    /signal\.throwIfAborted\(\);[\s\S]*?!ownsMediaOperation\(operation\.id\)[\s\S]*?signal\.throwIfAborted\(\);[\s\S]*?!ownsMediaOperation\(operation\.id\)[\s\S]*?await emitFromMedia\("photo"/,
+  );
+});
+
 test("capture analysis is synchronously bound to the current Studio context", () => {
   const studio = read("src/routes/studio.tsx");
   assert.match(studio, /captureContextAtCommitRef\.current = currentContextRef\.current/);
@@ -49,8 +62,44 @@ test("capture analysis is synchronously bound to the current Studio context", ()
   assert.match(studio, /disabled=\{stopped \|\| pending \|\| stepIndex === 0\}/);
 });
 
+test("a late analysis response rechecks the current mic state before speaking", () => {
+  const studio = read("src/routes/studio.tsx");
+  const analyze = between(studio, "async function runAnalyze()", "const acceptCapture");
+  assert.match(studio, /const micArmedRef = useRef\(false\)/);
+  assert.match(
+    studio,
+    /micArmedRef\.current = true;\s*setMicArmed\(true\)/,
+  );
+  assert.match(analyze, /settings\.voice && !micArmedRef\.current/);
+  assert.doesNotMatch(analyze, /settings\.voice && !micArmed\)/);
+});
+
+test("direct triage invalidates stale visual coaching before rendering or journaling", () => {
+  const studio = read("src/routes/studio.tsx");
+  const triageEffect = between(
+    studio,
+    'if (triage === "unanswered" || triage === "none") return;',
+    "async function runAnalyze()",
+  );
+  assert.match(
+    triageEffect,
+    /analysisRequestRef\.current \+= 1[\s\S]*?setPending\(false\)[\s\S]*?setReport\(null\)[\s\S]*?setSavedReportRevision\(null\)[\s\S]*?setObservationReport\(/,
+  );
+  assert.match(
+    studio,
+    /disabled=\{!contextBoundReport \|\| !contextBoundObservationReport \|\| !reportRevision \|\| currentReportSaved\}/,
+  );
+});
+
 test("only a verified pre-provider quota denial reopens a batch", () => {
   const analyze = read("src/lib/ai/analyze.ts");
+  const preflight = analyze.indexOf("if (!grokProviderConfigured())");
+  const reservation = analyze.indexOf("await consumeMediaBatch(");
+  assert.ok(preflight >= 0 && preflight < reservation);
+  assert.match(
+    analyze.slice(preflight, reservation),
+    /providerAttempted: false[\s\S]*?code: "AI_PROVIDER_UNAVAILABLE"[\s\S]*?retryableBeforeProvider: true/,
+  );
   const rateLimit = between(analyze, "if (error instanceof RateLimitError)", "if (error instanceof MediaBatchReplayError)");
   assert.match(rateLimit, /providerAttempted: false/);
   assert.match(rateLimit, /retryableBeforeProvider: true/);

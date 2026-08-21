@@ -2,8 +2,9 @@
 /**
  * Deploy-time database migrator (node-postgres, `pg`).
  *
- * Runs during `npm run build` — on every Vercel deploy — applying pending files
- * in ../migrations to DATABASE_URL. The pending batch and its bookkeeping are
+ * Runs only when explicitly invoked with `npm run db:migrate` from a protected
+ * release environment, applying pending files in ../migrations to DATABASE_URL.
+ * Ordinary builds are side-effect-free. The pending batch and its bookkeeping are
  * applied in one transaction, so it is atomic and safe to re-run.
  *
  * A transaction-scoped advisory lock serializes concurrent deploys before

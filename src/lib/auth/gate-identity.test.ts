@@ -8,6 +8,7 @@ import {
   gateIdentityFromHeaders,
   gateKeyResolver,
   parseGateJwksResponse,
+  resolveGateEndpoints,
   sessionBoundToGateIdentity,
   verifyGateIdentityToken,
   type GateJwks,
@@ -369,6 +370,17 @@ describe("gateIdentityFromHeaders", () => {
         fetchImpl,
       );
       assert.equal(identity, null);
+    } finally {
+      delete process.env.GROK_GATE_ORIGIN;
+    }
+  });
+});
+
+describe("resolveGateEndpoints", () => {
+  it("rejects an unsafe explicit trust root", () => {
+    process.env.GROK_GATE_ORIGIN = "http://attacker.invalid/path";
+    try {
+      assert.equal(resolveGateEndpoints(new Headers({ host: "app.grok.me" })), null);
     } finally {
       delete process.env.GROK_GATE_ORIGIN;
     }

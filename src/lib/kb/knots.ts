@@ -121,23 +121,26 @@ const CORE_KNOTS: Knot[] = [
     name: "Square Knot",
     jp: "本結び",
     summary:
-      "Right over left, left over right. Joins two ends of similar rope. Caps a decorative stem. Unties when one end is pulled — do not trust it as your only lock under suspension.",
+      "A decorative end-joining category shown only on loose, unoccupied material. It is not a lock, backup, or component for body restraint or a person-bearing system.",
     cinches: false,
     loadBearing: false,
     usedIn: ["karada", "hishi", "kikkou"],
     steps: [
       {
         title: "First throw",
-        body: "Right end over left, tuck under. Pull even.",
-        speak: "Right over left, under.",
+        body: "On loose, unoccupied practice material, cross the right end over the left and tuck it under without applying load.",
+        speak: "Practice the first throw only on loose, unoccupied material.",
       },
       {
         title: "Second throw",
-        body: "Left over right, tuck under. The two loops should lie flat, each end exiting beside its own standing part. If you see two loops that slide, you tied a granny. Untie.",
-        speak: "Left over right. Confirm it is not a granny knot.",
+        body: "Cross the left end over the right and tuck it under. Dress the loose sample only for visual recognition, then untie it; appearance does not validate strength, security, or body use.",
+        speak: "Dress the loose sample for recognition, then untie it.",
       },
     ],
-    watch: ["Granny knots capsize. Square knots lie flat.", "Backup with a half hitch if it matters."],
+    watch: [
+      "Visual flatness does not establish security, compatibility, or load capacity.",
+      "Do not use this entry to choose, back up, or validate any loaded or person-bearing connection.",
+    ],
   },
   {
     slug: "reverse-tension",
@@ -239,7 +242,10 @@ const CORE_KNOTS: Knot[] = [
         speak: "Around, through, snug.",
       },
     ],
-    watch: ["A lone half hitch will creep. Stack a second."],
+    watch: [
+      "A hitch that looks familiar can still move or release unpredictably.",
+      "Do not use this recognition entry to select or build a loaded lock or body-restraint component.",
+    ],
   },
   {
     slug: "portuguese-bowline",

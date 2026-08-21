@@ -14,7 +14,7 @@ import {
   type TriageState,
 } from "@/lib/observation/report";
 import { authorizeAiRequest } from "./guard.server";
-import { grokChat, parseJson } from "./grok";
+import { grokChat, grokProviderConfigured, parseStrictJson } from "./grok";
 import { MediaBatchReplayError, MediaBatchReservationError } from "./media-replay-core";
 import { RateLimitError } from "./rate-limit-core";
 import type { AnalyzeResult } from "./schema";
@@ -66,6 +66,50 @@ const modelResponseSchema = z
       .strict(),
   })
   .strict();
+
+const MODEL_RESPONSE_FORMAT = {
+  type: "json_schema",
+  json_schema: {
+    name: "knotty_visible_categories",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        matches: {
+          type: "array",
+          maxItems: 12,
+          items: {
+            type: "object",
+            properties: {
+              frame_id: { type: "string", pattern: "^F[0-9]{2}$" },
+              canonical_id: { type: "string", enum: CANONICAL_IDS },
+            },
+            required: ["frame_id", "canonical_id"],
+            additionalProperties: false,
+          },
+        },
+        audit: {
+          type: "object",
+          properties: {
+            nonvisual_inference: { type: "boolean" },
+            exact_identification: { type: "boolean" },
+            procedural_content: { type: "boolean" },
+            note: { type: "string", maxLength: 240 },
+          },
+          required: [
+            "nonvisual_inference",
+            "exact_identification",
+            "procedural_content",
+            "note",
+          ],
+          additionalProperties: false,
+        },
+      },
+      required: ["matches", "audit"],
+      additionalProperties: false,
+    },
+  },
+} as const;
 
 const analyzeInputSchema = z
   .object({
@@ -183,6 +227,19 @@ export const analyzeRope = createServerFn({ method: "POST" })
     };
 
     if (triage === "none") {
+      // Provider configuration is a retryable admission check. It must happen
+      // before the durable one-use reservation and quota charge; otherwise a
+      // missing credential consumes a batch even though no request can leave.
+      if (!grokProviderConfigured()) {
+        return {
+          ok: false,
+          error: "No media was sent. xAI is not available in this environment; retry after the deployment is configured.",
+          providerAttempted: false,
+          code: "AI_PROVIDER_UNAVAILABLE",
+          status: 503,
+          retryableBeforeProvider: true,
+        };
+      }
       const { consumeAiBudget } = await import("./rate-limit.server");
       const { consumeMediaBatch } = await import("./media-replay.server");
       try {
@@ -232,6 +289,7 @@ export const analyzeRope = createServerFn({ method: "POST" })
       const grok = await grokChat({
         temperature: 0,
         max_tokens: 700,
+        responseFormat: MODEL_RESPONSE_FORMAT,
         signal: authorization.signal,
         messages: [
           { role: "system", content: SYSTEM },
@@ -240,12 +298,16 @@ export const analyzeRope = createServerFn({ method: "POST" })
       });
 
       if (!grok.ok) {
-        modelStatus = grok.error === "AI is not available in this environment" ? "unavailable" : "failed";
-        refusal = grok.status === 400 || grok.status === 422 || grok.error === "empty";
-        if (refusal) modelStatus = "refused";
+        refusal = grok.refused === true;
+        modelStatus =
+          grok.error === "AI is not available in this environment"
+            ? "unavailable"
+            : refusal
+              ? "refused"
+              : "failed";
         selfAudit.note = `Remote classification ${modelStatus}.`;
       } else {
-        const candidate = parseJson<unknown>(grok.text);
+        const candidate = parseStrictJson<unknown>(grok.text);
         const parsed = modelResponseSchema.safeParse(candidate);
         if (!parsed.success) {
           modelStatus = "failed";

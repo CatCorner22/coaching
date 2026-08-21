@@ -3,6 +3,7 @@ import { memo, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   openRopeCamera,
+  playCameraPreview,
   setTorch,
   startClip,
   torchAvailable,
@@ -97,6 +98,7 @@ export const CameraCapture = memo(function CameraCapture({
   const recordTimerRef = useRef<number | null>(null);
   const recordStartedAtRef = useRef<number | null>(null);
   const cameraRequestRef = useRef(0);
+  const cameraOpenRef = useRef<AbortController | null>(null);
   const mediaOperationRef = useRef<AbortController | null>(null);
   const mediaOperationIdRef = useRef(0);
   const torchRequestRef = useRef(0);
@@ -129,6 +131,8 @@ export const CameraCapture = memo(function CameraCapture({
     return () => {
       mountedRef.current = false;
       mediaOperationRef.current?.abort();
+      cameraOpenRef.current?.abort();
+      cameraOpenRef.current = null;
       mediaOperationIdRef.current += 1;
       torchRequestRef.current += 1;
       cameraRequestRef.current += 1;
@@ -170,6 +174,8 @@ export const CameraCapture = memo(function CameraCapture({
   useEffect(() => {
     if (!disabled) return;
     mediaOperationRef.current?.abort();
+    cameraOpenRef.current?.abort();
+    cameraOpenRef.current = null;
     mediaOperationIdRef.current += 1;
     torchRequestRef.current += 1;
     cameraRequestRef.current += 1;
@@ -313,10 +319,12 @@ export const CameraCapture = memo(function CameraCapture({
     setVideoFrames([]);
     setSelectedFrames([]);
     const request = ++cameraRequestRef.current;
+    const cameraController = new AbortController();
+    cameraOpenRef.current = cameraController;
     let openedStream: MediaStream | null = null;
     setBusy(true);
     try {
-      const stream = await openRopeCamera(next);
+      const stream = await openRopeCamera(next, { signal: cameraController.signal });
       openedStream = stream;
       if (!mountedRef.current || request !== cameraRequestRef.current) {
         stream.getTracks().forEach((track) => track.stop());
@@ -326,7 +334,7 @@ export const CameraCapture = memo(function CameraCapture({
       setHasTorch(torchAvailable(stream));
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+        await playCameraPreview(videoRef.current, cameraController.signal);
       } else {
         throw new Error("Camera view is unavailable.");
       }
@@ -372,12 +380,15 @@ export const CameraCapture = memo(function CameraCapture({
         setError(cameraErrorMessage(cause));
       }
     } finally {
+      if (cameraOpenRef.current === cameraController) cameraOpenRef.current = null;
       if (mountedRef.current && request === cameraRequestRef.current) setBusy(false);
     }
   }
 
   function stopLive() {
     cameraRequestRef.current += 1;
+    cameraOpenRef.current?.abort();
+    cameraOpenRef.current = null;
     mediaOperationRef.current?.abort();
     mediaOperationIdRef.current += 1;
     torchRequestRef.current += 1;
@@ -630,7 +641,13 @@ export const CameraCapture = memo(function CameraCapture({
         await ingestVideo(file, operation);
       } else {
         const { jpeg, imageData } = await processMediaFrame(file, 768, 240, 0.74, dimensions);
-        await emitFromMedia("photo", [jpeg], [observeFrame(imageData)], [scoreFrame(imageData)]);
+        signal.throwIfAborted();
+        if (!ownsMediaOperation(operation.id) || disabledRef.current) return;
+        const observation = observeFrame(imageData);
+        const quality = scoreFrame(imageData);
+        signal.throwIfAborted();
+        if (!ownsMediaOperation(operation.id) || disabledRef.current) return;
+        await emitFromMedia("photo", [jpeg], [observation], [quality]);
       }
     } catch (e) {
       if (ownsMediaOperation(operation.id) && !(e instanceof DOMException && e.name === "AbortError")) {
@@ -924,6 +941,10 @@ export const CameraCapture = memo(function CameraCapture({
               Close
             </Button>
           </>
+        ) : busy ? (
+          <Button variant="ghost" className="flex-1" onClick={stopLive} disabled={disabled}>
+            Cancel current operation
+          </Button>
         ) : (
           <Button
             variant="outline"
@@ -937,7 +958,7 @@ export const CameraCapture = memo(function CameraCapture({
       </div>
       {busy && (
         <p className="text-xs text-muted" role="status">
-          Processing camera frames…
+          Opening or processing camera media…
         </p>
       )}
     </div>

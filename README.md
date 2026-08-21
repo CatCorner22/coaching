@@ -33,6 +33,10 @@ Camera and media behavior still requires real-device checks on current iOS Safar
 PGLite is a `npm run dev` convenience only. Production builds, `npm run preview`,
 and `npm run build:dev` do not use an embedded database; configure
 `DATABASE_URL` before exercising any server-side database path in those modes.
+`npm run build` is deliberately side-effect-free. Run `npm run db:migrate` once
+from a protected release job against the intended environment before promoting
+the already-verified artifact; never expose a production database URL to an
+untrusted pull-request or preview build.
 
 ## Deployment requirements
 
@@ -40,6 +44,7 @@ and `npm run build:dev` do not use an embedded database; configure
 - If embedded, the top-level site must deliberately grant the frame camera permission through Permissions Policy. The app never requests microphone audio as part of camera capture.
 - Set provider-level spend/concurrency limits in addition to the per-user, per-instance application limits.
 - Enable real authentication for production AI. Cost-bearing endpoints reject the shared development identity and require a same-origin browser request in production.
+- Auth-on live preview requires the confidential `GROK_PREVIEW_CLIENT_SECRET` as a server-only injected variable. Never place it in `VITE_*`, source, client configuration, or build artifacts; rotate the previously shared preview credential before reuse.
 - Confirm the applicable xAI account terms, retention configuration, and availability of Zero Data Retention before accepting personal data. The UI assumes already-transmitted requests cannot be recalled.
 - Install from the committed `package-lock.json` with `npm ci --ignore-scripts`. CI uses exact Node 22.23.2 and fails if a production build changes the committed lockfile or generated route tree.
 - Validate from a clean provider workspace with its generated `.grok/app-env.json`. CI runs the app-specific PWA fixture plus production desktop/mobile browser smoke, but provider authentication and camera hardware still require environment testing.

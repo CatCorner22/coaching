@@ -11,7 +11,11 @@ export const MAX_VIDEO_FRAME_EDGE = 5_120;
 
 const MEDIA_EVENT_TIMEOUT_MS = 12_000;
 const IMAGE_DECODE_TIMEOUT_MS = 8_000;
-let bitmapDecodePending = false;
+// Native bitmap decoding cannot be cancelled. Keep one orphan at a time, but
+// release the lease after a long cooldown so a decoder promise that never
+// settles cannot permanently disable every later photo import.
+const BITMAP_DECODE_STALL_RESET_MS = 30_000;
+let bitmapDecodeLease: symbol | null = null;
 
 const PHOTO_MIME_TYPES = new Set([
   "image/jpeg",
@@ -419,23 +423,30 @@ async function canvasFromSource(
   } else if (typeof HTMLImageElement !== "undefined" && src instanceof HTMLImageElement) {
     return drawContain(src, maxEdge, src.naturalWidth, src.naturalHeight);
   } else if (typeof createImageBitmap === "function") {
-    if (bitmapDecodePending) {
+    if (bitmapDecodeLease !== null) {
       throw new Error("A previous image decode is still finishing. Wait before choosing another photo.");
     }
     const bitmapOptions = knownDimensions
       ? resizedBitmapOptions(knownDimensions.width, knownDimensions.height, maxEdge)
       : undefined;
-    bitmapDecodePending = true;
+    const lease = Symbol("bitmap-decode");
+    bitmapDecodeLease = lease;
+    const releaseLease = () => {
+      if (bitmapDecodeLease !== lease) return;
+      bitmapDecodeLease = null;
+      window.clearTimeout(stallTimer);
+    };
+    const stallTimer = window.setTimeout(releaseLease, BITMAP_DECODE_STALL_RESET_MS);
     let bitmapPromise: Promise<ImageBitmap>;
     try {
       bitmapPromise = bitmapOptions ? createImageBitmap(src, bitmapOptions) : createImageBitmap(src);
     } catch (error) {
-      bitmapDecodePending = false;
+      releaseLease();
       throw error;
     }
     void bitmapPromise.then(
-      () => { bitmapDecodePending = false; },
-      () => { bitmapDecodePending = false; },
+      releaseLease,
+      releaseLease,
     );
     const bitmap = await withTimeout(
       bitmapPromise,
@@ -517,11 +528,14 @@ function resizedBitmapOptions(
   maxEdge: number,
 ): ImageBitmapOptions {
   const scale = Math.min(1, maxEdge / Math.max(width, height, 1));
-  return {
-    resizeWidth: Math.max(1, Math.round(width * scale)),
-    resizeHeight: Math.max(1, Math.round(height * scale)),
-    resizeQuality: "high",
-  };
+  if (scale >= 1) return {};
+  // Setting both dimensions from raw JPEG metadata can distort EXIF-rotated
+  // images because createImageBitmap applies orientation during decode. Set a
+  // single dimension and let the decoder preserve its oriented aspect ratio;
+  // drawContain enforces the final max edge afterward.
+  return width >= height
+    ? { resizeWidth: Math.max(1, Math.round(width * scale)), resizeQuality: "high" }
+    : { resizeHeight: Math.max(1, Math.round(height * scale)), resizeQuality: "high" };
 }
 
 export async function extractVideoFrames(

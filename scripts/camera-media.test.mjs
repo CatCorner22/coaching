@@ -13,6 +13,7 @@ import {
 import {
   applyFocus,
   openRopeCamera,
+  playCameraPreview,
   setTorch,
   startClip,
   torchAvailable,
@@ -310,6 +311,72 @@ test("openRopeCamera stops every acquired stream when post-acquisition setup thr
   assert.equal(stopped, 3);
 });
 
+test("openRopeCamera aborts a pending acquisition, stops a late stream, and does not retry", async (t) => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  t.after(() => restoreGlobal("navigator", original));
+  let resolveAcquisition;
+  let calls = 0;
+  let stopped = 0;
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: {
+      mediaDevices: {
+        getUserMedia: () => {
+          calls += 1;
+          return new Promise((resolve) => {
+            resolveAcquisition = resolve;
+          });
+        },
+      },
+    },
+  });
+  const controller = new AbortController();
+  const pending = openRopeCamera("environment", { signal: controller.signal, timeoutMs: 1_000 });
+  controller.abort();
+  await assert.rejects(pending, (error) => error?.name === "AbortError");
+  assert.equal(calls, 1);
+  resolveAcquisition({
+    getTracks: () => [{ stop: () => { stopped += 1; } }],
+    getVideoTracks: () => [],
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(stopped, 1);
+  assert.equal(calls, 1);
+});
+
+test("openRopeCamera bounds a stalled permission prompt without starting fallback requests", async (t) => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  t.after(() => restoreGlobal("navigator", original));
+  let calls = 0;
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: {
+      mediaDevices: {
+        getUserMedia: () => {
+          calls += 1;
+          return new Promise(() => undefined);
+        },
+      },
+    },
+  });
+  await assert.rejects(
+    openRopeCamera("environment", { timeoutMs: 5 }),
+    /timed out/i,
+  );
+  assert.equal(calls, 1);
+});
+
+test("playCameraPreview is abortable when HTMLMediaElement.play never settles", async () => {
+  const controller = new AbortController();
+  const pending = playCameraPreview(
+    { play: () => new Promise(() => undefined) },
+    controller.signal,
+    1_000,
+  );
+  controller.abort();
+  await assert.rejects(pending, (error) => error?.name === "AbortError");
+});
+
 test("applyFocus is bounded when a device never settles constraints", async (t) => {
   const timeoutDescriptor = Object.getOwnPropertyDescriptor(globalThis, "setTimeout");
   const clearDescriptor = Object.getOwnPropertyDescriptor(globalThis, "clearTimeout");
@@ -579,7 +646,7 @@ test("a bitmap that resolves after its decode timeout is still closed", async (t
     window: {
       configurable: true,
       value: {
-        setTimeout: (callback) => realSetTimeout(callback, 0),
+        setTimeout: (callback, ms) => realSetTimeout(callback, ms === 30_000 ? 50 : 0),
         clearTimeout: realClearTimeout,
       },
     },
@@ -604,6 +671,46 @@ test("a bitmap that resolves after its decode timeout is still closed", async (t
   assert.equal(decodeCalls, 1);
   await new Promise((resolve) => realSetTimeout(resolve, 35));
   assert.equal(closes, 1);
+});
+
+test("a native bitmap decode that never settles cannot wedge later imports forever", async (t) => {
+  const names = ["window", "HTMLVideoElement", "HTMLImageElement", "createImageBitmap"];
+  const originals = new Map(
+    names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]),
+  );
+  const realSetTimeout = globalThis.setTimeout;
+  const realClearTimeout = globalThis.clearTimeout;
+  t.after(() => {
+    for (const [name, descriptor] of originals) restoreGlobal(name, descriptor);
+  });
+
+  let decodeCalls = 0;
+  Object.defineProperties(globalThis, {
+    window: {
+      configurable: true,
+      value: {
+        setTimeout: (callback, ms) => realSetTimeout(callback, ms === 30_000 ? 10 : 0),
+        clearTimeout: realClearTimeout,
+      },
+    },
+    HTMLVideoElement: { configurable: true, value: class {} },
+    HTMLImageElement: { configurable: true, value: class {} },
+    createImageBitmap: {
+      configurable: true,
+      value: () => {
+        decodeCalls += 1;
+        if (decodeCalls === 1) return new Promise(() => undefined);
+        throw new Error("decoder retry reached");
+      },
+    },
+  });
+
+  await assert.rejects(processMediaFrame(new Blob(["image"])), /decode timed out/i);
+  await assert.rejects(processMediaFrame(new Blob(["image"])), /previous image decode/i);
+  assert.equal(decodeCalls, 1);
+  await new Promise((resolve) => realSetTimeout(resolve, 15));
+  await assert.rejects(processMediaFrame(new Blob(["image"])), /decoder retry reached/i);
+  assert.equal(decodeCalls, 2);
 });
 
 test("extractVideoFrames handles a zero-duration recording and always revokes its URL", async (t) => {

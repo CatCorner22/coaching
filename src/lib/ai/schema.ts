@@ -49,7 +49,11 @@ export type AnalyzeResult =
       error: string;
       /** Admission failures happen before any provider request is attempted. */
       providerAttempted: false;
-      code: "AI_RATE_LIMITED" | "MEDIA_BATCH_REPLAYED" | "MEDIA_BATCH_RESERVATION_UNCERTAIN";
+      code:
+        | "AI_PROVIDER_UNAVAILABLE"
+        | "AI_RATE_LIMITED"
+        | "MEDIA_BATCH_REPLAYED"
+        | "MEDIA_BATCH_RESERVATION_UNCERTAIN";
       status: 409 | 429 | 503;
       /** Only quota rejection rolls back the batch reservation for a later retry. */
       retryableBeforeProvider: boolean;

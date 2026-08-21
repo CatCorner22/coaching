@@ -67,6 +67,24 @@ jobs:
             echo "Production build did not emit a functions directory."
             exit 1
           fi
+
+      - name: Verify production excludes a baked preview OAuth secret
+        shell: bash
+        run: |
+          functions_dir=.vercel/output/functions
+          if grep --recursive --line-number --binary-files=without-match \
+            --extended-regexp --include='*.mjs' --include='*.js' \
+            '(grok_preview.{0,512}[[:xdigit:]]{64}|[[:xdigit:]]{64}.{0,512}grok_preview)' \
+            "$functions_dir"; then
+            echo "Production server output retained a credential-shaped preview OAuth secret."
+            exit 1
+          else
+            scan_status=$?
+            if [[ "$scan_status" -ne 1 ]]; then
+              echo "Preview credential artifact scan failed with status $scan_status."
+              exit "$scan_status"
+            fi
+          fi
           if grep --recursive --line-number --binary-files=without-match \
             --extended-regexp --include='*.mjs' --include='*.js' \
             'pglite\.(data|wasm)|initdb\.wasm' "$functions_dir"; then

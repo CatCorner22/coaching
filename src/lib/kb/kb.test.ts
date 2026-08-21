@@ -12,11 +12,13 @@ import {
   articleExcerpts,
   getKnot,
   getTie,
+  getArticleEvidence,
   isKnowledgeQueryUsable,
   knowledgeAnswer,
+  knowledgeDisposition,
   searchKnowledge,
 } from "./index.ts";
-import { SAFETY_SOURCES } from "./sources.ts";
+import { SAFETY_SOURCE_IDS, SAFETY_SOURCES, SOURCE_LEDGER_REVISION } from "./sources.ts";
 
 test("tie slugs are unique and getTie round-trips", () => {
   const slugs = TIES.map((t) => t.slug);
@@ -90,6 +92,25 @@ test("safety source identifiers and links are unique, stable, and HTTPS", () => 
     assert.ok(url.hostname.includes("."), source.id);
     assert.ok(source.note.length > 40, `${source.id} is missing an evidence-limit note`);
   }
+  assert.deepEqual(SAFETY_SOURCE_IDS, ids);
+  assert.equal(SAFETY_SOURCES.find((source) => source.id === "PRIVACY-1")?.title.startsWith("OpenAI"), true);
+  assert.equal(SAFETY_SOURCES.find((source) => source.id === "XAI-PRIVACY-1")?.title.startsWith("xAI"), true);
+});
+
+test("every article exposes honest evidence status and only canonical source anchors", () => {
+  const canonical = new Set(SAFETY_SOURCE_IDS);
+  for (const article of ARTICLES) {
+    const evidence = getArticleEvidence(article.slug);
+    assert.equal(evidence.ledgerRevision, SOURCE_LEDGER_REVISION, article.slug);
+    assert.match(evidence.auditedAt, /^\d{4}-\d{2}-\d{2}$/u, article.slug);
+    assert.ok(evidence.note.length > 80, article.slug);
+    assert.equal(evidence.status === "source_anchored", evidence.sourceIds.length > 0, article.slug);
+    for (const sourceId of evidence.sourceIds) {
+      assert.ok(canonical.has(sourceId), `${article.slug} has unknown source ${sourceId}`);
+    }
+  }
+  assert.ok(getArticleEvidence("photography-ethics").sourceIds.includes("XAI-PRIVACY-1"));
+  assert.ok(getArticleEvidence("emergency-stop").sourceIds.includes("FIRSTAID-1"));
 });
 
 test("every sequence step is a real tie", () => {
@@ -166,6 +187,28 @@ test("safety-oriented aliases route common wording to reviewed entries", () => {
 test("urgent natural-language intent prioritizes emergency release guidance and shears", () => {
   for (const query of [
     "not breathing",
+    "stopped breathing",
+    "isn't breathing",
+    "gasping for air",
+    "can't catch their breath",
+    "struggling to breathe",
+    "barely breathing",
+    "labored breathing",
+    "shallow breathing",
+    "short of breath",
+    "breathless",
+    "struggling for breath",
+    "cannot get air",
+    "suffocating",
+    "gasping",
+    "wheezing and cannot speak",
+    "cyanotic",
+    "her lips are turning blue",
+    "turning blue",
+    "no pulse",
+    "cardiac arrest",
+    "heart attack",
+    "his heart stopped",
     "can't breathe",
     "cut rope now",
     "passed out",
@@ -176,10 +219,145 @@ test("urgent natural-language intent prioritizes emergency release guidance and 
     "他昏倒了",
     "癫痫发作",
     "胸痛",
+    "severe bleeding",
+    "major weakness",
+    "loss of consciousness",
+    "collapsed and won't wake up",
+    "can't wake them",
+    "cannot awaken them",
+    "she does not wake up",
+    "not waking up",
+    "not conscious",
+    "out cold",
+    "cannot stay awake",
+    "bleeding profusely",
+    "bleeding heavily",
+    "bleeding won't stop",
+    "blood is spurting",
+    "hemorrhaging",
+    "massive blood loss",
+    "he is convulsing",
+    "his speech is slurred",
+    "drooping face",
+    "head injury",
+    "she fell and banged her head",
+    "fell from suspension",
+    "fell from the ceiling",
+    "dropped from the rig",
+    "they are suddenly confused",
+    "very confused",
+    "altered mental status",
+    "rope around neck and voice changed",
+    "rope across throat and raspy voice",
+    "ligature around neck and dizzy",
+    "neck pressure and cannot speak",
+    "serious fall",
+    "severe confusion",
+    "neck pressure followed by concerning symptoms",
+    "she is choking",
+    "cut the ropes now",
+    "cut them free now",
+    "emergency release immediately",
+    "息が苦しい",
+    "意識不明です",
+    "血が止まらない",
+    "今すぐ縄を切って",
+    "喘不上气",
+    "怎么叫也叫不醒",
+    "血流不止",
+    "马上把绳子剪断",
+    "숨을 쉴 수 없어요",
+    "깨워도 안 일어나요",
+    "피가 멈추지 않아요",
+    "지금 당장 밧줄을 잘라",
+    "出血がひどい",
+    "中风",
+    "喉が締まっている",
+    "호흡곤란",
   ]) {
     const hits = searchKnowledge(query, 4);
     assert.equal(hits[0]?.slug, "emergency-stop", query);
     assert.ok(hits.slice(0, 3).some((hit) => hit.slug === "shears"), query);
+    assert.equal(knowledgeDisposition(query).kind, "emergency", query);
+    assert.match(knowledgeAnswer(query), /^Emergency: stop the activity\./u, query);
+    assert.match(knowledgeAnswer(query), /Call local emergency services now/u, query);
+  }
+});
+
+test("action-first routing covers release, delayed neck symptoms, consent, and media scope", () => {
+  for (const query of [
+    "numb fingers",
+    "faintness",
+    "cannot feel my fingers",
+    "fingers will not move",
+    "arm is purple",
+    "pain is getting worse",
+    "rope cut off circulation",
+    "指の感覚がない",
+    "手没有知觉",
+    "손에 감각이 없어요",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "release_now", query);
+    assert.match(knowledgeAnswer(query), /^Stop and release now/u, query);
+  }
+  assert.equal(knowledgeDisposition("strangled yesterday").kind, "prompt_medical");
+  assert.match(knowledgeAnswer("strangled yesterday"), /^Possible neck-pressure exposure/u);
+  for (const query of [
+    "withdraw consent",
+    "I don't consent",
+    "I do not consent",
+    "there is no consent",
+    "stop recording me",
+    "recorded without permission",
+    "uploaded without permission",
+    "the recording was secret",
+    "the camera is hidden",
+    "delete my photo",
+    "I was forced to pose for a photo",
+    "stop, I changed my mind",
+    "they told me to stop",
+    "やめてと言われた",
+    "对方说停下",
+    "상대가 그만하라고 했어요",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "consent_withdrawn", query);
+    assert.match(knowledgeAnswer(query), /^Consent is absent or withdrawn/u, query);
+  }
+  for (const query of ["minor", "underage", "under 18", "ambiguous age", "nude", "explicit image"]) {
+    assert.equal(knowledgeDisposition(query).kind, "unsupported_media", query);
+    assert.equal(searchKnowledge(query, 1)[0]?.slug, "photography-ethics", query);
+    assert.match(knowledgeAnswer(query), /^Unsupported media:/u, query);
+    assert.match(knowledgeAnswer(query), /does not automatically detect/u, query);
+  }
+});
+
+test("action-first queries suppress procedural catalog navigation", () => {
+  for (const query of [
+    "seizure hogtie",
+    "choking single column",
+    "withdraw consent takate kote",
+    "nude somerville bowline",
+  ]) {
+    const hits = searchKnowledge(query, 12);
+    assert.ok(hits.length > 0, query);
+    assert.ok(hits.every((hit) => hit.kind === "article" || hit.kind === "gear"), query);
+    assert.doesNotMatch(knowledgeAnswer(query), /Takate|Hogtie|Single Column|Somerville/iu, query);
+  }
+});
+
+test("action routing avoids adjacent non-emergency wording", () => {
+  for (const query of [
+    "breathing exercise",
+    "blue rope care",
+    "purple rope comparison",
+    "the rope is turning blue",
+    "speech practice",
+    "fall prevention",
+    "recording permission settings",
+    "stop recording timer",
+    "consent frameworks",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "ordinary", query);
   }
 });
 
@@ -211,10 +389,10 @@ test("generic catalog search hits deep-link to the selected item", () => {
   assert.equal(searchKnowledge("pudendal", 8).find((hit) => hit.slug === "pudendal")?.href, "/nerves?nerve=pudendal");
 });
 
-test("reviewed answers are deterministic and available without a server or AI", () => {
+test("curated answers are deterministic and available without a server or AI", () => {
   const answer = knowledgeAnswer("coercion");
   assert.match(answer, /Consent Frameworks/);
   assert.match(answer, /does not validate a setup/);
   assert.equal(answer, knowledgeAnswer("coercion"));
-  assert.match(knowledgeAnswer("zzzzqvvvv"), /No reviewed entry matched/);
+  assert.match(knowledgeAnswer("zzzzqvvvv"), /No curated local entry matched/);
 });

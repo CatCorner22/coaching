@@ -69,6 +69,7 @@ function StudioPage() {
   const { user: currentUser, isPending: authPending } = useCurrentUserState();
   const nerveHits = useJournal((j) => j.nerveHits);
   const addEntry = useJournal((j) => j.add);
+  const removeEntry = useJournal((j) => j.remove);
   const items = useNegotiate((s) => s.items);
   const stopSession = useSession((s) => s.stop);
   const setStep = useSession((s) => s.setStep);
@@ -93,8 +94,10 @@ function StudioPage() {
   const [triage, setTriage] = useState<TriageState | "unanswered">("unanswered");
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [refusal, setRefusal] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [savedReportRevision, setSavedReportRevision] = useState<string | null>(null);
+  const [savedEntryId, setSavedEntryId] = useState<string | null>(null);
   const [micArmed, setMicArmed] = useState(false);
+  const micArmedRef = useRef(false);
   const [micStatus, setMicStatus] = useState<"idle" | "starting" | "active" | "error" | "unsupported">("idle");
   const analysisRequestRef = useRef(0);
   const currentContextRef = useRef(captureContextKey);
@@ -149,6 +152,7 @@ function StudioPage() {
       (status) => {
         setMicStatus(status);
         if (status === "error" || status === "unsupported" || status === "idle") {
+          micArmedRef.current = false;
           setMicArmed(false);
         }
       },
@@ -166,7 +170,9 @@ function StudioPage() {
   useEffect(() => {
     const contextChanged = captureContextRef.current !== captureContextKey;
     captureContextRef.current = captureContextKey;
-    setSaved(false);
+    setSavedReportRevision(null);
+    setSavedEntryId(null);
+    setRefusal(false);
     analysisRequestRef.current += 1;
     setPending(false);
     setAnalysisError(null);
@@ -188,11 +194,27 @@ function StudioPage() {
   }, [capture, captureMatchesContext]);
   const contextBoundReport = capture && !captureMatchesContext ? null : report;
   const contextBoundObservationReport = capture && !captureMatchesContext ? null : observationReport;
+  const reportRevision = useMemo(() => {
+    if (!contextBoundReport || !contextBoundObservationReport) return null;
+    return [
+      capture?.consent.batchId ?? "no-media",
+      modelStatus,
+      contextBoundObservationReport.schema_version,
+      contextBoundObservationReport.source_ledger_revision,
+      contextBoundObservationReport.report_type,
+      contextBoundObservationReport.disposition,
+      contextBoundObservationReport.next_step_id,
+      contextBoundReport.final.coaching,
+      contextBoundReport.final.flags.map((flag) => `${flag.code}:${flag.severity}`).join(","),
+    ].join("|");
+  }, [capture?.consent.batchId, contextBoundObservationReport, contextBoundReport, modelStatus]);
+  const currentReportSaved = reportRevision !== null && savedReportRevision === reportRevision;
 
   useEffect(() => {
     if (!stopped) return;
     analysisRequestRef.current += 1;
     stopCoachVoice();
+    micArmedRef.current = false;
     setMicArmed(false);
     setPending(false);
     captureContextAtCommitRef.current = null;
@@ -226,13 +248,23 @@ function StudioPage() {
         modelStatus: "not_requested",
       }),
     );
+    setRefusal(false);
     setModelStatus("not_requested");
     if (next.final.recommend === "stop") stopSession("coach");
   }, [det, capture, tie, stepIndex, nerveHits, hardNos, stopSession]);
 
   useEffect(() => {
     if (triage === "unanswered" || triage === "none") return;
+    // A direct symptom/consent report supersedes every prior visual result.
+    // Invalidate the request and capture-derived coach text so an urgent action
+    // cannot be displayed or journaled beside stale visual coaching.
+    analysisRequestRef.current += 1;
+    setPending(false);
+    setReport(null);
+    setSavedReportRevision(null);
+    setAnalysisError(null);
     setAnalysisConsumed(true);
+    setRefusal(false);
     setModelStatus("not_requested");
     setObservationReport(
       buildObservationReport({
@@ -301,7 +333,7 @@ function StudioPage() {
           res.selfAudit.hardLimit
         ) {
           stopSession("observation");
-        } else if (settings.voice && !micArmed) {
+        } else if (settings.voice && !micArmedRef.current) {
           void playCoachVoice(res.report.final.speak, settings.voice);
         }
       } else {
@@ -327,6 +359,7 @@ function StudioPage() {
     captureContextAtCommitRef.current = currentContextRef.current;
     setPending(false);
     setAnalysisError(null);
+    setRefusal(false);
     setReport(null);
     setObservationReport(null);
     setModelStatus("not_requested");
@@ -342,6 +375,7 @@ function StudioPage() {
     captureContextAtCommitRef.current = null;
     setPending(false);
     setAnalysisError(null);
+    setRefusal(false);
     setReport(null);
     setObservationReport(null);
     setModelStatus("not_requested");
@@ -428,10 +462,12 @@ function StudioPage() {
             className="font-medium text-fg underline-offset-2 hover:underline"
             onClick={() => {
               if (micArmed) {
+                micArmedRef.current = false;
                 setMicArmed(false);
                 setMicStatus("idle");
               } else {
                 setMicStatus("starting");
+                micArmedRef.current = true;
                 setMicArmed(true);
               }
             }}
@@ -528,6 +564,7 @@ function StudioPage() {
                 disabled={stopped || !settings.voice}
                 onClick={() => {
                   if (useSession.getState().stopped) return;
+                  micArmedRef.current = false;
                   setMicArmed(false);
                   setMicStatus("idle");
                   const line = tie.steps[stepIndex]?.speak;
@@ -654,11 +691,12 @@ function StudioPage() {
           <Button
             variant="ghost"
             size="sm"
-            disabled={!contextBoundReport || !contextBoundObservationReport}
+            disabled={!contextBoundReport || !contextBoundObservationReport || !reportRevision || currentReportSaved}
             onClick={() => {
-              if (!contextBoundReport || !contextBoundObservationReport) return;
+              if (!contextBoundReport || !contextBoundObservationReport || !reportRevision) return;
               const snapshot = useSession.getState();
-              addEntry({
+              if (savedEntryId) removeEntry(savedEntryId);
+              const entryId = addEntry({
                 tieSlug: snapshot.tieSlug,
                 minutes: Math.round(snapshot.elapsed / 60),
                 notes: contextBoundReport.final.coaching.slice(0, 280),
@@ -667,10 +705,11 @@ function StudioPage() {
                 limitations: contextBoundObservationReport.limitations.slice(0, 3),
                 sourceIds: contextBoundObservationReport.source_ids,
               });
-              setSaved(true);
+              setSavedEntryId(entryId);
+              setSavedReportRevision(reportRevision);
             }}
           >
-            {saved ? "Saved on this device" : "Save to journal"}
+            {currentReportSaved ? "Saved on this device" : savedEntryId ? "Update journal report" : "Save to journal"}
           </Button>
           <p className="text-xs leading-relaxed text-subtle">
             Captures stay in page memory until replaced, stopped, or the page closes; the journal

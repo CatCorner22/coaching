@@ -2,6 +2,7 @@ import { Volume2 } from "lucide-react";
 import { memo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SourceEvidence } from "@/components/source-evidence";
 import type { CoachReport } from "@/lib/ml/types";
 import type { ModelStatus, ObservationReport } from "@/lib/observation/report";
 import { playCoachVoice } from "@/lib/voice/play";
@@ -46,7 +47,7 @@ export const CoachPanel = memo(function CoachPanel({
     completed: "xAI categories · closed schema",
     refused: "xAI declined · insufficient view",
     unavailable: "xAI unavailable · local report",
-    failed: "xAI output discarded · local report",
+    failed: "xAI contract failure · conservative report",
   };
   return (
     <div className="space-y-3 rounded-lg border border-border bg-elevated p-4">
@@ -74,6 +75,24 @@ export const CoachPanel = memo(function CoachPanel({
           <span className="text-fg">Next action. </span>
           {observationReport.next_step_id.replaceAll("_", " ")}.
         </p>
+      )}
+      {observationReport && observationReport.nonvisual_checks.length > 0 && (
+        <div
+          className={cn(
+            "rounded-md border px-3 py-2",
+            urgent ? "border-danger/40 bg-danger/10" : "border-border bg-surface",
+          )}
+          role={urgent ? "alert" : undefined}
+        >
+          <p className="text-[11px] uppercase tracking-wide text-subtle">Action checklist</p>
+          <ol className="mt-1 list-decimal space-y-1 pl-4">
+            {observationReport.nonvisual_checks.map((check) => (
+              <li key={check} className="text-xs text-fg">
+                {check}
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
       {report && report.final.flags.length > 0 && (
         <ul className="space-y-1.5">
@@ -113,8 +132,9 @@ export const CoachPanel = memo(function CoachPanel({
             {observationReport.limitations[0]} No visible concern is never an all-clear.
           </p>
           <p className="text-[11px] text-subtle">
-            Schema {observationReport.schema_version} · sources {observationReport.source_ids.join(", ")}
+            Schema {observationReport.schema_version} · ledger {observationReport.source_ledger_revision}
           </p>
+          <SourceEvidence sourceIds={observationReport.source_ids} />
         </>
       )}
       {voice && !halted && report && (

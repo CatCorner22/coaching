@@ -4,6 +4,7 @@ import {
   assertProductionAuthEnvironment,
   AuthConfigurationError,
   productionAuthProblems,
+  normalizeHttpsOrigin,
 } from "./config.ts";
 
 const valid = {
@@ -59,4 +60,23 @@ test("development and an explicit production auth-off build retain safe fallback
     productionAuthProblems({ NODE_ENV: "production", VITE_AUTH_ENABLED: "false" }),
     [],
   );
+});
+
+test("provider and gate trust roots must be credential-free HTTPS origins", () => {
+  assert.equal(normalizeHttpsOrigin("https://auth.grok.me/"), "https://auth.grok.me");
+  for (const candidate of [
+    "http://auth.grok.me",
+    "https://user:pass@auth.grok.me",
+    "https://auth.grok.me/path",
+    "https://auth.grok.me?next=x",
+  ]) {
+    assert.equal(normalizeHttpsOrigin(candidate), null, candidate);
+  }
+  const problems = productionAuthProblems({
+    ...valid,
+    GROK_AUTH_ISSUER: "http://attacker.invalid/path",
+    GROK_GATE_ORIGIN: "https://gate.grok.me/untrusted-path",
+  });
+  assert.ok(problems.some((problem) => problem.startsWith("GROK_AUTH_ISSUER")));
+  assert.ok(problems.some((problem) => problem.startsWith("GROK_GATE_ORIGIN")));
 });

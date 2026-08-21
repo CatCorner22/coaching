@@ -41,7 +41,7 @@ test("auth routes, production validation, and provider capability discovery are 
   assert.match(login, /capabilities\.oauthProviders/);
 });
 
-test("the compile-time dev-server boundary owns PGLite and preview credentials", () => {
+test("the compile-time dev-server boundary owns PGLite and server-injected preview credentials", () => {
   const db = read("src/lib/db.ts");
   const auth = read("src/lib/auth/server.ts");
   const aiGuard = read("src/lib/ai/guard.server.ts");
@@ -57,6 +57,8 @@ test("the compile-time dev-server boundary owns PGLite and preview credentials",
   assert.doesNotMatch(db, /__pgBootstrapPromise__/);
   assert.doesNotMatch(auth, /void ensureDbReady\(\)/);
   assert.match(auth, /const production = !viteDevServer/);
+  assert.match(auth, /env\("GROK_PREVIEW_CLIENT_SECRET"\)/);
+  assert.doesNotMatch(read("src/lib/auth/preview.ts"), /export const PREVIEW_CLIENT_SECRET|[a-f0-9]{64}/i);
   assert.match(auth, /: viteDevServer[\s\S]*?pgliteDialect/);
   assert.match(auth, /rateLimit: \{ enabled: true, window: 60, max: 100 \}/);
   assert.match(aiGuard, /userId === DEV_USER_ID && !viteDevServer/);
@@ -78,18 +80,20 @@ test("the compile-time dev-server boundary owns PGLite and preview credentials",
 
 test("hosting-gate session rotation rejects invalid identity and adapter failures", () => {
   const source = read("src/lib/auth/gate-session.server.ts");
+  const auth = read("src/lib/auth/server.ts");
   assert.match(source, /APIError,[\s\S]*?from "better-auth\/api"/);
   assert.match(source, /if \(!inbound\.has\(GATE_IDENTITY_HEADER\)\) return/);
 
   const verify = source.indexOf("const identity = await gateIdentityFromHeaders(inbound)");
   const invalid = source.indexOf('throw new APIError("UNAUTHORIZED"', verify);
-  const bearerFastPath = source.indexOf(
-    'if (inbound.get("authorization")) return;',
-    verify,
+  assert.ok(verify >= 0 && verify < invalid);
+  assert.doesNotMatch(source, /if \(inbound\.get\("authorization"\)\) return/);
+  assert.ok(
+    auth.indexOf("bearer(),") < auth.indexOf("gateIdentitySessions(),"),
+    "bearer translation must run before authoritative gate binding",
   );
-  assert.ok(verify >= 0 && verify < invalid && invalid < bearerFastPath);
 
-  const inspect = source.indexOf("const existing = await getSessionFromCtx(ctx)");
+  const inspect = source.indexOf("const existing = await getSessionFromCtx(ctx, {");
   const accounts = source.indexOf("await ctx.context.internalAdapter.findAccounts", inspect);
   const remove = source.indexOf("await ctx.context.internalAdapter.deleteSession", accounts);
   const mint = source.indexOf("const result = await handleOAuthUserInfo", remove);
@@ -101,7 +105,34 @@ test("hosting-gate session rotation rejects invalid identity and adapter failure
   );
   assert.match(source, /if \(err instanceof APIError\) throw err/);
   assert.match(source, /throw new APIError\("INTERNAL_SERVER_ERROR"/);
-  assert.match(source, /Already signed in as this gate identity[\s\S]*?return;/);
+  assert.match(
+    source,
+    /sessionBoundToGateIdentity\([\s\S]*?await expireSessionDataCookies\([\s\S]*?removeRequestCookieFamily\([\s\S]*?return \{ context: \{ headers \} \};/,
+  );
+  assert.match(source, /disableCookieCache: true/);
+  assert.match(source, /removeRequestCookieFamily/);
+  assert.match(source, /from "\.\/gate-cookie-core"/);
+  assert.match(source, /ctx\.headers \?\? ctx\.request\?\.headers/);
+});
+
+test("session cookie delivery and chunk cleanup fail closed", () => {
+  const source = read("src/lib/auth/gate-session.server.ts");
+  assert.match(source, /let delivered = false/);
+  assert.match(source, /return delivered \? sessionValue : null/);
+  assert.match(source, /expireSessionDataCookies/);
+  assert.match(source, /sessionDataCookieNames/);
+  assert.doesNotMatch(source, /\{ userId: result\.data\.user\.id \}/);
+
+  const pkg = JSON.parse(read("package.json"));
+  assert.match(pkg.scripts["test:typed-core"], /gate-cookie-core\.test\.ts/);
+});
+
+test("ordinary builds are side-effect-free and migrations are explicit", () => {
+  const pkg = JSON.parse(read("package.json"));
+  const migrate = read("scripts/migrate.mjs");
+  assert.doesNotMatch(pkg.scripts.build, /migrate/);
+  assert.match(pkg.scripts["db:migrate"], /scripts\/migrate\.mjs/);
+  assert.match(migrate, /only when explicitly invoked/i);
 });
 
 test("preview popup completion is bound to its opener and a one-time nonce", () => {

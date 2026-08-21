@@ -1,178 +1,240 @@
-# Knotty omnibus engineering, product, and safety review
+# Knotty omnibus engineering, product, knowledge, and safety review
 
 Review date: 2026-08-21  
-Reviewed `main`: `cf5317206a47f037983b4c65e18b825705edc777`  
-Core implementation: merged pull request #2, `058bb386720d9617afe75cfde6d84e9cd585d300`  
-Concurrent deep-review hardening: merged pull request #4, `9b02ad96e3fad02e90f51d564a467a2961f8b413`  
-Final hardening: pull request #3, `codex/final-camera-kb-reliability`
+Reviewed `main`: `20b76441a5d6b77d5e27f86a8356152af6f4ed23`  
+Knowledge-ledger revision: `2026-08-21.2`
 
 ## Outcome
 
-The merged core, pull request #4's deep-review corrections, and the four-file
-final hardening follow-up contain the integrated stabilization work from repeated
-independent and adversarial reviews. The exact Node 22.23.2 release pipeline now
-builds one valid Vercel server bundle, verifies generated artifacts, typechecks,
-lints with zero warnings, runs the complete source-owned test corpus and PWA
-fixture, and smoke-tests the production preview in desktop and mobile Chromium.
+This branch integrates a fresh full-repository review, independent adversarial
+agent storms, source research, and regression-backed corrections across camera
+capture, photo/video import, observation reports, knowledge routing, provider
+contracts, authentication, build behavior, and release automation.
 
-Merge the follow-up only after its exact combined-head CI run completes. Keep
-the release uncertified until the external matrix is recorded.
-Browser automation cannot prove real camera permission behavior, phone codecs,
-live identity/provider integration, database pooling, accessibility, or safe
-real-world use.
+No remaining reproducible source-level release blocker was found after the final
+camera-to-report-to-knowledge re-probe. Local validation passed all 381
+source-owned tests, TypeScript, zero-warning ESLint, the production build,
+generated server-module syntax checks, and secret/PGLite artifact scans. The
+exact Node 22.23.2 GitHub pipeline and its production Chromium smoke remain the
+authoritative merge gate.
 
-## Media scope
+These results establish behavior under deterministic fixtures. They do not
+certify a physical setup, a participant's health or consent, model accuracy, a
+real phone camera/codec, or a production identity/database/provider deployment.
 
-This is an adult-only, consent-centered application for equipment-only or
-clothed, non-explicit media. The camera path does not detect or certify age,
-consent, clothing, nudity, anonymity, health, or safety. Every submitted batch
-requires explicit adult, non-explicit, non-secret, non-coerced, all-participant,
-activity, recording, upload, and output attestations. Nude or explicit-image
-acceptance is not enabled.
+## Media and safety scope
 
-Photo and video support is therefore a structural media capability, not a claim
-that every browser/device/codec works or that every accepted file is appropriate
-to send. Video remains local and only one to three user-selected, labeled stills
-are transmitted; camera capture never requests audio.
+Knotty is adult-only and consent-centered. Its supported review scope is
+unoccupied equipment or clothed, non-explicit adult-consensual material. Nude or
+explicit images are prohibited and unsupported.
 
-## Multi-agent adversarial storms
+The app cannot automatically determine age, consent, coercion, secrecy, nudity,
+identity, health, or safety. The UI now says this directly instead of implying
+that attestations are technical detection. Every transmitted batch requires the
+operator to attest to adult participation, current and revocable consent,
+recording and upload permission, non-secret/non-coerced capture, and supported
+non-explicit scope.
 
-Independent agents challenged the same implementation from conflicting roles,
-then cross-reviewed the merged result:
+Photo and video support is a bounded media capability, not universal device or
+codec certification. Video stays local; the operator chooses one to three
+labeled stills, which the client re-encodes as JPEG before submission. The
+camera does not request audio. The model may describe visible equipment and
+uncertainty, but cannot clear a setup, diagnose a participant, infer exact rope
+paths, or replace an in-person qualified instructor or emergency services.
 
-1. camera lifecycle, permission denial/revocation, focus and torch hangs,
-   backgrounding, stale operations, recorder errors, decoder limits, malformed
-   containers, MIME spoofing, image-dimension bombs, phone formats, and cleanup;
-2. consent withdrawal, unclear-adult state, coercion/secret recording, reported
-   symptoms, context changes, account transitions, local erase, provider privacy,
-   and emergency routing;
-3. model injection, Unicode/homoglyph evasion, invented ontology IDs, exact-tie
-   claims, nonvisual inference, consequence downgrades, contradictory mutations,
-   and false clearance;
-4. authentication, hosting-gate identity, preview sessions, same-origin checks,
-   cancellation, quotas, response bounds, credential logging, account isolation,
-   and sign-in/sign-out failure paths;
-5. replay races, migration concurrency, transaction-pool behavior, per-replica
-   state, dependency/build drift, emitted JavaScript validity, PWA integration,
-   and production startup behavior;
-6. concurrent-main conflict resolution and a final no-edit release-adversary pass.
+## Adversarial review coverage
 
-The deterministic observation-report state storm evaluated 32,832 combinations
-without a throw or invalid report. A final focused adversarial pass reported no
-remaining reproducible source-level release blocker before CI.
+Independent agents attacked the implementation from overlapping but conflicting
+roles, then re-probed the integrated result:
+
+1. Camera lifecycle: permission denial/revocation, acquisition timeout,
+   front/back fallback, focus and torch hangs, interruption/backgrounding,
+   cancellation, stale ownership, late decoder completion, recorder errors,
+   object-URL cleanup, and orphaned bitmap work.
+2. Media boundaries: MIME spoofing, malformed containers, base64 ambiguity,
+   trailing data, image-dimension bombs, pixel/duration budgets, EXIF-oriented
+   resizing, unsupported formats, multi-frame ordering, and photo/video races.
+3. Safety state: consent withdrawal, unclear-adult state, secret/coerced media,
+   reported symptoms, emergency release, changed context, stale model output,
+   journal duplication, and failure to discard invalidated reports.
+4. Model boundary: prompt injection, invented ontology IDs, unsupported
+   nonvisual inference, exact-tie claims, contradictory severity, structured
+   refusal variants, nonterminal completions, prefixed/fenced JSON, and provider
+   contract violations.
+5. Knowledge routing: emergency, immediate-release, consent-withdrawal, and
+   neurovascular phrases in English, Japanese, Simplified Chinese, and Korean;
+   neighboring negative controls; procedural-result suppression; and action-first
+   presentation.
+6. Authentication and operations: bearer/cookie gate bypass, stale cached
+   sessions, split cookies, cross-identity rotation, cookie delivery failure,
+   origin/issuer validation, quota reservation order, missing-provider config,
+   credential exposure, build-time migrations, server artifacts, and exact-node
+   CI behavior.
+
+The final focused camera/knowledge pass completed 107/107 cases and reported no
+remaining high-severity defect. A broader integrated focused pass completed
+155/155 cases. The deterministic observation-report state storm continues to
+cover 32,832 state combinations without an invalid report or throw.
 
 ## Material corrections
 
-- Camera/media: bounded acquisition and constraint calls; secure-context and
-  permission errors; front/back fallback; stop-on-failure/background/pagehide;
-  idempotent bounded recording finalization; cancellation-aware metadata, seek,
-  and bitmap decode; strict MIME/signature/extension checks; JPEG, PNG, WebP,
-  HEIC/HEIF, MP4/MOV, 3GP, and WebM structural validation; dimension, pixel,
-  duration, and decoder-surface budgets; user-selected video stills; no audio.
-- Observation contract: closed schema 1.1 IDs, per-frame evidence and abstention,
-  confounders, immutable consequence floors, source ledger, strict cross-field
-  validation, C3 instructor routing, C4 stop routing, action-first symptom and
-  coercion handling, and no chronology, physiology, exact-tie, or safety claims.
-- Knowledge base: deterministic offline answers, stable source IDs and HTTPS
-  links, unique routeable slugs, bounded/deduplicated results, Unicode-aware
-  tokenization, bounded CJK segmentation, urgent English/Japanese/Chinese intent
-  routing, safe-start routing, and explicit instructor/emergency boundaries.
-- Server/auth: verified middleware context for cost-bearing endpoints,
-  production same-origin enforcement, hosting-gate verification with bounded
-  JWKS single-flight, explicit auth-endpoint rate limiting, bounded provider
-  calls, reviewed-line-only cloud voice, account-local data isolation, durable
-  Postgres media reservations, small timeout-bounded pools, and
-  transaction-scoped migration locking.
-- Privacy/resilience: per-batch permissions, no secret recording, cross-tab erase,
-  legacy-key cleanup, late-response invalidation, no remote profile images,
-  accurate provider-retention caveats, and an auth-independent emergency route.
-- Concurrent deep review: fixed the TypeScript script-test loader; added the
-  required custom-card banner metadata and asset; removed unused AI and P2P code;
-  moved account-isolation storage reads behind an SSR-safe effect; and made a
-  production database configuration without enabled authentication fail closed.
-- Build/release: committed lockfile and route tree; exact Node version and
-  `npm ci`; generated-artifact drift check; zero-warning lint; emitted server
-  syntax check; Nitro single-bundle workaround for the upstream split-export
-  failure; app-specific PWA fixture; desktop/mobile production smoke evidence;
-  and development-only PGLite with no production-import side effects.
+### Camera, photo, and video
+
+- Camera acquisition and `video.play()` are bounded and cancellation-aware.
+  Late streams are stopped, the fallback path does not reopen after abort, and
+  the capture surface provides a visible Cancel action.
+- File decode and operation ownership are rechecked after every asynchronous
+  boundary, preventing a canceled import from publishing a late frame.
+- Native bitmap work has a bounded orphan lease so one hung decoder cannot
+  disable future attempts forever. One-dimension resize preserves the
+  EXIF-oriented aspect ratio.
+- The analysis endpoint accepts only a canonical JPEG data URL with strict
+  base64, JPEG start, and JPEG end validation. WebP disguised as JPEG and
+  trailing junk fail closed.
+- Capture, discard, context change, urgent triage, and consent withdrawal now
+  invalidate stale refusal, request, report, saved-revision, and error state.
+- Selected still labels are preserved, but the report never claims chronology,
+  motion understanding, or full-video review.
+
+### Observation and provider contracts
+
+- Provider availability is checked before durable batch reservation and quota
+  use. A missing or blank `XAI_API_KEY` returns a typed, retryable
+  `AI_PROVIDER_UNAVAILABLE` response without consuming the batch.
+- Only a terminal `finish_reason: "stop"` can be admitted. Missing, null,
+  truncated, or otherwise nonterminal completions fail closed.
+- HTTP 200 `message.refusal` is recognized without displaying provider prose.
+  Generic 400/422 responses are no longer mislabeled as safety refusals.
+- Provider JSON must be exactly one strict object—no fences, prefixes, or
+  suffixes—and still passes local Zod validation and cross-field invariants.
+- Prohibited-inference and hard-limit violations remain failures, while
+  conservative high-consequence visible matches are preserved for human review.
+- Nonvisual checks render as an action checklist before lower-priority visible
+  category detail. Reports consistently disclose selected-still and visual-only
+  limitations.
+
+### Knowledge source base and routing
+
+- The immutable source ledger is revisioned and separates provider-specific xAI
+  sources from retained OpenAI IDs. Provider claims now use first-party xAI
+  image-input, model, structured-output, video-boundary, privacy, and terms
+  references.
+- Every article exposes an evidence panel with stable Safety-page anchors,
+  ledger revision, audit date, source IDs, external links, and either
+  `source_anchored` or `editorial_only` status. Source anchoring explicitly does
+  not validate every sentence or an individual setup.
+- Unsourced rope-baking/oiling specifics and procedural suspension/knot language
+  were removed or narrowed to unloaded, unoccupied recognition. “Reviewed” was
+  replaced by the more accurate “curated.”
+- Emergency, immediate-release, consent-withdrawal, and concerning symptom
+  queries receive action-first guidance. Their results are restricted to a
+  closed safety allowlist so a query such as “seizure hogtie” cannot surface
+  procedural tying material beside emergency direction.
+- Expanded multilingual phrase families cover natural paraphrases and word
+  order, while negative controls keep adjacent terms such as “blue rope care”
+  and “recording permission settings” in ordinary search.
+- Reports without uploaded media do not cite xAI input/provider sources.
+
+### Authentication, privacy, and operations
+
+- Bearer transformation runs before hosting-gate evaluation. An arbitrary
+  `Authorization` header no longer bypasses the gate, transformed headers are
+  preferred, and authoritative session lookup disables cookie-cache reuse.
+- Bearer/cookie identity must match the hosting-gate identity; mismatches rotate
+  the session. All chunked session-cache cookies are removed without an
+  attacker-controlled artificial cap.
+- Session delivery fails closed if both cookie delivery paths fail. Issuer and
+  gate URLs require HTTPS origins outside the documented local-development
+  boundary.
+- Logs no longer emit raw stable subject/user identifiers.
+- The previously source-embedded preview OAuth secret was removed. Development
+  preview OAuth now reads a server-only `GROK_PREVIEW_CLIENT_SECRET`; the old
+  credential still requires external rotation because repository history and
+  prior artifacts cannot be repaired by this source change.
+- Production builds have no migration side effect. Schema migration is an
+  explicit `npm run db:migrate` deployment operation.
+- CI pins Node 22.23.2, installs without lifecycle scripts, builds before
+  typecheck, scans emitted JavaScript and credentials/database artifacts, runs
+  the full test/lint corpus, and captures production desktop/mobile smoke
+  evidence.
 
 ## Verification evidence
 
-- GitHub Actions run 15 on exact Node 22.23.2: clean install, production build,
-  emitted server syntax, generated-artifact drift, typecheck, zero-warning lint,
-  354/354 source-owned tests, and the 47/47 isolated PWA fixture all passed.
-- The same run proved that the production function contains no PGLite WASM/data
-  loader, started the built preview under hostile `NODE_ENV=development`, probed
-  the auth-off session route, and completed settled desktop/mobile Chromium
-  smoke with identical 929-character page bodies, no console/page errors, and
-  no horizontal overflow.
-- GitHub Actions run 19 revalidated the final hardening branch: 354/354
-  source-owned tests, 47/47 PWA fixture tests, release-artifact checks, and
-  desktop/mobile production smoke all passed.
-- GitHub Actions run 20 independently validated pull request #4: 355/355 tests,
-  typecheck, zero-warning lint, production build, PWA fixture, brand assets, and
-  browser smoke all passed.
-- Focused camera/report/safety corpus: 69/69 passed.
-- Focused typed camera/knowledge/ML/voice corpus: 72/72 passed, including 19/19
-  knowledge-base tests.
-- Deterministic report state storm: 32,832 combinations, zero throws.
-- Pull request #4 created one documentation overlap after the prior validation.
-  The two-parent resolution preserves its current code and documentation evidence
-  together with the final hardening review; the conflict-marker scan is clean.
+- `npm test`: 381/381 passed, zero failures (groups: 252, 40, 80, and 9).
+- Integrated focused corpus: 155/155 passed.
+- Final independent camera/knowledge re-probe: 107/107 passed.
+- `tsc --noEmit`: passed.
+- `eslint . --max-warnings=0`: passed.
+- Production Vite/Nitro/Vercel build: passed; 2,063 client modules, 411 SSR
+  modules, and 2,473 Nitro modules transformed.
+- Every emitted server `.js`/`.mjs` module passed `node --check`.
+- Production artifact scans found neither a credential-shaped preview OAuth
+  secret nor a PGLite WASM/data loader.
+- The built production preview returned HTTP 200 for `/`, `/knowledge`,
+  `/studio`, `/safety`, `/journal`, and auth-off `/api/auth/get-session`.
+- Migration command without `DATABASE_URL`: clean no-op, as designed.
 
-Tests establish reproducible software behavior under their fixtures. They do not
-certify a physical setup, a participant's condition, or future device behavior.
+Local browser capture was not treated as passing: this managed environment had
+no Chromium executable, and its restricted download returned an empty archive.
+The dev server itself became healthy under a verification-only Node 24 network
+enumeration shim. No shim was committed and the deployment startup contract was
+not changed. GitHub's clean Ubuntu job installs Chromium and is the required
+visual/runtime merge gate.
+
+The production build reports one optimization warning: the main client chunk is
+536.39 kB minified (165.56 kB gzip). It is not a correctness blocker, but route
+and feature code-splitting should be the next performance task.
 
 ## External release validation still required
 
 - Real devices: current iOS Safari, Android Chrome, desktop Chromium, Firefox,
-  and Safari. Record grant/deny/revoke, camera switching, interruption and
-  backgrounding, live photo, local photo/video import, native recording,
-  supported codecs, still selection, oversized-file rejection, and no-audio
-  behavior. Use non-sensitive fixtures and retain no participant media.
-- Live services: production identity/JWKS, OAuth callbacks, xAI refusal/error/
-  timeout paths, Postgres migrations, Neon pooled connections, PgBouncer
-  transaction mode, replica replay races, provider retention, and account erase.
-- Product quality: keyboard/screen-reader review, reduced motion, color contrast,
-  low-memory phones, slow networks, offline behavior, and localization review by
-  fluent speakers.
+  and Safari. Record grant/deny/revoke, camera switch, interruption/background,
+  live photo, local import, native recording, supported codecs, still selection,
+  oversize rejection, cancellation races, and no-audio behavior using
+  non-sensitive fixtures.
+- Live services: production identity/JWKS, OAuth callbacks, preview credential
+  rotation, xAI success/refusal/error/timeout, provider retention/ZDR response
+  headers, Postgres migrations, pooled connections, transaction mode, replica
+  races, account erase, and shared multi-replica rate limits.
+- Product quality: keyboard/screen-reader testing, reduced motion, contrast,
+  low-memory phones, slow networks, offline recovery, and fluent-speaker review
+  of Japanese, Simplified Chinese, and Korean emergency wording.
+- Safety/editorial governance: named qualified reviewers, claim-level review
+  dates, source-change monitoring, and expiry rules for high-consequence entries.
 
 ## Researched product backlog
 
-1. **Capability preflight (next).** Before consent, report secure-context and
-   iframe-policy status plus supported recording/decoder formats without opening
-   a camera. Treat device availability as indeterminate until acquisition.
-2. **Equipment-only default (next).** Start every camera workflow in an
-   unoccupied-equipment mode. Make the separate clothed-adult path deliberate so
-   it carries its larger consent and identification surface visibly.
-3. **Local privacy workbench (next).** Add manual crop/blur/redaction and optional
-   on-device face/text/tattoo-region warnings. Never claim that automation has
-   anonymized an image; the operator must review the exact transmitted stills.
-4. **Knowledge review manifest (next).** Give every reviewed entry a source ID,
-   revision, reviewer date, safety tier, checksum, and stale-review flag. Fail
-   CI when a routed entry lacks provenance or its source/route no longer resolves.
-5. **Offline readiness drills (later).** Add no-media consent, release-plan,
-   emergency-contact, and instructor-handoff exercises. Do not score a person or
-   evaluate a live setup.
-6. **Deployment retention status (later).** Show a server-derived provider and
-   retention mode beside confirmation; never let editable client text assert ZDR.
-7. **Redacted instructor handoff (later).** Export a text-only schema 1.1 report
-   with limitations and source IDs, defaulting to no names, media, room details,
-   timestamps, or device metadata.
-8. **Release evidence dashboard (later).** Track build SHA, schema version,
-   browser/device matrix, accessibility results, provider error rates, migration
-   probes, and deletion checks without storing live or sensitive media.
+1. **Capability preflight.** Before consent, show secure-context and iframe-policy
+   status plus supported capture/decoder formats without opening the camera.
+2. **Equipment-only default.** Start with unoccupied equipment; make the separate
+   clothed-adult path deliberate and visibly higher-friction.
+3. **Local privacy workbench.** Add manual crop/blur/redaction and optional
+   on-device face/text/tattoo-region warnings. Never claim automated anonymity.
+4. **Responses API migration.** Chat Completions is now documented as legacy.
+   Migrate only after strict schema, refusal, selected-image, timeout, and error
+   behavior reach contract parity.
+5. **Knowledge review manifest.** Add reviewer role, source revision, claim tier,
+   checksum, next-review date, and stale flag; fail CI for broken provenance.
+6. **Route/feature splitting.** Lazy-load Studio/media/provider surfaces and
+   measure real interaction latency before and after the 536 kB chunk reduction.
+7. **Verified retention status.** Surface a server-derived provider/retention
+   mode and verify `x-zero-data-retention` when claiming ZDR.
+8. **Shared abuse controls.** Move rate and concurrency budgets from per-process
+   memory to a bounded shared store before multi-replica scaling.
+9. **Release evidence dashboard.** Track build SHA, schema/ledger revision,
+   browser-device matrix, accessibility results, provider errors, migration
+   probes, and deletion checks without storing participant media.
 
 ## Research references
 
+- [xAI Image Understanding](https://docs.x.ai/developers/model-capabilities/images/understanding)
+- [xAI Chat Completions (legacy)](https://docs.x.ai/developers/model-capabilities/legacy/chat-completions)
+- [xAI Grok 4.5](https://docs.x.ai/developers/models/grok-4.5)
+- [xAI Structured Outputs](https://docs.x.ai/developers/model-capabilities/text/structured-outputs)
+- [xAI X Search video understanding](https://docs.x.ai/developers/tools/x-search)
+- [xAI API Security and Zero Data Retention](https://docs.x.ai/developers/faq/security)
+- [xAI Enterprise Terms](https://x.ai/legal/terms-of-service-enterprise)
 - [W3C Media Capture and Streams](https://www.w3.org/TR/mediacapture-streams/)
 - [W3C MediaStream Recording](https://www.w3.org/TR/mediastream-recording/)
-- [W3C Permissions Policy](https://www.w3.org/TR/permissions-policy/)
-- [MP4 Registration Authority brand registry](https://mp4ra.org/registered-types/brands)
 - [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
-- [PGlite filesystems](https://pglite.dev/docs/filesystems)
-- [Vite conditional configuration](https://vite.dev/config/)
-- [Vite global constant replacement](https://vite.dev/config/shared-options.html#define)
 - [PostgreSQL advisory-lock functions](https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-ADVISORY-LOCKS)
-- [PostgreSQL client connection defaults and timeouts](https://www.postgresql.org/docs/current/runtime-config-client.html)
-- [Better Auth rate-limit options](https://better-auth.com/docs/reference/options#rateLimit)
