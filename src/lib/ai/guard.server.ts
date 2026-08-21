@@ -11,6 +11,16 @@ export class AiRequestDeniedError extends Error {
   }
 }
 
+function trustedDevelopmentHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host.endsWith(".grok-sandbox.com")
+  );
+}
+
 /** Authenticate cost-bearing endpoints and reject cross-site browser calls. */
 export async function authorizeAiRequest(verifiedUserId?: string): Promise<{ userId: string; signal: AbortSignal }> {
   // The standard auth middleware supplies this value after resolving either
@@ -23,21 +33,30 @@ export async function authorizeAiRequest(verifiedUserId?: string): Promise<{ use
   const request = getRequest();
   if (!request) throw new Error("Request context is unavailable");
 
+  let requestUrl: URL;
+  try {
+    requestUrl = new URL(request.url);
+  } catch {
+    throw new AiRequestDeniedError("Request URL is invalid");
+  }
+  if (userId === DEV_USER_ID) {
+    if (process.env.ALLOW_DEV_AI?.trim().toLowerCase() !== "true") {
+      throw new AiRequestDeniedError("Development AI is disabled");
+    }
+    if (!trustedDevelopmentHost(requestUrl.hostname)) {
+      throw new AiRequestDeniedError("Development AI is limited to loopback and trusted preview hosts");
+    }
+  }
+
   const fetchSite = request.headers.get("sec-fetch-site")?.toLowerCase();
   if (fetchSite === "cross-site") throw new AiRequestDeniedError("Cross-site AI requests are not allowed");
 
   const origin = request.headers.get("origin");
-  if (!origin && process.env.NODE_ENV === "production") {
+  if (!origin) {
     throw new AiRequestDeniedError("AI requests require a same-origin browser request");
   }
   if (origin) {
-    let expected: string;
-    try {
-      expected = new URL(request.url).origin;
-    } catch {
-      throw new AiRequestDeniedError("Request origin is invalid");
-    }
-    if (origin !== expected) throw new AiRequestDeniedError("Request origin is not allowed");
+    if (origin !== requestUrl.origin) throw new AiRequestDeniedError("Request origin is not allowed");
   }
   return { userId, signal: request.signal };
 }

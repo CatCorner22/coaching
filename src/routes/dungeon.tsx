@@ -40,7 +40,7 @@ function DungeonPage() {
       <h2 className="mt-12 font-display text-2xl">Inventory</h2>
       <ul className="mt-3 space-y-3">
         {DUNGEON.map((d) => (
-          <li key={d.slug} className="rounded-lg border border-border bg-surface p-4">
+          <li id={d.slug} key={d.slug} className="scroll-mt-4 rounded-lg border border-border bg-surface p-4">
             <p className="text-[11px] uppercase tracking-wide text-subtle">{d.kind}</p>
             <h3 className="font-display text-2xl">{d.name}</h3>
             <p className="mt-2 text-sm text-muted">{d.summary}</p>

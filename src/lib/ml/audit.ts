@@ -5,14 +5,14 @@ import type { AuditVerdict, DeterministicReport, LlmDraft, Prediction } from "./
 const STOP_COACH =
   "Stop and release the restraint now without creating a fall. Call emergency services for abnormal breathing, unresponsiveness, seizure, chest pain, major weakness, or a serious fall.";
 const STOP_NEXT = "Release now. Do not re-tie or delay medical care for another image.";
-const STOP_SPEAK = "Stop and release now. Get emergency help for any serious symptom.";
+export const STOP_SPEAK = "Stop and release now. Get emergency help for any serious symptom.";
 const BANNED_COACH =
   "I will not provide procedural coaching for neck or breathing restriction, suspension, load-bearing rope, abandonment, or inaccessible release. Use a clothed, ground-level, non-loaded rehearsal with a qualified in-person instructor.";
 const OBSERVATION_COACH =
   "Image-only observation cannot establish consent, circulation, nerve function, breathing, pressure, load, or technique correctness. Use direct communication and hands-on checks; release for any concerning symptom or uncertainty.";
 const OBSERVATION_NEXT =
   "Pause before making any change. Confirm current consent, normal sensation and movement, ordinary breathing and speech, and immediate release readiness directly.";
-const OBSERVATION_SPEAK =
+export const OBSERVATION_SPEAK =
   "Pause. Check consent, sensation, movement, breathing, and release readiness directly.";
 
 const BANNED = [

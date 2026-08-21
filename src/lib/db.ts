@@ -67,6 +67,22 @@ const OID_DATE = 1082;
 const OID_INTERVAL = 1186;
 const identity = (v: string) => v;
 
+// Serverless instances multiply every process-local pool. Keep this app's pool
+// deliberately small and make dependency stalls fail within a request budget
+// instead of retaining connections or event-loop work indefinitely.
+const APP_POOL_OPTIONS = Object.freeze({
+  application_name: "knotty-app",
+  max: 2,
+  connectionTimeoutMillis: 5_000,
+  idleTimeoutMillis: 10_000,
+  maxLifetimeSeconds: 300,
+  statement_timeout: 15_000,
+  query_timeout: 20_000,
+  lock_timeout: 5_000,
+  idle_in_transaction_session_timeout: 15_000,
+  allowExitOnIdle: true,
+});
+
 type Run = <T>(text: string, params: unknown[]) => Promise<T[]>;
 
 /** Wrap a query runner in the tagged-template + `.query()` `Sql` surface. */
@@ -93,7 +109,10 @@ function createNeonSql(): Promise<Sql> {
     types.setTypeParser(OID_INT8, Number);
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
-    const pool = new Pool({ connectionString: databaseUrl });
+    const pool = new Pool({
+      connectionString: databaseUrl,
+      ...APP_POOL_OPTIONS,
+    });
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
       return res.rows as T[];

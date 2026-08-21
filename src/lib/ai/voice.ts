@@ -15,6 +15,10 @@ export const speakCoach = createServerFn({ method: "POST" })
     return { text };
   })
   .handler(async ({ data, context }) => {
+    const { isReviewedCoachSpeech } = await import("@/lib/voice/reviewed.server");
+    if (!isReviewedCoachSpeech(data.text)) {
+      throw new Error("Cloud voice accepts only reviewed app guidance");
+    }
     const authorization = await authorizeAiRequest(context.userId);
     const { consumeAiBudget } = await import("./rate-limit.server");
     consumeAiBudget("voice", 20, 10 * 60_000, authorization.userId);

@@ -8,8 +8,9 @@ The camera accepts photos or short clips, converts video to user-selected labele
 
 - Per batch: legal-adult attestation; separate clothed/non-explicit, non-secret, non-coerced, and all-people-consented attestations; and separate activity, recording, upload, and output permission.
 - Prefer equipment-only or clothed, non-identifying media; exclude faces, intimate contact, tattoos, screens, mail, and room details.
+- The non-explicit boundary is an operator attestation, not automatic content moderation. The app does not certify or reliably detect nudity; do not select explicit media.
 - Video stays local and is reduced to one to three stills selected by the user.
-- The current page submits a confirmed batch at most once; the running server rejects a repeated batch token on a best-effort, per-instance basis. Already-transmitted data cannot be recalled.
+- The current page submits a confirmed batch at most once. A shared Postgres reservation rejects the same verified-user batch across replicas for two hours, exceeding the one-hour permission window; this is not a permanent global exactly-once guarantee. Already-transmitted data cannot be recalled.
 - C3 categories route to qualified in-person instruction. C4 categories stop or decline. Every other result remains lower-consequence learning only or insufficient view—never clearance.
 - Directly reported symptoms and coercion bypass image analysis and route action first.
 

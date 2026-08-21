@@ -17,13 +17,18 @@
  * `client.ts` (`signIn` → `openSignInPopup`).
  */
 import { auth, SESSION_TOKEN_COOKIE } from "./server";
+import { GROK_PROVIDERS } from "./providers";
 
 /** Message shape the popup posts to the opener (must match `client.ts`). */
 type PopupMessage = {
   source: "grok-auth-popup";
   token: string | null;
+  nonce: string;
   error?: string;
 };
+
+const VALID_NONCE = /^[A-Za-z0-9_-]{16,128}$/;
+const VALID_PROVIDER_IDS = new Set(GROK_PROVIDERS.map((provider) => provider.providerId));
 
 /**
  * Handle `GET /auth/popup`. Invoked by the Vite `authPopupPlugin` (dev / live
@@ -32,6 +37,25 @@ type PopupMessage = {
 export async function handleAuthPopupRequest(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const done = url.searchParams.get("done") === "1";
+  const nonce = url.searchParams.get("nonce")?.trim() ?? "";
+
+  if (!VALID_NONCE.test(nonce)) {
+    return new Response("Invalid sign-in attempt", {
+      status: 400,
+      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+    });
+  }
+
+  if (url.searchParams.get("pending") === "1") {
+    return new Response(preparationHtml(), {
+      status: 200,
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'",
+      },
+    });
+  }
 
   if (done) {
     const errored = url.searchParams.has("error");
@@ -39,6 +63,7 @@ export async function handleAuthPopupRequest(request: Request): Promise<Response
     const message: PopupMessage = {
       source: "grok-auth-popup",
       token,
+      nonce,
       ...(errored ? { error: url.searchParams.get("error") ?? "sign_in_failed" } : {}),
     };
     return new Response(completionHtml(message), {
@@ -52,15 +77,15 @@ export async function handleAuthPopupRequest(request: Request): Promise<Response
   }
 
   const providerId = url.searchParams.get("providerId")?.trim();
-  if (!providerId) {
-    return new Response("Missing providerId", {
+  if (!providerId || !VALID_PROVIDER_IDS.has(providerId)) {
+    return new Response("Unsupported provider", {
       status: 400,
       headers: { "content-type": "text/plain; charset=utf-8" },
     });
   }
 
   // Stay first-party for the callback so the session cookie lands in THIS popup.
-  const back = `${url.origin}/auth/popup?done=1`;
+  const back = `${url.origin}/auth/popup?done=1&nonce=${encodeURIComponent(nonce)}`;
   try {
     const apiRes = await auth.api.signInWithOAuth2({
       body: {
@@ -79,6 +104,7 @@ export async function handleAuthPopupRequest(request: Request): Promise<Response
       return completionResponse({
         source: "grok-auth-popup",
         token: null,
+        nonce,
         error: detail || `oauth_init_failed_${apiRes.status}`,
       });
     }
@@ -91,6 +117,7 @@ export async function handleAuthPopupRequest(request: Request): Promise<Response
       return completionResponse({
         source: "grok-auth-popup",
         token: null,
+        nonce,
         error: "oauth_init_missing_url",
       });
     }
@@ -107,9 +134,28 @@ export async function handleAuthPopupRequest(request: Request): Promise<Response
     return completionResponse({
       source: "grok-auth-popup",
       token: null,
+      nonce,
       error: message,
     });
   }
+}
+
+/** Static holding page: no OAuth, cookies, script, opener message, or redirect. */
+function preparationHtml(): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Preparing sign-in…</title>
+<style>
+  html,body{margin:0;min-height:100%;background:#0b0b0c;color:#a1a1aa;
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  main{min-height:100vh;display:grid;place-items:center;padding:1.5rem;text-align:center}
+</style>
+</head>
+<body><main><p>Securing local account data before sign-in…</p></main></body>
+</html>`;
 }
 
 function completionResponse(message: PopupMessage): Response {
@@ -145,7 +191,7 @@ function completionHtml(message: PopupMessage): string {
 <script>
 (function () {
   var el = document.getElementById("grok-auth-popup-msg");
-  var msg = { source: "grok-auth-popup", token: null };
+  var msg = { source: "grok-auth-popup", token: null, nonce: "" };
   try { if (el && el.textContent) msg = JSON.parse(el.textContent); } catch (e) {}
   try {
     if (window.opener) window.opener.postMessage(msg, window.location.origin);

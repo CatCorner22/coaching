@@ -10,6 +10,14 @@ export type FrameQuality = {
   notes: string[];
 };
 
+const EMPTY_FRAME_QUALITY: FrameQuality = {
+  sharpness: 0,
+  exposure: 0,
+  ropeHint: 0,
+  score: 0,
+  notes: ["No readable frame was available."],
+};
+
 export function laplacianVar(data: ImageData): number {
   const { width, height, data: buf } = data;
   const gray = new Float32Array(width * height);
@@ -105,11 +113,52 @@ export function scoreFrame(data: ImageData): FrameQuality {
   const exposure = exposureScore(data);
   const rope = Math.min(1, ropeHint(data) / 0.12);
   const notes: string[] = [];
-  if (sharpness < 0.45) notes.push("Hold still — this frame is soft.");
-  if (exposure < 0.45) notes.push("Add light or torch. Underexposed rope disappears.");
-  if (rope < 0.2) notes.push("Get closer to the wraps, not the whole room.");
+  if (sharpness < 0.45) {
+    notes.push("Hold the camera steady and retake an equipment-only or clothed, non-identifying view.");
+  }
+  if (exposure < 0.45) {
+    notes.push("Add neutral light without revealing faces, identifiers, or more of the room.");
+  }
+  if (rope < 0.2) {
+    notes.push("Keep the relevant equipment visible in an equipment-only or clothed, non-identifying view.");
+  }
   const score = sharpness * 0.45 + exposure * 0.25 + rope * 0.3;
   return { sharpness, exposure, ropeHint: rope, score, notes };
+}
+
+/**
+ * Summarize a selected batch conservatively. Each independent quality axis is
+ * the lowest value in the batch so one usable still cannot mask another still
+ * whose blur or lighting makes a batch-level conclusion unreliable.
+ */
+export function worstFrameQuality(qualities: readonly FrameQuality[]): FrameQuality {
+  if (!qualities.length) return { ...EMPTY_FRAME_QUALITY, notes: [...EMPTY_FRAME_QUALITY.notes] };
+  return {
+    sharpness: Math.min(...qualities.map((quality) => finite01(quality.sharpness))),
+    exposure: Math.min(...qualities.map((quality) => finite01(quality.exposure))),
+    ropeHint: Math.min(...qualities.map((quality) => finite01(quality.ropeHint))),
+    score: Math.min(...qualities.map((quality) => finite01(quality.score))),
+    notes: [...new Set(qualities.flatMap((quality) => quality.notes.filter(Boolean)))],
+  };
+}
+
+/** A privacy-minimizing UI hint; quality never justifies a more intimate view. */
+export function privacySafeQualityHint(quality: FrameQuality): string {
+  if (quality.sharpness < 0.55) {
+    return "One or more selected frames are soft. Retake an equipment-only or clothed, non-identifying view while holding the camera steady.";
+  }
+  if (quality.exposure < 0.55) {
+    return "One or more selected frames need neutral light. Avoid faces, identifiers, intimate areas, and extra room detail.";
+  }
+  if (quality.ropeHint < 0.2) {
+    return "Use an equipment-only or clothed, non-identifying view with only the relevant equipment in frame.";
+  }
+  return "The selected stills passed a limited image-quality check; this is not safety clearance.";
+}
+
+function finite01(value: unknown): number {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.max(0, Math.min(1, numeric)) : 0;
 }
 
 export function pickBest<T>(

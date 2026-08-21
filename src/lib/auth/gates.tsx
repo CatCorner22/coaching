@@ -1,7 +1,23 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Navigate } from "@tanstack/react-router";
-import { authEnabled, signOut } from "./client";
+import {
+  getAuthCapabilitiesBounded,
+  type AuthCapabilities,
+} from "./capabilities";
+import { authEnabled, clearLocalAccountData, signOut } from "./client";
 import { useCurrentUser, useCurrentUserState } from "./use-current-user";
+
+let capabilityRequest: Promise<AuthCapabilities> | null = null;
+
+function loadAuthCapabilities(): Promise<AuthCapabilities> {
+  if (!capabilityRequest) {
+    capabilityRequest = getAuthCapabilitiesBounded().catch((cause) => {
+      capabilityRequest = null;
+      throw cause;
+    });
+  }
+  return capabilityRequest;
+}
 
 /**
  * Auth state components — plain wrappers around `useCurrentUserState()`.
@@ -45,44 +61,94 @@ export function RedirectToSignIn({ to = SIGN_IN_PATH }: { to?: string }) {
 }
 
 /**
- * Minimal signed-in identity chip + sign-out. Restyle freely (see the
- * `design-ui` skill). Sign-out is only shown when auth is enabled (the
- * disabled-auth dev user has nothing to sign out of).
+ * Minimal signed-in identity chip plus a capability-aware account action.
+ * Hosting-gate sessions expose local clearing with honest host-exit copy;
+ * ordinary OAuth sessions expose app sign-out. The disabled-auth dev user has
+ * neither action.
  */
-export function UserButton() {
+export function UserButton({ compact = false }: { compact?: boolean }) {
   const user = useCurrentUser();
   // Sign-out can take a moment (and can fail when deployed), so the control
   // shows it is working and cannot be fired twice.
   const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
+  const [capabilities, setCapabilities] = useState<AuthCapabilities | null>(null);
+  const [capabilityFailed, setCapabilityFailed] = useState(false);
+  useEffect(() => {
+    if (!authEnabled) return;
+    let current = true;
+    void loadAuthCapabilities().then(
+      (value) => {
+        if (current) setCapabilities(value);
+      },
+      () => {
+        if (current) setCapabilityFailed(true);
+      },
+    );
+    return () => {
+      current = false;
+    };
+  }, []);
   if (!user) return null;
   const label = user.displayName ?? user.primaryEmail ?? "Account";
+  const gateManaged = capabilities?.gateIdentity === true;
+  const capabilitiesPending = capabilities === null && !capabilityFailed;
+  const localClearOnly = gateManaged || capabilityFailed || capabilitiesPending;
   return (
-    <div className="flex items-center gap-2">
-      {user.profileImageUrl ? (
-        <img
-          src={user.profileImageUrl}
-          alt=""
-          className="h-8 w-8 rounded-full object-cover"
-        />
-      ) : (
-        <span className="grid h-8 w-8 place-items-center rounded-full bg-black/10 text-sm font-medium dark:bg-white/20">
-          {label.charAt(0).toUpperCase()}
-        </span>
-      )}
-      <span className="text-sm font-medium">{label}</span>
+    <div className="flex flex-wrap items-center gap-2">
+      <span
+        aria-hidden="true"
+        className="grid h-8 w-8 place-items-center rounded-full bg-black/10 text-sm font-medium dark:bg-white/20"
+      >
+        {label.charAt(0).toUpperCase()}
+      </span>
+      <span className={compact ? "sr-only" : "text-sm font-medium"}>{label}</span>
       {authEnabled && (
         <button
           type="button"
           disabled={signingOut}
           onClick={() => {
+            setSignOutError(null);
             setSigningOut(true);
-            // Success navigates away; on failure re-enable so it can be retried.
-            void signOut().catch(() => setSigningOut(false));
+            const action = localClearOnly
+              ? clearLocalAccountData()
+              : signOut();
+            // Success reloads/navigates; on failure re-enable so it can be retried.
+            void action.catch((cause) => {
+              setSigningOut(false);
+              setSignOutError(
+                cause instanceof Error
+                  ? cause.message
+                  : localClearOnly
+                    ? "Local content could not be cleared; please try again."
+                    : "Sign-out failed. You may still be signed in; please try again.",
+              );
+            });
           }}
           className="cursor-pointer text-sm underline-offset-4 opacity-70 hover:underline disabled:cursor-wait disabled:no-underline"
         >
-          {signingOut ? "Signing out…" : "Sign out"}
+          {signingOut
+            ? localClearOnly
+                ? "Clearing…"
+                : "Signing out…"
+            : localClearOnly
+              ? "Clear local data"
+              : "Sign out"}
         </button>
+      )}
+      {localClearOnly && (
+        <p className={compact ? "sr-only" : "basis-full text-xs leading-relaxed text-subtle"}>
+          {gateManaged
+            ? "The hosting gate controls account access. Exit or sign out through the host to end access; this control only clears Knotty data from this browser."
+            : capabilityFailed
+              ? "Knotty could not verify who controls this session. Only local data clearing is available."
+              : "Knotty is checking who controls this session. Local data clearing remains available and does not claim to end account access."}
+        </p>
+      )}
+      {signOutError && (
+        <p className="max-w-xs text-xs leading-relaxed text-danger" role="alert">
+          {signOutError}
+        </p>
       )}
     </div>
   );

@@ -276,17 +276,23 @@ function looksLikePhoto(bytes: Uint8Array): boolean {
   return hasIsoBrand(bytes, ["heic", "heix", "hevc", "hevx", "heim", "heis", "mif1", "msf1"]);
 }
 
+// Exact four-character codes from the MP4 Registration Authority. Keep this
+// finite: accepting an arbitrary `3gp*` prefix would turn an unregistered brand
+// into a signature bypass.
+const VIDEO_ISO_BRANDS = [
+  "isom", "iso2", "iso3", "iso4", "iso5", "iso6",
+  "mp41", "mp42", "mp4v", "avc1", "qt  ", "m4v ", "M4V ", "MSNV",
+  "3gp4", "3gp5", "3gp6", "3gp7", "3gp8", "3gp9",
+] as const;
+
 function looksLikeVideo(bytes: Uint8Array): boolean {
   if (bytes.length >= 4 && bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) {
     return true;
   }
-  return hasIsoBrand(bytes, [
-    "isom", "iso2", "iso3", "iso4", "iso5", "iso6",
-    "mp41", "mp42", "mp4v", "avc1", "qt  ", "m4v ", "M4V ", "MSNV", "3gp4",
-  ]);
+  return hasIsoBrand(bytes, VIDEO_ISO_BRANDS);
 }
 
-function hasIsoBrand(bytes: Uint8Array, brands: string[]): boolean {
+function hasIsoBrand(bytes: Uint8Array, brands: readonly string[]): boolean {
   if (bytes.length < 12 || String.fromCharCode(...bytes.slice(4, 8)) !== "ftyp") return false;
   const declaredBoxSize = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0);
   const end = Math.min(bytes.length, declaredBoxSize >= 12 ? declaredBoxSize : bytes.length);
@@ -300,7 +306,7 @@ function hasIsoBrand(bytes: Uint8Array, brands: string[]): boolean {
   return false;
 }
 
-function brandMatchesAt(bytes: Uint8Array, offset: number, end: number, brands: string[]): boolean {
+function brandMatchesAt(bytes: Uint8Array, offset: number, end: number, brands: readonly string[]): boolean {
   if (offset + 4 > end) return false;
   return brands.some(
     (brand) =>

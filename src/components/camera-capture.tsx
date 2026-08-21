@@ -8,7 +8,13 @@ import {
   torchAvailable,
   type ClipHandle,
 } from "@/lib/camera/stream";
-import { pickBest, scoreFrame, type FrameQuality } from "@/lib/camera/quality";
+import {
+  pickBest,
+  privacySafeQualityHint,
+  scoreFrame,
+  worstFrameQuality,
+  type FrameQuality,
+} from "@/lib/camera/quality";
 import {
   extractVideoFrames,
   processMediaFrame,
@@ -150,8 +156,13 @@ export const CameraCapture = memo(function CameraCapture({
     const onVisibility = () => {
       if (document.visibilityState === "hidden") stopLive();
     };
+    const onPageHide = () => stopLive();
     document.addEventListener("visibilitychange", onVisibility);
-    return () => document.removeEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
+    };
     // stopLive intentionally reads the latest refs and does not need resubscription.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -402,10 +413,8 @@ export const CameraCapture = memo(function CameraCapture({
     }
     const confirmedAt = confirmedAtForBatch();
     if (!jpegs.length || !observations.length) throw new Error("No readable frame was captured.");
-    const quality =
-      [...qualities].sort((a, b) => b.score - a.score)[0] ??
-      ({ sharpness: 0, exposure: 0, ropeHint: 0, score: 0, notes: ["No frame"] } satisfies FrameQuality);
-    setHint(quality.notes[0] ?? `Sharpness ${Math.round(quality.sharpness * 100)}`);
+    const quality = worstFrameQuality(qualities);
+    setHint(privacySafeQualityHint(quality));
     onCapture({
       preview: jpegs[0] ?? "",
       previewObservation: previewObservation!,
@@ -646,8 +655,12 @@ export const CameraCapture = memo(function CameraCapture({
       torchRequest !== torchRequestRef.current ||
       streamRef.current !== stream
     ) return;
-    setTorchOn(ok ? next : false);
-    if (!ok) setError("Torch is not available on this camera.");
+    if (!ok) {
+      stopLive();
+      setError("Torch could not be applied safely, so the camera was closed. Reopen it to continue without torch.");
+      return;
+    }
+    setTorchOn(next);
   }
 
   return (
@@ -657,7 +670,8 @@ export const CameraCapture = memo(function CameraCapture({
         <p className="mb-2 text-xs leading-relaxed text-muted">
           Confirm legal-adult status, non-explicit media scope, and all four permissions separately
           for each batch. Prefer equipment-only, clothed, non-identifying stills. Exclude faces,
-          nudity, intimate contact, tattoos, screens, mail, and room details.
+          nudity, intimate contact, tattoos, screens, mail, and room details. The app does not
+          automatically detect or certify that media is non-explicit; do not select explicit media.
         </p>
         <div className="space-y-2 text-xs text-fg">
           <PermissionCheck
@@ -715,9 +729,10 @@ export const CameraCapture = memo(function CameraCapture({
         <div className="rounded-md border border-accent/30 bg-accent/10 p-3 text-xs text-muted">
           <p>
             This page locks the batch to the attestations above and submits it at most once from this
-            view. The running server also rejects a repeated batch token, but that replay check is not
-            durable across a deployment restart. Uncheck any item to withdraw permission and discard
-            it, or discard it before starting another batch.
+            view. Shared database storage rejects the same verified-user batch across replicas for two
+            hours—longer than the one-hour permission window—but this is not a permanent global
+            exactly-once guarantee. Uncheck any item to withdraw permission and discard it, or discard
+            it before starting another batch.
           </p>
           <Button className="mt-2" variant="outline" size="sm" onClick={startNewBatch}>
             Discard batch and start another

@@ -46,11 +46,11 @@ export async function openRopeCamera(facing: Facing): Promise<MediaStream> {
 }
 
 function isPermissionFailure(error: unknown): boolean {
-  return (
-    typeof DOMException !== "undefined" &&
-    error instanceof DOMException &&
-    (error.name === "NotAllowedError" || error.name === "SecurityError")
-  );
+  if (!error || typeof error !== "object") return false;
+  // Browser exceptions may cross realms, where `instanceof DOMException`
+  // fails. The standardized name is the stable permission boundary.
+  const name = "name" in error ? (error as { name?: unknown }).name : undefined;
+  return name === "NotAllowedError" || name === "SecurityError";
 }
 
 export async function applyFocus(stream: MediaStream) {
@@ -63,9 +63,9 @@ export async function applyFocus(stream: MediaStream) {
     return;
   }
   const advanced: Record<string, unknown> = {};
-  if ("focusMode" in caps) advanced.focusMode = "continuous";
-  if ("exposureMode" in caps) advanced.exposureMode = "continuous";
-  if ("whiteBalanceMode" in caps) advanced.whiteBalanceMode = "continuous";
+  if (supportsContinuous(caps.focusMode)) advanced.focusMode = "continuous";
+  if (supportsContinuous(caps.exposureMode)) advanced.exposureMode = "continuous";
+  if (supportsContinuous(caps.whiteBalanceMode)) advanced.whiteBalanceMode = "continuous";
   if (Object.keys(advanced).length) {
     try {
       await settleWithin(
@@ -76,6 +76,10 @@ export async function applyFocus(stream: MediaStream) {
       /* device refused */
     }
   }
+}
+
+function supportsContinuous(value: unknown): boolean {
+  return Array.isArray(value) && value.includes("continuous");
 }
 
 function settleWithin(promise: Promise<unknown>, timeoutMs: number): Promise<boolean> {
@@ -93,19 +97,30 @@ function settleWithin(promise: Promise<unknown>, timeoutMs: number): Promise<boo
 }
 
 export async function setTorch(stream: MediaStream, on: boolean) {
-  const track = stream.getVideoTracks()[0];
-  if (!track) return false;
   try {
+    const track = stream.getVideoTracks()[0];
+    if (!track) return false;
     const caps = (track.getCapabilities?.() ?? {}) as { torch?: boolean };
     if (!caps.torch) return false;
-    return await settleWithin(
+    const applied = await settleWithin(
       track.applyConstraints({
         advanced: [{ torch: on } as MediaTrackConstraintSet],
       }),
       FOCUS_SETUP_TIMEOUT_MS,
     );
+    if (!applied) stopStream(stream);
+    return applied;
   } catch {
+    stopStream(stream);
     return false;
+  }
+}
+
+function stopStream(stream: MediaStream): void {
+  try {
+    stream.getTracks().forEach((track) => track.stop());
+  } catch {
+    // The source may already have ended; the operation still fails closed.
   }
 }
 

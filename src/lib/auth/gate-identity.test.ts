@@ -3,8 +3,11 @@ import assert from "node:assert/strict";
 import { generateKeyPairSync, type KeyObject } from "node:crypto";
 import { SignJWT, exportJWK, type JWK } from "jose";
 import {
+  GATE_JWKS_MAX_BYTES,
+  GATE_JWKS_MAX_KEYS,
   gateIdentityFromHeaders,
   gateKeyResolver,
+  parseGateJwksResponse,
   sessionBoundToGateIdentity,
   verifyGateIdentityToken,
   type GateJwks,
@@ -204,6 +207,94 @@ describe("verifyGateIdentityToken", () => {
     );
     assert.equal(second?.sub, "user-1");
     assert.equal(calls, 2);
+  });
+
+  it("coalesces concurrent cold-start JWKS fetches", async () => {
+    const key = await makeKey("k-single-flight");
+    const token = await signToken(key, { sub: "user-1" });
+    let calls = 0;
+    let release: (() => void) | undefined;
+    const ready = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const fetchImpl = async (): Promise<GateJwks> => {
+      calls += 1;
+      await ready;
+      return { keys: [key.jwk] };
+    };
+    const getKey = gateKeyResolver(uniqueUrl(), fetchImpl);
+    const verifications = Array.from({ length: 20 }, () =>
+      verifyGateIdentityToken(token, {
+        issuer: ISSUER,
+        audience: AUDIENCE,
+        getKey,
+      }),
+    );
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(calls, 1);
+    release?.();
+    const identities = await Promise.all(verifications);
+    assert.ok(identities.every((identity) => identity?.sub === "user-1"));
+    assert.equal(calls, 1);
+  });
+
+  it("fails closed within the configured budget when JWKS retrieval stalls", async () => {
+    const key = await makeKey("k-timeout");
+    const token = await signToken(key, { sub: "user-1" });
+    const neverReturns = async (): Promise<GateJwks | null> =>
+      new Promise<GateJwks | null>(() => undefined);
+    const startedAt = Date.now();
+    const identity = await verifyGateIdentityToken(token, {
+      issuer: ISSUER,
+      audience: AUDIENCE,
+      getKey: gateKeyResolver(uniqueUrl(), neverReturns, { fetchTimeoutMs: 10 }),
+    });
+    assert.equal(identity, null);
+    assert.ok(Date.now() - startedAt < 1_000, "JWKS timeout should remain bounded");
+  });
+
+  it("rejects an injected JWKS with too many keys", async () => {
+    const key = await makeKey("k-many");
+    const token = await signToken(key, { sub: "user-1" });
+    const identity = await verifyGateIdentityToken(token, {
+      issuer: ISSUER,
+      audience: AUDIENCE,
+      getKey: gateKeyResolver(
+        uniqueUrl(),
+        staticJwks(Array.from({ length: GATE_JWKS_MAX_KEYS + 1 }, () => key.jwk))
+          .fetchImpl,
+      ),
+    });
+    assert.equal(identity, null);
+  });
+});
+
+describe("parseGateJwksResponse", () => {
+  it("accepts a bounded key set", async () => {
+    const key = await makeKey("k1");
+    const response = new Response(JSON.stringify({ keys: [key.jwk] }), {
+      headers: { "content-type": "application/json" },
+    });
+    assert.deepEqual(await parseGateJwksResponse(response), { keys: [key.jwk] });
+  });
+
+  it("rejects a response body beyond the byte budget", async () => {
+    const response = new Response(
+      JSON.stringify({ keys: [], padding: "x".repeat(GATE_JWKS_MAX_BYTES) }),
+      { headers: { "content-type": "application/json" } },
+    );
+    assert.equal(await parseGateJwksResponse(response), null);
+  });
+
+  it("rejects a parsed response beyond the key-count budget", async () => {
+    const key = await makeKey("k1");
+    const response = new Response(
+      JSON.stringify({
+        keys: Array.from({ length: GATE_JWKS_MAX_KEYS + 1 }, () => key.jwk),
+      }),
+      { headers: { "content-type": "application/json" } },
+    );
+    assert.equal(await parseGateJwksResponse(response), null);
   });
 });
 

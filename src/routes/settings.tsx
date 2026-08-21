@@ -1,11 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  eraseAllLocalData,
-  readEmergencyNumber,
-  saveEmergencyNumber,
-} from "@/lib/privacy/local-data";
+import { eraseAllLocalData } from "@/lib/privacy/local-data";
 import { useSettings } from "@/lib/stores/settings";
 import { clearCoachVoiceCache } from "@/lib/voice/play";
 
@@ -18,9 +14,27 @@ function SettingsPage() {
   const s = useSettings();
   const [confirmErase, setConfirmErase] = useState(false);
   const [eraseStatus, setEraseStatus] = useState<string | null>(null);
-  const [emergencyNumber, setEmergencyNumber] = useState("");
-  const [emergencyStatus, setEmergencyStatus] = useState<string | null>(null);
-  useEffect(() => setEmergencyNumber(readEmergencyNumber()), []);
+  const [erasing, setErasing] = useState(false);
+  const [eraseFailed, setEraseFailed] = useState(false);
+  if (erasing) {
+    return (
+      <div className="mx-auto max-w-xl px-5 py-10">
+        <p className="text-xs uppercase tracking-[0.22em] text-muted">Protocol</p>
+        <h1 className="mt-2 font-display text-4xl">Local data erase</h1>
+        <p
+          className="mt-6 text-sm leading-relaxed text-muted"
+          role={eraseFailed ? "alert" : "status"}
+        >
+          {eraseStatus ?? "Erasing local data…"}
+        </p>
+        {eraseFailed && (
+          <Button className="mt-4" variant="outline" onClick={() => window.location.reload()}>
+            Reload before retrying
+          </Button>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="mx-auto max-w-xl px-5 py-10">
       <p className="text-xs uppercase tracking-[0.22em] text-muted">Protocol</p>
@@ -75,46 +89,6 @@ function SettingsPage() {
           While armed, Knotty listens only for the configured red/yellow words and suppresses its
           own speech to reduce feedback.
         </p>
-        <section className="rounded-lg border border-border bg-surface p-4">
-          <h2 className="font-display text-2xl">Emergency calling</h2>
-          <p className="mt-2 text-xs leading-relaxed text-muted">
-            Knotty does not infer your location or guess an emergency number. Before a scene, verify
-            the emergency-services number for the place where this device will be used. If saved,
-            it appears as the call link on the emergency page. The number is stored unencrypted in
-            this browser profile; leaving it blank keeps generic call instructions.
-          </p>
-          <label className="mt-3 block text-sm">
-            <span className="text-xs uppercase tracking-wide text-subtle">Verified local emergency number</span>
-            <input
-              type="tel"
-              inputMode="tel"
-              autoComplete="off"
-              placeholder="Enter the number for your location"
-              className="mt-1 h-11 w-full rounded-md border border-border bg-elevated px-3"
-              value={emergencyNumber}
-              onChange={(event) => {
-                setEmergencyNumber(event.target.value.slice(0, 32));
-                setEmergencyStatus(null);
-              }}
-            />
-          </label>
-          <Button
-            className="mt-3"
-            variant="outline"
-            onClick={() => {
-              try {
-                const saved = saveEmergencyNumber(emergencyNumber);
-                setEmergencyNumber(saved);
-                setEmergencyStatus(saved ? "Verified number saved in this browser." : "Saved number removed.");
-              } catch (error) {
-                setEmergencyStatus(error instanceof Error ? error.message : "Could not save this number.");
-              }
-            }}
-          >
-            Save emergency number
-          </Button>
-          {emergencyStatus && <p className="mt-2 text-xs text-muted" role="status">{emergencyStatus}</p>}
-        </section>
         <Button variant="outline" onClick={() => s.set({ consented: false })}>
           Reset consent gate
         </Button>
@@ -134,33 +108,52 @@ function SettingsPage() {
             cache, signal other open Knotty tabs to reload, and delete legacy still storage. It does
             not sign you out or remove authentication cookies, downloaded exports, device backups,
             browser or server logs, provider-side copies, or requests already transmitted.
+            Knotty deliberately retains one minimal account-ID marker so it can block one signed-in
+            account from inheriting another account's local content; the marker contains no notes,
+            captures, plans, or journal text.
           </p>
           {!confirmErase ? (
             <Button className="mt-3" variant="outline" onClick={() => setConfirmErase(true)}>
-              Erase all Knotty local data…
+              Erase Knotty local content and caches…
             </Button>
           ) : (
             <div className="mt-3 flex flex-wrap gap-2">
               <Button
                 variant="danger"
                 onClick={() => {
+                  setErasing(true);
+                  setEraseFailed(false);
                   setEraseStatus("Erasing local data…");
-                  void eraseAllLocalData().then(
+                  // AppShell subscribes to the cross-tab BroadcastChannel. Do
+                  // not notify this document before async IndexedDB deletion
+                  // and final verification finish; this handler owns its reload.
+                  void eraseAllLocalData({ broadcastToCurrentContext: false }).then(
                     (result) => {
-                      const status = result.browserStorageCleared
-                        ? "Knotty browser records removed."
-                        : "Some Knotty browser records could not be removed.";
-                      const legacy = result.legacyStills === "deleted_or_absent"
-                        ? " Legacy still storage deleted or absent."
-                        : " Legacy still deletion was not confirmed; close other Knotty tabs and try again.";
-                      setEraseStatus(`${status}${legacy} Reloading to clear in-memory state…`);
-                      window.setTimeout(() => window.location.reload(), 600);
+                      if (
+                        result.browserStorageCleared &&
+                        result.voiceCacheCleared &&
+                        result.legacyStills === "deleted_or_absent"
+                      ) {
+                        // Reload immediately; do not leave hydrated persisted
+                        // controls mounted after their storage was cleared.
+                        window.location.reload();
+                        return;
+                      }
+                      setEraseFailed(true);
+                      setEraseStatus(
+                        "Local content erasure could not be fully confirmed. Close other Knotty tabs, reload this page, and retry before sharing this browser.",
+                      );
                     },
-                    (error) => setEraseStatus(error instanceof Error ? error.message : "Could not erase local data."),
+                    (error) => {
+                      setEraseFailed(true);
+                      setEraseStatus(
+                        error instanceof Error ? error.message : "Could not erase local data.",
+                      );
+                    },
                   );
                 }}
               >
-                Confirm erase all
+                Confirm erase local content
               </Button>
               <Button variant="ghost" onClick={() => setConfirmErase(false)}>Cancel</Button>
             </div>

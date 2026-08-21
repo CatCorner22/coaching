@@ -243,9 +243,9 @@ export function isHighConsequence(id: CanonicalId): boolean {
 }
 
 /**
- * Remote category admission. A model that self-flags prohibited inference
- * must not wipe C3/C4 safety matches, and a high-consequence ID with a
- * junk frame label is rebound to the batch rather than dropped.
+ * Admit only closed, batch-bound remote categories. A model that self-flags a
+ * prohibited inference must not erase a C3/C4 observation; high-consequence
+ * matches with a junk frame label are conservatively rebound to the batch.
  */
 export function admitRemoteCategories(
   matches: ReadonlyArray<{ frame_id?: unknown; canonical_id?: unknown }>,
@@ -280,9 +280,7 @@ export function admitRemoteCategories(
   }
   const disallowed =
     audit.nonvisual_inference || audit.exact_identification || audit.procedural_content;
-  if (!disallowed) {
-    return { matches: bound, hardLimit: false, modelStatus: "completed" };
-  }
+  if (!disallowed) return { matches: bound, hardLimit: false, modelStatus: "completed" };
   const critical = bound.filter((match) => isHighConsequence(match.canonical_id));
   return {
     matches: critical,
@@ -328,7 +326,7 @@ export function buildObservationReport(options: {
   allowedFrameIds?: string[];
   modelStatus: ModelStatus;
   triage?: TriageState;
-  /** Model self-audit or another closed rule forbade trusting the full remote output. */
+  /** A closed rule forbade trusting the full remote output. */
   hardLimit?: boolean;
 }): ObservationReport {
   const triage = options.triage ?? "none";
@@ -389,18 +387,21 @@ export function buildObservationReport(options: {
       level: "none",
       reason: "Current voluntary activity, recording, upload, and output permission were not all confirmed. No analysis is permitted.",
     };
-  } else if (mediaMode !== "no_media" && !permissionsComplete) {
-    disposition = "do_not_proceed";
-    nextStep = "do_not_proceed";
   } else if (urgentStop) {
     disposition = "stop_now";
     nextStep = "stop_now";
   } else if (hasC3) {
     disposition = "do_not_proceed";
     nextStep = "qualified_instructor";
+  } else if (mediaMode !== "no_media" && !permissionsComplete) {
+    disposition = "do_not_proceed";
+    nextStep = "do_not_proceed";
   } else if (options.hardLimit) {
     disposition = "do_not_proceed";
     nextStep = "do_not_proceed";
+  } else if (mediaMode !== "no_media" && !mediaQuality.usable_for_requested_conclusion) {
+    disposition = "insufficient_view";
+    nextStep = "lower_consequence_only";
   } else if (modelUnavailable || categories.some((category) => category.canonical_id === "unknown_object")) {
     disposition = "insufficient_view";
     nextStep = "lower_consequence_only";
@@ -424,9 +425,9 @@ export function buildObservationReport(options: {
     disposition,
     media_quality: mediaQuality,
     recognized_categories: categories,
-    observations: triage === "none" ? observationsFor(matches, mediaQuality.focus) : [],
+    observations: triage === "none" ? observationsFor(matches, mediaQuality) : [],
     nonvisual_checks: nonvisualChecksFor(triage),
-    limitations: limitationsFor(options.modelStatus, mediaMode),
+    limitations: limitationsFor(options.modelStatus, mediaMode, options.hardLimit === true),
     escalation,
     next_step_id: nextStep,
     source_ids: sourceIds,
@@ -457,7 +458,6 @@ function qualityFor(
   }
   const sharpness = finite01(quality?.sharpness);
   const exposure = finite01(quality?.exposure);
-  const score = finite01(quality?.score);
   return {
     focus: quality === null ? "unusable" : sharpness >= 0.55 ? "adequate" : sharpness >= 0.25 ? "soft" : "unusable",
     lighting: quality === null ? "unusable" : exposure >= 0.55 ? "adequate" : exposure >= 0.25 ? "shadowed" : "unusable",
@@ -470,8 +470,11 @@ function qualityFor(
     transformations: "unknown",
     // This flag addresses only the requested broad visual-category conclusion.
     // It never means the media is usable for consent, physiology, technique, or safety.
-    usable_for_requested_conclusion:
-      quality !== null && sharpness >= 0.55 && exposure >= 0.55 && score >= 0.55,
+    // Technical usability is independent of the rope-color ranking hint folded
+    // into `score`. A clear frame of first-aid supplies, a release tool, or
+    // another supported non-rope category must not become unusable merely
+    // because little rope-like color is present.
+    usable_for_requested_conclusion: quality !== null && sharpness >= 0.55 && exposure >= 0.55,
   };
 }
 
@@ -501,6 +504,10 @@ function normalizeMatches(matches: ModelCategoryMatch[], allowedFrameIds: readon
   const output: ModelCategoryMatch[] = [];
   for (const [index, match] of matches.slice(0, 12).entries()) {
     if (!isCanonicalId(match?.canonical_id)) continue;
+    // The capture flow assigns frame labels but never receives user-attested
+    // chronology. A transition label therefore cannot satisfy its ontology
+    // discriminator and is replaced by a per-frame abstention below.
+    if (match.canonical_id === "transition_across_frames_possible") continue;
     const frameId = normalizeFrameId(match?.frame_id, index);
     if (!allowed.has(frameId)) continue;
     const key = `${frameId}:${match.canonical_id}`;
@@ -509,15 +516,7 @@ function normalizeMatches(matches: ModelCategoryMatch[], allowedFrameIds: readon
     output.push({ frame_id: frameId, canonical_id: match.canonical_id });
   }
 
-  const transitionFrames = new Set(
-    output
-      .filter((match) => match.canonical_id === "transition_across_frames_possible")
-      .map((match) => match.frame_id),
-  );
-  const bounded =
-    transitionFrames.size >= 2
-      ? output
-      : output.filter((match) => match.canonical_id !== "transition_across_frames_possible");
+  const bounded = output;
   const framesWithMatch = new Set(bounded.map((match) => match.frame_id));
   for (const frameId of allowedFrameIds) {
     if (!framesWithMatch.has(frameId)) bounded.push({ frame_id: frameId, canonical_id: "unknown_object" });
@@ -556,7 +555,7 @@ function buildCategories(matches: ModelCategoryMatch[]): ObservationReport["reco
 
 function observationsFor(
   matches: ModelCategoryMatch[],
-  focus: ObservationReport["media_quality"]["focus"],
+  quality: ObservationReport["media_quality"],
 ): ObservationReport["observations"] {
   // normalizeMatches already bounds remote matches; include any per-frame
   // unknown abstentions it adds so every emitted category stays evidenced.
@@ -565,8 +564,12 @@ function observationsFor(
     return {
       frame_id: match.frame_id,
       visible_fact: visibleFactFor(match.canonical_id),
-      visibility: focus === "unusable" ? "obscured" : "partial",
-      confidence: match.canonical_id === "unknown_object" ? "abstain" : "low",
+      visibility:
+        quality.focus === "unusable" || quality.lighting === "unusable" ? "obscured" : "partial",
+      confidence:
+        !quality.usable_for_requested_conclusion || match.canonical_id === "unknown_object"
+          ? "abstain"
+          : "low",
       why_it_matters: `${band} is a consequence floor, not a probability estimate or safety clearance.`,
       action_id: actionForBand(band),
     };
@@ -623,7 +626,11 @@ function nonvisualChecksFor(triage: TriageState): string[] {
   ];
 }
 
-function limitationsFor(status: ModelStatus, mode: ObservationReport["media_mode"]): string[] {
+function limitationsFor(
+  status: ModelStatus,
+  mode: ObservationReport["media_mode"],
+  hardLimit: boolean,
+): string[] {
   const limitations = [
     "Images cannot establish legal age, consent, capacity, comfort, pain, sensation, nerve function, circulation, breathing adequacy, pressure, force, load, duration, injury, or future condition.",
     "The report cannot validate an exact knot, tie, harness, placement, construction, material, anchor, rating, technique, instructor qualification, or safety.",
@@ -633,7 +640,11 @@ function limitationsFor(status: ModelStatus, mode: ObservationReport["media_mode
     limitations.push("The app resized and re-encoded the selected stills; crop, lighting, perspective, occlusion, and unknown prior edits can change appearance.");
   }
   if (status !== "completed") {
-    limitations.push("Remote visual classification did not complete; this is an insufficient-view, lower-consequence-only report.");
+    limitations.push(
+      hardLimit
+        ? "Remote visual classification failed or violated the closed output contract; do not proceed from its output."
+        : "Remote visual classification did not complete; this is an insufficient-view, lower-consequence-only report.",
+    );
   }
   return limitations;
 }
@@ -780,6 +791,12 @@ export function validateObservationReport(
       if (category.evidence_state === "not_assessed" && category.abstain_reason !== "out_of_scope") {
         issues.push("not_assessed evidence requires out_of_scope abstention");
       }
+      if (
+        category.canonical_id === "transition_across_frames_possible" &&
+        report.media_quality?.chronology !== "user_labeled"
+      ) {
+        issues.push("transition evidence requires user-labeled chronology");
+      }
     }
   }
   if (!Array.isArray(report.observations)) {
@@ -824,8 +841,9 @@ export function validateObservationReport(
       if (observation.action_id !== expectedAction) {
         issues.push(`observation action is below or inconsistent with ${canonicalId}`);
       }
-      if (canonicalId === "unknown_object") {
-        if (observation.confidence !== "abstain") issues.push("unknown-object observation must abstain");
+      const mediaUnusable = report.media_quality?.usable_for_requested_conclusion === false;
+      if (mediaUnusable || canonicalId === "unknown_object") {
+        if (observation.confidence !== "abstain") issues.push("unusable or unknown observation must abstain");
       } else if (observation.confidence !== "low") {
         issues.push("possible visual categories require low observation confidence");
       }
@@ -942,12 +960,36 @@ export function validateObservationReport(
     missingMediaPermission &&
     report.escalation?.level === "none" &&
     report.next_step_id !== "do_not_proceed" &&
-    report.next_step_id !== "stop_now"
+    report.next_step_id !== "stop_now" &&
+    !(hasC3 && !hasC4 && report.next_step_id === "qualified_instructor")
   ) {
     issues.push("missing media permission requires a non-proceeding next step");
   }
   if (report.disposition === "no_visible_concern_not_clearance") {
     issues.push("this unvalidated camera path cannot issue a no-visible-concern disposition");
+  }
+  const mediaUnusable =
+    report.media_mode !== "no_media" &&
+    report.media_quality?.usable_for_requested_conclusion === false;
+  if (
+    mediaUnusable &&
+    !missingMediaPermission &&
+    !hasC3 &&
+    !hasC4 &&
+    report.disposition !== "insufficient_view" &&
+    !(
+      report.disposition === "do_not_proceed" &&
+      report.next_step_id === "do_not_proceed"
+    )
+  ) {
+    issues.push("unusable media requires insufficient_view or a stricter do_not_proceed disposition");
+  }
+  if (
+    mediaUnusable &&
+    Array.isArray(report.observations) &&
+    report.observations.some((observation) => observation?.confidence !== "abstain")
+  ) {
+    issues.push("unusable media observations must abstain");
   }
   if (
     report.media_quality?.usable_for_requested_conclusion === true &&

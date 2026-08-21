@@ -7,6 +7,7 @@ import {
   runSignOut,
   settleWithin,
   signOutTimeoutMs,
+  verifyPreviewSession,
 } from "./sign-out-plan.mjs";
 
 const TEST_TIMEOUT_MS = 20;
@@ -158,8 +159,9 @@ test("settleWithin waits its full window, then gives up rather than hanging", as
 });
 
 // ── Pre-sign-in session clear (`signIn`) ─────────────────────────────────────
-// Same per-environment bound as sign-out, but best effort: it also runs when
-// there is no prior session, so a failure must never block sign-in.
+// Deployed preparation is fail closed because only the server can clear the
+// HttpOnly session cookie. Preview preparation may fall back to deleting its
+// locally held bearer credential.
 
 /** A pre-sign-in clear whose request never settles. */
 function preSignIn(livePreview, overrides = {}) {
@@ -205,14 +207,32 @@ test("pre-sign-in: a deployed session gets the deployed window, not the preview 
   );
 
   t.mock.timers.tick(DEPLOYED_SIGN_OUT_TIMEOUT_MS - PREVIEW_SIGN_OUT_TIMEOUT_MS);
+  await assert.rejects(h.done, /timed out.*not started/i);
+  assert.equal(h.cleared, 0, "a failed deployed clear must preserve the current session state");
+});
+
+test("pre-sign-in: rejected deployed sign-out blocks OAuth preparation", async () => {
+  const h = preSignIn(false, { requestSignOut: rejects, timeoutMs: TEST_TIMEOUT_MS });
+  await assert.rejects(h.done, /could not be signed out.*not started/i);
+  assert.equal(h.cleared, 0);
+});
+
+test("pre-sign-in: rejected preview invalidation still clears its bearer", async () => {
+  const h = preSignIn(true, { requestSignOut: rejects, timeoutMs: TEST_TIMEOUT_MS });
   await h.done;
   assert.equal(h.cleared, 1);
 });
 
-test("pre-sign-in: a failed clear never blocks sign-in", async () => {
-  // Best effort by design: this also runs with no prior session to clear.
-  await preSignIn(false, { requestSignOut: rejects, timeoutMs: TEST_TIMEOUT_MS }).done;
-  await preSignIn(true, { requestSignOut: rejects, timeoutMs: TEST_TIMEOUT_MS }).done;
+test("pre-sign-in: a confirmed deployed sign-out clears the local token", async () => {
+  let cleared = 0;
+  await runPreSignInSignOut({
+    livePreview: false,
+    hasBearer: false,
+    requestSignOut: () => Promise.resolve(),
+    clearToken: () => (cleared += 1),
+    timeoutMs: TEST_TIMEOUT_MS,
+  });
+  assert.equal(cleared, 1);
 });
 
 test("pre-sign-in: the preview skips the request when there is no bearer", async () => {
@@ -246,3 +266,33 @@ test("the defaults are bounded, and deployed waits longer than preview", async (
   await done;
   assert.deepEqual(h.order, ["clear", "redirect"]);
 });
+
+// ── New preview bearer verification ─────────────────────────────────────────
+
+test("preview session verification accepts only an identified user", async () => {
+  let cleared = 0;
+  const userId = await verifyPreviewSession({
+    requestSession: () => Promise.resolve({ data: { user: { id: "user-1" } }, error: null }),
+    clearToken: () => (cleared += 1),
+  });
+  assert.equal(userId, "user-1");
+  assert.equal(cleared, 0);
+});
+
+for (const [name, requestSession] of [
+  ["rejected request", () => Promise.reject(new Error("offline"))],
+  ["error response", () => Promise.resolve({ data: null, error: { message: "invalid" } })],
+  ["anonymous response", () => Promise.resolve({ data: { user: {} }, error: null })],
+]) {
+  test(`preview session verification clears bearer after ${name}`, async () => {
+    let cleared = 0;
+    await assert.rejects(
+      verifyPreviewSession({
+        requestSession,
+        clearToken: () => (cleared += 1),
+      }),
+      /could not be verified/i,
+    );
+    assert.equal(cleared, 1);
+  });
+}

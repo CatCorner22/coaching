@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   MAX_PHOTO_BYTES,
@@ -9,7 +10,13 @@ import {
   validateMediaFile,
   validateMediaSignature,
 } from "../src/lib/media.ts";
-import { applyFocus, openRopeCamera, startClip, torchAvailable } from "../src/lib/camera/stream.ts";
+import {
+  applyFocus,
+  openRopeCamera,
+  setTorch,
+  startClip,
+  torchAvailable,
+} from "../src/lib/camera/stream.ts";
 
 test("dataUrlSize measures padded base64 payloads", () => {
   assert.equal(dataUrlSize("data:image/jpeg;base64,YWJjZA=="), 4);
@@ -153,11 +160,19 @@ test("3GP MIME, extension, and ISO signature support are consistent", async () =
   assert.doesNotThrow(() =>
     validateMediaFile({ size: 24, type: "application/octet-stream", name: "capture.3gp" }, "video"),
   );
-  const bytes = new Uint8Array(24);
-  const view = new DataView(bytes.buffer);
-  view.setUint32(0, bytes.length);
-  bytes.set([0x66, 0x74, 0x79, 0x70, 0x33, 0x67, 0x70, 0x34], 4);
-  await assert.doesNotReject(validateMediaSignature(new Blob([bytes]), "video"));
+  for (const brand of ["3gp4", "3gp5", "3gp6", "3gp7", "3gp8", "3gp9"]) {
+    const bytes = new Uint8Array(24);
+    const view = new DataView(bytes.buffer);
+    view.setUint32(0, bytes.length);
+    bytes.set([0x66, 0x74, 0x79, 0x70], 4);
+    bytes.set([...brand].map((char) => char.charCodeAt(0)), 8);
+    await assert.doesNotReject(validateMediaSignature(new Blob([bytes]), "video"), brand);
+  }
+
+  const unregistered = new Uint8Array(24);
+  new DataView(unregistered.buffer).setUint32(0, unregistered.length);
+  unregistered.set([0x66, 0x74, 0x79, 0x70, 0x33, 0x67, 0x70, 0x41], 4);
+  await assert.rejects(validateMediaSignature(new Blob([unregistered]), "video"));
 });
 
 test("validateMediaSignature rejects every accepted WebP and HEIC dimension bomb before decode", async () => {
@@ -234,6 +249,26 @@ test("openRopeCamera retries constraint failures but not permission denials", as
   assert.equal(calls, 1);
 });
 
+test("openRopeCamera recognizes cross-realm-style permission errors by standardized name", async (t) => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  t.after(() => restoreGlobal("navigator", original));
+  let calls = 0;
+  const denied = Object.assign(new Error("permission denied"), { name: "NotAllowedError" });
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: {
+      mediaDevices: {
+        getUserMedia: async () => {
+          calls += 1;
+          throw denied;
+        },
+      },
+    },
+  });
+  await assert.rejects(openRopeCamera("environment"), /permission denied/i);
+  assert.equal(calls, 1);
+});
+
 test("openRopeCamera explains the HTTPS requirement before requesting permission", async (t) => {
   const secureDescriptor = Object.getOwnPropertyDescriptor(globalThis, "isSecureContext");
   const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
@@ -307,11 +342,39 @@ test("applyFocus is bounded when a device never settles constraints", async (t) 
   assert.equal(attempts, 1);
 });
 
+test("applyFocus requests continuous modes only when each capability advertises them", async () => {
+  const applied = [];
+  const stream = {
+    getVideoTracks: () => [{
+      getCapabilities: () => ({
+        focusMode: ["manual", "single-shot"],
+        exposureMode: ["manual", "continuous"],
+        whiteBalanceMode: "continuous",
+      }),
+      applyConstraints: async (constraints) => {
+        applied.push(constraints);
+      },
+    }],
+  };
+  await applyFocus(stream);
+  assert.deepEqual(applied, [{ advanced: [{ exposureMode: "continuous" }] }]);
+});
+
 test("torch capability races fail closed instead of throwing", () => {
   assert.equal(
     torchAvailable({ getVideoTracks: () => [{ getCapabilities: () => { throw new DOMException("ended", "InvalidStateError"); } }] }),
     false,
   );
+});
+
+test("torch track lookup races close the stream instead of rejecting", async () => {
+  let stopped = 0;
+  const stream = {
+    getVideoTracks: () => { throw new DOMException("ended", "InvalidStateError"); },
+    getTracks: () => [{ stop: () => { stopped += 1; } }],
+  };
+  assert.equal(await setTorch(stream, true), false);
+  assert.equal(stopped, 1);
 });
 
 test("torch application is bounded when device constraints never settle", async (t) => {
@@ -329,13 +392,42 @@ test("torch application is bounded when device constraints never settle", async 
     },
   });
   Object.defineProperty(globalThis, "clearTimeout", { configurable: true, value: () => undefined });
+  let stopped = 0;
+  const track = {
+    stop: () => { stopped += 1; },
+    getCapabilities: () => ({ torch: true }),
+    applyConstraints: () => new Promise(() => undefined),
+  };
   const stream = {
+    getTracks: () => [track],
     getVideoTracks: () => [{
-      getCapabilities: () => ({ torch: true }),
-      applyConstraints: () => new Promise(() => undefined),
+      ...track,
     }],
   };
-  assert.equal(await (await import("../src/lib/camera/stream.ts")).setTorch(stream, true), false);
+  assert.equal(await setTorch(stream, true), false);
+  assert.equal(stopped, 1);
+});
+
+test("torch constraint rejection stops the whole stream fail closed", async () => {
+  let stopped = 0;
+  const track = {
+    stop: () => { stopped += 1; },
+    getCapabilities: () => ({ torch: true }),
+    applyConstraints: async () => { throw new DOMException("ended", "InvalidStateError"); },
+  };
+  const stream = {
+    getTracks: () => [track, { stop: () => { stopped += 1; } }],
+    getVideoTracks: () => [track],
+  };
+  assert.equal(await setTorch(stream, true), false);
+  assert.equal(stopped, 2);
+});
+
+test("camera capture closes media on both visibility loss and pagehide", () => {
+  const source = readFileSync(new URL("../src/components/camera-capture.tsx", import.meta.url), "utf8");
+  assert.match(source, /addEventListener\("visibilitychange",\s*onVisibility\)/);
+  assert.match(source, /addEventListener\("pagehide",\s*onPageHide\)/);
+  assert.match(source, /removeEventListener\("pagehide",\s*onPageHide\)/);
 });
 
 test("startClip reports unsupported browsers and returns the native recorded type", async (t) => {

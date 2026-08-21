@@ -23,9 +23,180 @@ test("vision replay reservation encloses the quota charge", () => {
   const source = read("src/lib/ai/analyze.ts");
   assert.match(
     source,
-    /consumeMediaBatch\(authorization\.userId, data\.consent\.batchId, \(\) => \{\s*consumeAiBudget\(/,
+    /await consumeMediaBatch\(authorization\.userId, data\.consent\.batchId, \(\) => \{\s*consumeAiBudget\(/,
   );
   assert.doesNotMatch(source, /consumeAiBudget\([^;]+;\s*consumeMediaBatch\(/);
+});
+
+test("auth routes, production validation, and provider capability discovery are wired", () => {
+  const route = read("src/routes/api/auth/$.ts");
+  const server = read("src/lib/auth/server.ts");
+  const capability = read("src/lib/auth/capabilities.ts");
+  const login = read("src/routes/login.tsx");
+  assert.match(route, /GET:[\s\S]*?auth\.handler\(request\)/);
+  assert.match(route, /POST:[\s\S]*?auth\.handler\(request\)/);
+  assert.match(server, /assertProductionAuthEnvironment\(process\.env/);
+  assert.match(capability, /gateIdentityEnabled\(\)/);
+  assert.match(capability, /oauthProviders: authConfigured/);
+  assert.match(login, /capabilities\.oauthProviders/);
+});
+
+test("hosting-gate session rotation rejects invalid identity and adapter failures", () => {
+  const source = read("src/lib/auth/gate-session.server.ts");
+  assert.match(source, /APIError,[\s\S]*?from "better-auth\/api"/);
+  assert.match(source, /if \(!inbound\.has\(GATE_IDENTITY_HEADER\)\) return/);
+
+  const verify = source.indexOf("const identity = await gateIdentityFromHeaders(inbound)");
+  const invalid = source.indexOf('throw new APIError("UNAUTHORIZED"', verify);
+  const bearerFastPath = source.indexOf(
+    'if (inbound.get("authorization")) return;',
+    verify,
+  );
+  assert.ok(verify >= 0 && verify < invalid && invalid < bearerFastPath);
+
+  const inspect = source.indexOf("const existing = await getSessionFromCtx(ctx)");
+  const accounts = source.indexOf("await ctx.context.internalAdapter.findAccounts", inspect);
+  const remove = source.indexOf("await ctx.context.internalAdapter.deleteSession", accounts);
+  const mint = source.indexOf("const result = await handleOAuthUserInfo", remove);
+  assert.ok(inspect >= 0 && inspect < accounts && accounts < remove && remove < mint);
+  assert.doesNotMatch(
+    source.slice(inspect, mint),
+    /\.catch\(/,
+    "session inspection/deletion failures must reach the rejecting outer path",
+  );
+  assert.match(source, /if \(err instanceof APIError\) throw err/);
+  assert.match(source, /throw new APIError\("INTERNAL_SERVER_ERROR"/);
+  assert.match(source, /Already signed in as this gate identity[\s\S]*?return;/);
+});
+
+test("preview popup completion is bound to its opener and a one-time nonce", () => {
+  const client = read("src/lib/auth/client.ts");
+  const popup = read("src/lib/auth/popup.server.ts");
+  assert.match(client, /event\.source !== popup/);
+  assert.match(client, /data\.nonce !== nonce/);
+  assert.match(client, /crypto\.randomUUID\(\)/);
+  assert.match(popup, /VALID_NONCE/);
+  assert.match(popup, /VALID_PROVIDER_IDS/);
+  assert.match(popup, /nonce: string/);
+});
+
+test("preview OAuth stays inert until confirmed session and local-data preparation", () => {
+  const client = read("src/lib/auth/client.ts");
+  const popup = read("src/lib/auth/popup.server.ts");
+  assert.match(client, /pending=1/);
+  assert.match(client, /window\.open\(pendingUrl/);
+  assert.match(popup, /Static holding page: no OAuth, cookies, script, opener message, or redirect/);
+  assert.match(client, /requestSignOut: requestConfirmedSignOut/);
+  assert.match(client, /popupAttempt\?\.popup\.close\(\)/);
+  const prepare = client.indexOf("await runPreSignInSignOut(");
+  const erase = client.indexOf("await clearPriorAccountLocalData();", prepare);
+  const activate = client.indexOf("activateSignInPopup(popupAttempt);", erase);
+  assert.ok(prepare >= 0 && prepare < erase && erase < activate);
+  const failureCatch = client.indexOf("} catch (cause) {", activate);
+  const finalErase = client.indexOf("await clearPriorAccountLocalData();", failureCatch);
+  const invalidate = client.indexOf('writeAccountMarker(JSON.stringify([1, "erase-unconfirmed"]))', finalErase);
+  const reload = client.indexOf("window.location.reload();", invalidate);
+  assert.ok(
+    failureCatch >= 0 &&
+      failureCatch < finalErase &&
+      finalErase < invalidate &&
+      invalidate < reload,
+    "cancelled/failed OAuth must re-erase, invalidate on uncertainty, then reload",
+  );
+});
+
+test("account chrome never loads a remote profile image", () => {
+  const gates = read("src/lib/auth/gates.tsx");
+  const user = read("src/lib/auth/use-current-user.ts");
+  assert.doesNotMatch(gates, /<img|profileImageUrl/);
+  assert.doesNotMatch(user, /profileImageUrl|user\.image/);
+});
+
+test("account changes fail closed unless browser data and legacy stills are confirmed erased", () => {
+  const client = read("src/lib/auth/client.ts");
+  const provider = read("src/lib/auth/provider.tsx");
+  assert.match(client, /!result\.browserStorageCleared/);
+  assert.match(client, /!result\.voiceCacheCleared/);
+  assert.match(client, /result\.legacyStills !== "deleted_or_absent"/);
+  assert.match(client, /await clearPriorAccountLocalData\(\)/);
+  assert.match(provider, /readAccountMarker\(\)/);
+  assert.match(provider, /writeAccountMarker\(expectedMarker\)/);
+  assert.match(provider, /window\.location\.reload\(\)/);
+  assert.ok(
+    provider.indexOf("writeAccountMarker(expectedMarker)") <
+      provider.indexOf("window.location.reload()"),
+  );
+  assert.match(provider, /if \(!markerMatches\)/);
+  assert.match(provider, /if \(sessionError\)/);
+  assert.match(provider, /no erase was attempted/);
+  assert.match(provider, /Local data is blocked/);
+});
+
+test("failed or cancelled sign-in reloads after local erase begins", () => {
+  const client = read("src/lib/auth/client.ts");
+  assert.match(client, /function sameOriginCallbackPath/);
+  assert.match(client, /url\.origin !== window\.location\.origin/);
+  const started = client.indexOf("localEraseStarted = true");
+  const erased = client.indexOf("await clearPriorAccountLocalData();", started);
+  const caught = client.indexOf("} catch (cause) {", erased);
+  const reloaded = client.indexOf("window.location.reload();", caught);
+  assert.ok(started >= 0 && started < erased && erased < caught && caught < reloaded);
+  assert.match(client.slice(caught, reloaded), /if \(localEraseStarted/);
+  assert.match(client, /Persistent records may already be gone while Zustand stores still hold/);
+  assert.match(client, /Always navigate—even to the current route/);
+  assert.match(client, /if \(!data\?\.url\) throw new Error/);
+});
+
+test("login capability failures are retryable rather than an endless pending state", () => {
+  const login = read("src/routes/login.tsx");
+  const capabilities = read("src/lib/auth/capabilities.ts");
+  assert.match(login, /capabilityError/);
+  assert.match(login, /getAuthCapabilitiesBounded\(\)/);
+  assert.match(capabilities, /AUTH_CAPABILITIES_TIMEOUT_MS = 5_000/);
+  assert.match(capabilities, /Promise\.race/);
+  assert.match(login, /setCapabilityAttempt\(\(attempt\) => attempt \+ 1\)/);
+  assert.match(login, /Retry sign-in check/);
+  assert.match(login, /Cloud analysis remains unavailable until this check succeeds/);
+});
+
+test("the emergency cut-down card bypasses account-isolation availability failures", () => {
+  const provider = read("src/lib/auth/provider.tsx");
+  assert.match(provider, /state\.location\.pathname === "\/emergency"/);
+  assert.match(provider, /authEnabled && !emergencyBypass/);
+  const providerBody = provider.slice(
+    provider.indexOf("export function AuthProvider"),
+    provider.indexOf("function AccountIsolationGate"),
+  );
+  assert.doesNotMatch(providerBody, /authClient\.useSession|readAccountMarker/);
+});
+
+test("sign-out failures remain visible and retryable", () => {
+  const gates = read("src/lib/auth/gates.tsx");
+  assert.match(gates, /setSignOutError/);
+  assert.match(gates, /role="alert"/);
+  assert.match(gates, /You may still be signed in/);
+});
+
+test("hosting-gate account chrome never promises a persistent app sign-out", () => {
+  const gates = read("src/lib/auth/gates.tsx");
+  const client = read("src/lib/auth/client.ts");
+  assert.match(gates, /capabilities\?\.gateIdentity === true/);
+  assert.match(gates, /localClearOnly[\s\S]*?clearLocalAccountData\(\)/);
+  assert.match(gates, /capabilityFailed \|\| capabilitiesPending/);
+  assert.doesNotMatch(gates, /disabled=\{signingOut \|\| capabilitiesPending\}/);
+  assert.match(gates, /hosting gate controls account access/i);
+  assert.match(gates, /Exit or sign out through the host to end access/i);
+  assert.match(gates, /Clear local data/);
+  assert.match(client, /export async function clearLocalAccountData/);
+  const clearStart = client.indexOf("export async function clearLocalAccountData");
+  const clearEnd = client.indexOf("async function requestConfirmedSignOut", clearStart);
+  assert.doesNotMatch(client.slice(clearStart, clearEnd), /authClient\.signOut/);
+});
+
+test("cloud voice accepts only reviewed application lines", () => {
+  const source = read("src/lib/ai/voice.ts");
+  assert.match(source, /isReviewedCoachSpeech\(data\.text\)/);
+  assert.match(source, /Cloud voice accepts only reviewed app guidance/);
 });
 
 test("session cookie parse failures never log credential previews", () => {

@@ -1,12 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
 import { RopeFigure } from "@/components/rope-figure";
 import { NERVES, TIES } from "@/lib/kb";
 
-export const Route = createFileRoute("/nerves")({ component: NervesPage });
+export const Route = createFileRoute("/nerves")({
+  validateSearch: (search: Record<string, unknown>): { nerve?: string } => ({
+    nerve:
+      typeof search.nerve === "string" && NERVES.some((nerve) => nerve.slug === search.nerve)
+        ? search.nerve
+        : undefined,
+  }),
+  component: NervesPage,
+});
 
 function NervesPage() {
-  const [slug, setSlug] = useState<string>(NERVES[0]!.slug);
+  const search = Route.useSearch();
+  const slug = search.nerve ?? NERVES[0]!.slug;
   const n = NERVES.find((x) => x.slug === slug) ?? NERVES[0]!;
   return (
     <div className="mx-auto grid max-w-5xl gap-8 px-5 py-10 lg:grid-cols-[240px_minmax(0,1fr)]">
@@ -23,14 +31,17 @@ function NervesPage() {
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {NERVES.map((x) => (
-            <button
+            <Link
               key={x.slug}
-              type="button"
-              onClick={() => setSlug(x.slug)}
-              className="rounded-full border border-border px-3 py-1 text-xs uppercase tracking-wide text-muted hover:text-fg"
+              to="/nerves"
+              search={{ nerve: x.slug }}
+              aria-current={x.slug === slug ? "page" : undefined}
+              className={`rounded-full border px-3 py-1 text-xs uppercase tracking-wide hover:text-fg ${
+                x.slug === slug ? "border-accent text-fg" : "border-border text-muted"
+              }`}
             >
               {x.name}
-            </button>
+            </Link>
           ))}
         </div>
         <h2 className="mt-8 font-display text-3xl">{n.name}</h2>
