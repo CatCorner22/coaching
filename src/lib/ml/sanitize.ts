@@ -17,7 +17,7 @@ const FLAG_CODES = new Set<SafetyFlag["code"]>([
 export function foldText(s: string) {
   return String(s ?? "")
     .normalize("NFKC")
-    .replace(/[\u200B-\u200D\uFEFF\u00AD\u2060\u180E\u0300-\u036f]/g, "")
+    .replace(/[\u200B-\u200D\uFEFF\u00AD\u2060\u180E]|\p{M}/gu, "")
     .replace(/[еэєёЕЭЄЁεΕ]/g, "e")
     .replace(/[аАαΑ]/g, "a")
     .replace(/[оОοΟ]/g, "o")
