@@ -58,6 +58,7 @@ test("the compile-time dev-server boundary owns PGLite and preview credentials",
   assert.doesNotMatch(auth, /void ensureDbReady\(\)/);
   assert.match(auth, /const production = !viteDevServer/);
   assert.match(auth, /: viteDevServer[\s\S]*?pgliteDialect/);
+  assert.match(auth, /rateLimit: \{ enabled: true, window: 60, max: 100 \}/);
   assert.match(aiGuard, /userId === DEV_USER_ID && !viteDevServer/);
   assert.match(connector, /const envToken = viteDevServer/);
   for (const source of [db, auth, aiGuard, connector]) {
@@ -66,6 +67,10 @@ test("the compile-time dev-server boundary owns PGLite and preview credentials",
   assert.match(vite, /await mod\.ensureDbReady\(\)/);
   assert.match(config, /problems\.push\("DATABASE_URL is required"\)/);
   assert.match(workflow, /pglite\\\.\(data\|wasm\)\|initdb\\\.wasm/);
+  assert.match(workflow, /\[\[ ! -d "\$functions_dir" \]\]/);
+  assert.match(workflow, /"\$\{#modules\[@\]\}" -eq 0/);
+  assert.match(workflow, /scan_status=\$\?/);
+  assert.match(workflow, /"\$scan_status" -ne 1/);
   assert.match(workflow, /NODE_ENV=development npm run preview/);
   assert.match(workflow, /api\/auth\/get-session/);
 });
