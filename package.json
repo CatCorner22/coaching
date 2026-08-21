@@ -14,7 +14,7 @@
     "preview": "node scripts/with-app-env.mjs vite preview",
     "typecheck": "tsc --noEmit",
     "check:auth": "node scripts/check-auth-invariant.mjs",
-    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/auth/gate-identity.test.ts",
+    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/auth/gate-identity.test.ts && node --experimental-strip-types --import ./scripts/register-ts.mjs --test src/lib/ml/adversarial.test.ts src/lib/ml/signal.test.ts src/lib/kb/kb.test.ts src/lib/stores/session.test.ts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

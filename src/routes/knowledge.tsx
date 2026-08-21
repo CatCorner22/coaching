@@ -31,7 +31,7 @@ function KnowledgePage() {
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-10">
-      <p className="text-xs uppercase tracking-[0.22em] text-muted">知</p>
+      <p className="text-xs uppercase tracking-[0.22em] text-muted">Guide</p>
       <h1 className="mt-2 font-display text-4xl">Knowledge</h1>
       <p className="mt-3 text-sm text-muted">
         Consent, nerves, scenes, aftercare. Ask in your words — answers are grounded in these essays.

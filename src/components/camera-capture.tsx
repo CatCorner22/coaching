@@ -70,7 +70,7 @@ export function CameraCapture({
     qualities: FrameQuality[],
   ) {
     const quality =
-      qualities.sort((a, b) => b.score - a.score)[0] ??
+      [...qualities].sort((a, b) => b.score - a.score)[0] ??
       ({ sharpness: 0, exposure: 0, ropeHint: 0, score: 0, notes: ["No frame"] } satisfies FrameQuality);
     setHint(quality.notes[0] ?? `Sharpness ${Math.round(quality.sharpness * 100)}`);
     onCapture({
@@ -95,15 +95,21 @@ export function CameraCapture({
         });
         await new Promise((r) => setTimeout(r, 90));
       }
-      const best = pickBest(
-        frames.map((f) => ({ data: f.imageData, item: f })),
-        1,
-      );
-      const chosen = best[0] ?? frames[0]!;
+      const framed = frames.map((f) => {
+        const obs = observeFrame(f.imageData);
+        return {
+          data: f.imageData,
+          item: { ...f, obs },
+          neck: obs.neckRope,
+          paleness: obs.paleness,
+        };
+      });
+      const best = pickBest(framed, 1);
+      const chosen = best[0] ?? framed[0]!.item;
       await emitFromMedia(
         "photo",
         [chosen.jpeg],
-        [observeFrame(chosen.imageData)],
+        [chosen.obs],
         [scoreFrame(chosen.imageData)],
       );
     } finally {
@@ -174,6 +180,7 @@ export function CameraCapture({
     setBusy(true);
     setError(null);
     try {
+      if (file.size > 12 * 1024 * 1024) throw new Error("File is too large. Use a phone still under 12MB.");
       if (kind === "video" || file.type.startsWith("video/")) {
         await ingestVideo(file);
       } else {
@@ -205,6 +212,7 @@ export function CameraCapture({
           className={cn("aspect-[3/4] w-full object-cover", !live && "hidden")}
           playsInline
           muted
+          autoPlay
         />
         {live && <GuideOverlay guide={guide} />}
         {!live && (

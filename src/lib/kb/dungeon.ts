@@ -172,11 +172,11 @@ export const DUNGEON: DungeonPiece[] = [
 
 export const DUNGEON_SCENES = [
   {
-    slug: "table-open",
-    name: "Table, open",
+    slug: "table-fold",
+    name: "Table / bench",
     piece: "massage-table",
-    minutes: 35,
-    steps: ["single-column", "karada", "futomomo"],
+    minutes: 30,
+    steps: ["bench-drape", "frog-tie"],
     blurb: "Supine on the table. Cuffs, a wearable harness, one leg. Machine or toy only after hands check out green.",
   },
   {
@@ -196,19 +196,19 @@ export const DUNGEON_SCENES = [
     blurb: "Draped on the bench, one or both legs tied, machine in front of you not instead of you.",
   },
   {
-    slug: "swing-supported",
-    name: "Swing, supported",
+    slug: "swing-support",
+    name: "Swing holds",
     piece: "sex-swing",
-    minutes: 30,
-    steps: ["karada", "futomomo"],
+    minutes: 25,
+    steps: ["single-column", "hip-harness"],
     blurb: "The sling holds her. Rope dresses. No uplines. Toy or machine only if her hands can still signal.",
   },
   {
-    slug: "pole-stand",
-    name: "Pole, standing",
+    slug: "pole-dress",
+    name: "Pole, feet planted",
     piece: "pole",
     minutes: 20,
-    steps: ["single-column", "tasuki"],
+    steps: ["pole-cuffs", "shinju"],
     blurb: "Dance first if you want. Tie after she is dry enough that jute will not cinch on sweat.",
   },
 ] as const;

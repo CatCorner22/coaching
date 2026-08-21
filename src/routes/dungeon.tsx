@@ -31,6 +31,13 @@ function DungeonPage() {
                 </Link>
               ))}
               <Link
+                to="/plan"
+                search={{ seq: s.slug }}
+                className="text-xs text-muted hover:text-fg"
+              >
+                Load in planner
+              </Link>
+              <Link
                 to="/studio"
                 search={{ tie: s.steps[0] }}
                 className="text-xs text-accent"

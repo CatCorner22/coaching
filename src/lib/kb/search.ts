@@ -153,15 +153,41 @@ export function articleExcerpts(slugs: string[], maxChars = 900) {
   return slugs
     .map((slug) => {
       const a = ARTICLES.find((x) => x.slug === slug);
-      if (!a) return null;
-      const text = a.blocks
-        .map((b) => {
-          if (b.type === "ul") return b.items.join(" ");
-          if (b.type === "callout") return `${b.title}: ${b.text}`;
-          return b.text;
-        })
-        .join(" ");
-      return { slug: a.slug, title: a.title, text: text.slice(0, maxChars) };
+      if (a) {
+        const text = a.blocks
+          .map((b) => {
+            if (b.type === "ul") return b.items.join(" ");
+            if (b.type === "callout") return `${b.title}: ${b.text}`;
+            return b.text;
+          })
+          .join(" ");
+        return { slug: a.slug, title: a.title, text: text.slice(0, maxChars) };
+      }
+      const t = TIES.find((x) => x.slug === slug);
+      if (t) {
+        return {
+          slug: t.slug,
+          title: t.name,
+          text: `${t.summary} ${t.why} Stop: ${t.stop.join("; ")}`.slice(0, maxChars),
+        };
+      }
+      const k = KNOTS.find((x) => x.slug === slug);
+      if (k) {
+        return {
+          slug: k.slug,
+          title: k.name,
+          text: `${k.summary} ${k.watch.join(" ")}`.slice(0, maxChars),
+        };
+      }
+      const d = DUNGEON.find((x) => x.slug === slug);
+      if (d) {
+        return {
+          slug: d.slug,
+          title: d.name,
+          text: `${d.summary} With rope: ${d.withRope.join(" ")} Never: ${d.never.join(" ")}`.slice(0, maxChars),
+        };
+      }
+      return null;
     })
     .filter((x): x is { slug: string; title: string; text: string } => !!x);
 }

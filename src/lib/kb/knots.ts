@@ -1,6 +1,7 @@
 import type { Knot } from "./types";
+import { MORE_KNOTS } from "./more-knots";
 
-export const KNOTS: Knot[] = [
+const CORE_KNOTS: Knot[] = [
   {
     slug: "somerville-bowline",
     name: "Somerville Bowline",
@@ -150,7 +151,7 @@ export const KNOTS: Knot[] = [
     steps: [
       {
         title: "Lay the line",
-        body: "Bring the doubled rope to the turning point (under a breast, at a hip, at the nape).",
+        body: "Bring the doubled rope to the turning point (under a breast, at a hip, at the sternum). Never at the nape.",
         speak: "Bring the doubled rope to the turning point.",
       },
       {
@@ -281,6 +282,8 @@ export const KNOTS: Knot[] = [
     watch: ["A sloppy eight can capsize. Dress it like a climber."],
   },
 ];
+
+export const KNOTS: Knot[] = [...CORE_KNOTS, ...MORE_KNOTS];
 
 export function getKnot(slug: string) {
   return KNOTS.find((k) => k.slug === slug);

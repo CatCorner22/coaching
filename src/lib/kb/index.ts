@@ -47,6 +47,34 @@ export const SEQUENCES = [
     steps: ["single-column", "futomomo"],
     blurb: "Draped on the bench. Machine in front of you, not instead of you.",
   },
+  {
+    slug: "pole-dress",
+    name: "Pole, feet planted",
+    minutes: 20,
+    steps: ["pole-cuffs", "shinju"],
+    blurb: "Cuffed to the pole. Flogger optional. Feet stay on the floor.",
+  },
+  {
+    slug: "swing-support",
+    name: "Swing holds",
+    minutes: 25,
+    steps: ["single-column", "hip-harness"],
+    blurb: "Park her in the swing first. Rope only dresses. No extra uplines.",
+  },
+  {
+    slug: "table-fold",
+    name: "Table / bench",
+    minutes: 30,
+    steps: ["bench-drape", "frog-tie"],
+    blurb: "Hips on the pad. Machine off until you are on the kill switch.",
+  },
+  {
+    slug: "mermaid-evening",
+    name: "Mermaid evening",
+    minutes: 35,
+    steps: ["single-column", "mermaid", "karada"],
+    blurb: "Legs as a column, then a wearable harness. Land before you add a gag.",
+  },
 ] as const;
 
 export function kbStats() {

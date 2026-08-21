@@ -1,9 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
+import { scrubBannedAnswer, textIsBanned } from "@/lib/ml/audit";
 
 export const speakCoach = createServerFn({ method: "POST" })
-  .validator((input: { text: string }) => {
-    const text = (input?.text ?? "").replace(/\s+/g, " ").trim().slice(0, 400);
+  .validator((input: { text: unknown }) => {
+    let text = String(input?.text ?? "").replace(/\s+/g, " ").trim().slice(0, 400);
     if (!text) throw new Error("Nothing to speak");
+    if (textIsBanned(text)) text = scrubBannedAnswer(text);
     return { text };
   })
   .handler(async ({ data }) => {

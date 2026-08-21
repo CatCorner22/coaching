@@ -6,9 +6,9 @@ import type {
   DeterministicReport,
   FrameObservation,
   LlmDraft,
-  Prediction,
 } from "./types";
 import { predict } from "./predict";
+import { sanitizeDet } from "./sanitize";
 
 export function fuseCoach(opts: {
   det: DeterministicReport;
@@ -18,9 +18,11 @@ export function fuseCoach(opts: {
   stepIndex: number;
   elapsedSec: number;
   priorNerveHits: number;
+  hardNos?: string[];
 }): CoachReport {
+  const det = sanitizeDet(opts.det);
   const prediction = predict({
-    det: opts.det,
+    det,
     frames: opts.frames,
     tie: opts.tie,
     stepIndex: opts.stepIndex,
@@ -28,20 +30,21 @@ export function fuseCoach(opts: {
     priorNerveHits: opts.priorNerveHits,
   });
   const { draft, verdict } = localAudit({
-    det: opts.det,
+    det,
     pred: prediction,
     llm: opts.llm,
     tie: opts.tie,
     stepIndex: opts.stepIndex,
+    hardNos: opts.hardNos,
   });
   const recommend = rankRecommend(
-    opts.det.recommend,
+    det.recommend,
     prediction.recommend,
     draft.quality === "unsafe" ? "stop" : draft.quality === "adjust" ? "adjust" : "continue",
   );
   const flags = [
-    ...opts.det.flags,
-    ...(recommend !== "continue" && !opts.det.flags.length
+    ...det.flags,
+    ...(recommend !== "continue" && !det.flags.length
       ? [
           {
             code: "unknown" as const,
@@ -52,9 +55,9 @@ export function fuseCoach(opts: {
       : []),
   ];
   return {
-    deterministic: opts.det,
+    deterministic: det,
     prediction,
-    llm: opts.llm,
+    llm: draft,
     audit: verdict,
     final: {
       recommend,

@@ -5,6 +5,8 @@ export type Rank = "yes" | "maybe" | "no";
 
 export type NegItem = { id: string; label: string; rank: Rank };
 
+export const LOCKED_NO = new Set(["neck", "breath", "suspension", "alone"]);
+
 const STARTER: NegItem[] = [
   { id: "photos", label: "Nude photos / video for coaching", rank: "yes" },
   { id: "voice", label: "Being spoken to in protocol", rank: "yes" },
@@ -30,6 +32,23 @@ const STARTER: NegItem[] = [
   { id: "alone", label: "Being left tied and alone", rank: "no" },
 ];
 
+function clampRank(r: unknown): Rank {
+  return r === "yes" || r === "maybe" || r === "no" ? r : "maybe";
+}
+
+function lockItems(items: NegItem[]): NegItem[] {
+  const mapped = items.slice(0, 40).map((i) => ({
+    id: String(i.id).slice(0, 80),
+    label: String(i.label).slice(0, 80),
+    rank: LOCKED_NO.has(i.id) ? ("no" as Rank) : clampRank(i.rank),
+  }));
+  const have = new Set(mapped.map((i) => i.id));
+  for (const seed of STARTER) {
+    if (LOCKED_NO.has(seed.id) && !have.has(seed.id)) mapped.push({ ...seed, rank: "no" });
+  }
+  return mapped;
+}
+
 type State = {
   items: NegItem[];
   notes: string;
@@ -44,16 +63,35 @@ export const useNegotiate = create<State>()(
       items: STARTER,
       notes: "",
       setRank: (id, rank) =>
-        set({ items: get().items.map((i) => (i.id === id ? { ...i, rank } : i)) }),
-      setNotes: (notes) => set({ notes }),
-      add: (label) =>
+        set({
+          items: get().items.map((i) =>
+            i.id === id ? { ...i, rank: LOCKED_NO.has(i.id) ? "no" : clampRank(rank) } : i,
+          ),
+        }),
+      setNotes: (notes) => set({ notes: notes.slice(0, 600) }),
+      add: (label) => {
+        const clean = label.trim().slice(0, 80);
+        if (!clean) return;
         set({
           items: [
             ...get().items,
-            { id: crypto.randomUUID(), label, rank: "maybe" as Rank },
-          ],
-        }),
+            { id: crypto.randomUUID(), label: clean, rank: "maybe" as Rank },
+          ].slice(0, 40),
+        });
+      },
     }),
-    { name: "musubi-negotiate" },
+    {
+      name: "musubi-negotiate",
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<State>;
+        const items = Array.isArray(p.items) && p.items.length ? lockItems(p.items as NegItem[]) : current.items;
+        return {
+          ...current,
+          ...p,
+          items,
+          notes: typeof p.notes === "string" ? p.notes.slice(0, 600) : current.notes,
+        };
+      },
+    },
   ),
 );

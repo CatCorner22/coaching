@@ -1,4 +1,5 @@
 import type { Tie } from "./types";
+import { MORE_TIES } from "./more-ties";
 
 const scExpected = {
   wrapBands: 1,
@@ -8,7 +9,7 @@ const scExpected = {
   neckClear: true,
 };
 
-export const TIES: Tie[] = [
+const CORE_TIES: Tie[] = [
   {
     slug: "single-column",
     name: "Single Column",
@@ -725,6 +726,8 @@ export const TIES: Tie[] = [
     variations: [],
   },
 ];
+
+export const TIES: Tie[] = [...CORE_TIES, ...MORE_TIES];
 
 export function getTie(slug: string) {
   if (!slug) return undefined;

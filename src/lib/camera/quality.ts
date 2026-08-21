@@ -84,12 +84,14 @@ export function pickBest<T>(
   items: { data: ImageData; item: T; neck?: number; paleness?: number }[],
   keep = 3,
 ): T[] {
-  return [...items]
+  const danger = items.filter((x) => (x.neck ?? 0) > 0.08 || (x.paleness ?? 0) > 0.45);
+  const pool = danger.length ? danger : items;
+  return [...pool]
     .sort((a, b) => {
       const qa = scoreFrame(a.data);
       const qb = scoreFrame(b.data);
-      const sa = qa.score + (a.neck ?? 0) * 0.35 + (a.paleness ?? 0) * 0.15;
-      const sb = qb.score + (b.neck ?? 0) * 0.35 + (b.paleness ?? 0) * 0.15;
+      const sa = qa.score + (a.neck ?? 0) * 0.8 + (a.paleness ?? 0) * 0.4;
+      const sb = qb.score + (b.neck ?? 0) * 0.8 + (b.paleness ?? 0) * 0.4;
       return sb - sa;
     })
     .slice(0, keep)

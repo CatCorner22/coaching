@@ -1,6 +1,7 @@
 import type { Article } from "./types";
+import { MORE_ARTICLES } from "./more-articles";
 
-export const ARTICLES: Article[] = [
+const CORE_ARTICLES: Article[] = [
   {
     slug: "consent-frameworks",
     title: "Consent Frameworks",
@@ -562,6 +563,8 @@ export const ARTICLES: Article[] = [
     ],
   },
 ];
+
+export const ARTICLES: Article[] = [...CORE_ARTICLES, ...MORE_ARTICLES];
 
 export function getArticle(slug: string) {
   return ARTICLES.find((a) => a.slug === slug);

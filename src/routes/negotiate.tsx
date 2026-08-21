@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { useNegotiate, type Rank } from "@/lib/stores/negotiate";
+import { useNegotiate, LOCKED_NO, type Rank } from "@/lib/stores/negotiate";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/negotiate")({
@@ -36,6 +36,7 @@ function NegotiatePage() {
                 <button
                   key={r}
                   type="button"
+                  disabled={LOCKED_NO.has(i.id) && r !== "no"}
                   onClick={() => setRank(i.id, r)}
                   className={cn(
                     "rounded-full px-2.5 py-1 text-[11px] uppercase tracking-wide",
@@ -46,6 +47,7 @@ function NegotiatePage() {
                           ? "bg-ok/20 text-ok"
                           : "bg-warn/20 text-warn"
                       : "text-muted",
+                    LOCKED_NO.has(i.id) && r !== "no" && "cursor-not-allowed opacity-40",
                   )}
                 >
                   {r}

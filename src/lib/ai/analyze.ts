@@ -3,6 +3,7 @@ import { getDungeon, getTie } from "@/lib/kb";
 import { applyModelSelfAudit, fallbackDraft } from "@/lib/ml/audit";
 import { fuseCoach } from "@/lib/ml/fuse";
 import { predict } from "@/lib/ml/predict";
+import { clampStep, isCameraDataUrl, sanitizeDet, sanitizeDraft, sanitizeQuestion } from "@/lib/ml/sanitize";
 import type { LlmDraft } from "@/lib/ml/types";
 import { grokChat, parseJson } from "./grok";
 import type { AnalyzeInput, AnalyzeResult } from "./schema";
@@ -43,28 +44,46 @@ Return ONLY JSON:
 
 export const analyzeRope = createServerFn({ method: "POST" })
   .validator((input: AnalyzeInput) => {
-    if (!input || !Array.isArray(input.images) || input.images.length > 3) {
+    if (!input || !Array.isArray(input.images) || input.images.length < 1 || input.images.length > 3) {
       throw new Error("Up to three stills");
     }
     for (const img of input.images) {
-      if (typeof img !== "string" || img.length > 420000) {
-        throw new Error("Image too large");
-      }
-      if (!/^data:image\/(jpeg|jpg|png|webp);base64,/i.test(img)) {
+      if (typeof img !== "string" || !isCameraDataUrl(img)) {
         throw new Error("Stills must be camera captures, not remote URLs");
       }
     }
-    if (input.question && input.question.length > 400) {
+    if (input.question && typeof input.question === "string" && input.question.length > 400) {
       throw new Error("Question too long");
     }
-    return input;
+    if (!input.deterministic) throw new Error("Missing geometry");
+    const tieSlug = typeof input.tieSlug === "string" ? input.tieSlug.slice(0, 60) : undefined;
+    const furnitureSlug = typeof input.furnitureSlug === "string" ? input.furnitureSlug.slice(0, 60) : undefined;
+    return {
+      images: input.images.slice(0, 3),
+      question: input.question ? sanitizeQuestion(input.question) : undefined,
+      hardNos: (input.hardNos ?? []).map((s) => sanitizeQuestion(s, 80)).filter(Boolean).slice(0, 24),
+      deterministic: sanitizeDet(input.deterministic),
+      stepIndex: Number.isFinite(input.stepIndex) ? Math.round(input.stepIndex as number) : 0,
+      elapsedSec: Math.max(0, Math.min(8 * 3600, Number(input.elapsedSec) || 0)),
+      tieSlug: tieSlug && getTie(tieSlug) ? tieSlug : undefined,
+      furnitureSlug: furnitureSlug && getDungeon(furnitureSlug) ? furnitureSlug : undefined,
+      protocol: input.protocol
+        ? {
+            rigger: String(input.protocol.rigger ?? "rigger").slice(0, 40),
+            bottom: String(input.protocol.bottom ?? "your wife").slice(0, 40),
+            style: input.protocol.style === "peer" ? ("peer" as const) : ("ds" as const),
+          }
+        : undefined,
+    };
   })
   .handler(async ({ data }): Promise<AnalyzeResult> => {
+    const det = sanitizeDet(data.deterministic);
     const tie = data.tieSlug ? getTie(data.tieSlug) : undefined;
-    const stepIndex = data.stepIndex ?? 0;
+    const stepIndex = clampStep(data.stepIndex ?? 0, tie?.steps.length ?? 1);
     const elapsedSec = data.elapsedSec ?? 0;
+    const hardNos = data.hardNos ?? [];
     const pred = predict({
-      det: data.deterministic,
+      det,
       frames: [],
       tie,
       stepIndex,
@@ -91,10 +110,16 @@ export const analyzeRope = createServerFn({ method: "POST" })
           : null,
         protocol: data.protocol,
         furniture: getDungeon(data.furnitureSlug ?? "") ?? null,
-        question: (data.question ?? "").replace(/ignore (all |previous )?instructions/gi, "").slice(0, 400),
-        elapsedSec,
-        deterministic: data.deterministic,
-        prediction: pred,
+        hardNos,
+        question: sanitizeQuestion(data.question ?? ""),
+        det: {
+          recommend: det.recommend,
+          neckRope: det.neckRope,
+          paleness: det.paleness,
+          wrapCount: det.wrapCount,
+          flags: det.flags.map((f) => ({ code: f.code, severity: f.severity, note: f.note.slice(0, 120) })),
+          notes: det.notes.map((n) => sanitizeQuestion(n, 160)),
+        },
       }),
     });
 
@@ -121,32 +146,34 @@ export const analyzeRope = createServerFn({ method: "POST" })
       llm = null;
     } else {
       const parsed = parseJson<{
-        draft: LlmDraft;
+        draft: unknown;
         audit: typeof selfAudit;
       }>(grok.text);
-      if (parsed?.draft) {
-        llm = applyModelSelfAudit(parsed.draft, {
-          contradictsDet: !!parsed.audit?.contradictsDet,
-          hardLimit: !!parsed.audit?.hardLimit,
-          invented: !!parsed.audit?.invented,
+      const draft = parsed?.draft ? sanitizeDraft(parsed.draft) : null;
+      if (draft) {
+        llm = applyModelSelfAudit(draft, {
+          contradictsDet: !!parsed?.audit?.contradictsDet || (det.recommend === "stop" && draft.quality === "sound"),
+          hardLimit: !!parsed?.audit?.hardLimit,
+          invented: !!parsed?.audit?.invented,
         });
-        selfAudit = parsed.audit ?? selfAudit;
+        selfAudit = parsed?.audit ?? selfAudit;
       } else if (/refus|can't assist|cannot assist|safety/i.test(grok.text)) {
         refusal = true;
       }
     }
 
-    if (!llm) llm = fallbackDraft({ det: data.deterministic, pred, tie, stepIndex });
+    if (!llm) llm = fallbackDraft({ det, pred, tie, stepIndex });
 
     const report = fuseCoach({
-      det: data.deterministic,
+      det,
       frames: [],
       llm,
       tie,
       stepIndex,
       elapsedSec,
       priorNerveHits: 0,
+      hardNos,
     });
 
-    return { ok: true, llm, selfAudit, refusal, report };
+    return { ok: true, llm: report.llm, selfAudit, refusal, report };
   });

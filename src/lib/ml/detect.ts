@@ -1,4 +1,4 @@
-import { isDark, isDarkFiber, isRope, isSkin, meanRgb, palenessScore, type RGB } from "./color";
+import { isDark, isDarkFiber, isHandTone, isRope, isSkin, meanRgb, palenessScore, type RGB } from "./color";
 import { findPeaks, smooth } from "./signal";
 import type { FrameObservation, WrapBand } from "./types";
 
@@ -72,9 +72,10 @@ export function observeFrame(
     }));
 
   let neckRope = 0;
+  const neckHits: number[] = [];
   if (body) {
     const neckTop = Math.max(0, body.y - body.h * 0.14);
-    const neckBot = body.y + body.h * 0.18;
+    const neckBot = body.y + body.h * 0.28;
     let neckCells = 0;
     let neckRopeN = 0;
     for (let y = Math.max(0, neckTop | 0); y < Math.min(height, neckBot); y += step) {
@@ -84,19 +85,48 @@ export function observeFrame(
         if (isRope(buf[i]!, buf[i + 1]!, buf[i + 2]!) || isDarkFiber(buf[i]!, buf[i + 1]!, buf[i + 2]!)) neckRopeN++;
       }
     }
-    neckRope = neckCells ? neckRopeN / neckCells : 0;
+    if (neckCells) neckHits.push(neckRopeN / neckCells);
   }
+  if (height >= width) {
+    const y0 = Math.floor(height * 0.08);
+    const y1 = Math.floor(height * 0.28);
+    const x0 = Math.floor(width * 0.28);
+    const x1 = Math.floor(width * 0.72);
+    let cells = 0;
+    let zoneRope = 0;
+    for (let y = y0; y < y1; y += step) {
+      for (let x = x0; x < x1; x += step) {
+        const i = (y * width + x) * 4;
+        cells++;
+        if (isRope(buf[i]!, buf[i + 1]!, buf[i + 2]!) || isDarkFiber(buf[i]!, buf[i + 1]!, buf[i + 2]!)) zoneRope++;
+      }
+    }
+    if (cells) neckHits.push(zoneRope / cells);
+  }
+  neckRope = neckHits.length ? Math.max(...neckHits) : 0;
 
-  const handPixels = skinPixels.filter((p) => {
-    if (!body) return p.y > height * 0.55;
-    return p.y > body.y + body.h * 0.62;
+  const handPixels = (body ? skinPixels : []).filter((p) => {
+    if (!body) return false;
+    return p.y > body.y + body.h * 0.55;
   });
-  const handMean = meanRgb(handPixels.map((p) => p.rgb));
-  const paleness = handPixels.length > 8 ? palenessScore(handMean) : 0;
+  const extraHands: RGB[] = [];
+  const yHand0 = body ? Math.floor(body.y + body.h * 0.55) : Math.floor(height * 0.62);
+  const x0 = body ? body.x : Math.floor(width * 0.15);
+  const x1 = body ? body.x + body.w : Math.floor(width * 0.85);
+  for (let y = yHand0; y < height; y += step) {
+    for (let x = x0; x < x1; x += step) {
+      const i = (y * width + x) * 4;
+      const r = buf[i]!;
+      const g = buf[i + 1]!;
+      const b = buf[i + 2]!;
+      if (isHandTone(r, g, b)) extraHands.push({ r, g, b });
+    }
+  }
+  const handRgb = extraHands.length >= 8 ? extraHands : handPixels.map((p) => p.rgb);
+  const handMean = meanRgb(handRgb);
+  const paleness = handRgb.length > 8 ? palenessScore(handMean) : 0;
   const blueness =
-    handPixels.length > 8
-      ? Math.max(0, (handMean.b - (handMean.r + handMean.g) / 2) / 80)
-      : 0;
+    handRgb.length > 8 ? Math.max(0, (handMean.b - (handMean.r + handMean.g) / 2) / 80) : 0;
 
   return {
     width,
@@ -124,7 +154,7 @@ export function sampleHands(data: ImageData): RGB | null {
       const r = buf[i]!;
       const g = buf[i + 1]!;
       const b = buf[i + 2]!;
-      if (isSkin(r, g, b)) pixels.push({ r, g, b });
+      if (isHandTone(r, g, b) || isSkin(r, g, b)) pixels.push({ r, g, b });
     }
   }
   if (pixels.length < 12) return null;

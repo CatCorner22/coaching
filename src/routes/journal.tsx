@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { getTie } from "@/lib/kb";
-import { useJournal } from "@/lib/stores/journal";
+import { loadStill, useJournal } from "@/lib/stores/journal";
 
 export const Route = createFileRoute("/journal")({
   ssr: false,
@@ -48,7 +49,11 @@ function JournalPage() {
               <p className="text-xs text-subtle">
                 {new Date(e.at).toLocaleString()} · {e.minutes} min
               </p>
+              <Still id={e.id} />
               <p className="mt-2 text-sm text-fg">{e.notes}</p>
+              {e.flags.length > 0 && (
+                <p className="mt-1 text-xs text-warn">{e.flags.join(" · ")}</p>
+              )}
               {e.tieSlug && (
                 <Button asChild variant="ghost" size="sm" className="mt-2 px-0">
                   <Link to="/tie/$slug" params={{ slug: e.tieSlug }}>
@@ -62,4 +67,19 @@ function JournalPage() {
       )}
     </div>
   );
+}
+
+function Still({ id }: { id: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void loadStill(id).then((u) => {
+      if (live) setSrc(u);
+    });
+    return () => {
+      live = false;
+    };
+  }, [id]);
+  if (!src) return null;
+  return <img src={src} alt="" className="mt-3 max-h-40 w-full rounded-md object-cover ring-1 ring-border" />;
 }

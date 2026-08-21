@@ -2,12 +2,18 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { TIES } from "@/lib/kb";
 import { catalogLengths, metersFor } from "@/lib/calc/rope";
+import { useKit } from "@/lib/stores/kit";
 import { usePlanner } from "@/lib/stores/planner";
 
 export const Route = createFileRoute("/calc")({ component: CalcPage });
 
 function CalcPage() {
   const plan = usePlanner((s) => s.slugs);
+  const eights = useKit((s) => s.eights);
+  const fours = useKit((s) => s.fours);
+  const setEights = useKit((s) => s.setEights);
+  const setFours = useKit((s) => s.setFours);
+  const have = eights * 8 + fours * 4;
   const [extra, setExtra] = useState<string[]>([]);
   const slugs = [...plan, ...extra];
   const result = useMemo(() => metersFor(slugs), [slugs]);
@@ -24,7 +30,31 @@ function CalcPage() {
       <p className="text-sm text-muted">
         {result.eights} × 8m staffs for the current plan
         {plan.length ? "" : " (add ties below, or load a scene in Plan)"}
+        . You have {eights} × 8m and {fours} × 4m ({have}m).
+        {have < result.plusWaste ? " Short. Add rope or cut the scene." : " Enough, including waste."}
       </p>
+      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+        <label>
+          8m staffs
+          <input
+            type="number"
+            min={0}
+            className="mt-1 h-11 w-full rounded-md border border-border bg-elevated px-3"
+            value={eights}
+            onChange={(e) => setEights(Number(e.target.value) || 0)}
+          />
+        </label>
+        <label>
+          4m staffs
+          <input
+            type="number"
+            min={0}
+            className="mt-1 h-11 w-full rounded-md border border-border bg-elevated px-3"
+            value={fours}
+            onChange={(e) => setFours(Number(e.target.value) || 0)}
+          />
+        </label>
+      </div>
       <ul className="mt-6 space-y-1 text-sm">
         {result.rows.map((r) => (
           <li key={r.slug} className="flex justify-between border-b border-border py-2">

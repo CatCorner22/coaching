@@ -4,6 +4,9 @@ import { useSettings } from "@/lib/stores/settings";
 
 export function ConsentGate({ children }: { children: React.ReactNode }) {
   const consented = useSettings((s) => s.consented);
+  const adultsOk = useSettings((s) => s.adults);
+  const shearsOk = useSettings((s) => s.shears);
+  const photosOk = useSettings((s) => s.photosOk);
   const set = useSettings((s) => s.set);
   const enter = useSettings((s) => s.enter);
   const [mounted, setMounted] = useState(false);
@@ -17,9 +20,17 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   }, []);
 
   if (!mounted) {
-    return <div className="min-h-dvh bg-bg" aria-hidden />;
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-bg px-5 py-10">
+        <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6">
+          <p className="text-xs uppercase tracking-[0.22em] text-muted">Knotty</p>
+          <h1 className="mt-3 font-display text-4xl leading-none text-fg">Enter the studio</h1>
+          <p className="mt-4 text-sm text-muted">Loading your consent on this device…</p>
+        </div>
+      </div>
+    );
   }
-  if (consented) return <>{children}</>;
+  if (consented && adultsOk && shearsOk && photosOk) return <>{children}</>;
 
   const ready = adults && shears && photos && consent;
 

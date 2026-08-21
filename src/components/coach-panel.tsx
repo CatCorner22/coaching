@@ -10,11 +10,13 @@ export function CoachPanel({
   voice,
   pending,
   refusal,
+  halted,
 }: {
   report: CoachReport | null;
   voice: boolean;
   pending?: boolean;
   refusal?: boolean;
+  halted?: boolean;
 }) {
   if (pending) {
     return (
@@ -75,7 +77,7 @@ export function CoachPanel({
         <Risk label="Time" v={report.prediction.risks.time} />
       </div>
       <p className="text-xs text-subtle">If this keeps going: {report.prediction.nextFailure}</p>
-      {voice && (
+      {voice && !halted && (
         <Button
           variant="outline"
           size="sm"

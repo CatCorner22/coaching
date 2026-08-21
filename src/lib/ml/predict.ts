@@ -66,11 +66,13 @@ export function buildDeterministic(
       note: "Blue shift on the hands. Strip distal rope.",
     });
   }
-  if (!last || (last.width * last.height) < 16 || Number.isNaN(last.ropeShare)) {
+  if (!last || (last.width * last.height) < 16 || Number.isNaN(last.ropeShare) || !last.body) {
     flags.push({
       code: "unknown",
-      severity: "watch",
-      note: "Frame is unusable. Do not add rope until you have a still that shows her.",
+      severity: last?.body ? "watch" : "stop",
+      note: last?.body
+        ? "Frame is unusable. Do not add rope until you have a still that shows her."
+        : "I cannot see a body. Do not add rope. Photograph her, not the wall.",
     });
   }
 
@@ -137,9 +139,9 @@ export function predict(opts: {
   else if (top[0] === "breathing" && top[1] > 0.45) nextFailure = "Shallower breath as chest bands settle.";
 
   const recommend: Prediction["recommend"] =
-    neck > 0.55 || circulation > 0.72
+    opts.det.recommend === "stop" || neck > 0.55 || circulation > 0.72
       ? "stop"
-      : neck > 0.3 || circulation > 0.45 || time > 0.85
+      : neck > 0.3 || circulation > 0.45 || time > 0.85 || opts.det.recommend === "adjust"
         ? "adjust"
         : "continue";
 

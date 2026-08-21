@@ -37,6 +37,16 @@ export function isRope(r: number, g: number, b: number) {
   );
 }
 
+export function isHandTone(r: number, g: number, b: number) {
+  if (isSkin(r, g, b)) return true;
+  const y = luma(r, g, b);
+  const s = sat(r, g, b);
+  const blueBias = b - (r + g) / 2;
+  if (y > 175 && s < 0.22 && Math.abs(r - g) < 28) return true;
+  if (y > 55 && y < 210 && blueBias > 10 && b > r - 8) return true;
+  return false;
+}
+
 export function luma(r: number, g: number, b: number) {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }

@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AftercareRouteImport } from './routes/aftercare'
 import { Route as CalcRouteImport } from './routes/calc'
+import { Route as CheckinRouteImport } from './routes/checkin'
+import { Route as ChecklistRouteImport } from './routes/checklist'
 import { Route as DungeonRouteImport } from './routes/dungeon'
 import { Route as EmergencyRouteImport } from './routes/emergency'
 import { Route as GearRouteImport } from './routes/gear'
@@ -42,6 +44,16 @@ const AftercareRoute = AftercareRouteImport.update({
 const CalcRoute = CalcRouteImport.update({
   id: '/calc',
   path: '/calc',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckinRoute = CheckinRouteImport.update({
+  id: '/checkin',
+  path: '/checkin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChecklistRoute = ChecklistRouteImport.update({
+  id: '/checklist',
+  path: '/checklist',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DungeonRoute = DungeonRouteImport.update({
@@ -129,6 +141,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/aftercare': typeof AftercareRoute
   '/calc': typeof CalcRoute
+  '/checkin': typeof CheckinRoute
+  '/checklist': typeof ChecklistRoute
   '/dungeon': typeof DungeonRoute
   '/emergency': typeof EmergencyRoute
   '/gear': typeof GearRoute
@@ -150,6 +164,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/aftercare': typeof AftercareRoute
   '/calc': typeof CalcRoute
+  '/checkin': typeof CheckinRoute
+  '/checklist': typeof ChecklistRoute
   '/dungeon': typeof DungeonRoute
   '/emergency': typeof EmergencyRoute
   '/gear': typeof GearRoute
@@ -172,6 +188,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/aftercare': typeof AftercareRoute
   '/calc': typeof CalcRoute
+  '/checkin': typeof CheckinRoute
+  '/checklist': typeof ChecklistRoute
   '/dungeon': typeof DungeonRoute
   '/emergency': typeof EmergencyRoute
   '/gear': typeof GearRoute
@@ -195,6 +213,8 @@ export interface FileRouteTypes {
     | '/'
     | '/aftercare'
     | '/calc'
+    | '/checkin'
+    | '/checklist'
     | '/dungeon'
     | '/emergency'
     | '/gear'
@@ -216,6 +236,8 @@ export interface FileRouteTypes {
     | '/'
     | '/aftercare'
     | '/calc'
+    | '/checkin'
+    | '/checklist'
     | '/dungeon'
     | '/emergency'
     | '/gear'
@@ -237,6 +259,8 @@ export interface FileRouteTypes {
     | '/'
     | '/aftercare'
     | '/calc'
+    | '/checkin'
+    | '/checklist'
     | '/dungeon'
     | '/emergency'
     | '/gear'
@@ -259,6 +283,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AftercareRoute: typeof AftercareRoute
   CalcRoute: typeof CalcRoute
+  CheckinRoute: typeof CheckinRoute
+  ChecklistRoute: typeof ChecklistRoute
   DungeonRoute: typeof DungeonRoute
   EmergencyRoute: typeof EmergencyRoute
   GearRoute: typeof GearRoute
@@ -298,6 +324,20 @@ declare module '@tanstack/react-router' {
       path: '/calc'
       fullPath: '/calc'
       preLoaderRoute: typeof CalcRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkin': {
+      id: '/checkin'
+      path: '/checkin'
+      fullPath: '/checkin'
+      preLoaderRoute: typeof CheckinRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checklist': {
+      id: '/checklist'
+      path: '/checklist'
+      fullPath: '/checklist'
+      preLoaderRoute: typeof ChecklistRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dungeon': {
@@ -419,6 +459,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AftercareRoute: AftercareRoute,
   CalcRoute: CalcRoute,
+  CheckinRoute: CheckinRoute,
+  ChecklistRoute: ChecklistRoute,
   DungeonRoute: DungeonRoute,
   EmergencyRoute: EmergencyRoute,
   GearRoute: GearRoute,

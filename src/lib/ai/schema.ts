@@ -8,6 +8,7 @@ export type AnalyzeInput = {
   elapsedSec?: number;
   question?: string;
   furnitureSlug?: string;
+  hardNos?: string[];
   protocol?: { rigger: string; bottom: string; style: "peer" | "ds" };
 };
 

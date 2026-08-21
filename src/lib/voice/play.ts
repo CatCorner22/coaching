@@ -1,9 +1,10 @@
 import { speakCoach } from "@/lib/ai/voice";
+import { scrubBannedAnswer, textIsBanned } from "@/lib/ml/audit";
 
 const cache = new Map<string, string>();
 
 export async function playCoachVoice(text: string) {
-  const key = text.trim();
+  const key = textIsBanned(text) ? scrubBannedAnswer(text) : text.trim();
   if (!key) return;
   try {
     let url = cache.get(key);
@@ -42,17 +43,25 @@ export function listenForWords(
   if (!SR) return () => undefined;
   const rec = new SR();
   rec.continuous = true;
-  rec.interimResults = true;
+  rec.interimResults = false;
   rec.lang = "en-US";
+  const last = new Map<string, number>();
   rec.onresult = (ev: unknown) => {
     const e = ev as {
       resultIndex: number;
-      results: ArrayLike<{ 0: { transcript: string } }>;
+      results: ArrayLike<{ 0: { transcript: string }; isFinal?: boolean }>;
     };
     for (let i = e.resultIndex; i < e.results.length; i++) {
-      const t = e.results[i]![0]!.transcript.toLowerCase();
+      const t = ` ${e.results[i]![0]!.transcript.toLowerCase()} `;
+      const now = Date.now();
       for (const w of words) {
-        if (t.includes(w.toLowerCase())) onHit(w);
+        const needle = w.toLowerCase().trim();
+        if (!needle) continue;
+        const re = new RegExp(`(?:^|[^a-z0-9])${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:[^a-z0-9]|$)`);
+        if (!re.test(t)) continue;
+        if ((last.get(w) ?? 0) + 2500 > now) continue;
+        last.set(w, now);
+        onHit(w);
       }
     }
   };

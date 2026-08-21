@@ -111,7 +111,7 @@ function TiePage() {
         </Button>
       </div>
       <aside className="h-fit rounded-lg border border-border bg-surface p-4">
-        <RopeFigure pose={s.expected.pose} view={s.expected.view} wraps={wraps} />
+        <RopeFigure pose={s.expected.pose} view={s.expected.view} wraps={wraps} nerves={tie.nerves} />
         <p className="mt-2 text-center text-[11px] uppercase tracking-wide text-subtle">
           {s.expected.view} · {s.expected.wrapBands} bands
         </p>

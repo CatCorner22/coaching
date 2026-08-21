@@ -10,7 +10,7 @@ export const Route = createFileRoute("/")({ component: Home });
 function Home() {
   const stats = kbStats();
   const featured = TIES.filter((t) =>
-    ["single-column", "futomomo", "karada", "takate-kote"].includes(t.slug),
+    ["single-column", "futomomo", "frog-tie", "mermaid", "karada", "takate-kote"].includes(t.slug),
   );
   return (
     <div>
@@ -78,6 +78,8 @@ function Home() {
         <h2 className="mb-4 font-display text-3xl">Tools</h2>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {[
+            { to: "/checklist" as const, t: "Pre-scene", d: "Ten things before rope" },
+            { to: "/checkin" as const, t: "Check-in", d: "Color, heat, squeeze" },
             { to: "/dungeon" as const, t: "Dungeon", d: "Your cross, swing, machine" },
             { to: "/negotiate" as const, t: "Negotiate", d: "Yes / maybe / no" },
             { to: "/nerves" as const, t: "Nerve atlas", d: "Radial to peroneal" },
@@ -138,7 +140,7 @@ function Home() {
               params={{ slug: t.slug }}
               className="flex gap-4 rounded-lg border border-border bg-surface p-3 hover:border-border-strong"
             >
-              <MiniTie wraps={t.steps.at(-1)?.wraps ?? []} />
+              <MiniTie wraps={t.steps.at(-1)?.wraps ?? []} pose={t.steps.at(-1)?.expected.pose} />
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="font-display text-2xl">{t.name}</p>
