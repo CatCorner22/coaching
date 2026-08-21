@@ -80,19 +80,24 @@ function AccountIsolationGate({ children }: { children: ReactNode }) {
   const [clientReady, setClientReady] = useState(false);
   const [failure, setFailure] = useState<{ marker: string; message: string } | null>(null);
   const [retry, setRetry] = useState(0);
+  const [storedMarker, setStoredMarker] = useState<string | null>(null);
+  const [markerReadFailed, setMarkerReadFailed] = useState(false);
+  const [markerLoaded, setMarkerLoaded] = useState(false);
 
-  useEffect(() => setClientReady(true), []);
-
-  let storedMarker: string | null = null;
-  let markerReadFailed = false;
-  if (typeof window !== "undefined") {
+  useEffect(() => {
+    setClientReady(true);
     try {
-      storedMarker = readAccountMarker();
+      setStoredMarker(readAccountMarker());
+      setMarkerReadFailed(false);
     } catch {
-      markerReadFailed = true;
+      setStoredMarker(null);
+      setMarkerReadFailed(true);
+    } finally {
+      setMarkerLoaded(true);
     }
-  }
-  const markerMatches = !markerReadFailed && storedMarker === expectedMarker;
+  }, [retry]);
+
+  const markerMatches = markerLoaded && !markerReadFailed && storedMarker === expectedMarker;
 
   useEffect(() => {
     if (
@@ -148,7 +153,7 @@ function AccountIsolationGate({ children }: { children: ReactNode }) {
     sessionError,
   ]);
 
-  if (!clientReady || isPending) {
+  if (!clientReady || !markerLoaded || isPending) {
     return <AccountBoundaryStatus message="Checking the local account boundary…" />;
   }
   if (sessionError) {
