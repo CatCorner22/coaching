@@ -7,7 +7,7 @@ export const Route = createFileRoute("/knots")({ component: KnotsPage });
 function KnotsPage() {
   return (
     <div className="mx-auto max-w-3xl px-5 py-10">
-      <p className="text-xs uppercase tracking-[0.22em] text-muted">結び</p>
+      <p className="text-xs uppercase tracking-[0.22em] text-muted">Knots</p>
       <h1 className="mt-2 font-display text-4xl">Knot school</h1>
       <p className="mt-3 text-sm text-muted">
         Practice on a chair leg until it is boring. A cinching cuff is not a personality.

@@ -15,14 +15,19 @@ function Home() {
   return (
     <div>
       <section className="relative isolate overflow-hidden">
-        <img
-          src="/hero.jpg"
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover opacity-50"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/70 to-bg/30" />
+        <div className="absolute inset-0 bg-bg" aria-hidden>
+          <svg viewBox="0 0 400 300" className="absolute -right-8 top-8 h-[120%] w-auto text-rope/25" aria-hidden>
+            <path
+              d="M80 150 C80 70 160 70 200 150 C240 230 320 230 320 150 C320 70 240 70 200 150 C160 230 80 230 80 150"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="10"
+              strokeLinecap="round"
+            />
+          </svg>
+        </div>
         <div className="relative mx-auto max-w-3xl px-5 pb-16 pt-14 md:pt-24">
-          <p className="text-xs uppercase tracking-[0.28em] text-muted">Private atelier</p>
+          <p className="text-xs uppercase tracking-[0.28em] text-muted">Knotty · private rope studio</p>
           <h1 className="mt-4 font-display text-5xl leading-[0.95] text-fg md:text-6xl">
             Tie her.
             <br />

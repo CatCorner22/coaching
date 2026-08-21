@@ -208,7 +208,7 @@ export function CameraCapture({
         />
         {live && <GuideOverlay guide={guide} />}
         {!live && (
-          <div className="flex aspect-[3/4] w-full flex-col items-center justify-center gap-2 bg-[url('/hero.jpg')] bg-cover bg-center">
+          <div className="flex aspect-[3/4] w-full flex-col items-center justify-center gap-2 bg-elevated">
             <div className="absolute inset-0 bg-bg/70" />
             <Camera className="relative size-8 text-muted" />
             <p className="relative px-6 text-center text-sm text-muted">

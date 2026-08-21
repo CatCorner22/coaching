@@ -18,7 +18,7 @@ export const ARTICLES: Article[] = [
       },
       {
         type: "callout",
-        title: "What we use in Musubi",
+        title: "What we use in Knotty",
         text: "Informed, reversible, specific. She can revoke a tie without revoking the evening. You both know which nerves you are gambling with. Nothing happens because it looked good on someone else's body.",
       },
       {
@@ -77,7 +77,7 @@ export const ARTICLES: Article[] = [
       {
         type: "callout",
         title: "Non-verbal",
-        text: "If a gag is ever in play, agree a drop object or a triple tap before the gag goes in. Musubi's studio can listen for 'red' and 'yellow' when the mic is on. A bound person who cannot speak still needs a channel.",
+        text: "If a gag is ever in play, agree a drop object or a triple tap before the gag goes in. Knotty's studio can listen for 'red' and 'yellow' when the mic is on. A bound person who cannot speak still needs a channel.",
       },
       {
         type: "p",
@@ -186,7 +186,7 @@ export const ARTICLES: Article[] = [
       },
       {
         type: "p",
-        text: "Musubi's studio can compare hand color to a calibration photo you take unbound. It is a hint, not a doctor. Pale plus cold plus slow refill is a reason to strip rope, not a reason to 'see how she does'.",
+        text: "Knotty's studio can compare hand color to a calibration photo you take unbound. It is a hint, not a doctor. Pale plus cold plus slow refill is a reason to strip rope, not a reason to 'see how she does'.",
       },
       {
         type: "warn",
@@ -286,7 +286,7 @@ export const ARTICLES: Article[] = [
       },
       {
         type: "p",
-        text: "Musubi's planner is built around that arc. A night that is four ambitious ties is not impressive. It is how radial nerves get ignored.",
+        text: "Knotty's planner is built around that arc. A night that is four ambitious ties is not impressive. It is how radial nerves get ignored.",
       },
     ],
   },
@@ -382,7 +382,7 @@ export const ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "Photos of a bound partner are easy to take and impossible to un-take. Agree: who keeps them, whether faces are in frame, whether they leave the house, whether they go to an AI coach (they do, compressed, when you tap Analyze), and what happens if the relationship ever changes. Musubi stores the journal on this device, not on our servers. Analysis stills go to Grok for the coaching pass you asked for. If that sentence bothers either of you, use the written guides and leave the camera off.",
+        text: "Photos of a bound partner are easy to take and impossible to un-take. Agree: who keeps them, whether faces are in frame, whether they leave the house, whether they go to an AI coach (they do, compressed, when you tap Analyze), and what happens if the relationship ever changes. Knotty stores the journal on this device, not on our servers. Analysis stills go to Grok for the coaching pass you asked for. If that sentence bothers either of you, use the written guides and leave the camera off.",
       },
     ],
   },
@@ -418,7 +418,7 @@ export const ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "Full suspension is not a harder TK. It is a different sport: rated anchors, upline management, crash pads, spotters, and a lowering plan that works when she panics. People die from getting this wrong. People also lose hands. Musubi will coach a few kilos off one foot, on a real harness, with a munter. It will not coach you to hang her from a ceiling fan.",
+        text: "Full suspension is not a harder TK. It is a different sport: rated anchors, upline management, crash pads, spotters, and a lowering plan that works when she panics. People die from getting this wrong. People also lose hands. Knotty will coach a few kilos off one foot, on a real harness, with a munter. It will not coach you to hang her from a ceiling fan.",
       },
     ],
   },
@@ -502,7 +502,7 @@ export const ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "A TK might be honest for fifteen minutes on a given body and dishonest at minute sixteen. Futomomo is often done before you are done looking at it. Decorative hishi can run long because it is not load, but her feet are still her feet. Set timers. Musubi will nag you. That nag is the feature.",
+        text: "A TK might be honest for fifteen minutes on a given body and dishonest at minute sixteen. Futomomo is often done before you are done looking at it. Decorative hishi can run long because it is not load, but her feet are still her feet. Set timers. Knotty will nag you. That nag is the feature.",
       },
     ],
   },
@@ -532,7 +532,7 @@ export const ARTICLES: Article[] = [
       },
       {
         type: "warn",
-        text: "If the ceiling mount was not installed by someone who hangs people for a living, it is furniture. Musubi will not coach you to clip an upline to it.",
+        text: "If the ceiling mount was not installed by someone who hangs people for a living, it is furniture. Knotty will not coach you to clip an upline to it.",
       },
     ],
   },

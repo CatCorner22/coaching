@@ -154,7 +154,7 @@ function StudioPage() {
       )}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.22em] text-muted">写 · studio</p>
+          <p className="text-xs uppercase tracking-[0.22em] text-muted">Studio</p>
           <h1 className="mt-1 font-display text-4xl">Read the rope</h1>
         </div>
         <div className="flex items-center gap-3 text-sm">

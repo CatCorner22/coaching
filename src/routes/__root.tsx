@@ -4,7 +4,7 @@ import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { AuthProvider } from "@/lib/auth/provider";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "Musubi";
+const APP_NAME = "Knotty";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -14,7 +14,7 @@ export const Route = createRootRoute({
       { title: APP_NAME },
       {
         name: "description",
-        content: "A private atelier for Shibari: ties, knots, photo coaching, and safety.",
+        content: "Knotty — a private rope studio. Ties, knots, photo coaching, floor work.",
       },
       { name: "theme-color", content: "#0b0a09" },
     ],

@@ -26,8 +26,8 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-bg px-5 py-10">
       <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
-        <p className="text-xs uppercase tracking-[0.22em] text-muted">Musubi</p>
-        <h1 className="mt-3 font-display text-4xl leading-none text-fg">Enter the atelier</h1>
+        <p className="text-xs uppercase tracking-[0.22em] text-muted">Knotty</p>
+        <h1 className="mt-3 font-display text-4xl leading-none text-fg">Enter the studio</h1>
         <p className="mt-4 text-sm leading-relaxed text-muted">
           This is a private studio for a consenting adult couple. You will photograph and
           record your partner — often nude — to coach rope. Stills stay on this device unless
@@ -63,7 +63,7 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
           Enter
         </Button>
         <p className="mt-4 text-xs leading-relaxed text-subtle">
-          An app cannot replace a teacher with hands on the rope. Musubi will refuse neck
+          An app cannot replace a teacher with hands on the rope. Knotty will refuse neck
           restraint, breath play, and full suspension.
         </p>
       </div>

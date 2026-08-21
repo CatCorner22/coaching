@@ -4,11 +4,11 @@ import { ConsentGate } from "@/components/consent-gate";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { to: "/", label: "Atelier", jp: "工房", icon: House },
-  { to: "/library", label: "Library", jp: "縄", icon: BookOpen },
-  { to: "/studio", label: "Studio", jp: "写", icon: Camera },
-  { to: "/knowledge", label: "Knowledge", jp: "知", icon: Library },
-  { to: "/safety", label: "Safety", jp: "安", icon: Shield },
+  { to: "/", label: "Home", icon: House },
+  { to: "/library", label: "Library", icon: BookOpen },
+  { to: "/studio", label: "Studio", icon: Camera },
+  { to: "/knowledge", label: "Guide", icon: Library },
+  { to: "/safety", label: "Safety", icon: Shield },
 ] as const;
 
 const MORE = [
@@ -32,8 +32,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="min-h-dvh bg-bg text-fg">
         <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 flex-col border-r border-border bg-surface/80 px-4 py-6 md:flex">
           <Link to="/" className="px-2">
-            <p className="text-[11px] uppercase tracking-[0.28em] text-muted">Musubi</p>
-            <p className="font-display text-3xl leading-none">結</p>
+            <p className="text-[11px] uppercase tracking-[0.28em] text-muted">Rope studio</p>
+            <p className="font-display text-3xl leading-none">Knotty</p>
           </Link>
           <nav className="mt-8 flex flex-1 flex-col gap-1">
             {NAV.map((item) => (
@@ -49,7 +49,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               >
                 <item.icon className="size-4" />
                 <span>{item.label}</span>
-                <span className="ml-auto text-[11px] text-subtle">{item.jp}</span>
               </Link>
             ))}
             <p className="mt-6 px-3 text-[10px] uppercase tracking-[0.2em] text-subtle">More</p>
@@ -73,7 +72,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="md:pl-56">
           <header className="flex items-center justify-between border-b border-border px-4 py-3 md:hidden">
             <Link to="/" className="font-display text-2xl leading-none">
-              Musubi
+              Knotty
             </Link>
             <Link to="/studio" className="text-xs uppercase tracking-[0.18em] text-muted">
               Studio
