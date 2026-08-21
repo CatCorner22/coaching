@@ -81,8 +81,10 @@ async function loadVoice(key: string, generation: number): Promise<CachedVoice |
     // Stop, discard, cache erase, and a newer spoken line all advance this
     // generation. Never let a late server response recreate cleared data.
     if (generation !== playbackGeneration) return null;
+    const audioBuffer = new ArrayBuffer(bytes.byteLength);
+    new Uint8Array(audioBuffer).set(bytes);
     const entry = {
-      url: URL.createObjectURL(new Blob([bytes], { type: response.mime })),
+      url: URL.createObjectURL(new Blob([audioBuffer], { type: response.mime })),
       bytes: bytes.byteLength,
     };
     cache.set(key, entry);

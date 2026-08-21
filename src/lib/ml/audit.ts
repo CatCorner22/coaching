@@ -410,7 +410,7 @@ export function fallbackDraft(opts: {
     next,
     coaching,
     speak,
-    circulation: quality !== "sound",
+    circulation: true,
   };
 }
 

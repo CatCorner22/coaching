@@ -443,6 +443,9 @@ async function canvasFromSource(
       bitmap.close();
     }
   } else {
+    if (typeof Blob === "undefined" || !(src instanceof Blob)) {
+      throw new Error("This browser cannot decode the selected image source.");
+    }
     const img = await loadImage(src);
     return drawContain(img, maxEdge, img.naturalWidth, img.naturalHeight);
   }
