@@ -727,6 +727,7 @@ export const TIES: Tie[] = [
 ];
 
 export function getTie(slug: string) {
+  if (!slug) return undefined;
   return TIES.find((t) => t.slug === slug);
 }
 

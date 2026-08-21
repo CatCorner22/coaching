@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { askKnowledge } from "@/lib/ai/ask";
-import { ARTICLES, searchKnowledge } from "@/lib/kb";
+import { ARTICLES, searchKnowledge, type SearchHit } from "@/lib/kb";
 
 export const Route = createFileRoute("/knowledge")({ component: KnowledgePage });
 
@@ -41,6 +41,7 @@ function KnowledgePage() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Radial nerve, aftercare, crotch rope…"
+          aria-label="Search the knowledge base"
           className="h-11 flex-1 rounded-md border border-border bg-elevated px-3 text-sm"
         />
         <Button onClick={() => void ask()} disabled={pending}>
@@ -56,10 +57,7 @@ function KnowledgePage() {
         <ul className="mt-4 space-y-2">
           {hits.map((h) => (
             <li key={h.kind + h.slug}>
-              <a href={h.href} className="text-sm text-muted hover:text-fg">
-                {h.title}
-                <span className="text-subtle"> · {h.kind}</span>
-              </a>
+              <HitLink hit={h} />
             </li>
           ))}
         </ul>
@@ -87,5 +85,48 @@ function KnowledgePage() {
         </section>
       ))}
     </div>
+  );
+}
+
+function HitLink({ hit }: { hit: SearchHit }) {
+  const className = "text-sm text-muted hover:text-fg";
+  const label = (
+    <>
+      {hit.title}
+      <span className="text-subtle"> · {hit.kind}</span>
+    </>
+  );
+  if (hit.kind === "tie") {
+    return (
+      <Link to="/tie/$slug" params={{ slug: hit.slug }} className={className}>
+        {label}
+      </Link>
+    );
+  }
+  if (hit.kind === "knot") {
+    return (
+      <Link to="/knot/$slug" params={{ slug: hit.slug }} className={className}>
+        {label}
+      </Link>
+    );
+  }
+  if (hit.kind === "article") {
+    return (
+      <Link to="/article/$slug" params={{ slug: hit.slug }} className={className}>
+        {label}
+      </Link>
+    );
+  }
+  if (hit.kind === "dungeon") {
+    return (
+      <Link to="/dungeon" className={className}>
+        {label}
+      </Link>
+    );
+  }
+  return (
+    <Link to="/gear" className={className}>
+      {label}
+    </Link>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useSettings } from "@/lib/stores/settings";
 
@@ -6,11 +6,19 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   const consented = useSettings((s) => s.consented);
   const set = useSettings((s) => s.set);
   const enter = useSettings((s) => s.enter);
+  const [mounted, setMounted] = useState(false);
   const [adults, setAdults] = useState(false);
   const [shears, setShears] = useState(false);
   const [photos, setPhotos] = useState(false);
   const [consent, setConsent] = useState(false);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return <div className="min-h-dvh bg-bg" aria-hidden />;
+  }
   if (consented) return <>{children}</>;
 
   const ready = adults && shears && photos && consent;

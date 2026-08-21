@@ -34,13 +34,16 @@ function StudioPage() {
   const session = useSession();
   const nerveHits = useJournal((j) => j.nerveHits);
   const addEntry = useJournal((j) => j.add);
-  const hardNos = useNegotiate((s) => s.items.filter((i) => i.rank === "no"));
+  const items = useNegotiate((s) => s.items);
+  const hardNos = useMemo(() => items.filter((i) => i.rank === "no"), [items]);
   const [capture, setCapture] = useState<CaptureResult | null>(null);
   const [baseline, setBaseline] = useState<RGB | null>(null);
   const [report, setReport] = useState<CoachReport | null>(null);
   const [pending, setPending] = useState(false);
   const [refusal, setRefusal] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [question, setQuestion] = useState("");
+  const tie = getTie(session.tieSlug ?? "");
 
   useEffect(() => {
     if (search.tie) session.setTie(search.tie);
@@ -62,7 +65,9 @@ function StudioPage() {
     );
   }, [settings.listen, settings.safeword, settings.yellowWord, settings.greenWord, stopSession]);
 
-  const tie = getTie(session.tieSlug ?? "");
+  useEffect(() => {
+    setSaved(false);
+  }, [capture]);
   const det = useMemo(() => {
     if (!capture) return null;
     return buildDeterministic(capture.observations, baseline);
@@ -265,6 +270,7 @@ function StudioPage() {
           <Button
             variant="ghost"
             size="sm"
+            disabled={!report}
             onClick={() => {
               if (!report) return;
               addEntry({
@@ -275,9 +281,10 @@ function StudioPage() {
                 flags: report.final.flags.map((f) => f.code),
                 photoCount: capture?.jpegs.length ?? 0,
               });
+              setSaved(true);
             }}
           >
-            Save to journal
+            {saved ? "Saved on this device" : "Save to journal"}
           </Button>
           <p className="text-xs leading-relaxed text-subtle">
             Stills live in this browser until you analyze. Analyze sends compressed frames to Grok.

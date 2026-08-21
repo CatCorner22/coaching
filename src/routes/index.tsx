@@ -107,6 +107,7 @@ function Home() {
             <Link
               key={s.slug}
               to="/plan"
+              search={{ seq: s.slug }}
               className="rounded-lg border border-border bg-surface p-4 transition-colors hover:border-border-strong"
             >
               <p className="text-xs uppercase tracking-wide text-muted">{s.minutes} min</p>

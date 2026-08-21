@@ -55,6 +55,9 @@ test("local audit vetoes a sound grade on deterministic stop", () => {
   });
   assert.equal(draft.quality, "unsafe");
   assert.ok(verdict.overrides.length + verdict.droppedClaims.length > 0);
+  assert.match(draft.next, /stop/i);
+  assert.doesNotMatch(draft.next, /add a neck/i);
   assert.doesNotMatch(draft.speak, /neck rope for style/i);
+  assert.doesNotMatch(draft.speak, /before you add rope/i);
 });
 

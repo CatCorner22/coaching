@@ -1,16 +1,26 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { SEQUENCES, TIES, getTie } from "@/lib/kb";
 import { usePlanner } from "@/lib/stores/planner";
 
-export const Route = createFileRoute("/plan")({ component: PlanPage });
+export const Route = createFileRoute("/plan")({
+  validateSearch: (s: Record<string, unknown>): { seq?: string } => ({
+    seq: typeof s.seq === "string" && s.seq.length > 0 ? s.seq : undefined,
+  }),
+  component: PlanPage,
+});
 
 function PlanPage() {
+  const search = Route.useSearch();
   const slugs = usePlanner((s) => s.slugs);
   const add = usePlanner((s) => s.add);
   const remove = usePlanner((s) => s.remove);
   const loadSequence = usePlanner((s) => s.loadSequence);
   const minutes = slugs.reduce((n, s) => n + (getTie(s)?.minutes[1] ?? 10), 0);
+  useEffect(() => {
+    if (search.seq) loadSequence(search.seq);
+  }, [search.seq, loadSequence]);
   return (
     <div className="mx-auto max-w-2xl px-5 py-10">
       <p className="text-xs uppercase tracking-[0.22em] text-muted">Scene</p>
