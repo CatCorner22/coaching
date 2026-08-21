@@ -1,15 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
+import { articleExcerpts, searchKnowledge } from "@/lib/kb";
 import { grokChat } from "./grok";
-import type { AskInput } from "./schema";
 
 export const askKnowledge = createServerFn({ method: "POST" })
-  .validator((input: AskInput) => {
+  .validator((input: { question: string; slugs?: string[] }) => {
     if (!input?.question || input.question.length > 600) {
       throw new Error("Ask a short question");
     }
-    return { ...input, excerpts: (input.excerpts ?? []).slice(0, 4) };
+    return { question: input.question, slugs: (input.slugs ?? []).slice(0, 6) };
   })
   .handler(async ({ data }) => {
+    const slugs =
+      data.slugs.length > 0
+        ? data.slugs
+        : searchKnowledge(data.question, 4).map((h) => h.slug);
+    const excerpts = articleExcerpts(slugs);
     const grok = await grokChat({
       max_tokens: 500,
       temperature: 0.3,
@@ -17,11 +22,11 @@ export const askKnowledge = createServerFn({ method: "POST" })
         {
           role: "system",
           content:
-            "You are Musubi, a rope and BDSM safety instructor. Answer from the supplied excerpts. If they are insufficient, say so. No neck restraint, breath play, or full suspension how-tos. Cite article titles. Adults only, technical tone.",
+            "You are Musubi, a rope and BDSM safety instructor. Answer from the supplied excerpts. If they are insufficient, say so. No neck restraint, breath play, or full suspension how-tos. Cite article titles. Adults only, technical tone. Furniture is not a hang point. A sex machine does not hear yellow.",
         },
         {
           role: "user",
-          content: `Question: ${data.question}\n\nExcerpts:\n${data.excerpts
+          content: `Question: ${data.question}\n\nExcerpts:\n${excerpts
             .map((e) => `### ${e.title} (${e.slug})\n${e.text}`)
             .join("\n\n")}`,
         },

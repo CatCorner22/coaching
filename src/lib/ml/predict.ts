@@ -34,10 +34,11 @@ export function buildDeterministic(
   const last = frames[frames.length - 1];
   const wrapBands = last?.wrapBands ?? [];
   const palenessSeries = frames.map((f) => f.paleness);
-  const paleness = last?.paleness ?? 0;
+  const paleness = Math.max(0, ...frames.map((f) => f.paleness), last?.paleness ?? 0);
   const palenessDelta = palenessSeries.length > 1 ? linearSlope(palenessSeries) : 0;
-  const neckRope = last?.neckRope ?? 0;
+  const neckRope = Math.max(0, ...frames.map((f) => f.neckRope), last?.neckRope ?? 0);
   const motion = last?.motion ?? 0;
+  const blueness = Math.max(0, ...frames.map((f) => f.blueness ?? 0));
   const palenessVsBase =
     baseline && last
       ? Math.min(1, deltaE(baseline, { r: 220 - paleness * 80, g: 180, b: 160 + paleness * 40 }) / 40)
@@ -58,11 +59,18 @@ export function buildDeterministic(
       note: "Extremities look paler or cooler than they should. Check nail-bed refill and temperature.",
     });
   }
-  if ((last?.blueness ?? 0) > 0.45) {
+  if (blueness > 0.45) {
     flags.push({
       code: "circulation",
       severity: "stop",
       note: "Blue shift on the hands. Strip distal rope.",
+    });
+  }
+  if (!last || (last.width * last.height) < 16 || Number.isNaN(last.ropeShare)) {
+    flags.push({
+      code: "unknown",
+      severity: "watch",
+      note: "Frame is unusable. Do not add rope until you have a still that shows her.",
     });
   }
 

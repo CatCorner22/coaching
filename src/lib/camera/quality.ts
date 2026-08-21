@@ -80,9 +80,18 @@ export function scoreFrame(data: ImageData): FrameQuality {
   return { sharpness, exposure, ropeHint: rope, score, notes };
 }
 
-export function pickBest<T>(items: { data: ImageData; item: T }[], keep = 3): T[] {
+export function pickBest<T>(
+  items: { data: ImageData; item: T; neck?: number; paleness?: number }[],
+  keep = 3,
+): T[] {
   return [...items]
-    .sort((a, b) => scoreFrame(b.data).score - scoreFrame(a.data).score)
+    .sort((a, b) => {
+      const qa = scoreFrame(a.data);
+      const qb = scoreFrame(b.data);
+      const sa = qa.score + (a.neck ?? 0) * 0.35 + (a.paleness ?? 0) * 0.15;
+      const sb = qb.score + (b.neck ?? 0) * 0.35 + (b.paleness ?? 0) * 0.15;
+      return sb - sa;
+    })
     .slice(0, keep)
     .map((x) => x.item);
 }

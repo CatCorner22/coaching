@@ -15,7 +15,8 @@ export function isSkin(r: number, g: number, b: number) {
   const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
   const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
   const ycbcr = cb >= 77 && cb <= 127 && cr >= 133 && cr <= 173 && y > 40;
-  return kovac && ycbcr;
+  const notHemp = g - b < 48;
+  return kovac && ycbcr && notHemp;
 }
 
 export function isRope(r: number, g: number, b: number) {
@@ -36,8 +37,24 @@ export function isRope(r: number, g: number, b: number) {
   );
 }
 
+export function luma(r: number, g: number, b: number) {
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+export function sat(r: number, g: number, b: number) {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  return max === 0 ? 0 : (max - min) / max;
+}
+
+/** Black/dark hemp that would otherwise be discarded as background. */
+export function isDarkFiber(r: number, g: number, b: number) {
+  const y = luma(r, g, b);
+  return y >= 16 && y < 48 && sat(r, g, b) < 0.38;
+}
+
 export function isDark(r: number, g: number, b: number) {
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b < 42;
+  return luma(r, g, b) < 42;
 }
 
 export function rgbToLab(c: RGB): [number, number, number] {

@@ -5,11 +5,20 @@ const BANNED = [
   /breath\s*play/i,
   /chok(e|ing)/i,
   /strangle/i,
+  /strangulation/i,
+  /asphyx/i,
   /full suspension/i,
+  /suspend(ing)? her/i,
   /hang(ing)? her/i,
-  /rope (on|around) the neck/i,
+  /upline/i,
+  /hoist her/i,
+  /rope (on|around|at) (the )?neck/i,
   /neck rope/i,
+  /collar (on|around) (the )?(throat|neck)/i,
+  /throat rope/i,
   /gag and leave/i,
+  /leave her (tied|alone)/i,
+  /unattended/i,
 ];
 
 export function localAudit(opts: {
@@ -29,9 +38,15 @@ export function localAudit(opts: {
   let speak = base.speak;
   let circulation = base.circulation || opts.det.recommend !== "continue";
 
-  if (opts.det.recommend === "stop" && quality === "sound") {
+  if (opts.det.recommend === "stop") {
     quality = "unsafe";
-    overrides.push("Deterministic stop overrode a 'sound' grade.");
+    next = "Stop. Shears. Check hands and throat. Do not add rope.";
+    if (!overrides.includes("Deterministic stop overrode a 'sound' grade.")) {
+      overrides.push("Deterministic stop forced halt language.");
+    }
+    if (!/stop|shears|cut/i.test(speak)) {
+      speak = "Stop. Check her hands and throat. Cut if you cannot make it right.";
+    }
   }
   if (opts.det.recommend === "adjust" && quality === "sound") {
     quality = "adjust";
@@ -54,20 +69,20 @@ export function localAudit(opts: {
     }
   }
 
-  if (opts.tie) {
-    const max = opts.tie.steps.length - 1;
-    if (opts.stepIndex > max) {
-      overrides.push("Step index clamped to the tie.");
-    }
-  }
-
-  if (opts.det.neckRope > 0.1) {
+  if (opts.det.neckRope > 0.1 && opts.det.recommend !== "stop") {
     next = "Photograph or look at the throat. Empty it before any next wrap.";
     if (!/throat|neck/i.test(coaching)) {
       coaching = `Neck-zone rope signal is ${opts.det.neckRope.toFixed(2)}. ${coaching}`;
     }
     speak = "Check the throat before you add rope. Hands next.";
     overrides.push("Neck-zone density forced a throat check.");
+  }
+
+  if (opts.tie) {
+    const max = Math.max(0, opts.tie.steps.length - 1);
+    if (opts.stepIndex > max || opts.stepIndex < 0) {
+      overrides.push("Step index clamped to the tie.");
+    }
   }
 
   speak = speak.replace(/\s+/g, " ").trim().slice(0, 220);
@@ -133,11 +148,18 @@ export function applyModelSelfAudit(
   flags: { contradictsDet: boolean; hardLimit: boolean; invented: boolean },
 ): LlmDraft {
   if (!flags.hardLimit && !flags.contradictsDet && !flags.invented) return draft;
+  if (flags.hardLimit) {
+    return {
+      ...draft,
+      quality: "unsafe",
+      coaching:
+        "I will not coach neck restraint, breath play, or full suspension. Stay on the floor tie in front of you.",
+      next: "Stop. That suggestion is outside what this atelier will coach.",
+      speak: "I will not coach that. Return to a floor tie and check her.",
+    };
+  }
   return {
     ...draft,
-    quality: flags.hardLimit || flags.contradictsDet ? "unsafe" : "adjust",
-    speak: flags.hardLimit
-      ? "I will not coach that. Return to a floor tie and check her."
-      : draft.speak,
+    quality: flags.contradictsDet ? "unsafe" : "adjust",
   };
 }

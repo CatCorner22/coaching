@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { CameraCapture, type CaptureResult } from "@/components/camera-capture";
 import { WrapOverlay } from "@/components/wrap-overlay";
@@ -6,13 +6,14 @@ import { CoachPanel } from "@/components/coach-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { analyzeRope } from "@/lib/ai/analyze";
-import { TIES, getTie } from "@/lib/kb";
+import { DUNGEON, TIES, getTie } from "@/lib/kb";
 import { sampleHands } from "@/lib/ml/detect";
 import { fuseCoach } from "@/lib/ml/fuse";
 import { toImageData } from "@/lib/media";
 import type { CoachReport } from "@/lib/ml/types";
 import type { RGB } from "@/lib/ml/color";
 import { useJournal } from "@/lib/stores/journal";
+import { useNegotiate } from "@/lib/stores/negotiate";
 import { useSession } from "@/lib/stores/session";
 import { useSettings } from "@/lib/stores/settings";
 import { formatDuration } from "@/lib/utils";
@@ -21,10 +22,9 @@ import { buildDeterministic } from "@/lib/ml/predict";
 
 export const Route = createFileRoute("/studio")({
   ssr: false,
-  validateSearch: (s: Record<string, unknown>) => {
-    if (typeof s.tie === "string" && s.tie.length > 0) return { tie: s.tie };
-    return {};
-  },
+  validateSearch: (s: Record<string, unknown>): { tie?: string } => ({
+    tie: typeof s.tie === "string" && s.tie.length > 0 ? s.tie : undefined,
+  }),
   component: StudioPage,
 });
 
@@ -34,6 +34,7 @@ function StudioPage() {
   const session = useSession();
   const nerveHits = useJournal((j) => j.nerveHits);
   const addEntry = useJournal((j) => j.add);
+  const hardNos = useNegotiate((s) => s.items.filter((i) => i.rank === "no"));
   const [capture, setCapture] = useState<CaptureResult | null>(null);
   const [baseline, setBaseline] = useState<RGB | null>(null);
   const [report, setReport] = useState<CoachReport | null>(null);
@@ -49,12 +50,17 @@ function StudioPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search.tie]);
 
+  const stopSession = useSession((s) => s.stop);
   useEffect(() => {
     if (!settings.listen) return;
-    return listenForWords([settings.safeword, settings.yellowWord, "next", "analyze"], (w) => {
-      if (w.toLowerCase() === settings.safeword.toLowerCase()) session.stop("safeword");
-    });
-  }, [settings.listen, settings.safeword, settings.yellowWord, session]);
+    return listenForWords(
+      [settings.safeword, settings.yellowWord, settings.greenWord, "next", "analyze"],
+      (w) => {
+        const t = w.toLowerCase();
+        if (t === settings.safeword.toLowerCase()) stopSession("safeword");
+      },
+    );
+  }, [settings.listen, settings.safeword, settings.yellowWord, settings.greenWord, stopSession]);
 
   const tie = getTie(session.tieSlug ?? "");
   const det = useMemo(() => {
@@ -90,6 +96,7 @@ function StudioPage() {
           stepIndex: session.stepIndex,
           elapsedSec: session.elapsed,
           question: question || undefined,
+          furnitureSlug: session.furnitureSlug,
           protocol: {
             rigger: settings.riggerName || "rigger",
             bottom: settings.bottomName || "your wife",
@@ -127,9 +134,17 @@ function StudioPage() {
             Safeword or coach halt. Shears. Cut tensioned stems first. Hands, then throat, then
             the rest. Aftercare is the scene now.
           </p>
-          <Button className="mt-3" variant="outline" onClick={() => session.reset()}>
-            Reset studio
-          </Button>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => session.reset()}>
+              Reset studio
+            </Button>
+            <Button asChild variant="danger">
+              <Link to="/emergency">Cut-down card</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link to="/aftercare">Aftercare</Link>
+            </Button>
+          </div>
         </div>
       )}
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -142,6 +157,11 @@ function StudioPage() {
           <span className="tabular-nums text-muted">{formatDuration(session.elapsed)}</span>
         </div>
       </div>
+      {hardNos.length > 0 && (
+        <p className="mt-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
+          Negotiated no: {hardNos.map((n) => n.label).join(" · ")}
+        </p>
+      )}
       {dueCheck && (
         <p className="mt-4 rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-warn">
           Circulation check is due. Color, heat, refill, squeeze, which finger.
@@ -159,6 +179,19 @@ function StudioPage() {
             {TIES.map((t) => (
               <option key={t.slug} value={t.slug}>
                 {t.name}
+              </option>
+            ))}
+          </select>
+          <label className="mt-3 block text-xs uppercase tracking-wide text-subtle">On</label>
+          <select
+            className="mt-1 h-11 w-full rounded-md border border-border bg-elevated px-3 text-sm"
+            value={session.furnitureSlug ?? ""}
+            onChange={(e) => session.setFurniture(e.target.value || undefined)}
+          >
+            <option value="">Floor / bed</option>
+            {DUNGEON.map((d) => (
+              <option key={d.slug} value={d.slug}>
+                {d.name}
               </option>
             ))}
           </select>

@@ -73,6 +73,7 @@ function Home() {
         <h2 className="mb-4 font-display text-3xl">Tools</h2>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {[
+            { to: "/dungeon" as const, t: "Dungeon", d: "Your cross, swing, machine" },
             { to: "/negotiate" as const, t: "Negotiate", d: "Yes / maybe / no" },
             { to: "/nerves" as const, t: "Nerve atlas", d: "Radial to peroneal" },
             { to: "/calc" as const, t: "Rope calc", d: "Staffs for tonight" },

@@ -143,21 +143,30 @@ export function CameraCapture({
 
   async function ingestVideo(file: Blob) {
     const frames = await extractVideoFrames(file, 6);
+    const observed = frames.map((f) => ({
+      f,
+      obs: observeFrame(f.imageData),
+    }));
     const ranked = pickBest(
-      frames.map((f) => ({ data: f.imageData, item: f })),
+      observed.map((x) => ({
+        data: x.f.imageData,
+        item: x,
+        neck: x.obs.neckRope,
+        paleness: x.obs.paleness,
+      })),
       3,
     );
     let prev: Uint8ClampedArray | undefined;
-    const observations = ranked.map((f) => {
-      const obs = observeFrame(f.imageData, prev);
-      prev = f.imageData.data;
+    const observations = ranked.map((x) => {
+      const obs = observeFrame(x.f.imageData, prev);
+      prev = x.f.imageData.data;
       return obs;
     });
     await emitFromMedia(
       "video",
-      ranked.map((f) => f.jpeg),
+      ranked.map((x) => x.f.jpeg),
       observations,
-      ranked.map((f) => scoreFrame(f.imageData)),
+      ranked.map((x) => scoreFrame(x.f.imageData)),
     );
   }
 

@@ -506,6 +506,61 @@ export const ARTICLES: Article[] = [
       },
     ],
   },
+  {
+    slug: "furniture-not-hardpoints",
+    title: "Furniture Is Not a Hardpoint",
+    section: "risk",
+    minutes: 6,
+    summary:
+      "A swing, a pole, a cross, and a table are scenes. They are not inspected Shibari rigs. Rope dresses. Hardware that was sold for sex holds sex, not a hang.",
+    related: ["hard-limits", "emergency-stop"],
+    blocks: [
+      { type: "h", text: "What you own" },
+      {
+        type: "p",
+        text: "You have a sex bench, a massage table, a stripper pole, a Saint Andrew's Cross, and a sex swing. Those are excellent. They let her hips be high, her arms be displayed, her back be flogged, her legs be open without a squat. None of them is a bamboo, a ring, or a span set that a rigger would hang from.",
+      },
+      {
+        type: "ul",
+        items: [
+          "Massage table — platform. Face cradle is not a collar.",
+          "Sex bench — kneeling/drape. A handle, not a hoist.",
+          "Cross — arms-up clock. Short. Hands in the photograph.",
+          "Swing — sling. Straps hold her. Rope does not.",
+          "Pole — chrome to cuff to. Not an upline.",
+        ],
+      },
+      {
+        type: "warn",
+        text: "If the ceiling mount was not installed by someone who hangs people for a living, it is furniture. Musubi will not coach you to clip an upline to it.",
+      },
+    ],
+  },
+  {
+    slug: "machine-and-rope",
+    title: "Machines, Large Toys, and Bound Hips",
+    section: "scene",
+    minutes: 7,
+    summary:
+      "A Hismith does not watch her face. A Bad Dragon flare does not migrate itself off if crotch rope forbids backing out. You are the safeword channel.",
+    related: ["safewords", "circulation", "furniture-not-hardpoints"],
+    blocks: [
+      { type: "h", text: "The machine is not a partner" },
+      {
+        type: "p",
+        text: "Speed is a privilege she can revoke. If her hands are tied, that revoke is a word, a bell, a knee, or you watching her go quiet and stopping it yourself. Never: TK + gag + machine. That is three ways she cannot help herself.",
+      },
+      { type: "h", text: "Size is warmup" },
+      {
+        type: "p",
+        text: "Large toys are a lube and time problem, not a dominance problem. Insert before the restrictive hip rope, or leave a way to lift the crotch rope without untying the night. Rope positions. It does not force depth.",
+      },
+      {
+        type: "warn",
+        text: "Do not walk away while the machine is on. A machine does not hear yellow.",
+      },
+    ],
+  },
 ];
 
 export function getArticle(slug: string) {

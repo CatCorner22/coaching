@@ -1,4 +1,4 @@
-import { isDark, isRope, isSkin, meanRgb, palenessScore, type RGB } from "./color";
+import { isDark, isDarkFiber, isRope, isSkin, meanRgb, palenessScore, type RGB } from "./color";
 import { findPeaks, smooth } from "./signal";
 import type { FrameObservation, WrapBand } from "./types";
 
@@ -26,8 +26,8 @@ export function observeFrame(
       const r = buf[i]!;
       const g = buf[i + 1]!;
       const b = buf[i + 2]!;
-      if (isDark(r, g, b)) continue;
-      if (isRope(r, g, b)) {
+      if (isDark(r, g, b) && !isDarkFiber(r, g, b)) continue;
+      if (isRope(r, g, b) || isDarkFiber(r, g, b)) {
         ropeN++;
         ropeOnRow++;
       } else if (isSkin(r, g, b)) {
@@ -50,7 +50,7 @@ export function observeFrame(
     if (step === 2 && y + 1 < height) rowRope[y + 1] = ropeOnRow;
   }
 
-  const sampled = Math.ceil(width / step) * Math.ceil(height / step);
+  const sampled = Math.max(1, Math.ceil(width / step) * Math.ceil(height / step));
   const body =
     skinN > 30 && maxX > minX
       ? { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
@@ -73,15 +73,15 @@ export function observeFrame(
 
   let neckRope = 0;
   if (body) {
-    const neckTop = body.y;
-    const neckBot = body.y + body.h * 0.16;
+    const neckTop = Math.max(0, body.y - body.h * 0.14);
+    const neckBot = body.y + body.h * 0.18;
     let neckCells = 0;
     let neckRopeN = 0;
     for (let y = Math.max(0, neckTop | 0); y < Math.min(height, neckBot); y += step) {
       for (let x = body.x; x < body.x + body.w; x += step) {
         const i = (y * width + x) * 4;
         neckCells++;
-        if (isRope(buf[i]!, buf[i + 1]!, buf[i + 2]!)) neckRopeN++;
+        if (isRope(buf[i]!, buf[i + 1]!, buf[i + 2]!) || isDarkFiber(buf[i]!, buf[i + 1]!, buf[i + 2]!)) neckRopeN++;
       }
     }
     neckRope = neckCells ? neckRopeN / neckCells : 0;

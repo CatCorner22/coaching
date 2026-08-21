@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { askKnowledge } from "@/lib/ai/ask";
-import { ARTICLES, articleExcerpts, searchKnowledge } from "@/lib/kb";
+import { ARTICLES, searchKnowledge } from "@/lib/kb";
 
 export const Route = createFileRoute("/knowledge")({ component: KnowledgePage });
 
@@ -16,10 +16,12 @@ function KnowledgePage() {
   async function ask() {
     setPending(true);
     try {
-      const excerpts = articleExcerpts(
-        (hits.length ? hits : searchKnowledge(q || "consent", 4)).map((h) => h.slug),
-      );
-      const res = await askKnowledge({ data: { question: q || "How do we start safely?", excerpts } });
+      const res = await askKnowledge({
+        data: {
+          question: q || "How do we start safely?",
+          slugs: (hits.length ? hits : searchKnowledge(q || "consent", 4)).map((h) => h.slug),
+        },
+      });
       if (res.ok) setAnswer(res.text);
       else setAnswer(res.error);
     } finally {

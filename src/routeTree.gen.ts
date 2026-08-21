@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AftercareRouteImport } from './routes/aftercare'
 import { Route as CalcRouteImport } from './routes/calc'
+import { Route as DungeonRouteImport } from './routes/dungeon'
 import { Route as EmergencyRouteImport } from './routes/emergency'
 import { Route as GearRouteImport } from './routes/gear'
 import { Route as JournalRouteImport } from './routes/journal'
@@ -41,6 +42,11 @@ const AftercareRoute = AftercareRouteImport.update({
 const CalcRoute = CalcRouteImport.update({
   id: '/calc',
   path: '/calc',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DungeonRoute = DungeonRouteImport.update({
+  id: '/dungeon',
+  path: '/dungeon',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EmergencyRoute = EmergencyRouteImport.update({
@@ -123,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/aftercare': typeof AftercareRoute
   '/calc': typeof CalcRoute
+  '/dungeon': typeof DungeonRoute
   '/emergency': typeof EmergencyRoute
   '/gear': typeof GearRoute
   '/journal': typeof JournalRoute
@@ -143,6 +150,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/aftercare': typeof AftercareRoute
   '/calc': typeof CalcRoute
+  '/dungeon': typeof DungeonRoute
   '/emergency': typeof EmergencyRoute
   '/gear': typeof GearRoute
   '/journal': typeof JournalRoute
@@ -164,6 +172,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/aftercare': typeof AftercareRoute
   '/calc': typeof CalcRoute
+  '/dungeon': typeof DungeonRoute
   '/emergency': typeof EmergencyRoute
   '/gear': typeof GearRoute
   '/journal': typeof JournalRoute
@@ -186,6 +195,7 @@ export interface FileRouteTypes {
     | '/'
     | '/aftercare'
     | '/calc'
+    | '/dungeon'
     | '/emergency'
     | '/gear'
     | '/journal'
@@ -206,6 +216,7 @@ export interface FileRouteTypes {
     | '/'
     | '/aftercare'
     | '/calc'
+    | '/dungeon'
     | '/emergency'
     | '/gear'
     | '/journal'
@@ -226,6 +237,7 @@ export interface FileRouteTypes {
     | '/'
     | '/aftercare'
     | '/calc'
+    | '/dungeon'
     | '/emergency'
     | '/gear'
     | '/journal'
@@ -247,6 +259,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AftercareRoute: typeof AftercareRoute
   CalcRoute: typeof CalcRoute
+  DungeonRoute: typeof DungeonRoute
   EmergencyRoute: typeof EmergencyRoute
   GearRoute: typeof GearRoute
   JournalRoute: typeof JournalRoute
@@ -285,6 +298,13 @@ declare module '@tanstack/react-router' {
       path: '/calc'
       fullPath: '/calc'
       preLoaderRoute: typeof CalcRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dungeon': {
+      id: '/dungeon'
+      path: '/dungeon'
+      fullPath: '/dungeon'
+      preLoaderRoute: typeof DungeonRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/emergency': {
@@ -399,6 +419,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AftercareRoute: AftercareRoute,
   CalcRoute: CalcRoute,
+  DungeonRoute: DungeonRoute,
   EmergencyRoute: EmergencyRoute,
   GearRoute: GearRoute,
   JournalRoute: JournalRoute,

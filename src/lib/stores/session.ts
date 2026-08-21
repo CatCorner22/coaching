@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 type SessionState = {
   tieSlug?: string;
+  furnitureSlug?: string;
   stepIndex: number;
   startedAt: number | null;
   lastCheckAt: number | null;
@@ -10,6 +11,7 @@ type SessionState = {
   stopped: boolean;
   stopReason?: string;
   setTie: (slug?: string) => void;
+  setFurniture: (slug?: string) => void;
   setStep: (n: number) => void;
   start: () => void;
   tick: (now: number) => void;
@@ -27,6 +29,7 @@ export const useSession = create<SessionState>((set, get) => ({
   listening: false,
   stopped: false,
   setTie: (slug) => set({ tieSlug: slug, stepIndex: 0, stopped: false, stopReason: undefined }),
+  setFurniture: (slug) => set({ furnitureSlug: slug }),
   setStep: (n) => set({ stepIndex: Math.max(0, n) }),
   start: () => {
     const now = Date.now();

@@ -16,6 +16,7 @@ const MORE = [
   { to: "/plan", label: "Plan" },
   { to: "/journal", label: "Journal" },
   { to: "/gear", label: "Gear" },
+  { to: "/dungeon", label: "Dungeon" },
   { to: "/negotiate", label: "Negotiate" },
   { to: "/nerves", label: "Nerves" },
   { to: "/aftercare", label: "Aftercare" },

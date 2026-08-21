@@ -5,6 +5,7 @@ export * from "./articles";
 export * from "./gear";
 export * from "./search";
 export * from "./nerves";
+export * from "./dungeon";
 
 import { ARTICLES } from "./articles";
 import { KNOTS } from "./knots";
@@ -31,6 +32,20 @@ export const SEQUENCES = [
     minutes: 50,
     steps: ["single-column", "takate-kote", "futomomo"],
     blurb: "Warm the shoulders, build a TK with a clock, then a leg so the scene has a second beat.",
+  },
+  {
+    slug: "cross-short",
+    name: "Cross, short clock",
+    minutes: 15,
+    steps: ["single-column", "shinju"],
+    blurb: "Wrists and ankles on the Saint Andrew's. Flogger optional. Off before the hands fade.",
+  },
+  {
+    slug: "bench-machine",
+    name: "Bench and machine",
+    minutes: 30,
+    steps: ["single-column", "futomomo"],
+    blurb: "Draped on the bench. Machine in front of you, not instead of you.",
   },
 ] as const;
 

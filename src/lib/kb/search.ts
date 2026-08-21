@@ -1,9 +1,10 @@
 import { ARTICLES } from "./articles";
 import { GEAR } from "./gear";
 import { KNOTS } from "./knots";
+import { DUNGEON } from "./dungeon";
 import { TIES } from "./ties";
 
-export type HitKind = "tie" | "knot" | "article" | "gear";
+export type HitKind = "tie" | "knot" | "article" | "gear" | "dungeon";
 
 export type SearchHit = {
   kind: HitKind;
@@ -119,6 +120,27 @@ export function searchKnowledge(query: string, limit = 12): SearchHit[] {
         title: g.name,
         href: "/gear",
         summary: g.summary,
+        score,
+      });
+    }
+  }
+
+  for (const d of DUNGEON) {
+    const score = scoreText(terms, [
+      { text: d.name, w: 6 },
+      { text: d.slug, w: 4 },
+      { text: d.kind, w: 3 },
+      { text: d.summary, w: 2 },
+      { text: d.withRope.join(" "), w: 1 },
+      { text: d.never.join(" "), w: 2 },
+    ]);
+    if (score > 0) {
+      hits.push({
+        kind: "dungeon",
+        slug: d.slug,
+        title: d.name,
+        href: "/dungeon",
+        summary: d.summary,
         score,
       });
     }
