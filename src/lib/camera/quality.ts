@@ -1,6 +1,6 @@
 /** Camera skill: score stills so the coach sees rope, not blur. */
 
-import { isDarkFiber, isHandTone, isRope, isSkin } from "@/lib/ml/color";
+import { isDarkFiber, isHandTone, isRope, isSkin } from "../ml/color";
 
 export type FrameQuality = {
   sharpness: number;
@@ -53,13 +53,13 @@ export function exposureScore(data: ImageData): number {
   return Math.max(0, 1 - crush * 1.6);
 }
 
-/** Dark brown hemp that misses isRope (r ≤ 70) and isDarkFiber (too saturated). */
-function isDarkJute(r: number, g: number, b: number) {
+/** Dark brown hemp that misses the brighter rope range. */
+function isDarkJute(r: number, g: number, b: number): boolean {
   if (isSkin(r, g, b) || isHandTone(r, g, b)) return false;
   const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
-  const s = max === 0 ? 0 : (max - min) / max;
+  const saturation = max === 0 ? 0 : (max - min) / max;
   return (
     y >= 18 &&
     y < 70 &&
@@ -67,8 +67,8 @@ function isDarkJute(r: number, g: number, b: number) {
     r >= g - 2 &&
     g >= b - 8 &&
     r - b > 10 &&
-    s > 0.12 &&
-    s < 0.85
+    saturation > 0.12 &&
+    saturation < 0.85
   );
 }
 
@@ -76,14 +76,28 @@ export function ropeHint(data: ImageData): number {
   const buf = data.data;
   let rope = 0;
   let n = 0;
+  let lumaSum = 0;
+  let lumaSquaredSum = 0;
   for (let i = 0; i < buf.length; i += 16) {
     const r = buf[i]!;
     const g = buf[i + 1]!;
     const b = buf[i + 2]!;
+    const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    lumaSum += luma;
+    lumaSquaredSum += luma * luma;
     if (isRope(r, g, b) || isDarkFiber(r, g, b) || isDarkJute(r, g, b)) rope++;
     n++;
   }
-  return n ? rope / n : 0;
+  if (n < 4) return 0;
+
+  const meanLuma = lumaSum / n;
+  const lumaVariance = Math.max(0, lumaSquaredSum / n - meanLuma * meanLuma);
+  const share = rope / n;
+
+  // A flat dark/brown/skin-colored surface is not evidence of rope. Require scene
+  // texture and some non-rope context before using color as a ranking hint.
+  if (Math.sqrt(lumaVariance) < 6 || share > 0.85) return 0;
+  return share;
 }
 
 export function scoreFrame(data: ImageData): FrameQuality {
@@ -102,16 +116,24 @@ export function pickBest<T>(
   items: { data: ImageData; item: T; neck?: number; paleness?: number }[],
   keep = 3,
 ): T[] {
-  const danger = items.filter((x) => (x.neck ?? 0) > 0.08 || (x.paleness ?? 0) > 0.45);
+  // `paleness` is intentionally not used. The current color heuristic has no
+  // validated hand/body localization, so elevating it can select a pale wall
+  // over a usable subject frame. Keep the field temporarily for call-site
+  // compatibility while the observation contract is migrated.
+  const neckScore = (entry: { neck?: number }) =>
+    typeof entry.neck === "number" && Number.isFinite(entry.neck)
+      ? Math.max(0, Math.min(1, entry.neck))
+      : 0;
+  const danger = items.filter((entry) => neckScore(entry) > 0.08);
   const pool = danger.length ? danger : items;
   return pool
-    .map((x) => {
-      const q = scoreFrame(x.data);
-      return { x, s: q.score + (x.neck ?? 0) * 0.8 + (x.paleness ?? 0) * 0.4 };
-    })
-    .sort((a, b) => b.s - a.s)
-    .slice(0, keep)
-    .map((row) => row.x.item);
+    .map((entry) => ({
+      entry,
+      score: scoreFrame(entry.data).score + neckScore(entry) * 0.8,
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, Number.isFinite(keep) ? Math.max(0, Math.floor(keep)) : 3)
+    .map(({ entry }) => entry.item);
 }
 
 export function enhanceContrast(data: ImageData): ImageData {

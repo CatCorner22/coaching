@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import { adoptPersistKey } from "./persist";
 
 export type Settings = {
+  consentVersion: number;
   consented: boolean;
   adults: boolean;
   shears: boolean;
@@ -20,6 +21,7 @@ export type Settings = {
 };
 
 const defaults: Settings = {
+  consentVersion: 0,
   consented: false,
   adults: false,
   shears: false,
@@ -31,12 +33,12 @@ const defaults: Settings = {
   safeword: "red",
   yellowWord: "yellow",
   greenWord: "green",
-  voice: true,
-  listen: true,
+  voice: false,
+  listen: false,
   circulationMins: 4,
 };
 
-const RESERVED = new Set(["next", "analyze", "hands", "stop"]);
+const RESERVED = new Set(["next", "analyze", "hands", "stop", "pause", "release"]);
 
 function clampWord(v: unknown, fallback: string) {
   const s = typeof v === "string" ? v.trim().slice(0, 24) : "";
@@ -49,6 +51,36 @@ type SettingsState = Settings & {
   set: (p: Partial<Settings>) => void;
   enter: () => void;
 };
+
+/** Normalize an untrusted persisted snapshot without carrying unknown fields forward. */
+export function normalizePersistedSettings(persisted: unknown, current: Settings): Settings {
+  const p = (persisted ?? {}) as Partial<Settings>;
+  const adults = p.adults === true;
+  const shears = p.shears === true;
+  const photosOk = p.photosOk === true;
+  const consentVersion = p.consentVersion === 4 ? 4 : 0;
+  const consented = p.consented === true && adults && shears && photosOk && consentVersion === 4;
+  return {
+    consentVersion,
+    consented,
+    adults,
+    shears,
+    photosOk,
+    riggerName: typeof p.riggerName === "string" ? p.riggerName.slice(0, 40) : current.riggerName,
+    bottomName: typeof p.bottomName === "string" ? p.bottomName.slice(0, 40) : current.bottomName,
+    honorific: typeof p.honorific === "string" ? p.honorific.slice(0, 24) : current.honorific,
+    style: p.style === "peer" || p.style === "ds" ? p.style : current.style,
+    safeword: clampWord(p.safeword, current.safeword),
+    yellowWord: clampWord(p.yellowWord, current.yellowWord),
+    greenWord: clampWord(p.greenWord, current.greenWord),
+    voice: consented && p.voice === true,
+    listen: consented && p.listen === true,
+    circulationMins: Math.min(
+      12,
+      Math.max(2, Number(p.circulationMins) || current.circulationMins),
+    ),
+  };
+}
 
 adoptPersistKey("knotty-settings", "musubi-settings");
 
@@ -67,33 +99,14 @@ export const useSettings = create<SettingsState>()(
               ? Math.min(12, Math.max(2, Number(p.circulationMins) || s.circulationMins))
               : s.circulationMins,
         })),
-      enter: () => set({ consented: true, adults: true, shears: true, photosOk: true }),
+      enter: () => set({ consentVersion: 4, consented: true, adults: true, shears: true, photosOk: true }),
     }),
     {
       name: "knotty-settings",
       merge: (persisted, current) => {
-        const p = (persisted ?? {}) as Partial<Settings>;
-        const adults = p.adults === true;
-        const shears = p.shears === true;
-        const photosOk = p.photosOk === true;
-        const consented = p.consented === true && adults && shears && photosOk;
         return {
           ...current,
-          ...p,
-          adults,
-          shears,
-          photosOk,
-          consented,
-          safeword: clampWord(p.safeword, current.safeword),
-          yellowWord: clampWord(p.yellowWord, current.yellowWord),
-          greenWord: clampWord(p.greenWord, current.greenWord),
-          circulationMins: Math.min(12, Math.max(2, Number(p.circulationMins) || current.circulationMins)),
-          riggerName: String(p.riggerName ?? current.riggerName).slice(0, 40),
-          bottomName: String(p.bottomName ?? current.bottomName).slice(0, 40),
-          honorific: String(p.honorific ?? current.honorific).slice(0, 24),
-          style: p.style === "peer" || p.style === "ds" ? p.style : current.style,
-          voice: p.voice !== false,
-          listen: p.listen !== false,
+          ...normalizePersistedSettings(persisted, current),
         };
       },
     },

@@ -6,14 +6,14 @@ import { formatDuration } from "@/lib/utils";
 export const Route = createFileRoute("/aftercare")({ component: AftercarePage });
 
 const CHECKS = [
-  "Rope is off. Shears away from skin.",
-  "Blanket, water, sugar if she wants it.",
-  "Hands and feet: color, heat, squeeze, which finger.",
-  "Shoulders and knees uncurled slowly.",
-  "Marks photographed only if she asked for that.",
-  "She speaks in full sentences before you talk about the next scene.",
-  "You stay until she is oriented — drop can arrive late.",
-  "Write the journal tomorrow, not while she is still shaking.",
+  "Rope is off and release tools are away from skin.",
+  "Offer warmth, water, food, quiet, or space according to the person's current preference.",
+  "Ask directly about sensation, movement, pain, swelling, temperature change, breathing, speech, and alertness.",
+  "Do not force a joint or limb through resistance while changing position.",
+  "Make no photo unless recording and output permissions are separately current and specific.",
+  "Call emergency services now for unresponsiveness, abnormal breathing, severe confusion, collapse, or another emergency sign.",
+  "Prompt medical assessment for persistent or worsening weakness, numbness, severe pain, swelling, or temperature change.",
+  "Delay journaling until everyone is stable and willing; do not use a normal-looking image as reassurance.",
 ];
 
 function AftercarePage() {
@@ -30,8 +30,8 @@ function AftercarePage() {
       <p className="text-xs uppercase tracking-[0.22em] text-muted">Landing</p>
       <h1 className="mt-2 font-display text-4xl">Aftercare</h1>
       <p className="mt-3 text-sm text-muted">
-        The scene is not over when the last wrap comes off. Sit with her. Dominance is still
-        attention.
+        The activity is not over when the last wrap comes off. Follow the person’s current wishes,
+        check directly, and escalate concerning symptoms without waiting for this checklist.
       </p>
       <div className="mt-6 flex items-center gap-3">
         <p className="font-display text-4xl tabular-nums">{formatDuration(t)}</p>

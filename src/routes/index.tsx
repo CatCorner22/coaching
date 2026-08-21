@@ -27,15 +27,16 @@ function Home() {
           </svg>
         </div>
         <div className="relative mx-auto max-w-3xl px-5 pb-16 pt-14 md:pt-24">
-          <p className="text-xs uppercase tracking-[0.28em] text-muted">Knotty · private rope studio</p>
+          <p className="text-xs uppercase tracking-[0.28em] text-muted">Knotty · adult rope studio</p>
           <h1 className="mt-4 font-display text-5xl leading-[0.95] text-fg md:text-6xl">
-            Tie her.
+            Observe less.
             <br />
-            Read the rope.
+            Check directly.
           </h1>
           <p className="mt-5 max-w-lg text-base leading-relaxed text-muted">
-            Photograph or record your wife in Shibari. On-device vision counts wraps and watches
-            her hands. Grok coaches the next pass. Voice speaks it so you can keep your eyes on her.
+            Capture equipment-only or clothed, non-identifying stills. Knotty returns a bounded,
+            evidence-labeled observation report with explicit uncertainty and consequence floors—
+            never physiology, exact-tie validation, monitoring, clearance, or next-wrap coaching.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg">
@@ -59,18 +60,18 @@ function Home() {
       <section className="mx-auto grid max-w-5xl gap-3 px-5 py-10 md:grid-cols-3">
         <Card
           icon={<Camera className="size-4" />}
-          title="Photo & video coach"
-          body="Still or clip. Local geometry first, then an audited Grok pass. Deterministic safety can veto the model."
+          title="Photo & selected-still report"
+          body="The app holds a short clip in page memory. Analyze sends selected compressed stills and generic labels through the app server to xAI. Closed categories, confounders, abstention, and limitations make uncertainty visible."
         />
         <Card
           icon={<Shield className="size-4" />}
           title="Consent is the container"
-          body="Safewords, shears, nerve atlas, clocks. Yellow changes the tie. Red ends it. Dominance is attention."
+          body="Current, specific, revocable agreement comes first. Direct symptoms and coercion route action before any camera or model output."
         />
         <Card
           icon={<BookOpen className="size-4" />}
           title="A working knowledge base"
-          body="Foundations through partial lift. Knots, scenes, aftercare, and what this atelier will refuse to teach."
+          body="Lower-consequence foundations, emergency guidance, aftercare, privacy, evidence notes, and clear instructor-only routes."
         />
       </section>
 
@@ -79,13 +80,13 @@ function Home() {
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {[
             { to: "/checklist" as const, t: "Pre-scene", d: "Ten things before rope" },
-            { to: "/checkin" as const, t: "Check-in", d: "Color, heat, squeeze" },
-            { to: "/dungeon" as const, t: "Dungeon", d: "Your cross, swing, machine" },
+            { to: "/checkin" as const, t: "Check-in", d: "Direct report, no defaults" },
+            { to: "/dungeon" as const, t: "Equipment", d: "Boundaries and instructor routes" },
             { to: "/negotiate" as const, t: "Negotiate", d: "Yes / maybe / no" },
-            { to: "/nerves" as const, t: "Nerve atlas", d: "Radial to peroneal" },
+            { to: "/nerves" as const, t: "Symptoms", d: "Release and escalation" },
             { to: "/calc" as const, t: "Rope calc", d: "Staffs for tonight" },
-            { to: "/aftercare" as const, t: "Aftercare", d: "Sit with her" },
-            { to: "/emergency" as const, t: "Cut down", d: "Shears first" },
+            { to: "/aftercare" as const, t: "Aftercare", d: "Stay present and check directly" },
+            { to: "/emergency" as const, t: "Emergency", d: "Release, call, follow dispatch" },
             { to: "/settings" as const, t: "Settings", d: "Safewords, voice" },
             { to: "/knots" as const, t: "Knots", d: "Non-cinch school" },
             { to: "/journal" as const, t: "Journal", d: "Local notes" },
@@ -117,7 +118,7 @@ function Home() {
               search={{ seq: s.slug }}
               className="rounded-lg border border-border bg-surface p-4 transition-colors hover:border-border-strong"
             >
-              <p className="text-xs uppercase tracking-wide text-muted">{s.minutes} min</p>
+              <p className="text-xs uppercase tracking-wide text-muted">Planning outline · not a safety duration</p>
               <p className="mt-1 font-display text-2xl">{s.name}</p>
               <p className="mt-2 text-sm text-muted">{s.blurb}</p>
             </Link>

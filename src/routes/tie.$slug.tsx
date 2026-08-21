@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RopeFigure } from "@/components/rope-figure";
 import { getKnot, getTie } from "@/lib/kb";
+import { useSettings } from "@/lib/stores/settings";
 import { playCoachVoice } from "@/lib/voice/play";
 
 export const Route = createFileRoute("/tie/$slug")({ component: TiePage });
@@ -11,6 +12,7 @@ export const Route = createFileRoute("/tie/$slug")({ component: TiePage });
 function TiePage() {
   const { slug } = Route.useParams();
   const tie = getTie(slug);
+  const cloudVoice = useSettings((settings) => settings.voice);
   const [step, setStep] = useState(0);
   if (!tie) {
     return (
@@ -29,26 +31,30 @@ function TiePage() {
         <div className="mt-3 flex flex-wrap gap-2">
           <Badge>{tie.level}</Badge>
           <Badge>
-            {tie.minutes[0]}–{tie.minutes[1]} min
+            {tie.minutes[1] === 0 ? "Instructor route" : `${tie.minutes[0]}–${tie.minutes[1]} min study`}
           </Badge>
           <Badge>{tie.position}</Badge>
         </div>
         <p className="mt-4 text-sm leading-relaxed text-muted">{tie.summary}</p>
         <p className="mt-3 text-sm text-fg">{tie.why}</p>
+        <p className="mt-3 rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-xs leading-relaxed text-warn">
+          Planning estimates, fit rules, diagrams, and checklists are not safety clearance. Consent
+          and symptoms can change at any moment; pause and release for concern or uncertainty.
+        </p>
 
         <div className="mt-8 rounded-lg border border-border bg-surface p-4">
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs uppercase tracking-wide text-muted">
-              Step {step + 1} of {tie.steps.length}
+              Section {step + 1} of {tie.steps.length}
             </p>
-            <Button variant="ghost" size="sm" onClick={() => void playCoachVoice(s.speak)}>
-              Speak
+            <Button variant="ghost" size="sm" onClick={() => void playCoachVoice(s.speak, cloudVoice)}>
+              {cloudVoice ? "Speak with cloud voice" : "Browser voice · no xAI"}
             </Button>
           </div>
           <h2 className="mt-2 font-display text-3xl">{s.title}</h2>
           <dl className="mt-4 space-y-3 text-sm">
-            <Block k="Rigger" v={s.rigger} />
-            <Block k="Her" v={s.bottom} />
+            <Block k="Operator" v={s.rigger} />
+            <Block k="Participant" v={s.bottom} />
             <Block k="Check" v={s.check} />
           </dl>
           <div className="mt-5 flex gap-2">
@@ -65,7 +71,7 @@ function TiePage() {
               disabled={step >= tie.steps.length - 1}
               onClick={() => setStep((n) => n + 1)}
             >
-              Next wrap
+              Next section
             </Button>
           </div>
         </div>
@@ -104,11 +110,17 @@ function TiePage() {
             </div>
           </div>
         )}
-        <Button asChild className="mt-10">
-          <Link to="/studio" search={{ tie: tie.slug }}>
-            Coach this in the studio
-          </Link>
-        </Button>
+        {tie.minutes[1] === 0 ? (
+          <Button className="mt-10" disabled>
+            Instructor route · Studio unavailable
+          </Button>
+        ) : (
+          <Button asChild className="mt-10">
+            <Link to="/studio" search={{ tie: tie.slug }}>
+              Open limited observation—not coaching
+            </Link>
+          </Button>
+        )}
       </div>
       <aside className="h-fit rounded-lg border border-border bg-surface p-4">
         <RopeFigure pose={s.expected.pose} view={s.expected.view} wraps={wraps} nerves={tie.nerves} />

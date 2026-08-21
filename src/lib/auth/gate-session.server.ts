@@ -58,7 +58,8 @@ async function emitSessionCookie(
   )?.value;
   if (!sessionValue) {
     console.error(`${LOG} signed Set-Cookie missing session token value`, {
-      cookiePreview: signedCookie.slice(0, 120),
+      cookieName: sessionTokenName,
+      byteLength: Buffer.byteLength(signedCookie, "utf8"),
     });
     return null;
   }

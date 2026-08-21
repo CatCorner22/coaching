@@ -1,35 +1,41 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 
-export type Color = "pink" | "pale" | "dusky";
-export type Breath = "easy" | "work" | "hard";
+export type CheckChoice = "not_checked" | "no_concern" | "concern";
+export type ConsentChoice = "not_checked" | "yes" | "no";
 
 export type CheckIn = {
   id: string;
   at: number;
-  color: Color;
-  tingle: boolean;
-  breath: Breath;
-  whichFinger: string;
+  consent: ConsentChoice;
+  sensation: CheckChoice;
+  movement: CheckChoice;
+  breathingSpeechAlertness: CheckChoice;
+  painSwellingTemperature: CheckChoice;
+  emergencySigns: CheckChoice;
   note: string;
 };
 
 type State = {
   logs: CheckIn[];
-  add: (c: Omit<CheckIn, "id" | "at">) => void;
+  add: (check: Omit<CheckIn, "id" | "at">) => void;
   clear: () => void;
 };
 
-export const useCheckIn = create<State>()(
-  persist(
-    (set, get) => ({
-      logs: [],
-      add: (c) =>
-        set({
-          logs: [{ id: crypto.randomUUID(), at: Date.now(), ...c }, ...get().logs].slice(0, 40),
-        }),
-      clear: () => set({ logs: [] }),
+// Check-ins are intentionally session-memory only. They can contain health and
+// consent information and should not silently persist on a shared device.
+export const useCheckIn = create<State>((set, get) => ({
+  logs: [],
+  add: (check) =>
+    set({
+      logs: [
+        {
+          id: crypto.randomUUID(),
+          at: Date.now(),
+          ...check,
+          note: String(check.note ?? "").slice(0, 240),
+        },
+        ...get().logs,
+      ].slice(0, 20),
     }),
-    { name: "knotty-checkin" },
-  ),
-);
+  clear: () => set({ logs: [] }),
+}));

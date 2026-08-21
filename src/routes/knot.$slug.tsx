@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { getKnot } from "@/lib/kb";
+import { useSettings } from "@/lib/stores/settings";
 import { playCoachVoice } from "@/lib/voice/play";
 
 export const Route = createFileRoute("/knot/$slug")({ component: KnotPage });
@@ -8,6 +9,7 @@ export const Route = createFileRoute("/knot/$slug")({ component: KnotPage });
 function KnotPage() {
   const { slug } = Route.useParams();
   const knot = getKnot(slug);
+  const cloudVoice = useSettings((settings) => settings.voice);
   if (!knot) {
     return (
       <div className="px-5 py-16 text-muted">
@@ -25,8 +27,8 @@ function KnotPage() {
           <li key={s.title} className="rounded-lg border border-border bg-surface p-4">
             <div className="flex items-center justify-between">
               <p className="text-xs uppercase tracking-wide text-muted">Pass {i + 1}</p>
-              <Button variant="ghost" size="sm" onClick={() => void playCoachVoice(s.speak)}>
-                Speak
+              <Button variant="ghost" size="sm" onClick={() => void playCoachVoice(s.speak, cloudVoice)}>
+                {cloudVoice ? "Speak with cloud voice" : "Browser voice · no xAI"}
               </Button>
             </div>
             <h2 className="mt-1 font-display text-2xl">{s.title}</h2>

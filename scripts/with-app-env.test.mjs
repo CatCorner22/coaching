@@ -41,8 +41,8 @@ test("drops non-VITE keys, non-string values and malformed documents", () => {
   assert.deepEqual(parseAppEnv("null"), {});
 });
 
-test("a missing app-env.json is a clean no-op", () => {
-  assert.deepEqual(readAppEnv(makeWorkspace()), {});
+test("a missing app-env.json uses the safe standalone auth-off default", () => {
+  assert.deepEqual(readAppEnv(makeWorkspace()), { VITE_AUTH_ENABLED: "false" });
 });
 
 test("reads the app env from a workspace", () => {

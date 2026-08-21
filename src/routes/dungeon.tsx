@@ -9,14 +9,16 @@ function DungeonPage() {
       <p className="text-xs uppercase tracking-[0.22em] text-muted">Your room</p>
       <h1 className="mt-2 font-display text-4xl">Dungeon</h1>
       <p className="mt-3 text-sm text-muted">
-        Bench, table, pole, cross, swing, floggers, Hismith, large toys. Rope dresses her. Furniture
-        holds her. Nothing in this room is a hang point unless a rigger would stake their name on it.
+        Equipment recognition, consent boundaries, and combination risks. Nothing shown here is a
+        verified attachment, person-bearing component, impact target, or safe-use instruction.
       </p>
       <h2 className="mt-10 font-display text-2xl">Tonight on your kit</h2>
       <ul className="mt-3 space-y-2">
         {DUNGEON_SCENES.map((s) => (
           <li key={s.slug} className="rounded-lg border border-border bg-surface p-4">
-            <p className="text-xs uppercase tracking-wide text-muted">{s.minutes} min</p>
+            <p className="text-xs uppercase tracking-wide text-muted">
+              {s.minutes === 0 ? "Instructor route" : `${s.minutes} min study`}
+            </p>
             <p className="font-display text-2xl">{s.name}</p>
             <p className="mt-1 text-sm text-muted">{s.blurb}</p>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -30,20 +32,7 @@ function DungeonPage() {
                   {getTie(slug)?.name ?? slug}
                 </Link>
               ))}
-              <Link
-                to="/plan"
-                search={{ seq: s.slug }}
-                className="text-xs text-muted hover:text-fg"
-              >
-                Load in planner
-              </Link>
-              <Link
-                to="/studio"
-                search={{ tie: s.steps[0] }}
-                className="text-xs text-accent"
-              >
-                Open studio
-              </Link>
+              <span className="text-xs text-subtle">Recognition and questions only</span>
             </div>
           </li>
         ))}

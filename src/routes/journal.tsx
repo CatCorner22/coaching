@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { getTie } from "@/lib/kb";
-import { loadStill, useJournal } from "@/lib/stores/journal";
+import { purgeLegacyStills, useJournal } from "@/lib/stores/journal";
 
 export const Route = createFileRoute("/journal")({
   ssr: false,
@@ -12,13 +12,30 @@ export const Route = createFileRoute("/journal")({
 function JournalPage() {
   const entries = useJournal((s) => s.entries);
   const remove = useJournal((s) => s.remove);
+  const [purgeStatus, setPurgeStatus] = useState<string | null>(null);
   return (
     <div className="mx-auto max-w-2xl px-5 py-10">
       <p className="text-xs uppercase tracking-[0.22em] text-muted">Log</p>
       <h1 className="mt-2 font-display text-4xl">Journal</h1>
       <p className="mt-3 text-sm text-muted">
-        Local to this device. Notes, not a cloud of nudes. Write what the hands felt like tomorrow.
+        Text summaries are stored unencrypted in this browser's site storage. Captures are never
+        stored by current versions. Anyone with this browser profile may be able to read the notes;
+        export only with the adults' agreed output scope.
       </p>
+      <Button
+        variant="outline"
+        className="mt-4"
+        onClick={() => {
+          setPurgeStatus("Deleting legacy stills…");
+          void purgeLegacyStills().then(
+            () => setPurgeStatus("Legacy still storage deleted."),
+            (error) => setPurgeStatus(error instanceof Error ? error.message : "Could not delete legacy stills."),
+          );
+        }}
+      >
+        Delete legacy stored stills
+      </Button>
+      {purgeStatus && <p className="mt-2 text-xs text-muted" role="status">{purgeStatus}</p>}
       {entries.length > 0 && (
         <Button
           variant="outline"
@@ -36,7 +53,7 @@ function JournalPage() {
         </Button>
       )}
       {entries.length === 0 ? (
-        <p className="mt-10 text-sm text-muted">No scenes yet. The studio can save a pass here.</p>
+        <p className="mt-10 text-sm text-muted">No text summaries saved on this device.</p>
       ) : (
         <ul className="mt-8 space-y-3">
           {entries.map((e) => (
@@ -50,10 +67,15 @@ function JournalPage() {
               <p className="text-xs text-subtle">
                 {new Date(e.at).toLocaleString()} · {e.minutes} min
               </p>
-              <Still id={e.id} />
               <p className="mt-2 text-sm text-fg">{e.notes}</p>
+              <p className="mt-1 text-xs text-muted">
+                Disposition: {String(e.disposition ?? "legacy_entry_no_disposition").replaceAll("_", " ")}
+              </p>
               {e.flags.length > 0 && (
                 <p className="mt-1 text-xs text-warn">{e.flags.join(" · ")}</p>
+              )}
+              {Array.isArray(e.limitations) && e.limitations.length > 0 && (
+                <p className="mt-1 text-xs text-subtle">{e.limitations[0]}</p>
               )}
               {e.tieSlug && (
                 <Button asChild variant="ghost" size="sm" className="mt-2 px-0">
@@ -68,19 +90,4 @@ function JournalPage() {
       )}
     </div>
   );
-}
-
-function Still({ id }: { id: string }) {
-  const [src, setSrc] = useState<string | null>(null);
-  useEffect(() => {
-    let live = true;
-    void loadStill(id).then((u) => {
-      if (live) setSrc(u);
-    });
-    return () => {
-      live = false;
-    };
-  }, [id]);
-  if (!src) return null;
-  return <img src={src} alt="" className="mt-3 max-h-40 w-full rounded-md object-cover ring-1 ring-border" />;
 }

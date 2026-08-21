@@ -5,7 +5,7 @@ import { observeFrame } from "./detect.ts";
 import { fallbackDraft, hitsHardNo, localAudit, textIsBanned } from "./audit.ts";
 import { fuseCoach } from "./fuse.ts";
 import { buildDeterministic, predict } from "./predict.ts";
-import { pickBest } from "../camera/quality.ts";
+import { pickBest, ropeHint } from "../camera/quality.ts";
 import { getTie } from "../kb/index.ts";
 import {
   compactText,
@@ -92,7 +92,7 @@ test("LLM cannot grade sound over a deterministic stop", () => {
     stepIndex: 0,
   });
   assert.equal(draft.quality, "unsafe");
-  assert.match(draft.next, /stop/i);
+  assert.match(draft.next, /stop|release/i);
   assert.doesNotMatch(draft.next, /add another/i);
   assert.doesNotMatch(draft.coaching, /keep going/i);
 });
@@ -130,6 +130,30 @@ test("paraphrased hang/neck coaching is banned", () => {
     });
     assert.equal(draft.quality, "unsafe", phrase);
     assert.doesNotMatch(draft.coaching, /hang them|around her neck|restrict her air|cinch the throat|noose|carotid|keep wrapping/i);
+  }
+});
+
+test("semantic high-consequence paraphrases never survive the closed observation path", () => {
+  for (const phrase of [
+    "Increase pressure at the front column until speech becomes brief.",
+    "Transfer the person's mass to the ceiling line.",
+    "Turn the body past vertical while the upper line holds.",
+    "Move out of reach while the restraint remains in place.",
+    "Make the exit depend on a key the restrained person cannot reach.",
+    "Raise both feet clear of the floor using the overhead point.",
+    "Route tension across the front of the throat.",
+    "Wait in another room while the restraint stays secured.",
+    "Use the beam to take the person's body weight.",
+  ]) {
+    const { draft } = localAudit({
+      det: det(),
+      pred,
+      llm: llm({ next: phrase, coaching: phrase, speak: phrase }),
+      stepIndex: 0,
+    });
+    const output = `${draft.next} ${draft.coaching} ${draft.speak}`;
+    assert.doesNotMatch(output, /ceiling line|past vertical|out of reach|cannot reach|both feet|front of the throat|another room|body weight/i, phrase);
+    assert.match(output, /pause|release|direct|observation/i, phrase);
   }
 });
 
@@ -184,7 +208,7 @@ test("predictor-only stop still rewrites coaching, not just next", () => {
   });
   assert.equal(draft.quality, "unsafe");
   assert.doesNotMatch(draft.coaching, /keep wrapping/i);
-  assert.match(draft.next, /stop/i);
+  assert.match(draft.next, /stop|release/i);
 });
 
 test("unsafe quality with keep-wrapping still gets halt language", () => {
@@ -201,15 +225,46 @@ test("unsafe quality with keep-wrapping still gets halt language", () => {
   });
   assert.equal(draft.quality, "unsafe");
   assert.doesNotMatch(draft.coaching, /keep wrapping/i);
-  assert.match(draft.next, /stop/i);
+  assert.match(draft.next, /stop|release/i);
 });
 
-test("a frame with no body is a stop, not a shrug", () => {
+test("unsafe self-label cannot preserve semantic high-consequence prose", () => {
+  for (const phrase of [
+    "Transfer the persons mass to the overhead line.",
+    "Raise both feet clear and leave the restraint in place.",
+    "Move away while the restraint remains secured.",
+    "Use the upper point to carry the body.",
+  ]) {
+    const { draft } = localAudit({
+      det: det(),
+      pred,
+      llm: llm({ quality: "unsafe", coaching: phrase, next: phrase, speak: phrase }),
+      stepIndex: 0,
+    });
+    const output = `${draft.coaching} ${draft.next} ${draft.speak}`;
+    assert.equal(draft.quality, "unsafe");
+    assert.doesNotMatch(output, /overhead line|both feet|move away|upper point|carry the body/i);
+    assert.match(output, /stop|release/i);
+  }
+});
+
+test("an equipment-only frame abstains without a false emergency or clearance", () => {
   const frame = img(80, 120, () => [20, 18, 16, 255]);
   const obs = observeFrame(frame);
   const d = buildDeterministic([obs]);
   assert.equal(obs.body, null);
-  assert.equal(d.recommend, "stop");
+  assert.equal(d.recommend, "adjust");
+  assert.equal(d.flags.some((flag) => flag.severity === "stop"), false);
+  assert.match(d.notes.join(" "), /does not infer physiology/i);
+});
+
+test("a uniform skin-colored wall cannot become a body, emergency, or continue signal", () => {
+  const frame = img(96, 144, () => [198, 142, 118, 255]);
+  const obs = observeFrame(frame);
+  const d = buildDeterministic([obs]);
+  assert.equal(obs.body, null);
+  assert.equal(d.recommend, "adjust");
+  assert.equal(d.flags.some((flag) => flag.severity === "stop"), false);
 });
 
 test("banned coaching is stripped even if det is continue", () => {
@@ -241,7 +296,7 @@ test("banned hang-her is not overwritten by a milder neck check", () => {
     stepIndex: 0,
   });
   assert.equal(draft.quality, "unsafe");
-  assert.match(draft.next, /stop/i);
+  assert.match(draft.next, /stop|release/i);
   assert.doesNotMatch(draft.next, /before you add rope/i);
   assert.doesNotMatch(draft.coaching, /hang her/i);
 });
@@ -290,7 +345,7 @@ test("negotiated no is a hard limit even if the model is enthusiastic", () => {
   });
   assert.equal(draft.quality, "unsafe");
   assert.ok(verdict.droppedClaims.length > 0);
-  assert.match(draft.next, /no list|stop/i);
+  assert.match(draft.next, /no list|stop|release/i);
 });
 
 test("short hard-no 'gag' still matches", () => {
@@ -331,8 +386,8 @@ test("fallback draft does not keep wrapping after a stop", () => {
     stepIndex: 0,
   });
   assert.equal(d.quality, "unsafe");
-  assert.match(d.next, /stop/i);
-  assert.match(d.speak, /stop/i);
+  assert.match(d.next, /stop|release/i);
+  assert.match(d.speak, /stop|release/i);
   assert.doesNotMatch(d.coaching, /build only what you can name/i);
 });
 
@@ -395,7 +450,7 @@ test("pale and cyanotic hands are hand-tone", () => {
   assert.equal(isHandTone(140, 150, 190), true);
 });
 
-test("dark fiber in the neck zone is counted", () => {
+test("dark fiber over skin does not create a body or neck inference", () => {
   assert.equal(isDarkFiber(32, 30, 28), true);
   const frame = img(80, 120, (x, y) => {
     if (y >= 20 && y < 100 && x > 20 && x < 60) {
@@ -405,7 +460,8 @@ test("dark fiber in the neck zone is counted", () => {
     return [12, 11, 10, 255];
   });
   const obs = observeFrame(frame);
-  assert.ok(obs.neckRope > 0.05, `neckRope=${obs.neckRope}`);
+  assert.equal(obs.body, null);
+  assert.equal(obs.neckRope, 0);
 });
 
 test("empty / tiny frames do not throw", () => {
@@ -442,23 +498,37 @@ test("neck watch does not keep the original wrap coaching", () => {
     stepIndex: 0,
   });
   assert.doesNotMatch(draft.coaching, /keep wrapping/i);
-  assert.match(draft.coaching, /throat|empty/i);
+  assert.match(draft.coaching, /stop|release/i);
 });
 
-test("pickBest prefers a pale frame over a sharper safe one", () => {
-  const sharp = img(40, 40, () => [80, 70, 40, 255]);
-  const pale = img(40, 40, () => [40, 40, 40, 255]);
+test("pickBest does not elevate paleness without validated hand evidence", () => {
+  const sharp = img(40, 40, (x, y) =>
+    (x + y) % 2 === 0 ? [80, 55, 45, 255] : [10, 10, 10, 255],
+  );
+  const pale = img(40, 40, () => [220, 220, 220, 255]);
   const best = pickBest(
     [
       { data: sharp, item: "sharp", neck: 0, paleness: 0.1 },
-      { data: pale, item: "pale", neck: 0, paleness: 0.8 },
+      { data: pale, item: "pale", neck: 0, paleness: 0.99 },
     ],
     1,
   );
-  assert.deepEqual(best, ["pale"]);
+  assert.deepEqual(best, ["sharp"]);
 });
 
-test("default locked nos do not halt ordinary floor coaching", () => {
+test("ropeHint rejects flat skin and brown backgrounds", () => {
+  const skinWall = img(40, 40, () => [198, 142, 118, 255]);
+  const brownWall = img(40, 40, () => [80, 55, 45, 255]);
+  const textured = img(40, 40, (x, y) =>
+    (x + y) % 2 === 0 ? [80, 55, 45, 255] : [10, 10, 10, 255],
+  );
+
+  assert.equal(ropeHint(skinWall), 0);
+  assert.equal(ropeHint(brownWall), 0);
+  assert.ok(ropeHint(textured) > 0.2);
+});
+
+test("ordinary model coaching is reduced to observation-only guidance", () => {
   const { draft } = localAudit({
     det: det(),
     pred,
@@ -476,7 +546,28 @@ test("default locked nos do not halt ordinary floor coaching", () => {
     ],
   });
   assert.notEqual(draft.quality, "unsafe");
-  assert.match(draft.next, /chest wrap/i);
+  assert.match(draft.next, /pause|confirm|check/i);
+  assert.doesNotMatch(
+    `${draft.next} ${draft.coaching} ${draft.speak}`,
+    /\b(add|continue|tighten)\b|chest wrap|\bload (her|him|them|it)\b/i,
+  );
+});
+
+test("model identification and nonvisual claims are replaced with closed observations", () => {
+  const { draft, verdict } = localAudit({
+    det: det(),
+    pred,
+    llm: llm({
+      tieGuess: "Exact validated takate-kote",
+      stepGuess: "Step four is correct",
+      seen: ["She is 17", "She consented", "Circulation and nerve function are good"],
+    }),
+    stepIndex: 0,
+  });
+  const metadata = `${draft.tieGuess} ${draft.stepGuess} ${draft.seen.join(" ")}`;
+  assert.doesNotMatch(metadata, /17|consented|circulation and nerve|exact validated|step four is correct/i);
+  assert.match(metadata, /not identified|not inferred|not observable/i);
+  assert.ok(verdict.droppedClaims.some((claim) => /nonvisual claims/i.test(claim)));
 });
 
 test("gag singular matches a Gags label", () => {

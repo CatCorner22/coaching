@@ -1,64 +1,81 @@
 import { Volume2 } from "lucide-react";
+import { memo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { CoachReport } from "@/lib/ml/types";
+import type { ModelStatus, ObservationReport } from "@/lib/observation/report";
 import { playCoachVoice } from "@/lib/voice/play";
 import { cn } from "@/lib/utils";
 
-export function CoachPanel({
+export const CoachPanel = memo(function CoachPanel({
   report,
+  observationReport,
+  modelStatus,
   voice,
   pending,
   refusal,
   halted,
 }: {
   report: CoachReport | null;
+  observationReport: ObservationReport | null;
+  modelStatus: ModelStatus;
   voice: boolean;
   pending?: boolean;
   refusal?: boolean;
   halted?: boolean;
 }) {
-  if (!report && pending) {
+  if (!report && !observationReport && pending) {
     return (
       <div className="rounded-lg border border-border bg-elevated p-4 text-sm text-muted">
-        Grok is reading the rope…
+        xAI is preparing a limited report from the selected stills…
       </div>
     );
   }
-  if (!report) {
+  if (!report && !observationReport) {
     return (
       <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted">
-        Capture a still or a short clip. On-device vision grades wraps immediately. Ask Grok for
-        the full coach pass.
+        Capture a still or short clip for limited visible observations. The camera cannot clear a
+        tie, assess physiology or consent, or replace direct checks and an in-person instructor.
       </div>
     );
   }
-  const rec = report.final.recommend;
+  const disposition = observationReport?.disposition ?? "insufficient_view";
+  const urgent = observationReport?.urgent_stop || disposition === "stop_now" || disposition === "do_not_proceed";
+  const statusLabel: Record<ModelStatus, string> = {
+    not_requested: "local report · model not requested",
+    completed: "xAI categories · closed schema",
+    refused: "xAI declined · insufficient view",
+    unavailable: "xAI unavailable · local report",
+    failed: "xAI output discarded · local report",
+  };
   return (
     <div className="space-y-3 rounded-lg border border-border bg-elevated p-4">
       {pending && (
-        <p className="text-xs uppercase tracking-wide text-muted">Grok is reading the rope…</p>
+        <p className="text-xs uppercase tracking-wide text-muted" role="status">
+          xAI is preparing an updated limited report…
+        </p>
       )}
       <div className="flex items-center justify-between gap-2">
-        <Badge variant={rec === "stop" ? "danger" : rec === "adjust" ? "warn" : "ok"}>
-          {rec}
+        <Badge variant={urgent ? "danger" : "warn"}>
+          {disposition.replaceAll("_", " ")}
         </Badge>
         <span className="text-[11px] uppercase tracking-wide text-subtle">
-          {report.audit.source}
-          {report.audit.overrides.length ? " · audited" : ""}
+          {statusLabel[modelStatus]}
         </span>
       </div>
       {refusal && (
         <p className="text-xs text-muted">
-          The vision model declined the still. Local rope geometry is still coaching you.
+          The vision model declined the still. Only limited local image observations are shown.
         </p>
       )}
-      <p className="text-sm leading-relaxed text-fg">{report.final.coaching}</p>
-      <p className="text-sm text-muted">
-        <span className="text-fg">Next. </span>
-        {report.final.next}
-      </p>
-      {report.final.flags.length > 0 && (
+      {report && <p className="text-sm leading-relaxed text-fg">{report.final.coaching}</p>}
+      {observationReport && (
+        <p className="text-sm text-muted">
+          <span className="text-fg">Next action. </span>
+          {observationReport.next_step_id.replaceAll("_", " ")}.
+        </p>
+      )}
+      {report && report.final.flags.length > 0 && (
         <ul className="space-y-1.5">
           {report.final.flags.map((f, i) => (
             <li
@@ -73,18 +90,38 @@ export function CoachPanel({
           ))}
         </ul>
       )}
-      <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] text-muted">
-        <Risk label="Circulation" v={report.prediction.risks.circulation} />
-        <Risk label="Nerve" v={report.prediction.risks.nerve} />
-        <Risk label="Throat" v={report.prediction.risks.neck} />
-        <Risk label="Time" v={report.prediction.risks.time} />
-      </div>
-      <p className="text-xs text-subtle">If this keeps going: {report.prediction.nextFailure}</p>
-      {voice && !halted && (
+      {observationReport && observationReport.recognized_categories.length > 0 && (
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-subtle">Broad categories</p>
+          <ul className="mt-1 space-y-1.5">
+            {observationReport.recognized_categories.map((category) => (
+              <li key={category.canonical_id} className="text-xs text-muted">
+                <span className="text-fg">{category.canonical_id.replaceAll("_", " ")}</span>
+                {" · "}{category.evidence_state}{" · "}{category.consequence_band.split("_")[0]}
+                <br />
+                <span className="text-subtle">
+                  Confounders: {category.confounders_considered.join("; ")}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {observationReport && (
+        <>
+          <p className="text-xs text-subtle">
+            {observationReport.limitations[0]} No visible concern is never an all-clear.
+          </p>
+          <p className="text-[11px] text-subtle">
+            Schema {observationReport.schema_version} · sources {observationReport.source_ids.join(", ")}
+          </p>
+        </>
+      )}
+      {voice && !halted && report && (
         <Button
           variant="outline"
           size="sm"
-          onClick={() => void playCoachVoice(report.final.speak)}
+          onClick={() => void playCoachVoice(report.final.speak, voice)}
         >
           <Volume2 />
           Speak it
@@ -92,21 +129,4 @@ export function CoachPanel({
       )}
     </div>
   );
-}
-
-function Risk({ label, v }: { label: string; v: number }) {
-  return (
-    <div>
-      <div className="mb-1 flex justify-between">
-        <span>{label}</span>
-        <span className="tabular-nums">{Math.round(v * 100)}</span>
-      </div>
-      <div className="h-1 overflow-hidden rounded-full bg-bg">
-        <div
-          className={cn("h-full bg-accent", v > 0.65 && "bg-danger", v > 0.4 && v <= 0.65 && "bg-warn")}
-          style={{ width: `${Math.round(v * 100)}%` }}
-        />
-      </div>
-    </div>
-  );
-}
+});

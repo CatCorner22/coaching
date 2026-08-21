@@ -2,54 +2,56 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { pickBest, ropeHint, scoreFrame } from "./quality.ts";
 
-function img(w: number, h: number, fill: (x: number, y: number) => [number, number, number, number]) {
-  const data = new Uint8ClampedArray(w * h * 4);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
+function image(
+  width: number,
+  height: number,
+  fill: (x: number, y: number) => [number, number, number, number],
+): ImageData {
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
       const [r, g, b, a] = fill(x, y);
-      const i = (y * w + x) * 4;
-      data[i] = r;
-      data[i + 1] = g;
-      data[i + 2] = b;
-      data[i + 3] = a;
+      const index = (y * width + x) * 4;
+      data[index] = r;
+      data[index + 1] = g;
+      data[index + 2] = b;
+      data[index + 3] = a;
     }
   }
-  return { width: w, height: h, data, colorSpace: "srgb" } as ImageData;
+  return { width, height, data, colorSpace: "srgb" } as ImageData;
 }
 
-test("dark fiber and dark jute count as rope, empty room does not", () => {
-  const empty = img(48, 48, () => [12, 11, 10, 255]);
-  const fiber = img(48, 48, () => [32, 30, 28, 255]);
-  const jute = img(48, 48, () => [58, 42, 26, 255]);
-  const warm = img(48, 48, () => [140, 105, 55, 255]);
+test("textured dark fiber and dark jute count without treating a flat dark field as rope", () => {
+  const empty = image(48, 48, () => [12, 11, 10, 255]);
+  const uniformFiber = image(48, 48, () => [32, 30, 28, 255]);
+  const fiber = image(48, 48, (x) => (x % 8 < 4 ? [32, 30, 28, 255] : [12, 11, 10, 255]));
+  const jute = image(48, 48, (x) => (x % 8 < 4 ? [58, 42, 26, 255] : [12, 11, 10, 255]));
+
   assert.ok(ropeHint(empty) < 0.05, `empty=${ropeHint(empty)}`);
-  assert.ok(ropeHint(fiber) > 0.5, `fiber=${ropeHint(fiber)}`);
-  assert.ok(ropeHint(jute) > 0.5, `jute=${ropeHint(jute)}`);
-  assert.ok(ropeHint(warm) > 0.5, `warm=${ropeHint(warm)}`);
-  assert.equal(
-    scoreFrame(fiber).notes.some((n) => /get closer/i.test(n)),
-    false,
-  );
-  assert.equal(
-    scoreFrame(empty).notes.some((n) => /get closer/i.test(n)),
-    true,
-  );
+  assert.ok(ropeHint(uniformFiber) < 0.05, `uniform=${ropeHint(uniformFiber)}`);
+  assert.ok(ropeHint(fiber) > 0.35, `fiber=${ropeHint(fiber)}`);
+  assert.ok(ropeHint(jute) > 0.35, `jute=${ropeHint(jute)}`);
+  assert.equal(scoreFrame(fiber).notes.some((note) => /get closer/i.test(note)), false);
 });
 
-test("skin is not scored as rope", () => {
-  const skin = img(48, 48, () => [198, 142, 118, 255]);
+test("skin tone is not scored as rope", () => {
+  const skin = image(48, 48, (x) =>
+    x % 8 < 4 ? [198, 142, 118, 255] : [170, 118, 96, 255],
+  );
   assert.ok(ropeHint(skin) < 0.08, `skin=${ropeHint(skin)}`);
 });
 
-test("pickBest still prefers a pale frame over a sharper safe one", () => {
-  const sharp = img(40, 40, () => [80, 70, 40, 255]);
-  const pale = img(40, 40, () => [40, 40, 40, 255]);
+test("pickBest does not promote an unlocalized pale field over a useful frame", () => {
+  const useful = image(40, 40, (x, y) =>
+    (x + y) % 4 < 2 ? [145, 104, 52, 255] : [35, 28, 22, 255],
+  );
+  const pale = image(40, 40, () => [210, 210, 210, 255]);
   const best = pickBest(
     [
-      { data: sharp, item: "sharp", neck: 0, paleness: 0.1 },
-      { data: pale, item: "pale", neck: 0, paleness: 0.8 },
+      { data: useful, item: "useful", neck: 0, paleness: 0.1 },
+      { data: pale, item: "pale", neck: 0, paleness: 0.9 },
     ],
     1,
   );
-  assert.deepEqual(best, ["pale"]);
+  assert.deepEqual(best, ["useful"]);
 });

@@ -1,6 +1,7 @@
+import { memo } from "react";
 import type { FrameObservation } from "@/lib/ml/types";
 
-export function WrapOverlay({
+export const WrapOverlay = memo(function WrapOverlay({
   src,
   obs,
 }: {
@@ -8,14 +9,19 @@ export function WrapOverlay({
   obs?: FrameObservation | null;
 }) {
   if (!src) return null;
-  const wraps = obs?.wrapBands.length ?? 0;
-  const pale = obs?.paleness ?? 0;
-  const neck = (obs?.neckRope ?? 0) > 0.15;
+  const neck = (obs?.neckRope ?? 0) > 0.08;
+  const width = Math.max(1, obs?.width ?? 4);
+  const height = Math.max(1, obs?.height ?? 3);
+  const maxWidth = Math.max(1, Math.round(320 * (width / height)));
   return (
-    <div className="relative overflow-hidden rounded-lg ring-1 ring-border">
-      <img src={src} alt="Captured still with wrap overlay" className="max-h-80 w-full object-cover" />
+    <div className="mt-3 overflow-hidden rounded-lg bg-elevated ring-1 ring-border">
+      <div
+        className="relative mx-auto w-full overflow-hidden"
+        style={{ aspectRatio: `${width} / ${height}`, maxWidth: `${maxWidth}px` }}
+      >
+      <img src={src} alt="Selected still with observation overlay" className="absolute inset-0 h-full w-full object-contain" />
       {obs && (
-        <svg className="absolute inset-0 h-full w-full" viewBox={`0 0 ${obs.width} ${obs.height}`} preserveAspectRatio="none">
+        <svg className="absolute inset-0 h-full w-full" viewBox={`0 0 ${obs.width} ${obs.height}`} preserveAspectRatio="xMidYMid meet">
           {obs.body && (
             <rect
               x={obs.body.x}
@@ -46,9 +52,9 @@ export function WrapOverlay({
                   y={y - 6}
                   fill="#ded8cf"
                   fontSize="11"
-                  fontFamily="Figtree, sans-serif"
+                  fontFamily="system-ui, sans-serif"
                 >
-                  wrap {i + 1}
+                  possible rope-like feature {i + 1}
                 </text>
               </g>
             );
@@ -56,19 +62,14 @@ export function WrapOverlay({
         </svg>
       )}
       <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-2 bg-gradient-to-t from-bg/90 to-transparent p-3 text-[11px]">
-        <p className="tabular-nums text-fg">
-          {wraps} wrap{wraps === 1 ? "" : "s"}
-          {obs ? ` · rope ${Math.round(obs.ropeShare * 100)}%` : ""}
-        </p>
-        <p className={pale > 0.35 ? "text-warn" : "text-muted"}>
-          paleness {Math.round(pale * 100)}
-        </p>
+        <p className="text-fg">Limited image observation · not safety clearance</p>
       </div>
       {neck && (
         <p className="absolute left-3 top-3 rounded-full bg-danger px-2 py-0.5 text-[11px] uppercase tracking-wide text-danger-fg">
-          Neck flag
+          Possible neck overlap — stop and release now
         </p>
       )}
+      </div>
     </div>
   );
-}
+});

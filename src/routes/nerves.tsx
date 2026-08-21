@@ -18,6 +18,9 @@ function NervesPage() {
       <div>
         <p className="text-xs uppercase tracking-[0.22em] text-muted">Atlas</p>
         <h1 className="mt-2 font-display text-4xl">Nerves</h1>
+        <p className="mt-3 text-sm text-muted">
+          Orientation only—not diagnosis, placement instruction, or clearance. Symptoms can have many causes; stop and release for concern.
+        </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {NERVES.map((x) => (
             <button
@@ -37,7 +40,7 @@ function NervesPage() {
             <dd className="mt-1">{n.zone}</dd>
           </div>
           <div>
-            <dt className="text-[11px] uppercase tracking-wide text-subtle">If you miss it</dt>
+            <dt className="text-[11px] uppercase tracking-wide text-subtle">Why changes matter</dt>
             <dd className="mt-1 text-danger">{n.risk}</dd>
           </div>
           <div>
@@ -45,7 +48,7 @@ function NervesPage() {
             <dd className="mt-1">{n.check}</dd>
           </div>
           <div>
-            <dt className="text-[11px] uppercase tracking-wide text-subtle">Avoid</dt>
+            <dt className="text-[11px] uppercase tracking-wide text-subtle">Boundary</dt>
             <dd className="mt-1">{n.avoid}</dd>
           </div>
         </dl>

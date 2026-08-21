@@ -8,15 +8,15 @@ export const Route = createFileRoute("/checklist")({ component: ChecklistPage })
 
 const ITEMS = [
   { id: "adults", label: "Everyone involved is 18 or older." },
-  { id: "consent", label: "Tonight's yes / maybe / no was said out loud." },
-  { id: "safewords", label: "Red, yellow, green are agreed and she can still say them." },
+  { id: "consent", label: "Today's specific yes / maybe / no was confirmed directly; maybe still means no." },
+  { id: "safewords", label: "Verbal and non-verbal stop channels were agreed and tested while unrestrained." },
   { id: "shears", label: "Trauma shears are on the scene, not in another room." },
   { id: "water", label: "Water and a blanket are within reach." },
-  { id: "furniture", label: "The bench / table / swing / cross is set before rope goes on." },
-  { id: "machine", label: "Hismith is off. Kill switch is in your hand's path." },
-  { id: "camera", label: "She is fine with stills or clips for coaching tonight." },
-  { id: "clock", label: "A timer exists that is not 'I'll remember'." },
-  { id: "exit", label: "You both know the first thing you cut if it goes red." },
+  { id: "furniture", label: "Furniture is stable and remains non-load-bearing; no household anchor is assumed rated." },
+  { id: "machine", label: "Any machine is off, and its emergency stop is unobstructed and directly tested." },
+  { id: "camera", label: "If using media, adult/activity/recording/upload/output permissions and the clothed, non-secret scope are current." },
+  { id: "clock", label: "Any reminder is only a prompt to check directly, never a safe-duration guarantee." },
+  { id: "exit", label: "The release plan was practiced unrestrained; emergency actions stay within your training and dispatcher instructions." },
 ] as const;
 
 function ChecklistPage() {
@@ -31,8 +31,8 @@ function ChecklistPage() {
       <p className="text-xs uppercase tracking-[0.22em] text-muted">Before rope</p>
       <h1 className="mt-2 font-display text-4xl">Pre-scene</h1>
       <p className="mt-3 text-sm text-muted">
-        Ten things that are cheaper than a nerve injury. Safeword is {safeword}. You have {eights} ×
-        8m staffs{shears ? " and shears logged in the kit" : ""}.
+        Ten prompts to verify directly before any activity. Your saved stop word is {safeword}. Your
+        kit lists {eights} × 8m lengths{shears ? " and trauma shears" : ""}; a checked box is not proof of safety.
       </p>
       <ul className="mt-8 space-y-3">
         {ITEMS.map((item) => (
@@ -65,7 +65,7 @@ function ChecklistPage() {
         </Button>
       </div>
       {!ready && (
-        <p className="mt-4 text-xs text-subtle">Studio still opens from the nav if you insist. This list is the grown-up path.</p>
+        <p className="mt-4 text-xs text-subtle">Complete each item directly with everyone involved before opening Studio.</p>
       )}
     </div>
   );

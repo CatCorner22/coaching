@@ -20,15 +20,15 @@ const CORE_ARTICLES: Article[] = [
       {
         type: "callout",
         title: "What we use in Knotty",
-        text: "Informed, reversible, specific. She can revoke a tie without revoking the evening. You both know which nerves you are gambling with. Nothing happens because it looked good on someone else's body.",
+        text: "Informed, reversible, and specific. Anyone can revoke an activity without consenting to a substitute. No photo, checklist, timer, or model output overrides a current no or uncertainty.",
       },
       {
         type: "ul",
         items: [
           "Freely given — not bargained out of sulking",
           "Reversible — a safeword that actually stops the thing",
-          "Informed — you can name the nerve you are wrapping",
-          "Enthusiastic — 'I guess' is a no on a TK",
+          "Informed — everyone can describe the planned activity, material risks, and release plan",
+          "Enthusiastic — uncertainty is not permission to start or escalate",
           "Specific — 'rope tonight' is not consent to a crotch rope",
         ],
       },
@@ -73,7 +73,7 @@ const CORE_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "Traffic lights outperform unique safewords because they survive panic. Red: everything stops, rope comes off as fast as is safe. Yellow: pause escalation, loosen, check, maybe change ties. Green: a reply to 'where are you?' — not a request for harder.",
+        text: "Traffic-light words can be easier to remember than a unique phrase. Red: stop the activity and begin the rehearsed release while preventing a secondary fall. Yellow: stop adding intensity, reduce restriction, and check directly. Green: a reply to a check-in, not permission to escalate. Freezing, unusual silence, confusion, distress, or loss of response requires stopping even if no word is spoken.",
       },
       {
         type: "callout",
@@ -97,8 +97,8 @@ const CORE_ARTICLES: Article[] = [
       {
         type: "ul",
         items: [
-          "Yes: single column, futomomo, karada, shinju, photography, sex after",
-          "Maybe: TK, crotch rope, predicament, light impact on a harness, partial lift",
+          "Yes: only specific activities both adults explicitly choose for this session",
+          "Maybe: discuss further; maybe is not permission and defaults to no until clarified",
           "No: neck rope, gag, full suspension from a tutorial, breath play, leaving the house, surprise visitors",
         ],
       },
@@ -122,7 +122,7 @@ const CORE_ARTICLES: Article[] = [
       },
       {
         type: "p",
-        text: "Kinbaku history includes torture positions and hojojutsu captures. Knowing that history is not the same as recreating it on someone you love. Punishment ties (ebi as torment, hair suspension, strappado) are either time-boxed with a clock or they are not happening.",
+        text: "Kinbaku history includes torture positions and hojojutsu captures. Knowing that history is not permission or instruction to recreate high-consequence positions. This app routes those activities to qualified, hands-on adult education.",
       },
     ],
   },
@@ -132,38 +132,23 @@ const CORE_ARTICLES: Article[] = [
     jp: "神経",
     section: "body",
     minutes: 9,
-    summary: "Where rope makes people drop hands and feet. Learn these five and you will prevent most of the horror stories.",
+    summary: "Recognize concerning changes without trying to diagnose a nerve or derive a placement rule from an atlas.",
     related: ["circulation", "takate-kote", "futomomo"],
     blocks: [
-      { type: "h", text: "Radial — the TK killer" },
+      { type: "h", text: "Symptoms are stop signals, not anatomy tests" },
       {
         type: "p",
-        text: "Spirals around the outer upper arm in a groove a few fingers below the deltoid. A tight wrap or cinch here causes wrist-drop: she cannot extend the wrist or thumb. Check: 'touch my finger with your thumb. Open the hand.' Symptoms can appear after the rope is off.",
+        text: "New numbness, tingling, burning, electric sensations, weakness, loss of movement, loss of coordination, severe or escalating pain, swelling, or a marked temperature or color change all require prompt release. A symptom pattern cannot identify the structure involved, and a normal-looking limb does not clear the tie.",
       },
-      { type: "h", text: "Ulnar" },
+      { type: "h", text: "What an atlas can and cannot do" },
       {
         type: "p",
-        text: "Funny bone at the elbow and the pinky edge of the wrist. Cuffs that sit in the inner elbow or on the pinky-side wrist go numb in the fourth and fifth fingers.",
-      },
-      { type: "h", text: "Median" },
-      {
-        type: "p",
-        text: "Inner elbow and carpal tunnel. Palmar numbness, clumsy grip. Do not park knots in the inner elbow crease.",
-      },
-      { type: "h", text: "Peroneal (fibular)" },
-      {
-        type: "p",
-        text: "Outside of the knee, just below the head of the fibula. Futomomo and any wrap near the outer knee. Foot-drop: she cannot lift the foot. This is a walking injury. Outer knee is a no-cinch zone.",
-      },
-      { type: "h", text: "Femoral and pudendal" },
-      {
-        type: "p",
-        text: "Inner thigh / groin, and the crotch. Hip harnesses and matanawa. Numb genitals or a dead-feeling thigh is not 'intense'. It is a nerve or a vessel asking you to stop.",
+        text: "Names such as radial, ulnar, median, fibular, femoral, and pudendal are vocabulary for an instructor or clinician conversation. A diagram, body landmark, finger-width rule, color check, pulse check, photograph, or movement test cannot define safe placement, pressure, or duration. Learn person-specific placement and release skills hands-on from a qualified, consent-centered instructor.",
       },
       {
         type: "callout",
         title: "After the rope is off",
-        text: "Nerve injuries often announce themselves later the same night or the next morning. If a weakness remains in the morning, it is a medical issue, not a 'shake it off'.",
+        text: "New weakness, numbness, loss of movement, severe pain, swelling, or temperature change is a reason to release. Persistent or worsening symptoms need prompt medical assessment; do not wait overnight for a photo, timer, or app result.",
       },
     ],
   },
@@ -172,26 +157,26 @@ const CORE_ARTICLES: Article[] = [
     title: "Circulation",
     section: "body",
     minutes: 6,
-    summary: "Color, temperature, capillary refill, motion, feeling. Five checks, every few minutes, out loud.",
+    summary: "Direct communication and comparison checks can reveal a reason to release, but no interval or threshold proves safety.",
     related: ["nerve-atlas", "emergency-stop"],
     blocks: [
       {
         type: "ul",
         items: [
-          "Color — pink, not white, not dusky, not blue",
-          "Temperature — compare to the unbound hand",
-          "Capillary refill — press a nail bed, color back in under two seconds",
-          "Motion — squeeze, thumb extension, ankle pump",
-          "Feeling — can she tell which finger you are touching without looking",
+          "Ask about new or changing sensation, movement, strength, pain, swelling, and temperature.",
+          "Compare with the person's own baseline only to notice change, never to approve continuation.",
+          "Release for numbness, tingling, weakness, loss of movement, severe or escalating pain, or a marked color or temperature change.",
+          "Do not use nail-bed timing, pulse checks, finger-width rules, photographs, or forced movement as clearance.",
+          "Persistent or worsening symptoms after release need prompt medical assessment.",
         ],
       },
       {
         type: "p",
-        text: "Knotty's studio can compare hand color to a calibration photo you take unbound. It is a hint, not a doctor. Pale plus cold plus slow refill is a reason to strip rope, not a reason to 'see how she does'.",
+        text: "A camera cannot assess circulation, nerve function, pain, sensation, breathing, or injury. Directly ask, compare both sides and baseline, and release for any concerning change or uncertainty rather than waiting for an app or a fixed threshold.",
       },
       {
         type: "warn",
-        text: "Numbness is not a circulation check you have passed. Numbness is a nerve or a vessel already in trouble.",
+        text: "Numbness is an immediate-release signal, not evidence of a particular diagnosis. If symptoms persist or worsen after release, seek prompt medical assessment.",
       },
     ],
   },
@@ -205,15 +190,15 @@ const CORE_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "Trauma shears, not kitchen scissors, not a knife toward a body. They live where your hand already is — on a lanyard, on the mat, in a pocket — not in a drawer. Practice cutting cheap rope on a chair leg so the first cut of your life is not on her.",
+        text: "Keep an appropriate release tool immediately accessible and practice using it on unoccupied material. In an emergency, stop the activity, prevent a fall, release within your training, call emergency services when indicated, and follow dispatcher instructions.",
       },
       {
         type: "ul",
         items: [
-          "Cut tensioned stems first, then bands that hold the position, then decorative rope",
-          "If she faints, get her horizontal, rope off the chest, airway clear, call emergency services if she does not come back immediately",
-          "Panic looks like fighting the rope. Yellow is already late. Cut.",
-          "Never cut toward the body. Slide the blunt beak under, blades up away from skin",
+          "There is no universal cutting order; stabilize against a fall and use the release method you have practiced for the actual configuration.",
+          "Call emergency services immediately for unresponsiveness, abnormal breathing, severe confusion, collapse, or another emergency sign.",
+          "Stop and release for panic, a stop signal, loss of communication, or uncertainty.",
+          "Keep sharp edges directed away from the body and follow your hands-on training and dispatcher instructions.",
         ],
       },
     ],
@@ -228,7 +213,7 @@ const CORE_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "The scene is not over when the last wrap comes off. Blood returns, endorphins fall, marks bloom, and the story of what just happened is still being written. Physical: water, a blanket, something salty or sweet, a look at every place rope lived. Emotional: she may want quiet, or jokes, or to be held, or to be left alone in the same room. Ask. Do not assume the aftercare you like is the aftercare she needs.",
+        text: "The scene is not over when the last wrap comes off. Ask what support is wanted: water, warmth, quiet, reassurance, space, company, or something else. Do not impose food, touch, photographs, or a standard ritual. Recheck for pain, weakness, numbness, breathing or swallowing changes, dizziness, confusion, or significant distress.",
       },
       {
         type: "h",
@@ -245,12 +230,12 @@ const CORE_ARTICLES: Article[] = [
     title: "Sub Drop and Top Drop",
     section: "aftercare",
     minutes: 6,
-    summary: "The chemical hangover. It can arrive hours or days later and it is not a verdict on the marriage.",
+    summary: "Some people report delayed emotional or physical changes after an intense scene; the cause should not be assumed.",
     related: ["aftercare", "subspace"],
     blocks: [
       {
         type: "p",
-        text: "Sub drop is a slump: sadness, itchiness in the skin, irritability, sudden shame, fatigue. Top drop is less famous and just as real: you were the responsible one, the adrenaline leaves, and you feel monstrous or empty. Both are physiology plus meaning. Treat them with food, sleep, ordinary kindness, and a scheduled debrief — not with a bigger scene to 'fix' the mood.",
+        text: "Some people report sadness, irritability, shame, fatigue, emptiness, or other changes after an intense scene. Those experiences have many possible causes and are not diagnosed here. Offer ordinary, consented support and a later debrief; do not use another scene to override distress. Seek professional help for severe, persistent, or safety-threatening symptoms.",
       },
     ],
   },
@@ -264,7 +249,7 @@ const CORE_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "Subspace can look like floating, time loss, slurry speech, a smile that is not tracking. It is beautiful and it is a person with reduced capacity. Do not add a new edge because she seems 'gone in a good way'. Topspace can look like flow, or like tunnel vision. If you notice you have not checked her hands in five minutes, you are not in flow, you are negligent.",
+        text: "An altered or less-responsive presentation can mean reduced capacity or a medical problem; this app cannot distinguish them. Do not introduce a new activity. Stop, check directly, and call emergency services for unresponsiveness, abnormal breathing, severe confusion, collapse, or another emergency sign. No fixed check interval proves safety.",
       },
     ],
   },
@@ -279,15 +264,15 @@ const CORE_ARTICLES: Article[] = [
       {
         type: "ul",
         items: [
-          "Open — consent recap, shears, bathroom, water, calibration photo",
-          "Rise — a cuff, a futomomo, something that lets both of you find the rhythm",
-          "Peak — the one ambitious tie, timed",
+          "Open — direct consent recap, release plan, bathroom, water, and baseline conversation; no photo is a physiological baseline",
+          "Rise — a lower-consequence, ground-level activity with active communication",
+          "Peak — stay within the least experienced person's demonstrated skill and pre-negotiated limits",
           "Land — a simpler harness or just hands, then aftercare",
         ],
       },
       {
         type: "p",
-        text: "Knotty's planner is built around that arc. A night that is four ambitious ties is not impressive. It is how radial nerves get ignored.",
+        text: "Knotty's planner is built around that arc. Time estimates organize a plan; they never establish a safe duration or excuse a delayed response to symptoms or withdrawn consent.",
       },
     ],
   },
@@ -315,14 +300,14 @@ const CORE_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "Good bottoms are not quiet. They say when a wrap is on a nerve, when a hip is done, when a feeling is delicious, when a feeling is wrong. Pride in 'taking it' is how people go home with wrist-drop. You can be bratty, floaty, formal, or filthy — those are flavors. Circulation reports are not flavors. They are the job.",
+        text: "The person in rope should be able to communicate freely and stop without penalty. Report new or changing sensation, movement, pain, swelling, temperature, breathing, alertness, or distress without trying to diagnose the cause. Silence, freezing, unusual quiet, or loss of responsiveness also require a stop and direct assessment.",
       },
       {
         type: "ul",
         items: [
-          "Wiggle fingers when asked, and also when not asked if they stop belonging to you",
-          "Eat and drink before, not after you faint",
-          "Your no does not need a better argument than his yes",
+          "Use the agreed verbal and nonverbal stop signals as soon as anything changes or feels wrong.",
+          "Do not use a movement test, speech test, or normal appearance as proof that continuing is safe.",
+          "Your no does not need a better argument than someone else's yes.",
         ],
       },
     ],
@@ -351,11 +336,11 @@ const CORE_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "Hit muscle, not rope over bone, not kidneys, not the spine, not the neck. A TK gives you a still back; it also gives you a person who cannot catch herself. Start lighter than you would if she were free. Watch hands — impact plus a tight wrap is a circulation stack. Aftercare includes looking at the hit tissue and the rope marks separately.",
+        text: "Combining impact with restraint changes mobility, communication, fall, and tissue risks. This app does not teach impact placement or remotely validate a configuration. Keep release access immediate, maintain direct communication, and use qualified in-person education for technique.",
       },
       {
         type: "warn",
-        text: "Do not flog over a nerve you have already compressed. The radial nerve does not need your help.",
+        text: "Do not combine impact with restraint from app instructions. Stop and release for symptoms, distress, loss of communication, or uncertainty; use qualified in-person education for impact technique.",
       },
     ],
   },
@@ -364,12 +349,12 @@ const CORE_ARTICLES: Article[] = [
     title: "Sensation Play in Rope",
     section: "scene",
     minutes: 5,
-    summary: "Ice, wax, breath on skin, a fingernail, a vibrator against a crotch rope. Small tools, big scenes.",
+    summary: "Adding sensation to restraint changes heat, friction, communication, and release risks.",
     related: ["matanawa", "scene-architecture"],
     blocks: [
       {
         type: "p",
-        text: "Once she cannot move, ordinary sensations get loud. That is the gift. Wax: not on the face, not in hair, not at a temperature you have not tested on your own inner arm. Ice: not trapped against skin under rope (burns). Vibration: watch that a crotch rope plus a wand does not become a numbness machine — pleasure that goes numb is a nerve asking you to ease.",
+        text: "This app does not teach heat, wax, intense cold, electrical stimulation, or intimate restraint combinations. Discuss the exact activity, limits, stop channels, hygiene, and rapid release while everyone is unrestrained. Stop for numbness, pain, skin injury, distress, or any communication change, and learn higher-consequence techniques in person.",
       },
     ],
   },
@@ -383,7 +368,7 @@ const CORE_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "Photos of a bound partner are easy to take and impossible to un-take. Agree: who keeps them, whether faces are in frame, whether they leave the house, whether they go to an AI coach (they do, compressed, when you tap Analyze), and what happens if the relationship ever changes. Knotty stores the journal on this device, not on our servers. Analysis stills go to Grok for the coaching pass you asked for. If that sentence bothers either of you, use the written guides and leave the camera off.",
+        text: "For every batch, directly confirm legal-adult status, clothed/non-explicit scope, and four separate current permissions: the depicted activity, recording, one upload of selected stills with generic frame labels, and the generated output's recipient, use, sharing, and deletion plan. Prefer equipment-only, non-identifying frames; exclude faces, intimate contact, tattoos, screens, mail, and room details. New journal entries store text, not captures. xAI may retain inputs and outputs under workspace settings, and withdrawal cannot recall a request already transmitted. If any attestation is absent or withdrawn, keep the camera off and delete the local batch.",
       },
     ],
   },
@@ -397,7 +382,7 @@ const CORE_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "Jute is the Japanese default: light, grippy, a little harsh, breaks in with oil and use. Hemp is stronger, heavier, slower to break in, kinder to some skin. Cotton is soft and stretchy — it feels beginner-friendly and then tightens when she moves, which is why we do not recommend it as a load-bearing cuff. Nylon and MFP are strong and slick; knots need more lock, burns are real, and they do not tell your hands the truth the way plant fiber does.",
+        text: "Jute, hemp, cotton, and synthetics differ in feel, stretch, friction, maintenance, and failure behavior. A fiber label, diameter, appearance, or familiar knot does not establish condition or suitability for restraint or person-bearing use. Keep app-guided practice ground-level and non-loaded, inspect before each use, and obtain hands-on guidance for body application.",
       },
       {
         type: "ul",
@@ -414,12 +399,12 @@ const CORE_ARTICLES: Article[] = [
     title: "Suspension Reality",
     section: "risk",
     minutes: 6,
-    summary: "Why this app will teach partial load and then send you to a human.",
+    summary: "Why all load-bearing rope is routed to qualified in-person instruction.",
     related: ["partial-suspension", "hip-harness", "emergency-stop"],
     blocks: [
       {
         type: "p",
-        text: "Full suspension is not a harder TK. It is a different sport: rated anchors, upline management, crash pads, spotters, and a lowering plan that works when she panics. People die from getting this wrong. People also lose hands. Knotty will coach a few kilos off one foot, on a real harness, with a munter. It will not coach you to hang her from a ceiling fan.",
+        text: "Partial or full suspension, inversion, dynamic transitions, anchors, and loaded rope are high-consequence activities. This app does not teach or validate their construction, placement, load path, equipment, or emergency release. Use a qualified in-person instructor with hands-on emergency practice. For app-based learning, stay with a clothed, ground-level, non-loaded rehearsal.",
       },
     ],
   },
@@ -433,7 +418,7 @@ const CORE_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "If sex is part of the scene, build for access: open crotch, arms in a position that still lets her be a participant if she wants that, a futomomo instead of a full agura. Plant fiber plus lube is a mess and a hygiene project — plan a towel. A TK during penetrative sex means she cannot catch herself; you are responsible for the bed not eating her shoulder. After, rope off before you fall asleep.",
+        text: "If sexual activity is part of a scene, negotiate it separately from restraint, including barriers, fluids, recording, observers, stop channels, and the ability to withdraw from either activity without accepting a substitute. Combining restraint with penetration or machinery increases fall, friction, mobility, and rapid-release risks; this app does not provide a configuration. Never leave someone restrained or fall asleep before all restraint is removed.",
       },
     ],
   },
@@ -447,7 +432,7 @@ const CORE_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "Cold shoulders do not belong in a gote. Spend five minutes: arm circles, doorway pec stretch, gentle wrist flex, hip openers, a squat. Then put hands on her unbound — a massage is a circulation check you both enjoy. The first rope of the night should feel like a continuation, not a jump scare, unless a jump scare was the negotiated scene.",
+        text: "Warm up voluntarily and unrestrained within an ordinary, pain-free range. Do not force flexibility or use a fixed routine, massage, photograph, or range-of-motion snapshot as clearance for a restrictive position. High-consequence forms require qualified hands-on instruction.",
       },
     ],
   },
@@ -475,7 +460,7 @@ const CORE_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "A solid chair with no wheels is a gift. A four-poster is not automatically rated. A door hook will extract from drywall at the worst time. If you want a hard point, buy one, install it into structure, and know the rating. Until then, floor work and furniture as shape — not as an anchor — will give you years of scenes.",
+        text: "Furniture and household fixtures are not established load paths. This app cannot assess structure, installation, capacity, redundancy, or condition from a description or image. Keep app-guided practice ground-level and non-loaded; route any anchor or load-bearing question to qualified in-person instruction and appropriate structural expertise.",
       },
     ],
   },
@@ -489,7 +474,7 @@ const CORE_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "A rope mark is a badge that fades in hours. A bruise is blood under skin — cosmetic, usually. A blister is a friction problem; dress it, do not put rope on it tomorrow. Weakness, foot-drop, wrist-drop, loss of feeling that is still there in the morning, chest pain, fainting that does not make sense: those are injuries. Do not put them in the journal as 'intense' and try again on Saturday.",
+        text: "An image cannot distinguish an expected mark from injury. Stop and assess directly. Call emergency services for chest pain, unresponsiveness, abnormal breathing, severe confusion, collapse, or another emergency sign. Persistent or worsening weakness, numbness, severe pain, swelling, temperature change, blistering, or broken skin warrants prompt medical assessment.",
       },
     ],
   },
@@ -503,7 +488,7 @@ const CORE_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "A TK might be honest for fifteen minutes on a given body and dishonest at minute sixteen. Futomomo is often done before you are done looking at it. Decorative hishi can run long because it is not load, but her feet are still her feet. Set timers. Knotty will nag you. That nag is the feature.",
+        text: "Time ranges in this library are planning estimates, never safe-duration guarantees. Risk can change immediately with position, movement, construction, health, communication, or equipment. A reminder prompts a direct check; it is not permission to wait, continue, or escalate.",
       },
     ],
   },
@@ -513,27 +498,27 @@ const CORE_ARTICLES: Article[] = [
     section: "risk",
     minutes: 6,
     summary:
-      "A swing, a pole, a cross, and a table are scenes. They are not inspected Shibari rigs. Rope dresses. Hardware that was sold for sex holds sex, not a hang.",
+      "A swing, pole, cross, table, or bench is not a verified person-bearing rope system, and a camera cannot establish that it is one.",
     related: ["hard-limits", "emergency-stop"],
     blocks: [
-      { type: "h", text: "What you own" },
+      { type: "h", text: "What an equipment label cannot prove" },
       {
         type: "p",
-        text: "You have a sex bench, a massage table, a stripper pole, a Saint Andrew's Cross, and a sex swing. Those are excellent. They let her hips be high, her arms be displayed, her back be flogged, her legs be open without a squat. None of them is a bamboo, a ring, or a span set that a rigger would hang from.",
+        text: "Household and specialty furniture may be useful for unrestrained support, but appearance, marketing, a household test, or a photograph cannot establish installation, condition, capacity, redundancy, or a safe load path. Keep app-guided activity unoccupied or ground-level and non-loaded.",
       },
       {
         type: "ul",
         items: [
-          "Massage table — platform. Face cradle is not a collar.",
-          "Sex bench — kneeling/drape. A handle, not a hoist.",
-          "Cross — arms-up clock. Short. Hands in the photograph.",
-          "Swing — sling. Straps hold her. Rope does not.",
-          "Pole — chrome to cuff to. Not an upline.",
+          "Massage table or bench — furniture, not an anchor; a face opening is never a restraint point.",
+          "Cross — an arms-up restraint can change risk quickly and requires qualified hands-on instruction.",
+          "Swing — do not add rope loading or treat shared hardware as a rigging system.",
+          "Pole — do not attach a person with rope or treat a dance-pole installation as an anchor.",
+          "Any proposed person-bearing use — route to qualified in-person instruction and appropriate structural expertise.",
         ],
       },
       {
         type: "warn",
-        text: "If the ceiling mount was not installed by someone who hangs people for a living, it is furniture. Knotty will not coach you to clip an upline to it.",
+        text: "Knotty does not coach attachment, loading, anchors, uplines, or emergency release from furniture. Use unoccupied equipment inspection in Studio and seek qualified in-person guidance before any person-bearing use.",
       },
     ],
   },
@@ -543,18 +528,18 @@ const CORE_ARTICLES: Article[] = [
     section: "scene",
     minutes: 7,
     summary:
-      "A Hismith does not watch her face. A Bad Dragon flare does not migrate itself off if crotch rope forbids backing out. You are the safeword channel.",
+      "Combining powered equipment, large toys, and restraint can remove ordinary escape and communication options; this app does not provide a configuration.",
     related: ["safewords", "circulation", "furniture-not-hardpoints"],
     blocks: [
-      { type: "h", text: "The machine is not a partner" },
+      { type: "h", text: "Powered equipment does not monitor consent" },
       {
         type: "p",
-        text: "Speed is a privilege she can revoke. If her hands are tied, that revoke is a word, a bell, a knee, or you watching her go quiet and stopping it yourself. Never: TK + gag + machine. That is three ways she cannot help herself.",
+        text: "Do not combine powered equipment with restraint from app instructions. If a machine is used in any adult scene, consent must remain specific and reversible, controls and emergency stop must stay immediately accessible, and unusual silence, freezing, distress, or loss of response requires an immediate stop.",
       },
-      { type: "h", text: "Size is warmup" },
+      { type: "h", text: "Keep learning unrestrained" },
       {
         type: "p",
-        text: "Large toys are a lube and time problem, not a dominance problem. Insert before the restrictive hip rope, or leave a way to lift the crotch rope without untying the night. Rope positions. It does not force depth.",
+        text: "Do not use restraint to force position, depth, endurance, or continued participation. Learn equipment operation and stop controls while unrestrained, use the least restrictive alternative, and seek qualified in-person education for combined activities.",
       },
       {
         type: "warn",

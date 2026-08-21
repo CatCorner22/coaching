@@ -70,11 +70,3 @@ export const useSession = create<SessionState>((set, get) => ({
   },
   setListening: (v) => set({ listening: v }),
 }));
-
-if (typeof window !== "undefined") {
-  const w = window as Window & { __knottySessionTick?: number };
-  if (w.__knottySessionTick) window.clearInterval(w.__knottySessionTick);
-  w.__knottySessionTick = window.setInterval(() => {
-    useSession.getState().tick(Date.now());
-  }, 1000);
-}

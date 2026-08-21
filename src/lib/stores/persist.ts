@@ -1,12 +1,12 @@
-/** Copy a leftover Musubi persist blob onto the Knotty key once. */
-export function adoptPersistKey(next: string, prev: string) {
+/** Copy a legacy persisted blob to its current key without overwriting newer data. */
+export function adoptPersistKey(next: string, previous: string) {
   if (typeof localStorage === "undefined") return;
   try {
     if (!localStorage.getItem(next)) {
-      const old = localStorage.getItem(prev);
+      const old = localStorage.getItem(previous);
       if (old) localStorage.setItem(next, old);
     }
   } catch {
-    /* private mode / blocked storage */
+    /* Private mode or blocked storage: Zustand will fall back normally. */
   }
 }

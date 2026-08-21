@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { askKnowledge } from "@/lib/ai/ask";
 import { ARTICLES, searchKnowledge, type SearchHit } from "@/lib/kb";
@@ -10,10 +10,18 @@ function KnowledgePage() {
   const [q, setQ] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const requestGeneration = useRef(0);
   const hits = useMemo(() => (q.trim().length > 1 ? searchKnowledge(q, 8) : []), [q]);
   const sections = [...new Set(ARTICLES.map((a) => a.section))];
 
+  useEffect(() => {
+    requestGeneration.current += 1;
+    setAnswer(null);
+    setPending(false);
+  }, [q]);
+
   async function ask() {
+    const generation = ++requestGeneration.current;
     setPending(true);
     try {
       const res = await askKnowledge({
@@ -22,10 +30,13 @@ function KnowledgePage() {
           slugs: (hits.length ? hits : searchKnowledge(q || "consent", 4)).map((h) => h.slug),
         },
       });
-      if (res.ok) setAnswer(res.text);
-      else setAnswer(res.error);
+      if (generation === requestGeneration.current) setAnswer(res.text);
+    } catch {
+      if (generation === requestGeneration.current) {
+        setAnswer("Search could not complete. The reviewed entries below remain available without AI or remote analysis.");
+      }
     } finally {
-      setPending(false);
+      if (generation === requestGeneration.current) setPending(false);
     }
   }
 
@@ -34,7 +45,8 @@ function KnowledgePage() {
       <p className="text-xs uppercase tracking-[0.22em] text-muted">Guide</p>
       <h1 className="mt-2 font-display text-4xl">Knowledge</h1>
       <p className="mt-3 text-sm text-muted">
-        Consent, nerves, scenes, aftercare. Ask in your words — answers are grounded in these essays.
+        Consent, risk recognition, privacy, and aftercare. Search in your words; results point to
+        reviewed entries without generating individualized rope instructions.
       </p>
       <div className="mt-6 flex gap-2">
         <input
@@ -45,11 +57,11 @@ function KnowledgePage() {
           className="h-11 flex-1 rounded-md border border-border bg-elevated px-3 text-sm"
         />
         <Button onClick={() => void ask()} disabled={pending}>
-          Ask
+          {pending ? "Searching…" : "Find entries"}
         </Button>
       </div>
       {answer && (
-        <div className="mt-4 whitespace-pre-wrap rounded-lg border border-border bg-surface p-4 text-sm leading-relaxed">
+        <div role="status" aria-live="polite" className="mt-4 whitespace-pre-wrap rounded-lg border border-border bg-surface p-4 text-sm leading-relaxed">
           {answer}
         </div>
       )}
@@ -76,7 +88,7 @@ function KnowledgePage() {
                   <p className="font-display text-2xl">{a.title}</p>
                   <p className="mt-1 text-sm text-muted">{a.summary}</p>
                   <p className="mt-2 text-[11px] uppercase tracking-wide text-subtle">
-                    {a.minutes} min
+                    {a.minutes} min reading estimate
                   </p>
                 </Link>
               </li>

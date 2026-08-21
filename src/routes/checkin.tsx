@@ -1,108 +1,187 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { useCheckIn, type Breath, type Color } from "@/lib/stores/checkin";
+import {
+  useCheckIn,
+  type CheckIn,
+  type CheckChoice,
+  type ConsentChoice,
+} from "@/lib/stores/checkin";
 import { useSession } from "@/lib/stores/session";
 
 export const Route = createFileRoute("/checkin")({ component: CheckInPage });
 
 function CheckInPage() {
-  const logs = useCheckIn((s) => s.logs);
-  const add = useCheckIn((s) => s.add);
-  const checked = useSession((s) => s.checked);
-  const [color, setColor] = useState<Color>("pink");
-  const [tingle, setTingle] = useState(false);
-  const [breath, setBreath] = useState<Breath>("easy");
-  const [whichFinger, setWhichFinger] = useState("");
+  const logs = useCheckIn((state) => state.logs);
+  const add = useCheckIn((state) => state.add);
+  const checked = useSession((state) => state.checked);
+  const [consent, setConsent] = useState<ConsentChoice>("not_checked");
+  const [sensation, setSensation] = useState<CheckChoice>("not_checked");
+  const [movement, setMovement] = useState<CheckChoice>("not_checked");
+  const [breathingSpeechAlertness, setBreathingSpeechAlertness] = useState<CheckChoice>("not_checked");
+  const [painSwellingTemperature, setPainSwellingTemperature] = useState<CheckChoice>("not_checked");
+  const [emergencySigns, setEmergencySigns] = useState<CheckChoice>("not_checked");
   const [note, setNote] = useState("");
-  const alarm = color !== "pink" || tingle || breath === "hard";
+  const choices = [sensation, movement, breathingSpeechAlertness, painSwellingTemperature, emergencySigns];
+  const ready = consent !== "not_checked" && choices.every((choice) => choice !== "not_checked");
+  const concern = consent === "no" || choices.includes("concern");
+  const emergency = emergencySigns === "concern";
 
   return (
     <div className="mx-auto max-w-xl px-5 py-10">
-      <p className="text-xs uppercase tracking-[0.22em] text-muted">Hands</p>
+      <p className="text-xs uppercase tracking-[0.22em] text-muted">Direct report</p>
       <h1 className="mt-2 font-display text-4xl">Check-in</h1>
-      <p className="mt-3 text-sm text-muted">
-        Same five questions every time so the answers compare. Pale plus cold plus buzz is a strip,
-        not a wait.
+      <p className="mt-3 text-sm leading-relaxed text-muted">
+        Ask directly and record each answer; nothing defaults to normal. Images and timers cannot
+        answer these questions. Release for any concern or uncertainty.
       </p>
-      <fieldset className="mt-8">
-        <legend className="text-xs uppercase tracking-wide text-subtle">Color</legend>
-        <div className="mt-2 flex gap-2">
-          {(["pink", "pale", "dusky"] as const).map((c) => (
-            <Button key={c} variant={color === c ? "default" : "outline"} size="sm" onClick={() => setColor(c)}>
-              {c}
-            </Button>
-          ))}
-        </div>
-      </fieldset>
-      <fieldset className="mt-6">
-        <legend className="text-xs uppercase tracking-wide text-subtle">Breathing</legend>
-        <div className="mt-2 flex gap-2">
-          {(["easy", "work", "hard"] as const).map((b) => (
-            <Button key={b} variant={breath === b ? "default" : "outline"} size="sm" onClick={() => setBreath(b)}>
-              {b}
-            </Button>
-          ))}
-        </div>
-      </fieldset>
-      <label className="mt-6 flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={tingle} onChange={(e) => setTingle(e.target.checked)} />
-        Tingling or buzzing
-      </label>
-      <input
-        className="mt-3 h-11 w-full rounded-md border border-border bg-elevated px-3 text-sm"
-        placeholder="Which finger?"
-        value={whichFinger}
-        onChange={(e) => setWhichFinger(e.target.value)}
-      />
+
+      <div className="mt-8 space-y-6">
+        <ConsentField value={consent} onChange={setConsent} />
+        <CheckField
+          legend="Sensation"
+          help="Any new numbness, tingling, burning, altered feeling, or inability to describe sensation?"
+          value={sensation}
+          onChange={setSensation}
+        />
+        <CheckField
+          legend="Movement and strength"
+          help="Any new weakness, loss of grip, reduced movement, or inability to move normally?"
+          value={movement}
+          onChange={setMovement}
+        />
+        <CheckField
+          legend="Breathing, speech, and alertness"
+          help="Any breathing or voice change, trouble speaking, confusion, panic, faintness, or unusual drowsiness?"
+          value={breathingSpeechAlertness}
+          onChange={setBreathingSpeechAlertness}
+        />
+        <CheckField
+          legend="Pain, swelling, temperature, or color change"
+          help="Any severe or escalating pain, swelling, coldness, marked discoloration, or other worsening change?"
+          value={painSwellingTemperature}
+          onChange={setPainSwellingTemperature}
+        />
+        <CheckField
+          legend="Emergency signs"
+          help="Abnormal breathing, unresponsiveness, seizure, chest pain, a serious fall, stroke-like signs, major weakness, severe confusion, or concerning symptoms after neck pressure?"
+          value={emergencySigns}
+          onChange={setEmergencySigns}
+        />
+      </div>
+
       <textarea
-        className="mt-3 h-20 w-full rounded-md border border-border bg-elevated p-3 text-sm"
-        placeholder="Anything else she said"
+        className="mt-6 h-20 w-full rounded-md border border-border bg-elevated p-3 text-sm"
+        placeholder="Optional session-only note; do not include identifying details"
         value={note}
-        onChange={(e) => setNote(e.target.value)}
+        onChange={(event) => setNote(event.target.value.slice(0, 240))}
       />
-      {alarm && (
-        <p className="mt-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
-          This is a stop-adding reading. Strip the wrap on that limb. Do not bargain.
-        </p>
+
+      {concern && (
+        <div className="mt-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">
+          Release now and do not re-tie. {emergency
+            ? "Call local emergency services and follow dispatcher instructions."
+            : "Seek prompt medical assessment for persistent or worsening symptoms; use emergency services if an emergency sign develops."}
+          {" "}A normal-looking image cannot rule out injury.
+        </div>
       )}
+
       <div className="mt-6 flex flex-wrap gap-2">
         <Button
+          disabled={!ready}
           onClick={() => {
-            add({ color, tingle, breath, whichFinger, note });
+            if (!ready) return;
+            add({
+              consent,
+              sensation,
+              movement,
+              breathingSpeechAlertness,
+              painSwellingTemperature,
+              emergencySigns,
+              note,
+            });
             checked();
-            if (alarm) useSession.getState().stop("checkin");
+            if (concern) useSession.getState().stop(emergency ? "medical-emergency" : "checkin-concern");
           }}
         >
-          {alarm ? "Save and halt" : "Save check-in"}
+          {!ready ? "Complete every direct check" : concern ? "Log and halt" : "Log direct check"}
         </Button>
         <Button asChild variant="outline">
           <Link to="/studio">Back to studio</Link>
         </Button>
-        {alarm && (
+        {concern && (
           <Button asChild variant="danger">
-            <Link to="/emergency">Cut-down card</Link>
+            <Link to="/emergency">Emergency card</Link>
           </Button>
         )}
       </div>
-      <h2 className="mt-12 font-display text-2xl">This session</h2>
+
+      <h2 className="mt-12 font-display text-2xl">This tab only</h2>
+      <p className="mt-1 text-xs text-subtle">Check-ins are not written to browser storage.</p>
       {logs.length === 0 ? (
-        <p className="mt-3 text-sm text-muted">No check-ins yet.</p>
+        <p className="mt-3 text-sm text-muted">No completed direct check-ins in this tab.</p>
       ) : (
         <ol className="mt-4 space-y-2">
-          {logs.map((l) => (
-            <li key={l.id} className="rounded-md border border-border bg-surface px-3 py-2 text-sm">
-              <p className="text-xs text-subtle">{new Date(l.at).toLocaleTimeString()}</p>
-              <p>
-                {l.color}
-                {l.tingle ? " · tingle" : ""} · breath {l.breath}
-                {l.whichFinger ? ` · ${l.whichFinger}` : ""}
-              </p>
-              {l.note && <p className="mt-1 text-muted">{l.note}</p>}
+          {logs.map((entry) => (
+            <li key={entry.id} className="rounded-md border border-border bg-surface px-3 py-2 text-sm">
+              <p className="text-xs text-subtle">{new Date(entry.at).toLocaleTimeString()}</p>
+              <p>{entry.consent === "yes" ? "consent confirmed" : "consent not confirmed"} · {hasConcern(entry) ? "concern logged" : "no concern reported"}</p>
+              {entry.note && <p className="mt-1 text-muted">{entry.note}</p>}
             </li>
           ))}
         </ol>
       )}
     </div>
+  );
+}
+
+function ConsentField({ value, onChange }: { value: ConsentChoice; onChange: (value: ConsentChoice) => void }) {
+  return (
+    <fieldset>
+      <legend className="text-xs uppercase tracking-wide text-subtle">Current consent</legend>
+      <p className="mt-1 text-xs text-muted">Does the person directly confirm they want the activity to continue right now?</p>
+      <div className="mt-2 flex gap-2">
+        <Choice active={value === "yes"} onClick={() => onChange("yes")}>Yes, directly confirmed</Choice>
+        <Choice active={value === "no"} onClick={() => onChange("no")}>No or uncertain</Choice>
+      </div>
+    </fieldset>
+  );
+}
+
+function CheckField({
+  legend,
+  help,
+  value,
+  onChange,
+}: {
+  legend: string;
+  help: string;
+  value: CheckChoice;
+  onChange: (value: CheckChoice) => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="text-xs uppercase tracking-wide text-subtle">{legend}</legend>
+      <p className="mt-1 text-xs text-muted">{help}</p>
+      <div className="mt-2 flex gap-2">
+        <Choice active={value === "no_concern"} onClick={() => onChange("no_concern")}>No concern reported</Choice>
+        <Choice active={value === "concern"} onClick={() => onChange("concern")}>Concern or uncertain</Choice>
+      </div>
+    </fieldset>
+  );
+}
+
+function Choice({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return <Button type="button" variant={active ? "default" : "outline"} size="sm" onClick={onClick}>{children}</Button>;
+}
+
+function hasConcern(entry: CheckIn): boolean {
+  return (
+    entry.consent !== "yes" ||
+    entry.sensation === "concern" ||
+    entry.movement === "concern" ||
+    entry.breathingSpeechAlertness === "concern" ||
+    entry.painSwellingTemperature === "concern" ||
+    entry.emergencySigns === "concern"
   );
 }

@@ -4,21 +4,17 @@ import { adoptPersistKey } from "./persist.ts";
 
 function installMemoryStorage() {
   if (typeof globalThis.localStorage !== "undefined") return;
-  const mem = new Map<string, string>();
+  const memory = new Map<string, string>();
   Object.defineProperty(globalThis, "localStorage", {
     configurable: true,
     value: {
-      getItem: (k: string) => mem.get(k) ?? null,
-      setItem: (k: string, v: string) => {
-        mem.set(k, String(v));
-      },
-      removeItem: (k: string) => {
-        mem.delete(k);
-      },
-      clear: () => mem.clear(),
-      key: (i: number) => [...mem.keys()][i] ?? null,
+      getItem: (key: string) => memory.get(key) ?? null,
+      setItem: (key: string, value: string) => memory.set(key, String(value)),
+      removeItem: (key: string) => memory.delete(key),
+      clear: () => memory.clear(),
+      key: (index: number) => [...memory.keys()][index] ?? null,
       get length() {
-        return mem.size;
+        return memory.size;
       },
     },
   });
@@ -26,7 +22,7 @@ function installMemoryStorage() {
 
 installMemoryStorage();
 
-test("adoptPersistKey copies leftover musubi blob once", () => {
+test("adoptPersistKey copies a legacy blob once and never overwrites current data", () => {
   localStorage.removeItem("knotty-x");
   localStorage.setItem("musubi-x", '{"state":1}');
   adoptPersistKey("knotty-x", "musubi-x");

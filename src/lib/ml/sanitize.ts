@@ -84,13 +84,24 @@ function looksLikeImage(b: Uint8Array) {
 
 export function sanitizeQuestion(q: unknown, max = 400) {
   const s = typeof q === "string" ? q : "";
-  return s
+  const withoutPromptInjection = s
     .replace(/ignore (all |any |the |previous |prior |above |system )?instructions?/gi, "")
     .replace(/you are now/gi, "")
     .replace(/jailbreak/gi, "")
     .replace(/system prompt/gi, "")
     .replace(/developer message/gi, "")
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u200B-\u200D\uFEFF]/g, "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "");
+  return Array.from(withoutPromptInjection)
+    .filter((char) => {
+      const code = char.codePointAt(0) ?? 0;
+      return !(
+        code <= 0x08 ||
+        code === 0x0b ||
+        code === 0x0c ||
+        (code >= 0x0e && code <= 0x1f)
+      );
+    })
+    .join("")
     .trim()
     .slice(0, max);
 }
@@ -112,14 +123,17 @@ function sanitizeWrapBands(raw: unknown): WrapBand[] {
     .filter((b): b is WrapBand => !!b && (b.strength > 0 || b.yNorm > 0));
 }
 
-export function sanitizeDet(raw: DeterministicReport): DeterministicReport {
-  const neckRope = clamp01(Number(raw?.neckRope) || 0);
-  const paleness = clamp01(Number(raw?.paleness) || 0);
-  const palenessDelta = Math.max(-1, Math.min(1, Number(raw?.palenessDelta) || 0));
-  const motion = clamp01(Number(raw?.motion) || 0);
-  const wrapCount = Math.max(0, Math.min(40, Math.round(Number(raw?.wrapCount) || 0)));
-  const flags: SafetyFlag[] = Array.isArray(raw?.flags)
-    ? raw.flags
+export function sanitizeDet(raw: unknown): DeterministicReport {
+  const report = raw && typeof raw === "object" && !Array.isArray(raw)
+    ? (raw as Partial<DeterministicReport>)
+    : {};
+  const neckRope = clamp01(Number(report.neckRope) || 0);
+  const paleness = clamp01(Number(report.paleness) || 0);
+  const palenessDelta = Math.max(-1, Math.min(1, Number(report.palenessDelta) || 0));
+  const motion = clamp01(Number(report.motion) || 0);
+  const wrapCount = Math.max(0, Math.min(40, Math.round(Number(report.wrapCount) || 0)));
+  const flags: SafetyFlag[] = Array.isArray(report.flags)
+    ? report.flags
         .filter((f) => f && typeof f.note === "string")
         .slice(0, 12)
         .map((f) => ({
@@ -128,38 +142,38 @@ export function sanitizeDet(raw: DeterministicReport): DeterministicReport {
           note: sanitizeQuestion(f.note, 240),
         }))
     : [];
-  if (neckRope > 0.16 && !flags.some((f) => f.code === "neck" && f.severity === "stop")) {
+  if (neckRope > 0.08 && !flags.some((f) => f.code === "neck" && f.severity === "stop")) {
     flags.push({
       code: "neck",
       severity: "stop",
-      note: "Neck-zone density on the still. Confirm the throat is empty.",
+      note: "A two-dimensional overlap may involve the neck or airway. Stop and release; the still cannot establish clearance.",
     });
   }
-  if (paleness > 0.78 && !flags.some((f) => f.code === "circulation" && f.severity === "stop")) {
+  const validRecommend = report.recommend === "continue" || report.recommend === "adjust" || report.recommend === "stop";
+  let recommend: DeterministicReport["recommend"] = validRecommend ? report.recommend! : "stop";
+  if (!validRecommend) {
     flags.push({
-      code: "circulation",
+      code: "unknown",
       severity: "stop",
-      note: "Hands look too pale. Strip distal rope.",
+      note: "The camera report was malformed. Do not rely on it; pause and release before reassessing.",
     });
   }
-  let recommend: DeterministicReport["recommend"] = raw?.recommend;
-  if (recommend !== "continue" && recommend !== "adjust" && recommend !== "stop") recommend = "adjust";
-  if (flags.some((f) => f.severity === "stop") || neckRope > 0.16 || paleness > 0.78) {
+  if (flags.some((f) => f.severity === "stop") || neckRope > 0.08) {
     recommend = "stop";
-  } else if (flags.some((f) => f.severity === "watch") && recommend === "continue") {
+  } else if (recommend === "continue" || flags.some((f) => f.severity === "watch")) {
     recommend = "adjust";
   }
   return {
     wrapCount,
-    wrapBands: sanitizeWrapBands(raw?.wrapBands),
+    wrapBands: sanitizeWrapBands(report.wrapBands),
     neckRope,
     paleness,
     palenessDelta,
     motion,
     flags,
     recommend,
-    notes: Array.isArray(raw?.notes)
-      ? raw.notes.map((n) => sanitizeQuestion(n, 200)).filter(Boolean).slice(0, 8)
+    notes: Array.isArray(report.notes)
+      ? report.notes.map((n) => sanitizeQuestion(n, 200)).filter(Boolean).slice(0, 8)
       : [],
   };
 }

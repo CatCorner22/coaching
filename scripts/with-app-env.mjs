@@ -28,11 +28,10 @@ import { fileURLToPath } from "node:url";
 export const APP_ENV_REL_PATH = ".grok/app-env.json";
 
 const VITE_PREFIX = "VITE_";
+const DEFAULT_APP_ENV = Object.freeze({ VITE_AUTH_ENABLED: "false" });
 
 /**
  * Parse an app-env document, keeping only `VITE_`-prefixed string entries.
- * Anything unparseable is an empty environment — a workspace without the file
- * must behave exactly like today (auth on, no overrides).
  */
 export function parseAppEnv(text) {
   let parsed;
@@ -51,12 +50,12 @@ export function parseAppEnv(text) {
   return env;
 }
 
-/** The app env recorded under `root`, or `{}` when the file is absent. */
+/** The app env recorded under `root`, with a safe standalone auth-off default. */
 export function readAppEnv(root) {
   try {
-    return parseAppEnv(readFileSync(join(root, APP_ENV_REL_PATH), "utf8"));
+    return { ...DEFAULT_APP_ENV, ...parseAppEnv(readFileSync(join(root, APP_ENV_REL_PATH), "utf8")) };
   } catch {
-    return {};
+    return { ...DEFAULT_APP_ENV };
   }
 }
 
