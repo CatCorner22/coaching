@@ -2,17 +2,20 @@
 
 Review date: 2026-08-21  
 Reviewed `main`: `cf5317206a47f037983b4c65e18b825705edc777`  
-Implementation: draft pull request #2, `codex/final-camera-kb-reliability`
+Core implementation: merged pull request #2, `058bb386720d9617afe75cfde6d84e9cd585d300`  
+Final hardening: draft pull request #3, `codex/final-camera-kb-reliability`
 
 ## Outcome
 
-The draft pull request contains the integrated stabilization work from repeated
-independent and adversarial reviews. The exact Node 22.23.2 release pipeline now
-builds one valid Vercel server bundle, verifies generated artifacts, typechecks,
-lints with zero warnings, runs the complete source-owned test corpus and PWA
-fixture, and smoke-tests the production preview in desktop and mobile Chromium.
+The merged core and its four-file hardening follow-up contain the integrated
+stabilization work from repeated independent and adversarial reviews. The exact
+Node 22.23.2 release pipeline now builds one valid Vercel server bundle, verifies
+generated artifacts, typechecks, lints with zero warnings, runs the complete
+source-owned test corpus and PWA fixture, and smoke-tests the production preview
+in desktop and mobile Chromium.
 
-Keep the pull request in draft until the external release matrix is recorded.
+Keep the follow-up in draft until its exact CI run completes. Keep the release
+uncertified until the external matrix is recorded.
 Browser automation cannot prove real camera permission behavior, phone codecs,
 live identity/provider integration, database pooling, accessibility, or safe
 real-world use.
@@ -160,4 +163,4 @@ certify a physical setup, a participant's condition, or future device behavior.
 - [Vite global constant replacement](https://vite.dev/config/shared-options.html#define)
 - [PostgreSQL advisory-lock functions](https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-ADVISORY-LOCKS)
 - [PostgreSQL client connection defaults and timeouts](https://www.postgresql.org/docs/current/runtime-config-client.html)
-- [Better Auth documentation](https://www.better-auth.com/docs)
+- [Better Auth rate-limit options](https://better-auth.com/docs/reference/options#rateLimit)
