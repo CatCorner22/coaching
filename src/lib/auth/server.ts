@@ -223,6 +223,11 @@ export const auth = betterAuth({
   secret: env("BETTER_AUTH_SECRET") ?? previewAuthSecret(),
   ...databaseOption,
 
+  // Better Auth otherwise keys this default off a mutable runtime mode. Keep the
+  // auth surface bounded in production, hostile preview environments, and the
+  // public live-development preview alike.
+  rateLimit: { enabled: true, window: 60, max: 100 },
+
   // CSRF / origin check for credentialed auth POSTs (email sign-up/sign-in, …).
   // See `trustedOrigins` construction above — must cover live preview hosts AND
   // local loopback variants, or clients get "Invalid origin".
