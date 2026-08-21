@@ -24,6 +24,7 @@ import { readFileSync, realpathSync } from "node:fs";
 import { constants as osConstants } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkDeployAuthConfig } from "./check-auth-invariant.mjs";
 
 export const APP_ENV_REL_PATH = ".grok/app-env.json";
 
@@ -110,6 +111,15 @@ function main(argv) {
     process.exit(2);
   }
   const env = mergeAppEnv(readAppEnv(projectRoot()), process.env);
+  const isProductionBuild =
+    command.endsWith("vite") && args.some((arg) => arg === "build" || arg.startsWith("build"));
+  if (isProductionBuild) {
+    const deployCheck = checkDeployAuthConfig(env);
+    if (deployCheck.status === "misconfigured") {
+      console.error(deployCheck.message);
+      process.exit(1);
+    }
+  }
   const child = spawn(command, args, { stdio: "inherit", env });
   // The dev server is long-running and is stopped by signalling this wrapper.
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {

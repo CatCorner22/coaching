@@ -1,12 +1,13 @@
 # Knotty omnibus engineering and safety review
 
-Review date: 2026-08-21  
+Review date: 2026-08-21 (updated after deep-review hardening pass)  
 Reviewed base: `81b4084775cc7448dbd6c4cb1aa2462769631b02`  
-Integrated concurrent `main`: `a68b5c0550bf93f455a4a012ab7bfc14de66d6c5`
+Integrated concurrent `main`: `a68b5c0550bf93f455a4a012ab7bfc14de66d6c5`  
+Hardening branch: `cursor/knotty-deep-review-19f1`
 
 ## Decision
 
-Keep the stabilization pull request in draft until a clean Node 22 checkout has a lockfile, its platform environment, a passing full test/typecheck/lint/production-build path, and recorded real-device camera/video results. The source-owned camera, report, safety, privacy, and server boundaries are substantially stronger, but dependency-free tests cannot prove browser/device interoperability or safe real-world use.
+The source-owned camera, report, safety, privacy, and server boundaries remain substantially stronger than a typical scaffold. A clean Node 22 checkout now has a committed `package-lock.json`, a passing full test/typecheck/lint/production-build path, and recorded desktop/mobile browser smoke on both dev and production preview. **Real-device camera/video matrix testing and authenticated production smoke in the provider environment remain the primary release gates** — dependency-free tests cannot prove browser/device interoperability or safe real-world use.
 
 ## Adversarial storms
 
@@ -29,22 +30,26 @@ Four independent multi-agent rounds, followed by a separate merge-adversary pass
 - Server trust: authenticated middleware on vision/TTS, live-preview bearer propagation, production same-origin checks, request-signal relay, bounded provider responses, typed 403/429 errors, atomic per-user/per-instance quotas, non-evictable global sentinels, bounded request schemas, and redacted session-cookie error logs.
 - Integration: cloud TTS is explicit and fail-closed, browser speech bypasses xAI, opt-out stops playback and invalidates late cache writes, captured batches retain their permission ledger and expiry controls, only a rolled-back pre-provider quota denial reopens a batch, unclear-adult triage clears adult confirmation, instructor-only content cannot route into Studio, and capture/model results are synchronously bound to their tie/step/surface/limit context.
 - Concurrent-main merge: useful hydration, planner, journal-export, dark-fiber, and timer improvements were retained without importing main's stale-step report reuse, unlocalized paleness weighting, uniform-dark rope assumption, always-on voice/mic defaults, or unversioned consent acceptance. Canonical `knotty-*` storage adopts legacy data once, normalizes journal records, and erases both key families.
-- Operations: Node 22 declaration, focused source-owned CI suite, deployment/device matrix, explicit lockfile/platform-environment blockers, and a durable review record.
+- Operations: Node 22 declaration, focused source-owned CI suite, deployment/device matrix, committed `package-lock.json`, and a durable review record.
+- Deep-review hardening (2026-08-21): script test loader fixed (`--experimental-strip-types` + `register-ts.mjs`), brand assets completed (`type: x:game`, `public/x-banner.jpg`), dead code removed (`ask.ts`, `multiplayer/p2p`), SSR-safe account isolation gate, and production build fail-fast when `DATABASE_URL` is set without `VITE_AUTH_ENABLED=true`.
 
 ## Verification
 
-- `npm run test:core`: **161/161 passed** (110 dependency-free script tests plus 51 TypeScript camera/ML/knowledge tests).
-- The independent `bdsm-shibari-camera` observation-report validator: **6/6 representative C2/C3/C4/emergency/coercion reports passed**.
+- `npm test`: **355/355 passed** on Node 22 (235 script tests, 111 typed-core tests, 9 store tests).
+- `npm run typecheck`: **pass** (0 errors).
+- `npm run lint`: **pass** (zero warnings).
+- `npm run build`: **pass** — production bundle excludes PGLite WASM/data loaders.
+- Dev browser smoke (desktop 1280×800 + mobile 390×844): **pass** — visible consent gate content, clean console, no brand warnings.
+- Production preview smoke (`127.0.0.1:8081`, baseline compared to dev): **pass** — no divergence, clean console.
+- Isolated platform PWA fixture (`scripts/grok-pwa-plugin.test.mjs` in temp cwd): **47/47 passed**.
+- Brand assets: `public/og.jpg`, `public/x-banner.jpg`, `public/__grok/icon-180.png`, and `src/lib/og/site.json` with `"card": "custom"` and `"type": "x:game"` — all present.
+- The independent `bdsm-shibari-camera` observation-report validator: **6/6 representative C2/C3/C4/emergency/coercion reports passed** (from prior review pass).
 - Store and migration suite: **9/9 passed** on Node 22, including same-second timer behavior, planner idempotency, legacy-key adoption, versioned consent, and voice/microphone fail-closed migration.
-- Full dependency-free script corpus: **229/236 passed**. All seven failures are isolated to the untouched platform PWA fixture: six generic-title expectations inherit this app's `Knotty` `site.json`, and the reconstructed local snapshot omits `public/__grok/icon-180.png`. The icon was verified on GitHub `main` and remains in the branch tree.
-- GitHub Actions run 4 on Node 22: dependency install, typecheck, lint, `test:core`, and `test:stores` all passed. Lint reports four pre-existing warnings and zero errors.
-- Final conflict-marker scan: clean. GitHub reports the draft PR mergeable after the two-parent conflict-resolution commit.
-- Production build, authenticated browser smoke, and real-device checks remain pending; the repository still has no committed lockfile.
+- Authenticated production smoke in the provider environment and real-device camera matrix remain pending.
 
 ## Release blockers and residual risk
 
-- Generate and commit `package-lock.json`, switch CI to `npm ci`, restore the platform environment in a clean workspace, reconcile the generic PWA fixture with the app-specific site identity through the platform-supported path, and make the full test/build path mandatory.
-- Run the production build, authenticated preview, full platform fixture suite, and production-like smoke tests in the provider environment.
+- Run authenticated preview smoke and the full platform fixture suite in the provider environment with real auth credentials and `XAI_API_KEY`.
 - Test current iOS Safari, Android Chrome, desktop Chromium, Firefox, and Safari with permission grant/deny/revoke, camera switching, interruption/backgrounding, photo import, native recording round-trip, MP4/MOV/WebM/HEIC support where applicable, still selection, and no-audio capture. Do not retain participants' sensitive test media.
 - The batch replay cache is per process. A durable “exactly once” promise needs a server-minted capability bound to user, consent expiry, context, and media digests, consumed atomically in shared storage.
 - Stop/discard suppresses stale UI output and server requests observe connection cancellation, but the current server-function client API has no demonstrated application-level abort handle. Provider work already in flight may continue.
