@@ -37,6 +37,13 @@ jobs:
       - name: Build production bundle and generate route tree
         run: npm run build
 
+      - name: Verify emitted server module syntax
+        shell: bash
+        run: |
+          while IFS= read -r -d '' module; do
+            node --check "$module"
+          done < <(find .vercel/output/functions -type f \( -name '*.mjs' -o -name '*.js' \) -print0)
+
       - name: Verify generated artifacts are committed
         run: git diff --exit-code -- package-lock.json src/routeTree.gen.ts
 
