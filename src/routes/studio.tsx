@@ -63,14 +63,23 @@ function blockedByIds(slug: string | undefined, table: Record<string, string[]>,
 function StudioPage() {
   const search = Route.useSearch();
   const settings = useSettings();
-  const session = useSession();
   const nerveHits = useJournal((j) => j.nerveHits);
   const addEntry = useJournal((j) => j.add);
   const items = useNegotiate((s) => s.items);
+  const stopSession = useSession((s) => s.stop);
+  const setStep = useSession((s) => s.setStep);
+  const setTie = useSession((s) => s.setTie);
+  const setFurniture = useSession((s) => s.setFurniture);
+  const startSession = useSession((s) => s.start);
+  const resetSession = useSession((s) => s.reset);
+  const stopped = useSession((s) => s.stopped);
+  const stepIndex = useSession((s) => s.stepIndex);
+  const tieSlug = useSession((s) => s.tieSlug);
+  const furnitureSlug = useSession((s) => s.furnitureSlug);
   const hardNos = useMemo(() => items.filter((i) => i.rank === "no"), [items]);
   const hardNoIds = useMemo(() => new Set(hardNos.map((item) => item.id)), [hardNos]);
   const hardNoKey = useMemo(() => hardNos.map((item) => `${item.id}:${item.label}`).sort().join("\u0000"), [hardNos]);
-  const captureContextKey = `${session.tieSlug ?? ""}|${session.stepIndex}|${session.furnitureSlug ?? ""}|${hardNoKey}`;
+  const captureContextKey = `${tieSlug ?? ""}|${stepIndex}|${furnitureSlug ?? ""}|${hardNoKey}`;
   const [capture, setCapture] = useState<CaptureResult | null>(null);
   const [report, setReport] = useState<CoachReport | null>(null);
   const [observationReport, setObservationReport] = useState<ObservationReport | null>(null);
@@ -84,10 +93,13 @@ function StudioPage() {
   const [micArmed, setMicArmed] = useState(false);
   const [micStatus, setMicStatus] = useState<"idle" | "starting" | "active" | "error" | "unsupported">("idle");
   const analysisRequestRef = useRef(0);
-  const tie = getTie(session.tieSlug ?? "");
+  const currentContextRef = useRef(captureContextKey);
+  const captureContextAtCommitRef = useRef<string | null>(null);
+  currentContextRef.current = captureContextKey;
+  const tie = getTie(tieSlug ?? "");
   const instructorOnlyTie = tie?.minutes[1] === 0;
-  const tieBlocked = blockedByIds(session.tieSlug, TIE_LIMIT_IDS, hardNoIds);
-  const furnitureBlocked = blockedByIds(session.furnitureSlug, FURNITURE_LIMIT_IDS, hardNoIds);
+  const tieBlocked = blockedByIds(tieSlug, TIE_LIMIT_IDS, hardNoIds);
+  const furnitureBlocked = blockedByIds(furnitureSlug, FURNITURE_LIMIT_IDS, hardNoIds);
   const mediaBlocked = hardNoIds.has("photos");
 
   useEffect(() => {
@@ -95,6 +107,7 @@ function StudioPage() {
     if (furnitureBlocked) useSession.getState().setFurniture(undefined);
     if (mediaBlocked) {
       analysisRequestRef.current += 1;
+      captureContextAtCommitRef.current = null;
       setCapture(null);
       setReport(null);
       setObservationReport(null);
@@ -107,17 +120,14 @@ function StudioPage() {
   useEffect(() => {
     if (search.tie) {
       const requestedTie = getTie(search.tie);
-      session.setTie(requestedTie && requestedTie.minutes[1] > 0 ? search.tie : undefined);
+      setTie(requestedTie && requestedTie.minutes[1] > 0 ? search.tie : undefined);
     }
-    if (!session.startedAt) session.start();
-    const id = window.setInterval(() => session.tick(Date.now()), 1000);
+    if (!useSession.getState().startedAt) startSession();
+    useSession.getState().tick(Date.now());
+    const id = window.setInterval(() => useSession.getState().tick(Date.now()), 1000);
     return () => window.clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search.tie]);
+  }, [search.tie, setTie, startSession]);
 
-  const stopSession = useSession((s) => s.stop);
-  const setStep = useSession((s) => s.setStep);
-  const nagged = useRef(false);
   const stopAlertRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -157,6 +167,7 @@ function StudioPage() {
     setPending(false);
     setAnalysisError(null);
     if (contextChanged && capture) {
+      captureContextAtCommitRef.current = null;
       setCapture(null);
       setReport(null);
       setObservationReport(null);
@@ -165,17 +176,14 @@ function StudioPage() {
       setTriage("unanswered");
     }
   }, [capture, captureContextKey]);
+  const captureMatchesContext =
+    capture !== null && captureContextAtCommitRef.current === captureContextKey;
   const det = useMemo(() => {
-    if (!capture) return null;
+    if (!capture || !captureMatchesContext) return null;
     return buildDeterministic(capture.observations, null);
-  }, [capture]);
-
-  const stopped = useSession((s) => s.stopped);
-  const stepIndex = useSession((s) => s.stepIndex);
-  const tieSlug = useSession((s) => s.tieSlug);
-  const furnitureSlug = useSession((s) => s.furnitureSlug);
-  const elapsed = useSession((s) => s.elapsed);
-  const lastCheckAt = useSession((s) => s.lastCheckAt);
+  }, [capture, captureMatchesContext]);
+  const contextBoundReport = capture && !captureMatchesContext ? null : report;
+  const contextBoundObservationReport = capture && !captureMatchesContext ? null : observationReport;
 
   useEffect(() => {
     if (!stopped) return;
@@ -183,6 +191,7 @@ function StudioPage() {
     stopCoachVoice();
     setMicArmed(false);
     setPending(false);
+    captureContextAtCommitRef.current = null;
     setCapture(null);
     stopAlertRef.current?.focus();
   }, [stopped]);
@@ -191,6 +200,7 @@ function StudioPage() {
 
   useEffect(() => {
     if (!det || !capture) return;
+    if (captureContextAtCommitRef.current !== currentContextRef.current) return;
     if (useSession.getState().stopped) return;
     const next = fuseCoach({
       det,
@@ -235,8 +245,11 @@ function StudioPage() {
 
   async function runAnalyze() {
     if (!capture || !det) return;
-    if (session.stopped || mediaBlocked || analysisConsumed || triage !== "none") return;
+    if (captureContextAtCommitRef.current !== currentContextRef.current) return;
+    const sessionSnapshot = useSession.getState();
+    if (sessionSnapshot.stopped || mediaBlocked || analysisConsumed || triage !== "none") return;
     const request = ++analysisRequestRef.current;
+    const requestContext = currentContextRef.current;
     setAnalysisConsumed(true);
     setPending(true);
     setRefusal(false);
@@ -249,7 +262,7 @@ function StudioPage() {
           deterministic: det,
           tieSlug,
           stepIndex,
-          elapsedSec: elapsed,
+          elapsedSec: sessionSnapshot.elapsed,
           hardNos: hardNos.map((n) => `${n.id}: ${n.label}`),
           triage,
           media: {
@@ -263,14 +276,19 @@ function StudioPage() {
           consent: capture.consent,
         },
       });
-      if (request !== analysisRequestRef.current || useSession.getState().stopped) return;
+      if (
+        request !== analysisRequestRef.current ||
+        requestContext !== currentContextRef.current ||
+        captureContextAtCommitRef.current !== requestContext ||
+        useSession.getState().stopped
+      ) return;
       if (res.ok) {
         setRefusal(res.refusal);
         setReport(res.report);
         setObservationReport(res.observationReport);
         setModelStatus(res.modelStatus);
         if (res.observationReport.urgent_stop || res.observationReport.disposition === "do_not_proceed") {
-          session.stop("observation");
+          stopSession("observation");
         } else if (settings.voice && !micArmed) {
           void playCoachVoice(res.report.final.speak, settings.voice);
         }
@@ -294,6 +312,7 @@ function StudioPage() {
 
   const acceptCapture = useCallback((next: CaptureResult) => {
     analysisRequestRef.current += 1;
+    captureContextAtCommitRef.current = currentContextRef.current;
     setPending(false);
     setAnalysisError(null);
     setReport(null);
@@ -308,6 +327,7 @@ function StudioPage() {
 
   const discardCapture = useCallback(() => {
     analysisRequestRef.current += 1;
+    captureContextAtCommitRef.current = null;
     setPending(false);
     setAnalysisError(null);
     setReport(null);
@@ -321,34 +341,19 @@ function StudioPage() {
   const spoke = useRef<number | null>(null);
   useEffect(() => {
     if (spoke.current === null) {
-      spoke.current = session.stepIndex;
+      spoke.current = stepIndex;
       return;
     }
-    if (spoke.current === session.stepIndex) return;
-    spoke.current = session.stepIndex;
-    if (session.stopped) return;
-    const line = tie?.steps[session.stepIndex]?.speak;
+    if (spoke.current === stepIndex) return;
+    spoke.current = stepIndex;
+    if (stopped) return;
+    const line = tie?.steps[stepIndex]?.speak;
     if (line && settings.voice && !micArmed) void playCoachVoice(line, settings.voice);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.stepIndex, tie?.slug, settings.voice, micArmed]);
-
-  const dueCheck =
-    !!lastCheckAt && Date.now() - lastCheckAt > settings.circulationMins * 60 * 1000;
-
-  useEffect(() => {
-    if (dueCheck && settings.voice && !micArmed && !session.stopped && !nagged.current) {
-      nagged.current = true;
-      void playCoachVoice(
-        "Direct-check reminder. Ask about comfort, sensation, motion, and change. Release for concern.",
-        settings.voice,
-      );
-    }
-    if (!dueCheck) nagged.current = false;
-  }, [dueCheck, settings.voice, micArmed, session.stopped]);
+  }, [stepIndex, stopped, tie, settings.voice, micArmed]);
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
-      {session.stopped && (
+      {stopped && (
         <div
           ref={stopAlertRef}
           role="alert"
@@ -370,11 +375,12 @@ function StudioPage() {
                 analysisRequestRef.current += 1;
                 stopCoachVoice();
                 setCapture(null);
+                captureContextAtCommitRef.current = null;
                 setReport(null);
                 setObservationReport(null);
                 setAnalysisConsumed(false);
                 setTriage("unanswered");
-                session.reset();
+                resetSession();
               }}
             >
               Reset studio
@@ -395,11 +401,7 @@ function StudioPage() {
         </div>
         <div className="flex items-center gap-3 text-sm">
           <Badge variant="danger">{settings.safeword}</Badge>
-          <ClockRing
-            elapsed={session.elapsed}
-            limitSec={settings.circulationMins * 60}
-            label="reminder"
-          />
+          <SessionClock limitSec={settings.circulationMins * 60} />
         </div>
       </div>
       {hardNos.length > 0 && (
@@ -407,7 +409,7 @@ function StudioPage() {
           Negotiated no: {hardNos.map((n) => n.label).join(" · ")}
         </p>
       )}
-      {settings.listen && !session.stopped && (
+      {settings.listen && !stopped && (
         <div className="mt-3 rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted">
           <button
             type="button"
@@ -430,14 +432,11 @@ function StudioPage() {
           </span>
         </div>
       )}
-      {dueCheck && (
-        <p className="mt-4 rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-warn">
-          The optional direct-check reminder elapsed. It is not a safety deadline or clearance.{" "}
-          <Link to="/checkin" className="underline">
-            Log it
-          </Link>
-        </p>
-      )}
+      <CirculationBanner
+        minutes={settings.circulationMins}
+        voice={settings.voice}
+        micArmed={micArmed}
+      />
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <div>
           <label htmlFor="studio-tie" className="text-xs uppercase tracking-wide text-subtle">Tie</label>
@@ -446,7 +445,7 @@ function StudioPage() {
             className="mt-1 h-11 w-full rounded-md border border-border bg-elevated px-3 text-sm"
             value={tieSlug ?? ""}
             disabled={stopped}
-            onChange={(e) => session.setTie(e.target.value || undefined)}
+            onChange={(e) => setTie(e.target.value || undefined)}
           >
             <option value="">Freeform</option>
             {TIES.map((t) => (
@@ -470,7 +469,7 @@ function StudioPage() {
             className="mt-1 h-11 w-full rounded-md border border-border bg-elevated px-3 text-sm"
             value={furnitureSlug ?? ""}
             disabled={stopped}
-            onChange={(e) => session.setFurniture(e.target.value || undefined)}
+            onChange={(e) => setFurniture(e.target.value || undefined)}
           >
             <option value="">Floor / bed</option>
             {DUNGEON.map((d) => (
@@ -487,15 +486,15 @@ function StudioPage() {
             <div className="mt-3">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm text-muted">
-                  Step {session.stepIndex + 1}/{tie.steps.length}: {tie.steps[session.stepIndex]?.title}
+                  Step {stepIndex + 1}/{tie.steps.length}: {tie.steps[stepIndex]?.title}
                 </p>
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={session.stopped || session.stepIndex === 0}
+                disabled={stopped || pending || stepIndex === 0}
                 onClick={() => {
-                  if (session.stopped) return;
-                  setStep(session.stepIndex - 1);
+                  if (useSession.getState().stopped || pending) return;
+                  setStep(stepIndex - 1);
                 }}
               >
                 Prev
@@ -503,10 +502,10 @@ function StudioPage() {
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={session.stopped || session.stepIndex >= tie.steps.length - 1}
+                disabled={stopped || pending || stepIndex >= tie.steps.length - 1}
                 onClick={() => {
-                  if (session.stopped) return;
-                  setStep(session.stepIndex + 1);
+                  if (useSession.getState().stopped || pending) return;
+                  setStep(stepIndex + 1);
                 }}
               >
                 Next
@@ -514,12 +513,12 @@ function StudioPage() {
               <Button
                 size="sm"
                 variant="ghost"
-                disabled={session.stopped || !settings.voice}
+                disabled={stopped || !settings.voice}
                 onClick={() => {
-                  if (session.stopped) return;
+                  if (useSession.getState().stopped) return;
                   setMicArmed(false);
                   setMicStatus("idle");
-                  const line = tie.steps[session.stepIndex]?.speak;
+                  const line = tie.steps[stepIndex]?.speak;
                   if (line) void playCoachVoice(line, settings.voice);
                 }}
               >
@@ -527,14 +526,14 @@ function StudioPage() {
               </Button>
               </div>
               <p className="mt-2 text-sm leading-relaxed text-fg">
-                {tie.steps[session.stepIndex]?.rigger}
+                {tie.steps[stepIndex]?.rigger}
               </p>
-              <p className="mt-1 text-xs text-muted">Check. {tie.steps[session.stepIndex]?.check}</p>
+              <p className="mt-1 text-xs text-muted">Check. {tie.steps[stepIndex]?.check}</p>
               <div className="mx-auto mt-3 h-64 w-36">
                 <RopeFigure
-                  pose={tie.steps[session.stepIndex]?.expected.pose}
-                  view={tie.steps[session.stepIndex]?.expected.view}
-                  wraps={tie.steps.slice(0, session.stepIndex + 1).flatMap((x) => x.wraps)}
+                  pose={tie.steps[stepIndex]?.expected.pose}
+                  view={tie.steps[stepIndex]?.expected.view}
+                  wraps={tie.steps.slice(0, stepIndex + 1).flatMap((x) => x.wraps)}
                   nerves={tie.nerves}
                   compact
                   className="text-muted"
@@ -589,22 +588,22 @@ function StudioPage() {
               key={captureContextKey}
               onCapture={acceptCapture}
               onDiscard={discardCapture}
-              disabled={session.stopped || mediaBlocked || triage !== "none"}
+              disabled={stopped || mediaBlocked || triage !== "none"}
             />
           </div>
-          {capture && (
+          {capture && captureMatchesContext && (
             <WrapOverlay src={capture.preview} obs={capture.previewObservation} />
           )}
         </div>
         <div className="space-y-4">
           <CoachPanel
-            report={report}
-            observationReport={observationReport}
+            report={contextBoundReport}
+            observationReport={contextBoundObservationReport}
             modelStatus={modelStatus}
             voice={settings.voice && !micArmed}
             pending={pending}
             refusal={refusal}
-            halted={session.stopped}
+            halted={stopped}
           />
           {analysisError && <p className="text-sm text-danger" role="alert">{analysisError}</p>}
           <div className="flex flex-wrap gap-2">
@@ -612,8 +611,9 @@ function StudioPage() {
               onClick={() => void runAnalyze()}
               disabled={
                 !capture ||
+                !captureMatchesContext ||
                 pending ||
-                session.stopped ||
+                stopped ||
                 mediaBlocked ||
                 triage !== "none" ||
                 analysisConsumed
@@ -624,24 +624,25 @@ function StudioPage() {
             <Button asChild variant="outline">
               <Link to="/checkin">Open direct check-in</Link>
             </Button>
-            <Button variant="danger" onClick={() => session.stop("manual")}>
+            <Button variant="danger" onClick={() => stopSession("manual")}>
               {settings.safeword}
             </Button>
           </div>
           <Button
             variant="ghost"
             size="sm"
-            disabled={!report || !observationReport}
+            disabled={!contextBoundReport || !contextBoundObservationReport}
             onClick={() => {
-              if (!report || !observationReport) return;
+              if (!contextBoundReport || !contextBoundObservationReport) return;
+              const snapshot = useSession.getState();
               addEntry({
-                tieSlug: session.tieSlug,
-                minutes: Math.round(session.elapsed / 60),
-                notes: report.final.coaching.slice(0, 280),
-                flags: report.final.flags.map((f) => f.code),
-                disposition: observationReport.disposition,
-                limitations: observationReport.limitations.slice(0, 3),
-                sourceIds: observationReport.source_ids,
+                tieSlug: snapshot.tieSlug,
+                minutes: Math.round(snapshot.elapsed / 60),
+                notes: contextBoundReport.final.coaching.slice(0, 280),
+                flags: contextBoundReport.final.flags.map((flag) => flag.code),
+                disposition: contextBoundObservationReport.disposition,
+                limitations: contextBoundObservationReport.limitations.slice(0, 3),
+                sourceIds: contextBoundObservationReport.source_ids,
               });
               setSaved(true);
             }}
@@ -658,6 +659,51 @@ function StudioPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function SessionClock({ limitSec }: { limitSec: number }) {
+  const elapsed = useSession((state) => state.elapsed);
+  return <ClockRing elapsed={elapsed} limitSec={limitSec} label="reminder" />;
+}
+
+function CirculationBanner({
+  minutes,
+  voice,
+  micArmed,
+}: {
+  minutes: number;
+  voice: boolean;
+  micArmed: boolean;
+}) {
+  const lastCheckAt = useSession((state) => state.lastCheckAt);
+  const reminderTick = useSession((state) => state.elapsed);
+  const stopped = useSession((state) => state.stopped);
+  const nagged = useRef(false);
+  const due =
+    reminderTick >= 0 &&
+    !!lastCheckAt &&
+    Date.now() - lastCheckAt > minutes * 60 * 1000;
+
+  useEffect(() => {
+    if (due && voice && !micArmed && !stopped && !nagged.current) {
+      nagged.current = true;
+      void playCoachVoice(
+        "Direct-check reminder. Ask about comfort, sensation, motion, and change. Release for concern.",
+        voice,
+      );
+    }
+    if (!due) nagged.current = false;
+  }, [due, voice, micArmed, stopped]);
+
+  if (!due) return null;
+  return (
+    <p className="mt-4 rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-warn">
+      The optional direct-check reminder elapsed. It is not a safety deadline or clearance.{" "}
+      <Link to="/checkin" className="underline">
+        Log it
+      </Link>
+    </p>
   );
 }
 

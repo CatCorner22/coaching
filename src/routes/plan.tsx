@@ -54,6 +54,9 @@ function PlanPage() {
           );
         })}
       </ol>
+      {slugs.length === 0 && (
+        <p className="mt-8 text-sm text-muted">Nothing queued. Load a learning sequence or add one library entry.</p>
+      )}
       <p className="mt-3 text-xs text-subtle">
         Library times are reading and planning estimates, never safe-duration limits. Check directly and release for any concern.
       </p>

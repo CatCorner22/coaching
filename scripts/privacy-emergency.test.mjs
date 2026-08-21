@@ -39,6 +39,9 @@ test("local erase signals other tabs and treats blocked legacy deletion as a war
   assert.match(source, /LEGACY_PURGE_ATTEMPTS = 2/);
   assert.match(source, /legacyStills: "deleted_or_absent" \| "not_confirmed"/);
   assert.match(source, /EMERGENCY_NUMBER_KEY/);
+  for (const key of ["knotty-settings", "knotty-negotiate", "knotty-plan", "knotty-journal"]) {
+    assert.match(source, new RegExp(`"${key}"`), `${key} must be included in all-data erase`);
+  }
 });
 
 test("emergency number normalizer rejects arbitrary dial strings", async () => {

@@ -49,9 +49,11 @@ export const useSession = create<SessionState>((set, get) => ({
     set({ startedAt: now, lastCheckAt: now, elapsed: 0 });
   },
   tick: (now) => {
-    const { startedAt, stopped } = get();
+    const { startedAt, stopped, elapsed } = get();
     if (!startedAt || stopped) return;
-    set({ elapsed: Math.floor((now - startedAt) / 1000) });
+    const next = Math.floor((now - startedAt) / 1000);
+    if (next === elapsed) return;
+    set({ elapsed: next });
   },
   checked: () => set({ lastCheckAt: Date.now() }),
   stop: (reason) => set({ stopped: true, stopReason: reason }),

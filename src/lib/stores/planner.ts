@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { SEQUENCES } from "@/lib/kb";
+import { adoptPersistKey } from "./persist";
 
 type PlannerState = {
   slugs: string[];
@@ -11,12 +12,20 @@ type PlannerState = {
   clear: () => void;
 };
 
+adoptPersistKey("knotty-plan", "musubi-plan");
+
 export const usePlanner = create<PlannerState>()(
   persist(
     (set, get) => ({
       slugs: [...SEQUENCES[0].steps],
       setSlugs: (slugs) => set({ slugs }),
-      add: (slug) => set({ slugs: [...get().slugs, slug] }),
+      add: (slug) => {
+        const next = slug.trim();
+        if (!next) return;
+        const slugs = get().slugs;
+        if (slugs.includes(next)) return;
+        set({ slugs: [...slugs, next] });
+      },
       remove: (i) => set({ slugs: get().slugs.filter((_, idx) => idx !== i) }),
       loadSequence: (slug) => {
         const seq = SEQUENCES.find((s) => s.slug === slug);
@@ -24,6 +33,6 @@ export const usePlanner = create<PlannerState>()(
       },
       clear: () => set({ slugs: [] }),
     }),
-    { name: "musubi-plan" },
+    { name: "knotty-plan" },
   ),
 );

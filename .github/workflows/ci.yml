@@ -28,3 +28,4 @@ jobs:
       # The full template suite and production build also require provider-
       # generated .grok metadata and PWA binary assets that are not in source.
       - run: npm run test:core
+      - run: npm run test:stores

@@ -56,3 +56,16 @@ test("furniture cannot change after a halt", () => {
   assert.equal(useSession.getState().furnitureSlug, "hismith");
   assert.equal(useSession.getState().stopped, true);
 });
+
+test("tick is a no-op after stop and when the second has not advanced", () => {
+  fresh();
+  useSession.getState().start();
+  const t0 = useSession.getState().startedAt!;
+  useSession.getState().tick(t0 + 2500);
+  assert.equal(useSession.getState().elapsed, 2);
+  useSession.getState().tick(t0 + 2800);
+  assert.equal(useSession.getState().elapsed, 2);
+  useSession.getState().stop("manual");
+  useSession.getState().tick(t0 + 9000);
+  assert.equal(useSession.getState().elapsed, 2);
+});

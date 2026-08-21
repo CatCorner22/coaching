@@ -1,6 +1,10 @@
 export const EMERGENCY_NUMBER_KEY = "knotty-emergency-number";
 
 export const LOCAL_DATA_KEYS = [
+  "knotty-settings",
+  "knotty-negotiate",
+  "knotty-plan",
+  "knotty-journal",
   "musubi-settings",
   "musubi-negotiate",
   "musubi-plan",

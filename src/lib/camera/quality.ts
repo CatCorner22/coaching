@@ -1,6 +1,6 @@
 /** Camera skill: score stills so the coach sees rope, not blur. */
 
-import { isRope } from "../ml/color";
+import { isDarkFiber, isHandTone, isRope, isSkin } from "../ml/color";
 
 export type FrameQuality = {
   sharpness: number;
@@ -53,6 +53,25 @@ export function exposureScore(data: ImageData): number {
   return Math.max(0, 1 - crush * 1.6);
 }
 
+/** Dark brown hemp that misses the brighter rope range. */
+function isDarkJute(r: number, g: number, b: number): boolean {
+  if (isSkin(r, g, b) || isHandTone(r, g, b)) return false;
+  const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const saturation = max === 0 ? 0 : (max - min) / max;
+  return (
+    y >= 18 &&
+    y < 70 &&
+    r < 95 &&
+    r >= g - 2 &&
+    g >= b - 8 &&
+    r - b > 10 &&
+    saturation > 0.12 &&
+    saturation < 0.85
+  );
+}
+
 export function ropeHint(data: ImageData): number {
   const buf = data.data;
   let rope = 0;
@@ -66,7 +85,7 @@ export function ropeHint(data: ImageData): number {
     const luma = 0.299 * r + 0.587 * g + 0.114 * b;
     lumaSum += luma;
     lumaSquaredSum += luma * luma;
-    if (isRope(r, g, b)) rope++;
+    if (isRope(r, g, b) || isDarkFiber(r, g, b) || isDarkJute(r, g, b)) rope++;
     n++;
   }
   if (n < 4) return 0;
@@ -75,7 +94,7 @@ export function ropeHint(data: ImageData): number {
   const lumaVariance = Math.max(0, lumaSquaredSum / n - meanLuma * meanLuma);
   const share = rope / n;
 
-  // A flat brown/skin-colored surface is not evidence of rope. Require scene
+  // A flat dark/brown/skin-colored surface is not evidence of rope. Require scene
   // texture and some non-rope context before using color as a ranking hint.
   if (Math.sqrt(lumaVariance) < 6 || share > 0.85) return 0;
   return share;

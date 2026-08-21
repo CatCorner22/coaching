@@ -24,7 +24,7 @@ export const CoachPanel = memo(function CoachPanel({
   refusal?: boolean;
   halted?: boolean;
 }) {
-  if (pending) {
+  if (!report && !observationReport && pending) {
     return (
       <div className="rounded-lg border border-border bg-elevated p-4 text-sm text-muted">
         xAI is preparing a limited report from the selected stills…
@@ -50,6 +50,11 @@ export const CoachPanel = memo(function CoachPanel({
   };
   return (
     <div className="space-y-3 rounded-lg border border-border bg-elevated p-4">
+      {pending && (
+        <p className="text-xs uppercase tracking-wide text-muted" role="status">
+          xAI is preparing an updated limited report…
+        </p>
+      )}
       <div className="flex items-center justify-between gap-2">
         <Badge variant={urgent ? "danger" : "warn"}>
           {disposition.replaceAll("_", " ")}

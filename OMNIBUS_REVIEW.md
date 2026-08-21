@@ -1,7 +1,8 @@
 # Knotty omnibus engineering and safety review
 
 Review date: 2026-08-21  
-Reviewed base: `81b4084775cc7448dbd6c4cb1aa2462769631b02`
+Reviewed base: `81b4084775cc7448dbd6c4cb1aa2462769631b02`  
+Integrated concurrent `main`: `a68b5c0550bf93f455a4a012ab7bfc14de66d6c5`
 
 ## Decision
 
@@ -9,7 +10,7 @@ Keep the stabilization pull request in draft until a clean Node 22 checkout has 
 
 ## Adversarial storms
 
-Three independent multi-agent rounds challenged the app across seven fronts:
+Four independent multi-agent rounds, followed by a separate merge-adversary pass, challenged the app across eight fronts:
 
 1. camera lifecycle, permissions, focus/torch drivers, recording finalization, decoder limits, malformed containers, stale operations, and cancellation;
 2. consent withdrawal, action-first symptom/coercion triage, context changes, privacy claims, local deletion, and knowledge-base copy;
@@ -18,6 +19,7 @@ Three independent multi-agent rounds challenged the app across seven fronts:
 5. dependency-free fuzz/mutation cases for signatures, Unicode/euphemism boundaries, report invariants, and rate-limit state;
 6. CI truthfulness and clean-checkout release prerequisites.
 7. cross-file consent state, cloud-voice opt-in, quota/replay retry semantics, unclear-adult triage, and instructor-only route isolation.
+8. concurrent-main conflict resolution, stale capture/response races, consent-version migration, dual-key erasure, dark-media false positives, recognition restart bounds, and render isolation.
 
 ## Material modifications
 
@@ -25,16 +27,17 @@ Three independent multi-agent rounds challenged the app across seven fronts:
 - Consent/privacy: separate adult, non-explicit, non-secret, non-coerced, bystander, activity, recording, upload, and output attestations; one-use page batches; context-key remount on tie/step/surface/hard-limit changes; action-first triage before camera access; accurate browser/server/xAI disclosure; cross-tab local erase; configurable emergency number without locale guessing.
 - Observation contract: schema 1.1 closed IDs, evidence state, confounders, abstention, consequence floors, fixed actions, source ledger, strict cross-field validation, direct-report escalation, C3 instructor routing, C4 stop routing, no clearance, no invented chronology, and no synthesized pixel discriminator. C1 ontology entries are promoted to C2 because the app does not collect every separate readiness fact required for C1.
 - Server trust: authenticated middleware on vision/TTS, live-preview bearer propagation, production same-origin checks, request-signal relay, bounded provider responses, typed 403/429 errors, atomic per-user/per-instance quotas, non-evictable global sentinels, bounded request schemas, and redacted session-cookie error logs.
-- Integration: cloud TTS is explicit and fail-closed, browser speech bypasses xAI, opt-out stops playback and invalidates late cache writes, captured batches retain their permission ledger and expiry controls, only a rolled-back pre-provider quota denial reopens a batch, unclear-adult triage clears adult confirmation, and instructor-only content cannot route into Studio.
+- Integration: cloud TTS is explicit and fail-closed, browser speech bypasses xAI, opt-out stops playback and invalidates late cache writes, captured batches retain their permission ledger and expiry controls, only a rolled-back pre-provider quota denial reopens a batch, unclear-adult triage clears adult confirmation, instructor-only content cannot route into Studio, and capture/model results are synchronously bound to their tie/step/surface/limit context.
+- Concurrent-main merge: useful hydration, planner, journal-export, dark-fiber, and timer improvements were retained without importing main's stale-step report reuse, unlocalized paleness weighting, uniform-dark rope assumption, always-on voice/mic defaults, or unversioned consent acceptance. Canonical `knotty-*` storage adopts legacy data once, normalizes journal records, and erases both key families.
 - Operations: Node 22 declaration, focused source-owned CI suite, deployment/device matrix, explicit lockfile/platform-environment blockers, and a durable review record.
 
 ## Verification
 
-- `npm run test:core`: **157/157 passed** (109 dependency-free script tests plus 48 TypeScript ML/knowledge tests).
+- `npm run test:core`: **161/161 passed** (110 dependency-free script tests plus 51 TypeScript camera/ML/knowledge tests).
 - The independent `bdsm-shibari-camera` observation-report validator: **6/6 representative C2/C3/C4/emergency/coercion reports passed**.
 - Full dependency-free script corpus: **228/235 passed**. All seven failures are isolated to the untouched platform PWA fixture: six generic-title expectations inherit this app's `Knotty` `site.json`, and the reconstructed local snapshot omits `public/__grok/icon-180.png`. The icon was verified on GitHub `main` and remains in the base tree.
-- Conflict-marker scan: clean. The final cross-file storm found no additional actionable source regression after remediation.
-- Full TypeScript, lint, production build, browser smoke, and real-device checks were not run because this reconstruction has no installed dependencies or lockfile and is running Node 24 rather than the declared Node 22 target.
+- Conflict-marker scan: clean before the concurrent-main merge; the final merge scan and Node 22 CI are required again after integration.
+- The pre-merge branch passed Node 22 typecheck in CI. Final merged typecheck, lint, store-migration tests, production build, browser smoke, and real-device checks remain pending; this reconstruction has no installed dependencies or lockfile and is running Node 24 rather than the declared Node 22 target.
 
 ## Release blockers and residual risk
 

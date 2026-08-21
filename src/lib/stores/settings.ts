@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { adoptPersistKey } from "./persist";
 
 export type Settings = {
   consentVersion: number;
@@ -51,6 +52,8 @@ type SettingsState = Settings & {
   enter: () => void;
 };
 
+adoptPersistKey("knotty-settings", "musubi-settings");
+
 export const useSettings = create<SettingsState>()(
   persist(
     (set) => ({
@@ -69,7 +72,7 @@ export const useSettings = create<SettingsState>()(
       enter: () => set({ consentVersion: 4, consented: true, adults: true, shears: true, photosOk: true }),
     }),
     {
-      name: "musubi-settings",
+      name: "knotty-settings",
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<Settings>;
         const adults = p.adults === true;

@@ -139,6 +139,9 @@ export function listenForWords(
   }
   const rec = new SR();
   let disposed = false;
+  let fatal = false;
+  let restartAttempts = 0;
+  let restartTimer: number | null = null;
   const report = (status: "starting" | "active" | "idle" | "error" | "unsupported") => {
     if (!disposed) onStatus?.(status);
   };
@@ -147,6 +150,7 @@ export function listenForWords(
   rec.lang = "en-US";
   const last = new Map<string, number>();
   rec.onresult = (ev: unknown) => {
+    restartAttempts = 0;
     const e = ev as {
       resultIndex: number;
       results: ArrayLike<{ 0: { transcript: string }; isFinal?: boolean }>;
@@ -166,8 +170,33 @@ export function listenForWords(
     }
   };
   rec.onstart = () => report("active");
-  rec.onerror = () => report("error");
-  rec.onend = () => report("idle");
+  const scheduleRestart = () => {
+    if (disposed || fatal || restartTimer !== null) return;
+    if (restartAttempts >= 5) {
+      report("idle");
+      return;
+    }
+    report("starting");
+    const delay = Math.min(4_000, 250 * 2 ** restartAttempts);
+    restartTimer = window.setTimeout(() => {
+      restartTimer = null;
+      if (disposed || fatal) return;
+      restartAttempts += 1;
+      try {
+        rec.start();
+      } catch {
+        scheduleRestart();
+      }
+    }, delay);
+  };
+  rec.onerror = (event: unknown) => {
+    const code = (event as { error?: string }).error;
+    if (code === "not-allowed" || code === "service-not-allowed") {
+      fatal = true;
+      report("error");
+    }
+  };
+  rec.onend = scheduleRestart;
   report("starting");
   try {
     rec.start();
@@ -176,6 +205,10 @@ export function listenForWords(
   }
   return () => {
     disposed = true;
+    if (restartTimer !== null) {
+      window.clearTimeout(restartTimer);
+      restartTimer = null;
+    }
     try {
       rec.stop();
     } catch {

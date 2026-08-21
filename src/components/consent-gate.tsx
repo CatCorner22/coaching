@@ -16,7 +16,20 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   const [consent, setConsent] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      setMounted(true);
+    };
+    const api = useSettings.persist;
+    const unsubscribe = api.onFinishHydration(finish);
+    if (api.hasHydrated()) finish();
+    const timeout = window.setTimeout(finish, 80);
+    return () => {
+      unsubscribe();
+      window.clearTimeout(timeout);
+    };
   }, []);
 
   if (!mounted) {

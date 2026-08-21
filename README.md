@@ -24,6 +24,7 @@ npm install
 npm run typecheck
 npm run lint
 npm run test:core
+npm run test:stores
 npm run build
 ```
 

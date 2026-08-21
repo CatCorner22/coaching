@@ -37,7 +37,16 @@ test("accepting a capture preserves the committed permission ledger", () => {
   const camera = read("src/components/camera-capture.tsx");
   assert.match(camera, /setBatchCommitted\(true\)/);
   assert.match(camera, /permissionExpiryTimerRef\.current = window\.setTimeout/);
-  assert.match(studio, /disabled=\{session\.stopped \|\| mediaBlocked \|\| triage !== "none"\}/);
+  assert.match(studio, /disabled=\{stopped \|\| mediaBlocked \|\| triage !== "none"\}/);
+});
+
+test("capture analysis is synchronously bound to the current Studio context", () => {
+  const studio = read("src/routes/studio.tsx");
+  assert.match(studio, /captureContextAtCommitRef\.current = currentContextRef\.current/);
+  assert.match(studio, /captureContextAtCommitRef\.current !== currentContextRef\.current/);
+  assert.match(studio, /requestContext !== currentContextRef\.current/);
+  assert.match(studio, /captureContextAtCommitRef\.current !== requestContext/);
+  assert.match(studio, /disabled=\{stopped \|\| pending \|\| stepIndex === 0\}/);
 });
 
 test("only a verified pre-provider quota denial reopens a batch", () => {
