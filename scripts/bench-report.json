@@ -1,0 +1,49 @@
+{
+  "literature": {
+    "laplacian_blur_threshold_full_res": 100.0,
+    "source": "PyImageSearch / Pech-Pacheco 2000; default 100.0",
+    "cie76_jnd": 2.3,
+    "hf_pose": {
+      "model": "qualcomm/MediaPipe-Pose-Estimation",
+      "detector_mb": 3.14,
+      "landmark_mb": 12.9,
+      "input": "256x256",
+      "decision": "skip-on-first-paint; geometric bbox remains the default"
+    }
+  },
+  "timing_ms_three_laplacians": 3.25,
+  "laplacian": {
+    "coils_sharp_4n": 935.07,
+    "coils_blur_4n": 3.98,
+    "hero_4n": 1021.36,
+    "coils_sharp_opencv_sign": 935.07,
+    "separation_ratio_sharp_over_blur": 235.18,
+    "musubi_norm_divisor": 180,
+    "musubi_soft_cutoff_norm": 0.28,
+    "implied_raw_cutoff": 50.4,
+    "pass_sharp_vs_literature_scaled": true
+  },
+  "rope_recall_on_jute_still": {
+    "coils_jpg": 0.1769,
+    "false_on_blue": 0.0,
+    "false_on_skin_patch": 1.0
+  },
+  "skin": {
+    "musubi_on_skin_patch": 1.0,
+    "kovac_on_skin_patch": 1.0,
+    "musubi_false_on_jute": 0.1253,
+    "kovac_false_on_jute": 0.1105,
+    "prefer": "AND Kovac with current rule to cut jute false-positives"
+  },
+  "circulation_deltaE": {
+    "pale_hand_vs_warm": 26.07,
+    "jnd": 2.3,
+    "note": "A 15+ \u0394E shift is a real color change, not noise. Current palenessDelta uses slope, which is correct."
+  },
+  "recommendations": [
+    "Keep 4-neighbor Laplacian; sharp/blur ratio is healthy on jute stills.",
+    "Rope classifier fires on real jute; keep HSV-brown rule.",
+    "Tighten isSkin to Kovac 2003 to reduce jute counted as skin.",
+    "Do not ship ViTPose/MediaPipe on first load (16MB+). Optional later WASM cache."
+  ]
+}
