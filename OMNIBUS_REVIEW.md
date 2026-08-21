@@ -3,19 +3,20 @@
 Review date: 2026-08-21  
 Reviewed `main`: `cf5317206a47f037983b4c65e18b825705edc777`  
 Core implementation: merged pull request #2, `058bb386720d9617afe75cfde6d84e9cd585d300`  
-Final hardening: draft pull request #3, `codex/final-camera-kb-reliability`
+Concurrent deep-review hardening: merged pull request #4, `9b02ad96e3fad02e90f51d564a467a2961f8b413`  
+Final hardening: pull request #3, `codex/final-camera-kb-reliability`
 
 ## Outcome
 
-The merged core and its four-file hardening follow-up contain the integrated
-stabilization work from repeated independent and adversarial reviews. The exact
-Node 22.23.2 release pipeline now builds one valid Vercel server bundle, verifies
-generated artifacts, typechecks, lints with zero warnings, runs the complete
-source-owned test corpus and PWA fixture, and smoke-tests the production preview
-in desktop and mobile Chromium.
+The merged core, pull request #4's deep-review corrections, and the four-file
+final hardening follow-up contain the integrated stabilization work from repeated
+independent and adversarial reviews. The exact Node 22.23.2 release pipeline now
+builds one valid Vercel server bundle, verifies generated artifacts, typechecks,
+lints with zero warnings, runs the complete source-owned test corpus and PWA
+fixture, and smoke-tests the production preview in desktop and mobile Chromium.
 
-Keep the follow-up in draft until its exact CI run completes. Keep the release
-uncertified until the external matrix is recorded.
+Merge the follow-up only after its exact combined-head CI run completes. Keep
+the release uncertified until the external matrix is recorded.
 Browser automation cannot prove real camera permission behavior, phone codecs,
 live identity/provider integration, database pooling, accessibility, or safe
 real-world use.
@@ -85,6 +86,10 @@ remaining reproducible source-level release blocker before CI.
 - Privacy/resilience: per-batch permissions, no secret recording, cross-tab erase,
   legacy-key cleanup, late-response invalidation, no remote profile images,
   accurate provider-retention caveats, and an auth-independent emergency route.
+- Concurrent deep review: fixed the TypeScript script-test loader; added the
+  required custom-card banner metadata and asset; removed unused AI and P2P code;
+  moved account-isolation storage reads behind an SSR-safe effect; and made a
+  production database configuration without enabled authentication fail closed.
 - Build/release: committed lockfile and route tree; exact Node version and
   `npm ci`; generated-artifact drift check; zero-warning lint; emitted server
   syntax check; Nitro single-bundle workaround for the upstream split-export
@@ -101,12 +106,19 @@ remaining reproducible source-level release blocker before CI.
   the auth-off session route, and completed settled desktop/mobile Chromium
   smoke with identical 929-character page bodies, no console/page errors, and
   no horizontal overflow.
+- GitHub Actions run 19 revalidated the final hardening branch: 354/354
+  source-owned tests, 47/47 PWA fixture tests, release-artifact checks, and
+  desktop/mobile production smoke all passed.
+- GitHub Actions run 20 independently validated pull request #4: 355/355 tests,
+  typecheck, zero-warning lint, production build, PWA fixture, brand assets, and
+  browser smoke all passed.
 - Focused camera/report/safety corpus: 69/69 passed.
 - Focused typed camera/knowledge/ML/voice corpus: 72/72 passed, including 19/19
   knowledge-base tests.
 - Deterministic report state storm: 32,832 combinations, zero throws.
-- Final conflict-marker scan: clean. GitHub comparison reports no unresolved
-  source conflict with the reviewed `main` base.
+- Pull request #4 created one documentation overlap after the prior validation.
+  The two-parent resolution preserves its current code and documentation evidence
+  together with the final hardening review; the conflict-marker scan is clean.
 
 Tests establish reproducible software behavior under their fixtures. They do not
 certify a physical setup, a participant's condition, or future device behavior.

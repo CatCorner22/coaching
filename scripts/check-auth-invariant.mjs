@@ -89,6 +89,30 @@ export function buildAuthEnabled(root = projectRoot(), processEnv = process.env)
   return authEnabledFromEnvValue(env.VITE_AUTH_ENABLED);
 }
 
+/**
+ * Fail fast when a production database is configured but sign-in stays off.
+ * Cloud AI/TTS and authenticated server functions require real auth when
+ * DATABASE_URL is present — otherwise every cost-bearing endpoint rejects
+ * requests with no obvious UI explanation.
+ */
+export function checkDeployAuthConfig(processEnv = process.env) {
+  const databaseUrl = processEnv.DATABASE_URL?.trim();
+  if (!databaseUrl) {
+    return { status: "ok", message: "[deploy-auth] no DATABASE_URL — auth flag not required" };
+  }
+  const authEnabled = authEnabledFromEnvValue(processEnv.VITE_AUTH_ENABLED);
+  if (authEnabled) {
+    return { status: "ok", message: "[deploy-auth] DATABASE_URL set and sign-in enabled" };
+  }
+  return {
+    status: "misconfigured",
+    message:
+      "[deploy-auth] DATABASE_URL is set but VITE_AUTH_ENABLED=false. " +
+      "Cloud AI/TTS and authenticated server functions require sign-in in production. " +
+      "Set VITE_AUTH_ENABLED=true or unset DATABASE_URL for local-only builds.",
+  };
+}
+
 async function main(argv) {
   const devUrlFlag = argv.indexOf("--dev-url");
   const devUrl = devUrlFlag === -1 ? DEFAULT_DEV_URL : argv[devUrlFlag + 1];

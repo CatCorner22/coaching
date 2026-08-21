@@ -95,6 +95,21 @@ test("the build side resolves the template's shipped app-env", () => {
   assert.equal(buildAuthEnabled(projectRoot(), { VITE_AUTH_ENABLED: "true" }), true);
 });
 
+test("DATABASE_URL without sign-in is a deploy misconfiguration", async () => {
+  const { checkDeployAuthConfig } = await import("./check-auth-invariant.mjs");
+  assert.equal(checkDeployAuthConfig({}).status, "ok");
+  assert.equal(
+    checkDeployAuthConfig({ DATABASE_URL: "postgres://x", VITE_AUTH_ENABLED: "true" }).status,
+    "ok",
+  );
+  const misconfigured = checkDeployAuthConfig({
+    DATABASE_URL: "postgres://x",
+    VITE_AUTH_ENABLED: "false",
+  });
+  assert.equal(misconfigured.status, "misconfigured");
+  assert.match(misconfigured.message, /DATABASE_URL is set but VITE_AUTH_ENABLED=false/);
+});
+
 test("the CLI reports rather than silently passing when run via a symlink", async () => {
   // A check whose exit code is the whole signal must never no-op to 0 because
   // process.argv[1] came in through a symlinked path.
