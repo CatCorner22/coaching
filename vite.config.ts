@@ -23,8 +23,8 @@ function hasGlobbedMigrations(root: string): boolean {
 
 /**
  * Finish PGLite bootstrap during dev-server setup (before traffic). Vite awaits
- * async `configureServer` hooks. Production: `src/lib/db` kicks `ensureDbReady`
- * on import.
+ * async `configureServer` hooks. Production stays lazy and requires Postgres
+ * before any server-side database operation; module imports have no DB effects.
  *
  * Vite awaiting the hook puts this on time-to-first-render, so an app with no
  * migrations — no schema to apply — skips it entirely rather than paying for a

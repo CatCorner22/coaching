@@ -41,6 +41,20 @@ test("auth routes, production validation, and provider capability discovery are 
   assert.match(login, /capabilities\.oauthProviders/);
 });
 
+test("PGLite is development-only and production imports do not bootstrap a database", () => {
+  const db = read("src/lib/db.ts");
+  const auth = read("src/lib/auth/server.ts");
+  const config = read("src/lib/auth/config.ts");
+  const vite = read("vite.config.ts");
+
+  assert.match(db, /production[\s\S]*?\? "unconfigured"[\s\S]*?: "pglite"/);
+  assert.match(db, /DATABASE_URL is required for server-side database use in production/);
+  assert.doesNotMatch(db, /__pgBootstrapPromise__/);
+  assert.doesNotMatch(auth, /void ensureDbReady\(\)/);
+  assert.match(vite, /await mod\.ensureDbReady\(\)/);
+  assert.match(config, /problems\.push\("DATABASE_URL is required"\)/);
+});
+
 test("hosting-gate session rotation rejects invalid identity and adapter failures", () => {
   const source = read("src/lib/auth/gate-session.server.ts");
   assert.match(source, /APIError,[\s\S]*?from "better-auth\/api"/);
