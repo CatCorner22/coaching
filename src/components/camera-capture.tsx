@@ -119,6 +119,7 @@ export const CameraCapture = memo(function CameraCapture({
 
   useEffect(() => {
     mountedRef.current = true;
+    const video = videoRef.current;
     return () => {
       mountedRef.current = false;
       mediaOperationRef.current?.abort();
@@ -138,9 +139,9 @@ export const CameraCapture = memo(function CameraCapture({
       recordStartedAtRef.current = null;
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
-      if (videoRef.current) {
-        videoRef.current.pause();
-        videoRef.current.srcObject = null;
+      if (video) {
+        video.pause();
+        video.srcObject = null;
       }
     };
   }, []);
@@ -575,7 +576,7 @@ export const CameraCapture = memo(function CameraCapture({
     setHint("Choose one to three labeled stills from the clip. Nothing is analyzed remotely until you confirm.");
   }
 
-  async function useSelectedVideoFrames() {
+  async function commitSelectedVideoFrames() {
     if (!hasCurrentBatchPermissions()) return;
     const indices = [...selectedFrames].sort((a, b) => a - b).slice(0, 3);
     const chosen = indices.map((index) => videoFrames[index]).filter(Boolean) as PendingVideoFrame[];
@@ -803,7 +804,7 @@ export const CameraCapture = memo(function CameraCapture({
           <div className="mt-3 flex gap-2">
             <Button
               className="flex-1"
-              onClick={() => void useSelectedVideoFrames()}
+              onClick={() => void commitSelectedVideoFrames()}
               disabled={!selectedFrames.length || disabled || !permissionsReady}
             >
               Use selected stills

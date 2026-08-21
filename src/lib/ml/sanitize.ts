@@ -84,13 +84,24 @@ function looksLikeImage(b: Uint8Array) {
 
 export function sanitizeQuestion(q: unknown, max = 400) {
   const s = typeof q === "string" ? q : "";
-  return s
+  const withoutPromptInjection = s
     .replace(/ignore (all |any |the |previous |prior |above |system )?instructions?/gi, "")
     .replace(/you are now/gi, "")
     .replace(/jailbreak/gi, "")
     .replace(/system prompt/gi, "")
     .replace(/developer message/gi, "")
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u200B-\u200D\uFEFF]/g, "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "");
+  return Array.from(withoutPromptInjection)
+    .filter((char) => {
+      const code = char.codePointAt(0) ?? 0;
+      return !(
+        code <= 0x08 ||
+        code === 0x0b ||
+        code === 0x0c ||
+        (code >= 0x0e && code <= 0x1f)
+      );
+    })
+    .join("")
     .trim()
     .slice(0, max);
 }

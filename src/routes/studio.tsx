@@ -344,7 +344,7 @@ function StudioPage() {
       );
     }
     if (!dueCheck) nagged.current = false;
-  }, [dueCheck, settings.voice, micArmed]);
+  }, [dueCheck, settings.voice, micArmed, session.stopped]);
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">

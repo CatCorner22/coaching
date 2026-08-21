@@ -194,7 +194,9 @@ export function hitsHardNo(token: string, hayRaw: string): boolean {
   const t = String(token ?? "").trim();
   if (t.length < 2) return false;
   const original = String(hayRaw ?? "");
-  if (/[^\u0000-\u00ff]/.test(t) && original.includes(t)) return true;
+  if (Array.from(t).some((char) => (char.codePointAt(0) ?? 0) > 0xff) && original.includes(t)) {
+    return true;
+  }
 
   const folded = foldText(t);
   const hay = foldText(original);
