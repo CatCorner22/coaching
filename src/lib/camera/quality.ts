@@ -84,18 +84,19 @@ export function pickBest<T>(
   items: { data: ImageData; item: T; neck?: number; paleness?: number }[],
   keep = 3,
 ): T[] {
-  const danger = items.filter((x) => (x.neck ?? 0) > 0.08 || (x.paleness ?? 0) > 0.45);
+  const danger = items.filter((entry) => (entry.neck ?? 0) > 0.08 || (entry.paleness ?? 0) > 0.45);
   const pool = danger.length ? danger : items;
-  return [...pool]
-    .sort((a, b) => {
-      const qa = scoreFrame(a.data);
-      const qb = scoreFrame(b.data);
-      const sa = qa.score + (a.neck ?? 0) * 0.8 + (a.paleness ?? 0) * 0.4;
-      const sb = qb.score + (b.neck ?? 0) * 0.8 + (b.paleness ?? 0) * 0.4;
-      return sb - sa;
-    })
+  return pool
+    .map((entry) => ({
+      entry,
+      score:
+        scoreFrame(entry.data).score +
+        (entry.neck ?? 0) * 0.8 +
+        (entry.paleness ?? 0) * 0.4,
+    }))
+    .sort((a, b) => b.score - a.score)
     .slice(0, keep)
-    .map((x) => x.item);
+    .map(({ entry }) => entry.item);
 }
 
 export function enhanceContrast(data: ImageData): ImageData {

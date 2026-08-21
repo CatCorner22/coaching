@@ -59,7 +59,7 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
           <Check
             checked={photos}
             onChange={setPhotos}
-            label="I understand Analyze sends a compressed still to Grok for coaching, then discards it on the server."
+            label="I understand Analyze sends compressed frames to xAI, which may retain API inputs and outputs under the workspace's data-retention settings."
           />
         </ul>
         <Button

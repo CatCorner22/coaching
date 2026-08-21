@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 export type Settings = {
+  consentVersion: number;
   consented: boolean;
   adults: boolean;
   shears: boolean;
@@ -19,6 +20,7 @@ export type Settings = {
 };
 
 const defaults: Settings = {
+  consentVersion: 0,
   consented: false,
   adults: false,
   shears: false,
@@ -64,7 +66,7 @@ export const useSettings = create<SettingsState>()(
               ? Math.min(12, Math.max(2, Number(p.circulationMins) || s.circulationMins))
               : s.circulationMins,
         })),
-      enter: () => set({ consented: true, adults: true, shears: true, photosOk: true }),
+      enter: () => set({ consentVersion: 2, consented: true, adults: true, shears: true, photosOk: true }),
     }),
     {
       name: "musubi-settings",
@@ -73,7 +75,8 @@ export const useSettings = create<SettingsState>()(
         const adults = p.adults === true;
         const shears = p.shears === true;
         const photosOk = p.photosOk === true;
-        const consented = p.consented === true && adults && shears && photosOk;
+        const consentVersion = p.consentVersion === 2 ? 2 : 0;
+        const consented = p.consented === true && adults && shears && photosOk && consentVersion === 2;
         return {
           ...current,
           ...p,
@@ -81,6 +84,7 @@ export const useSettings = create<SettingsState>()(
           shears,
           photosOk,
           consented,
+          consentVersion,
           safeword: clampWord(p.safeword, current.safeword),
           yellowWord: clampWord(p.yellowWord, current.yellowWord),
           greenWord: clampWord(p.greenWord, current.greenWord),

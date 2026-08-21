@@ -2,28 +2,55 @@ import { speakCoach } from "@/lib/ai/voice";
 import { scrubBannedAnswer, textIsBanned } from "@/lib/ml/audit";
 
 const cache = new Map<string, string>();
+const MAX_CACHED_VOICES = 20;
+let currentAudio: HTMLAudioElement | null = null;
+let playbackGeneration = 0;
+
+export function stopCoachVoice() {
+  playbackGeneration += 1;
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.removeAttribute("src");
+    currentAudio.load();
+    currentAudio = null;
+  }
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+}
 
 export async function playCoachVoice(text: string) {
   const key = textIsBanned(text) ? scrubBannedAnswer(text) : text.trim();
   if (!key) return;
+  stopCoachVoice();
+  const generation = playbackGeneration;
   try {
     let url = cache.get(key);
     if (!url) {
       const res = await speakCoach({ data: { text: key } });
+      if (generation !== playbackGeneration) return;
       if (res.ok) {
         url = `data:${res.mime};base64,${res.b64}`;
         cache.set(key, url);
+        if (cache.size > MAX_CACHED_VOICES) {
+          const oldest = cache.keys().next().value as string | undefined;
+          if (oldest) cache.delete(oldest);
+        }
       }
     }
-    if (url) {
+    if (url && generation === playbackGeneration) {
       const audio = new Audio(url);
+      currentAudio = audio;
+      audio.addEventListener("ended", () => {
+        if (currentAudio === audio) currentAudio = null;
+      }, { once: true });
       await audio.play();
       return;
     }
   } catch {
     /* fall through */
   }
-  if ("speechSynthesis" in window) {
+  if (generation === playbackGeneration && "speechSynthesis" in window) {
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(key);
     u.rate = 0.95;

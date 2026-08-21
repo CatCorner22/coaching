@@ -10,14 +10,14 @@ import { analyzeRope } from "@/lib/ai/analyze";
 import { DUNGEON, TIES, getTie } from "@/lib/kb";
 import { sampleHands } from "@/lib/ml/detect";
 import { fuseCoach } from "@/lib/ml/fuse";
-import { toImageData } from "@/lib/media";
+import { toImageData, validateMediaFile } from "@/lib/media";
 import type { CoachReport } from "@/lib/ml/types";
 import type { RGB } from "@/lib/ml/color";
-import { saveStill, useJournal } from "@/lib/stores/journal";
+import { useJournal } from "@/lib/stores/journal";
 import { useNegotiate } from "@/lib/stores/negotiate";
 import { useSession } from "@/lib/stores/session";
 import { useSettings } from "@/lib/stores/settings";
-import { listenForWords, playCoachVoice } from "@/lib/voice/play";
+import { listenForWords, playCoachVoice, stopCoachVoice } from "@/lib/voice/play";
 import { buildDeterministic } from "@/lib/ml/predict";
 
 export const Route = createFileRoute("/studio")({
@@ -41,9 +41,12 @@ function StudioPage() {
   const [baseline, setBaseline] = useState<RGB | null>(null);
   const [report, setReport] = useState<CoachReport | null>(null);
   const [pending, setPending] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [calibrationError, setCalibrationError] = useState<string | null>(null);
   const [refusal, setRefusal] = useState(false);
   const [saved, setSaved] = useState(false);
   const [question, setQuestion] = useState("");
+  const analysisRequestRef = useRef(0);
   const tie = getTie(session.tieSlug ?? "");
 
   useEffect(() => {
@@ -100,6 +103,9 @@ function StudioPage() {
 
   useEffect(() => {
     setSaved(false);
+    analysisRequestRef.current += 1;
+    setPending(false);
+    setAnalysisError(null);
   }, [capture]);
   const det = useMemo(() => {
     if (!capture) return null;
@@ -112,6 +118,16 @@ function StudioPage() {
   const furnitureSlug = useSession((s) => s.furnitureSlug);
   const elapsed = useSession((s) => s.elapsed);
   const lastCheckAt = useSession((s) => s.lastCheckAt);
+
+  useEffect(() => {
+    if (!stopped) return;
+    analysisRequestRef.current += 1;
+    stopCoachVoice();
+    setPending(false);
+    setCapture(null);
+    setPrior(null);
+    setReport(null);
+  }, [stopped]);
 
   useEffect(() => {
     if (!det || !capture) return;
@@ -133,8 +149,10 @@ function StudioPage() {
   async function runAnalyze() {
     if (!capture || !det) return;
     if (session.stopped) return;
+    const request = ++analysisRequestRef.current;
     setPending(true);
     setRefusal(false);
+    setAnalysisError(null);
     try {
       const res = await analyzeRope({
         data: {
@@ -153,15 +171,21 @@ function StudioPage() {
           },
         },
       });
+      if (request !== analysisRequestRef.current || useSession.getState().stopped) return;
       if (res.ok) {
-        if (useSession.getState().stopped) return;
         setRefusal(res.refusal);
         setReport(res.report);
         if (res.report.final.recommend === "stop") session.stop("coach");
-        if (settings.voice) void playCoachVoice(res.report.final.speak);
+        else if (settings.voice) void playCoachVoice(res.report.final.speak);
+      } else {
+        setAnalysisError(res.error || "The analysis could not be completed.");
+      }
+    } catch (cause) {
+      if (request === analysisRequestRef.current) {
+        setAnalysisError(cause instanceof Error ? cause.message : "The analysis could not be completed.");
       }
     } finally {
-      setPending(false);
+      if (request === analysisRequestRef.current) setPending(false);
     }
   }
   analyzeRef.current = () => {
@@ -194,9 +218,16 @@ function StudioPage() {
   }, [dueCheck, settings.voice]);
 
   async function calibrate(file: File) {
-    const imageData = await toImageData(file, 240);
-    const rgb = sampleHands(imageData);
-    if (rgb) setBaseline(rgb);
+    setCalibrationError(null);
+    try {
+      validateMediaFile(file, "photo");
+      const imageData = await toImageData(file, 240);
+      const rgb = sampleHands(imageData);
+      if (!rgb) throw new Error("No readable hand area was found. Try a closer, brighter photo.");
+      setBaseline(rgb);
+    } catch (cause) {
+      setCalibrationError(cause instanceof Error ? cause.message : "Could not read the calibration photo.");
+    }
   }
 
   return (
@@ -205,13 +236,17 @@ function StudioPage() {
         <div className="mb-6 rounded-lg border border-danger/40 bg-danger/10 p-4">
           <p className="font-display text-3xl text-danger">Stop</p>
           <p className="mt-1 text-sm text-fg">
-            Safeword or coach halt. Shears. Cut tensioned stems first. Hands, then throat, then
-            the rest. Aftercare is the scene now.
+            Stop loading immediately. Support your partner's position, release or cut rope without
+            pulling it tighter, and call emergency services for breathing trouble, loss of
+            consciousness, severe color or temperature change, chest pain, or persistent numbness
+            or weakness.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button
               variant="outline"
               onClick={() => {
+                analysisRequestRef.current += 1;
+                stopCoachVoice();
                 setCapture(null);
                 setPrior(null);
                 setReport(null);
@@ -355,10 +390,11 @@ function StudioPage() {
                 setPrior(capture);
                 setCapture(c);
               }}
+              disabled={session.stopped}
             />
           </div>
           {capture && (
-            <WrapOverlay src={capture.preview} obs={capture.observations.at(-1)} />
+            <WrapOverlay src={capture.preview} obs={capture.previewObservation} />
           )}
           {prior && capture && (
             <div className="mt-3 grid grid-cols-2 gap-2">
@@ -386,12 +422,14 @@ function StudioPage() {
             placeholder="Optional: what you want coached in this still"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
+            disabled={session.stopped}
           />
+          {analysisError && <p className="text-sm text-danger" role="alert">{analysisError}</p>}
           <div className="flex flex-wrap gap-2">
             <Button onClick={() => void runAnalyze()} disabled={!capture || pending || session.stopped}>
               Ask Grok
             </Button>
-            <Button variant="outline" onClick={() => session.checked()}>
+            <Button variant="outline" onClick={() => session.checked()} disabled={session.stopped}>
               Hands checked
             </Button>
             <Button variant="danger" onClick={() => session.stop("manual")}>
@@ -404,12 +442,14 @@ function StudioPage() {
               type="file"
               accept="image/*"
               className="mt-1 block w-full text-xs"
+              disabled={session.stopped}
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) void calibrate(f);
               }}
             />
             {baseline && <span className="text-ok"> Baseline stored on this device.</span>}
+            {calibrationError && <span className="block text-danger" role="alert">{calibrationError}</span>}
           </label>
           <Button
             variant="ghost"
@@ -417,7 +457,7 @@ function StudioPage() {
             disabled={!report}
             onClick={() => {
               if (!report) return;
-              const id = addEntry({
+              addEntry({
                 tieSlug: session.tieSlug,
                 minutes: Math.round(session.elapsed / 60),
                 notes: report.final.coaching.slice(0, 280),
@@ -425,16 +465,16 @@ function StudioPage() {
                 flags: report.final.flags.map((f) => f.code),
                 photoCount: capture?.jpegs.length ?? 0,
               });
-              const still = capture?.preview ?? capture?.jpegs[0];
-              if (still) void saveStill(id, still);
               setSaved(true);
             }}
           >
             {saved ? "Saved on this device" : "Save to journal"}
           </Button>
           <p className="text-xs leading-relaxed text-subtle">
-            Stills live in this browser until you analyze. Analyze sends compressed frames to Grok.
-            A local auditor can veto the model. Nude is fine. Unattended rope is not.
+            Captures stay in this page's memory until replaced, stopped, or the page closes; the
+            journal does not save them. Analyze sends compressed frames to xAI. xAI may retain API
+            inputs and outputs under the workspace's data-retention settings. A local auditor can
+            veto the model, but it cannot prove that a tie is safe.
           </p>
         </div>
       </div>
