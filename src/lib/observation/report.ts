@@ -237,6 +237,60 @@ export function consequenceFloor(id: CanonicalId): ConsequenceBand {
   return "C2_elevated";
 }
 
+export function isHighConsequence(id: CanonicalId): boolean {
+  const band = consequenceFloor(id);
+  return band === "C3_high_consequence_instructor_only" || band === "C4_stop_or_decline";
+}
+
+/**
+ * Remote category admission. A model that self-flags prohibited inference
+ * must not wipe C3/C4 safety matches, and a high-consequence ID with a
+ * junk frame label is rebound to the batch rather than dropped.
+ */
+export function admitRemoteCategories(
+  matches: ReadonlyArray<{ frame_id?: unknown; canonical_id?: unknown }>,
+  allowedFrameIds: readonly string[],
+  audit: {
+    nonvisual_inference: boolean;
+    exact_identification: boolean;
+    procedural_content: boolean;
+  },
+): {
+  matches: ModelCategoryMatch[];
+  hardLimit: boolean;
+  modelStatus: Extract<ModelStatus, "completed" | "failed">;
+} {
+  const allowed = allowedFrameIds.filter((id) => /^F0[1-3]$/.test(id));
+  const fallback = allowed[0] ?? "F01";
+  const bound: ModelCategoryMatch[] = [];
+  const seen = new Set<string>();
+  for (const raw of matches) {
+    if (!isCanonicalId(raw.canonical_id)) continue;
+    const requested = typeof raw.frame_id === "string" ? raw.frame_id : "";
+    const frameId = allowed.includes(requested)
+      ? requested
+      : isHighConsequence(raw.canonical_id)
+        ? fallback
+        : "";
+    if (!frameId) continue;
+    const key = `${frameId}:${raw.canonical_id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    bound.push({ frame_id: frameId, canonical_id: raw.canonical_id });
+  }
+  const disallowed =
+    audit.nonvisual_inference || audit.exact_identification || audit.procedural_content;
+  if (!disallowed) {
+    return { matches: bound, hardLimit: false, modelStatus: "completed" };
+  }
+  const critical = bound.filter((match) => isHighConsequence(match.canonical_id));
+  return {
+    matches: critical,
+    hardLimit: true,
+    modelStatus: critical.length > 0 ? "completed" : "failed",
+  };
+}
+
 const CONSEQUENCE_RANK: Record<ConsequenceBand, number> = {
   C1_lower_consequence_learning: 1,
   C2_elevated: 2,
@@ -274,6 +328,8 @@ export function buildObservationReport(options: {
   allowedFrameIds?: string[];
   modelStatus: ModelStatus;
   triage?: TriageState;
+  /** Model self-audit or another closed rule forbade trusting the full remote output. */
+  hardLimit?: boolean;
 }): ObservationReport {
   const triage = options.triage ?? "none";
   const consent = options.consent ?? {
@@ -342,6 +398,9 @@ export function buildObservationReport(options: {
   } else if (hasC3) {
     disposition = "do_not_proceed";
     nextStep = "qualified_instructor";
+  } else if (options.hardLimit) {
+    disposition = "do_not_proceed";
+    nextStep = "do_not_proceed";
   } else if (modelUnavailable || categories.some((category) => category.canonical_id === "unknown_object")) {
     disposition = "insufficient_view";
     nextStep = "lower_consequence_only";

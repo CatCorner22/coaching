@@ -87,6 +87,7 @@ export function sanitizeQuestion(q: unknown, max = 400) {
   const withoutPromptInjection = s
     .replace(/ignore[\s\S]{0,48}(instructions?|rules?|prompts?|policies)/gi, "")
     .replace(/disregard[\s\S]{0,40}(rules?|instructions?|safety)/gi, "")
+    .replace(/forget[\s\S]{0,40}(instructions?|rules?|prompts?|policies)/gi, "")
     .replace(/you are now/gi, "")
     .replace(/jailbreak/gi, "")
     .replace(/system prompt/gi, "")

@@ -287,7 +287,7 @@ function StudioPage() {
         setReport(res.report);
         setObservationReport(res.observationReport);
         setModelStatus(res.modelStatus);
-        if (res.observationReport.urgent_stop || res.observationReport.disposition === "do_not_proceed") {
+        if (res.observationReport.urgent_stop || res.observationReport.disposition === "do_not_proceed" || res.selfAudit.hardLimit) {
           stopSession("observation");
         } else if (settings.voice && !micArmed) {
           void playCoachVoice(res.report.final.speak, settings.voice);

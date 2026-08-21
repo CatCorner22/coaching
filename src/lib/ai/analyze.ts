@@ -8,6 +8,7 @@ import type { DeterministicReport, SafetyFlag } from "@/lib/ml/types";
 import {
   buildObservationReport,
   CANONICAL_IDS,
+  admitRemoteCategories,
   type ModelCategoryMatch,
   type ModelStatus,
   type TriageState,
@@ -238,42 +239,27 @@ export const analyzeRope = createServerFn({ method: "POST" })
         if (!parsed.success) {
           modelStatus = "failed";
           selfAudit.note = "Remote output failed the closed schema and was discarded.";
+          selfAudit.hardLimit = true;
         } else {
-          const disallowed =
-            parsed.data.audit.nonvisual_inference ||
-            parsed.data.audit.exact_identification ||
-            parsed.data.audit.procedural_content;
+          const admitted = admitRemoteCategories(
+            parsed.data.matches,
+            data.frameLabels,
+            parsed.data.audit,
+          );
+          matches = admitted.matches;
+          modelStatus = admitted.modelStatus;
           selfAudit = {
             contradictsDet: false,
-            hardLimit: parsed.data.audit.procedural_content,
+            hardLimit: admitted.hardLimit,
             invented: parsed.data.audit.nonvisual_inference || parsed.data.audit.exact_identification,
-            note: sanitizeQuestion(parsed.data.audit.note, 240),
+            note: admitted.hardLimit
+              ? "Remote output reported a prohibited inference. High-consequence categories were kept; the rest was discarded."
+              : sanitizeQuestion(parsed.data.audit.note, 240),
           };
-          if (disallowed) {
-            modelStatus = "failed";
-            matches = [];
-            selfAudit.note = "Remote output reported a prohibited inference and was discarded.";
-          } else {
-            const allowedFrames = new Set(data.frameLabels);
-            matches = parsed.data.matches.filter((match) => allowedFrames.has(match.frame_id));
-            modelStatus = "completed";
-          }
         }
       }
     }
 
-    // The legacy coach shape remains internal compatibility only. No free-form
-    // model action prose enters it; local rules generate its fixed stop/observe text.
-    const report = fuseCoach({
-      det: effectiveDet,
-      frames: [],
-      llm: null,
-      tie,
-      stepIndex,
-      elapsedSec,
-      priorNerveHits: 0,
-      hardNos,
-    });
     const observationReport = buildObservationReport({
       mediaMode: data.media.mode,
       consent: data.consent,
@@ -282,6 +268,20 @@ export const analyzeRope = createServerFn({ method: "POST" })
       allowedFrameIds: data.frameLabels,
       modelStatus,
       triage,
+      hardLimit: selfAudit.hardLimit,
+    });
+    const report = fuseCoach({
+      det:
+        observationReport.urgent_stop || observationReport.disposition === "do_not_proceed"
+          ? visualHaltReport(effectiveDet)
+          : effectiveDet,
+      frames: [],
+      llm: null,
+      tie,
+      stepIndex,
+      elapsedSec,
+      priorNerveHits: 0,
+      hardNos,
     });
 
     return {
@@ -324,6 +324,20 @@ function closeClientHeuristic(det: DeterministicReport): DeterministicReport {
     flags,
     recommend: stop ? "stop" : "adjust",
     notes: ["Client image hints are unvalidated and cannot establish age, consent, physiology, load, category absence, or technique."],
+  };
+}
+
+function visualHaltReport(det: DeterministicReport): DeterministicReport {
+  return {
+    ...det,
+    flags: [
+      {
+        code: "unknown",
+        severity: "stop",
+        note: "The limited visual report requires stopping. Release and assess directly; the image cannot establish cause or severity.",
+      },
+    ],
+    recommend: "stop",
   };
 }
 

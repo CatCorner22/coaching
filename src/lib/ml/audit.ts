@@ -85,6 +85,22 @@ const BANNED = [
   /strappado/i,
   /hair suspension/i,
   /hoist from/i,
+  /hoist (her|him|them) (from|off|by)/i,
+  /wrist suspension/i,
+  /elevate (her|him|them)/i,
+  /(take|put|shift) (her |his |their |the )?(weight|mass) (on|onto|to)/i,
+  /toes? (leave|clear|off) the (mat|floor|ground)/i,
+  /plastic bag over/i,
+  /bag over (her |his |their |the )?face/i,
+  /gas ?mask play/i,
+  /air hunger/i,
+  /oxygen (play|restriction)/i,
+  /\bhyoid\b/i,
+  /cervical (wrap|spine|band|rope)/i,
+  /under the mandible/i,
+  /leave (her|him|them) in it/i,
+  /sleep while .{0,28}(bound|tied|gagged)/i,
+  /\bhang point\b/i,
   /(add|use|clip|tie|run|improvis(?:e|ing)?) (an |the |a )?up[- ]?lines?/i,
   /up[- ]?lines? to the (ceiling|neck|throat|ring|beam|fan|hook|pole|swing)/i,
   /pole is (your |the |an )?up[- ]?line/i,
@@ -129,6 +145,9 @@ const BANNED_COMPACT = [
   "underthejaw",
   "napeharness",
   "naperope",
+  "hyoid",
+  "airhunger",
+  "wristsuspension",
 ];
 
 const NO_STOPWORDS = new Set([
@@ -240,7 +259,7 @@ const KEY_ALIASES: Record<string, string[]> = {
   air: ["breath", "air", "airway"],
   hang: ["hang", "hoist"],
   suspension: ["suspension", "hang", "hoist"],
-  alone: ["alone", "unattended"],
+  alone: ["alone", "unattended", "bound"],
 };
 
 function dangerousWeak(k: string, hay: string) {
@@ -253,12 +272,12 @@ function dangerousWeak(k: string, hay: string) {
   if (k === "breath" || k === "air") {
     return /breath play|restrict .{0,12}(breath|air)|hold (her |his )?breath|steal .{0,12}(air|breath)/.test(h);
   }
-  if (k === "hang") return /hang (her|him|them|from)/.test(h);
+  if (k === "hang") return /hang (her|him|them|from)|hoist (her|him|them|from)/.test(h);
   if (k === "suspension") {
-    return /full suspension|hang (her|him|them|from)|both feet (off|leave)|string (her|him|them) up/.test(h);
+    return /full suspension|hang (her|him|them|from)|hoist (her|him|them|from)|both feet (off|leave)|string (her|him|them) up/.test(h);
   }
   if (k === "alone") {
-    return /left (tied and )?alone|tied and alone|leave (her|him|them) (tied|alone|bound)|unattended/.test(h);
+    return /left (tied and )?alone|tied and alone|leave (her|him|them) (tied|alone|bound)|leave (her|him|them) in it|unattended/.test(h);
   }
   return false;
 }

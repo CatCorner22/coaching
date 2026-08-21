@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  admitRemoteCategories,
   buildObservationReport,
   CANONICAL_IDS,
   consequenceFloor,
@@ -99,6 +100,67 @@ test("model failure fails closed as insufficient view and never as clearance", (
   assert.match(report.limitations.join(" "), /did not complete/i);
   assert.notEqual(report.disposition, "no_visible_concern_not_clearance");
   assert.notEqual(report.next_step_id, "no_action_from_image");
+});
+
+test("procedural self-audit cannot wipe a neck category", () => {
+  const admitted = admitRemoteCategories(
+    [
+      { frame_id: "F01", canonical_id: "rope_restraint_unspecified" },
+      { frame_id: "F01", canonical_id: "neck_or_airway_overlap_possible" },
+    ],
+    ["F01"],
+    { nonvisual_inference: false, exact_identification: false, procedural_content: true },
+  );
+  assert.equal(admitted.hardLimit, true);
+  assert.deepEqual(
+    admitted.matches.map((match) => match.canonical_id),
+    ["neck_or_airway_overlap_possible"],
+  );
+  const report = buildObservationReport({
+    mediaMode: "static_photos",
+    consent,
+    quality,
+    matches: admitted.matches,
+    allowedFrameIds: ["F01"],
+    modelStatus: admitted.modelStatus,
+    hardLimit: admitted.hardLimit,
+  });
+  assert.equal(report.urgent_stop, true);
+  assert.equal(report.disposition, "stop_now");
+  assert.equal(report.next_step_id, "stop_now");
+});
+
+test("C4 with a junk frame id is rebound instead of dropped", () => {
+  const admitted = admitRemoteCategories(
+    [{ frame_id: "F99", canonical_id: "neck_or_airway_overlap_possible" }],
+    ["F01"],
+    { nonvisual_inference: false, exact_identification: false, procedural_content: false },
+  );
+  assert.deepEqual(admitted.matches, [
+    { frame_id: "F01", canonical_id: "neck_or_airway_overlap_possible" },
+  ]);
+});
+
+test("procedural self-audit without a high-consequence match refuses continuation", () => {
+  const admitted = admitRemoteCategories(
+    [{ frame_id: "F01", canonical_id: "rope_restraint_unspecified" }],
+    ["F01"],
+    { nonvisual_inference: false, exact_identification: true, procedural_content: false },
+  );
+  assert.equal(admitted.hardLimit, true);
+  assert.equal(admitted.matches.length, 0);
+  const report = buildObservationReport({
+    mediaMode: "static_photos",
+    consent,
+    quality,
+    matches: admitted.matches,
+    allowedFrameIds: ["F01"],
+    modelStatus: admitted.modelStatus,
+    hardLimit: true,
+  });
+  assert.equal(report.disposition, "do_not_proceed");
+  assert.equal(report.next_step_id, "do_not_proceed");
+  assert.notEqual(report.disposition, "insufficient_view");
 });
 
 test("missing per-batch permission refuses media analysis", () => {
