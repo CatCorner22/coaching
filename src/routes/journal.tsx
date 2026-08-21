@@ -18,8 +18,9 @@ function JournalPage() {
       <p className="text-xs uppercase tracking-[0.22em] text-muted">Log</p>
       <h1 className="mt-2 font-display text-4xl">Journal</h1>
       <p className="mt-3 text-sm text-muted">
-        Local notes only. New journal entries never store captures. Older app versions may have
-        left stills in browser storage; you can remove that legacy database below.
+        Text summaries are stored unencrypted in this browser's site storage. Captures are never
+        stored by current versions. Anyone with this browser profile may be able to read the notes;
+        export only with the adults' agreed output scope.
       </p>
       <Button
         variant="outline"
@@ -51,7 +52,7 @@ function JournalPage() {
         </Button>
       )}
       {entries.length === 0 ? (
-        <p className="mt-10 text-sm text-muted">No scenes yet. The studio can save a pass here.</p>
+        <p className="mt-10 text-sm text-muted">No text summaries saved on this device.</p>
       ) : (
         <ul className="mt-8 space-y-3">
           {entries.map((e) => (
@@ -66,8 +67,14 @@ function JournalPage() {
                 {new Date(e.at).toLocaleString()} · {e.minutes} min
               </p>
               <p className="mt-2 text-sm text-fg">{e.notes}</p>
+              <p className="mt-1 text-xs text-muted">
+                Disposition: {String(e.disposition ?? "legacy_entry_no_disposition").replaceAll("_", " ")}
+              </p>
               {e.flags.length > 0 && (
                 <p className="mt-1 text-xs text-warn">{e.flags.join(" · ")}</p>
+              )}
+              {Array.isArray(e.limitations) && e.limitations.length > 0 && (
+                <p className="mt-1 text-xs text-subtle">{e.limitations[0]}</p>
               )}
               {e.tieSlug && (
                 <Button asChild variant="ghost" size="sm" className="mt-2 px-0">

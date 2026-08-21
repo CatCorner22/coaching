@@ -5,11 +5,11 @@ export const GEAR: GearItem[] = [
     slug: "jute-8m",
     name: "Jute 6mm × 8m",
     kind: "rope",
-    summary: "The standard working length. Most floor harnesses want one or two of these.",
+    summary: "A common practice length for unoccupied, ground-level, non-loaded rope-handling drills.",
     notes: [
-      "Six to eight pieces is a real kit, not two",
-      "Natural fiber will shed; that is normal",
-      "Treat lightly with camellia or jojoba, then work it in",
+      "Start with the least material needed for an unoccupied handling drill",
+      "Natural fiber can shed; inspect for damage rather than assuming shedding is harmless",
+      "Follow the maker's care instructions and retire damaged or uncertain rope from body use",
     ],
   },
   {
@@ -30,14 +30,14 @@ export const GEAR: GearItem[] = [
     slug: "cotton",
     name: "Cotton",
     kind: "rope",
-    summary: "Soft and treacherous. Stretches, then tightens. Fine for decorative practice on furniture, not for cuffs you trust.",
-    notes: ["If it is what you have tonight, double-check every cuff after she leans."],
+    summary: "Cotton can stretch and change under tension. A soft feel does not establish suitability for body restraint.",
+    notes: ["Use it for unoccupied, non-loaded handling drills in this app; seek hands-on guidance for body application."],
   },
   {
     slug: "shears",
     name: "Trauma shears",
     kind: "tool",
-    summary: "The only piece of kit that is not optional. Blunt beak, serrated, on a lanyard.",
+    summary: "A suitable rapid-release tool should be immediately accessible, with a rehearsed backup release plan.",
     notes: [
       "Practice on scrap rope",
       "A knife is not a substitute",
@@ -76,7 +76,7 @@ export const GEAR: GearItem[] = [
     slug: "blanket",
     name: "Aftercare blanket",
     kind: "care",
-    summary: "Warmth is medical, not cute. Drop and shock look like cold.",
-    notes: ["Keep water and a snack next to it so you do not leave her to go hunting."],
+    summary: "Offer warmth only if wanted; a blanket is comfort equipment, not treatment or a way to rule out a medical problem.",
+    notes: ["Keep agreed aftercare items nearby so nobody restrained is left alone. Seek urgent help for emergency signs."],
   },
 ];

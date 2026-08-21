@@ -59,7 +59,7 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
           <Check
             checked={photos}
             onChange={setPhotos}
-            label="I understand Analyze sends only my selected compressed stills to xAI, which may retain API inputs and outputs under the workspace's data-retention settings."
+            label="I understand Analyze sends selected compressed stills and generic frame labels to xAI once per batch; xAI may retain inputs and outputs under the workspace's data-retention settings."
           />
         </ul>
         <Button
@@ -74,8 +74,10 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
           Enter
         </Button>
         <p className="mt-4 text-xs leading-relaxed text-subtle">
-          An app cannot replace a teacher with hands on the rope. Knotty will refuse neck
-          restraint, breath play, suspension, load-bearing rigging, and image-based clearance.
+          Captures remain page-memory only unless you explicitly save a text summary. If cloud
+          voice is enabled later, its exact spoken text is also sent to xAI. Browser speech and
+          local storage may involve device or platform services; do not use a shared device if
+          that exposure is unacceptable.
         </p>
       </div>
     </div>

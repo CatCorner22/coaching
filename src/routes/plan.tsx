@@ -17,16 +17,17 @@ function PlanPage() {
   const add = usePlanner((s) => s.add);
   const remove = usePlanner((s) => s.remove);
   const loadSequence = usePlanner((s) => s.loadSequence);
-  const minutes = slugs.reduce((n, s) => n + (getTie(s)?.minutes[1] ?? 10), 0);
+  const firstTie = slugs[0] ? getTie(slugs[0]) : undefined;
   useEffect(() => {
     if (search.seq) loadSequence(search.seq);
   }, [search.seq, loadSequence]);
   return (
     <div className="mx-auto max-w-2xl px-5 py-10">
-      <p className="text-xs uppercase tracking-[0.22em] text-muted">Scene</p>
-      <h1 className="mt-2 font-display text-4xl">Planner</h1>
+      <p className="text-xs uppercase tracking-[0.22em] text-muted">Education</p>
+      <h1 className="mt-2 font-display text-4xl">Learning planner</h1>
       <p className="mt-3 text-sm text-muted">
-        One peak. A landing. A clock. Not four ambitious ties stacked until her hands go quiet.
+        Build a short reading or unoccupied-practice plan. Instructor-route entries are for risk
+        recognition and questions, not remote construction or a live-scene sequence.
       </p>
       <div className="mt-6 flex flex-wrap gap-2">
         {SEQUENCES.map((s) => (
@@ -53,7 +54,9 @@ function PlanPage() {
           );
         })}
       </ol>
-      <p className="mt-3 text-xs text-subtle">Budget about {minutes} minutes, plus aftercare.</p>
+      <p className="mt-3 text-xs text-subtle">
+        Library times are reading and planning estimates, never safe-duration limits. Check directly and release for any concern.
+      </p>
       <select
         className="mt-6 h-11 w-full rounded-md border border-border bg-elevated px-3 text-sm"
         defaultValue=""
@@ -62,20 +65,24 @@ function PlanPage() {
           e.target.value = "";
         }}
       >
-        <option value="">Add a tie</option>
+        <option value="">Add a library entry</option>
         {TIES.map((t) => (
           <option key={t.slug} value={t.slug}>
             {t.name}
           </option>
         ))}
       </select>
-      {slugs[0] && (
+      {firstTie && firstTie.minutes[1] > 0 ? (
         <Button asChild className="mt-6">
-          <Link to="/studio" search={{ tie: slugs[0] }}>
-            Open studio on the first beat
+          <Link to="/studio" search={{ tie: firstTie.slug }}>
+            Open limited observation—not coaching
           </Link>
         </Button>
-      )}
+      ) : firstTie ? (
+        <Button className="mt-6" disabled>
+          Instructor route · Studio unavailable
+        </Button>
+      ) : null}
     </div>
   );
 }

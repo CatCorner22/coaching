@@ -135,7 +135,7 @@ export function sanitizeDet(raw: unknown): DeterministicReport {
     flags.push({
       code: "neck",
       severity: "stop",
-      note: "Neck-zone density on the still. Confirm the throat is empty.",
+      note: "A two-dimensional overlap may involve the neck or airway. Stop and release; the still cannot establish clearance.",
     });
   }
   const validRecommend = report.recommend === "continue" || report.recommend === "adjust" || report.recommend === "stop";

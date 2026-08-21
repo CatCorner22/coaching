@@ -2,10 +2,16 @@ export const MAX_PHOTO_BYTES = 25 * 1024 * 1024;
 export const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
 export const MAX_ANALYZE_IMAGE_BYTES = 300_000;
 export const MAX_VIDEO_DURATION_SECONDS = 60;
-export const MAX_IMAGE_PIXELS = 16_000_000;
+// Current phones commonly produce 24 MP stills. Accept those uploads, then
+// downsample them before analysis, while retaining an absolute decode budget.
+export const MAX_IMAGE_PIXELS = 26_000_000;
+export const MAX_IMAGE_EDGE = 8_192;
+export const MAX_VIDEO_FRAME_PIXELS = 16_000_000;
+export const MAX_VIDEO_FRAME_EDGE = 5_120;
 
 const MEDIA_EVENT_TIMEOUT_MS = 12_000;
 const IMAGE_DECODE_TIMEOUT_MS = 8_000;
+let bitmapDecodePending = false;
 
 const PHOTO_MIME_TYPES = new Set([
   "image/jpeg",
@@ -19,7 +25,9 @@ const VIDEO_MIME_TYPES = new Set([
   "video/quicktime",
   "video/webm",
   "video/x-m4v",
+  "video/3gpp",
 ]);
+const GENERIC_MIME_TYPES = new Set(["", "application/octet-stream", "binary/octet-stream"]);
 
 type UploadKind = "photo" | "video";
 
@@ -42,17 +50,21 @@ export function validateMediaFile(file: File, kind: UploadKind): void {
   const allowedExtensions =
     kind === "photo"
       ? new Set(["jpg", "jpeg", "png", "webp", "heic", "heif"])
-      : new Set(["mp4", "m4v", "mov", "webm"]);
+      : new Set(["mp4", "m4v", "mov", "webm", "3gp"]);
   const allowedMimeTypes = kind === "photo" ? PHOTO_MIME_TYPES : VIDEO_MIME_TYPES;
-  if (mime && !allowedMimeTypes.has(mime)) {
+  const jpegAlias = kind === "photo" && mime === "image/jpg";
+  if (!GENERIC_MIME_TYPES.has(mime) && !allowedMimeTypes.has(mime) && !jpegAlias) {
     throw new Error(`Choose a supported ${kind} file.`);
   }
-  if (!mime && !allowedExtensions.has(extension)) {
+  if ((GENERIC_MIME_TYPES.has(mime) || jpegAlias) && !allowedExtensions.has(extension)) {
     throw new Error(`That ${kind} format is not supported.`);
   }
 }
 
-export async function validateMediaSignature(file: Blob, kind: UploadKind): Promise<void> {
+export async function validateMediaSignature(
+  file: Blob,
+  kind: UploadKind,
+): Promise<{ width: number; height: number } | null> {
   const headerLimit = kind === "photo" ? 1024 * 1024 : 64 * 1024;
   const bytes = new Uint8Array(await file.slice(0, headerLimit).arrayBuffer());
   const valid = kind === "photo" ? looksLikePhoto(bytes) : looksLikeVideo(bytes);
@@ -61,7 +73,9 @@ export async function validateMediaSignature(file: Blob, kind: UploadKind): Prom
     const dimensions = readImageDimensions(bytes);
     if (!dimensions) throw new Error("Could not verify the image dimensions before decoding.");
     assertPixelBudget(dimensions.width, dimensions.height);
+    return dimensions;
   }
+  return null;
 }
 
 function readImageDimensions(bytes: Uint8Array): { width: number; height: number } | null {
@@ -121,21 +135,122 @@ function readImageDimensions(bytes: Uint8Array): { width: number; height: number
     }
   }
   if (hasIsoBrand(bytes, ["heic", "heix", "hevc", "hevx", "heim", "heis", "mif1", "msf1"])) {
-    let largest: { width: number; height: number } | null = null;
-    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    for (let offset = 4; offset + 16 <= bytes.length; offset += 1) {
-      if (!asciiAt(bytes, offset, "ispe")) continue;
-      const boxStart = offset - 4;
-      const boxSize = view.getUint32(boxStart);
-      if (boxSize < 20 || boxStart + boxSize > bytes.length) continue;
-      const width = view.getUint32(offset + 8);
-      const height = view.getUint32(offset + 12);
-      if (!width || !height) continue;
-      if (!largest || width * height > largest.width * largest.height) largest = { width, height };
-    }
-    return largest;
+    return readPrimaryHeifDimensions(bytes);
   }
   return null;
+}
+
+type IsoBox = { start: number; end: number; header: number; type: string };
+
+/**
+ * Resolve HEIF dimensions only from an `ispe` property associated with the
+ * primary item (`pitm` -> `ipma` -> `ipco`). A byte-pattern scan would let an
+ * unrelated or attacker-inserted `ispe` box bypass the pre-decode budget.
+ */
+function readPrimaryHeifDimensions(bytes: Uint8Array): { width: number; height: number } | null {
+  const meta = readIsoBoxes(bytes, 0, bytes.length).find((box) => box.type === "meta");
+  if (!meta || meta.start + meta.header + 4 > meta.end) return null;
+  const metaChildren = readIsoBoxes(bytes, meta.start + meta.header + 4, meta.end);
+  const primary = metaChildren.find((box) => box.type === "pitm");
+  const iprp = metaChildren.find((box) => box.type === "iprp");
+  if (!primary || !iprp) return null;
+  const primaryId = readPrimaryItemId(bytes, primary);
+  if (primaryId === null) return null;
+
+  const propertyChildren = readIsoBoxes(bytes, iprp.start + iprp.header, iprp.end);
+  const ipco = propertyChildren.find((box) => box.type === "ipco");
+  const associations = propertyChildren.filter((box) => box.type === "ipma");
+  if (!ipco || !associations.length) return null;
+
+  const properties = readIsoBoxes(bytes, ipco.start + ipco.header, ipco.end);
+  const propertyIndexes = new Set<number>();
+  for (const association of associations) {
+    for (const index of readAssociatedPropertyIndexes(bytes, association, primaryId)) {
+      propertyIndexes.add(index);
+    }
+  }
+
+  let largest: { width: number; height: number } | null = null;
+  for (const index of propertyIndexes) {
+    const property = properties[index - 1];
+    if (!property || property.type !== "ispe") continue;
+    const offset = property.start + property.header;
+    if (offset + 12 > property.end) continue;
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const width = view.getUint32(offset + 4);
+    const height = view.getUint32(offset + 8);
+    if (!width || !height) continue;
+    if (!largest || width * height > largest.width * largest.height) largest = { width, height };
+  }
+  return largest;
+}
+
+function readPrimaryItemId(bytes: Uint8Array, box: IsoBox): number | null {
+  const offset = box.start + box.header;
+  if (offset + 6 > box.end) return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const version = bytes[offset] ?? 0;
+  if (version === 0) return view.getUint16(offset + 4);
+  if (offset + 8 > box.end) return null;
+  return view.getUint32(offset + 4);
+}
+
+function readAssociatedPropertyIndexes(bytes: Uint8Array, box: IsoBox, primaryId: number): number[] {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const fullBox = box.start + box.header;
+  if (fullBox + 8 > box.end) return [];
+  const version = bytes[fullBox] ?? 0;
+  const flags = ((bytes[fullBox + 1] ?? 0) << 16) | ((bytes[fullBox + 2] ?? 0) << 8) | (bytes[fullBox + 3] ?? 0);
+  const wideAssociation = (flags & 1) !== 0;
+  let offset = fullBox + 4;
+  const entryCount = view.getUint32(offset);
+  offset += 4;
+  if (entryCount > 100_000) return [];
+  for (let entry = 0; entry < entryCount; entry += 1) {
+    const idBytes = version < 1 ? 2 : 4;
+    if (offset + idBytes + 1 > box.end) return [];
+    const itemId = idBytes === 2 ? view.getUint16(offset) : view.getUint32(offset);
+    offset += idBytes;
+    const count = bytes[offset] ?? 0;
+    offset += 1;
+    const indexes: number[] = [];
+    for (let association = 0; association < count; association += 1) {
+      const associationBytes = wideAssociation ? 2 : 1;
+      if (offset + associationBytes > box.end) return [];
+      const encoded = wideAssociation ? view.getUint16(offset) : bytes[offset]!;
+      offset += associationBytes;
+      const index = encoded & (wideAssociation ? 0x7fff : 0x7f);
+      if (index) indexes.push(index);
+    }
+    if (itemId === primaryId) return indexes;
+  }
+  return [];
+}
+
+function readIsoBoxes(bytes: Uint8Array, start: number, end: number): IsoBox[] {
+  const output: IsoBox[] = [];
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let offset = Math.max(0, start);
+  const boundedEnd = Math.min(bytes.length, end);
+  while (offset + 8 <= boundedEnd && output.length < 10_000) {
+    const size32 = view.getUint32(offset);
+    const type = String.fromCharCode(bytes[offset + 4]!, bytes[offset + 5]!, bytes[offset + 6]!, bytes[offset + 7]!);
+    let header = 8;
+    let size = size32;
+    if (size32 === 1) {
+      if (offset + 16 > boundedEnd) break;
+      const extended = view.getBigUint64(offset + 8);
+      if (extended > BigInt(Number.MAX_SAFE_INTEGER)) break;
+      size = Number(extended);
+      header = 16;
+    } else if (size32 === 0) {
+      size = boundedEnd - offset;
+    }
+    if (size < header || offset + size > boundedEnd) break;
+    output.push({ start: offset, end: offset + size, header, type });
+    offset += size;
+  }
+  return output;
 }
 
 function asciiAt(bytes: Uint8Array, offset: number, value: string): boolean {
@@ -165,7 +280,10 @@ function looksLikeVideo(bytes: Uint8Array): boolean {
   if (bytes.length >= 4 && bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) {
     return true;
   }
-  return hasIsoBrand(bytes, ["isom", "iso2", "mp41", "mp42", "avc1", "qt  ", "m4v ", "3gp4"]);
+  return hasIsoBrand(bytes, [
+    "isom", "iso2", "iso3", "iso4", "iso5", "iso6",
+    "mp41", "mp42", "mp4v", "avc1", "qt  ", "m4v ", "M4V ", "MSNV", "3gp4",
+  ]);
 }
 
 function hasIsoBrand(bytes: Uint8Array, brands: string[]): boolean {
@@ -232,7 +350,7 @@ function withTimeout<T>(
 
 function assertPixelBudget(width: number, height: number): void {
   if (!width || !height) throw new Error("The image has no readable pixels.");
-  if (width * height > MAX_IMAGE_PIXELS) {
+  if (width > MAX_IMAGE_EDGE || height > MAX_IMAGE_EDGE || width * height > MAX_IMAGE_PIXELS) {
     throw new Error("Image is too large to score safely.");
   }
 }
@@ -283,6 +401,7 @@ export async function compressToJpeg(
 async function canvasFromSource(
   src: Blob | HTMLImageElement | HTMLVideoElement,
   maxEdge: number,
+  knownDimensions?: { width: number; height: number } | null,
 ): Promise<HTMLCanvasElement> {
   if (typeof HTMLVideoElement !== "undefined" && src instanceof HTMLVideoElement) {
     return drawContain(
@@ -294,8 +413,26 @@ async function canvasFromSource(
   } else if (typeof HTMLImageElement !== "undefined" && src instanceof HTMLImageElement) {
     return drawContain(src, maxEdge, src.naturalWidth, src.naturalHeight);
   } else if (typeof createImageBitmap === "function") {
+    if (bitmapDecodePending) {
+      throw new Error("A previous image decode is still finishing. Wait before choosing another photo.");
+    }
+    const bitmapOptions = knownDimensions
+      ? resizedBitmapOptions(knownDimensions.width, knownDimensions.height, maxEdge)
+      : undefined;
+    bitmapDecodePending = true;
+    let bitmapPromise: Promise<ImageBitmap>;
+    try {
+      bitmapPromise = bitmapOptions ? createImageBitmap(src, bitmapOptions) : createImageBitmap(src);
+    } catch (error) {
+      bitmapDecodePending = false;
+      throw error;
+    }
+    void bitmapPromise.then(
+      () => { bitmapDecodePending = false; },
+      () => { bitmapDecodePending = false; },
+    );
     const bitmap = await withTimeout(
-      createImageBitmap(src),
+      bitmapPromise,
       IMAGE_DECODE_TIMEOUT_MS,
       "Image decode timed out",
       (lateBitmap) => lateBitmap.close(),
@@ -353,14 +490,28 @@ export async function processMediaFrame(
   previewEdge = 768,
   analysisEdge = 240,
   quality = 0.72,
+  knownDimensions?: { width: number; height: number } | null,
 ): Promise<ProcessedMediaFrame> {
-  const preview = await canvasFromSource(src, previewEdge);
+  const preview = await canvasFromSource(src, previewEdge, knownDimensions);
   const analysis = drawContain(preview, analysisEdge, preview.width, preview.height);
   const ctx = analysis.getContext("2d", { willReadFrequently: true });
   if (!ctx) throw new Error("No canvas");
   return {
     jpeg: encodeJpegWithin(preview, quality, MAX_ANALYZE_IMAGE_BYTES),
     imageData: ctx.getImageData(0, 0, analysis.width, analysis.height),
+  };
+}
+
+function resizedBitmapOptions(
+  width: number,
+  height: number,
+  maxEdge: number,
+): ImageBitmapOptions {
+  const scale = Math.min(1, maxEdge / Math.max(width, height, 1));
+  return {
+    resizeWidth: Math.max(1, Math.round(width * scale)),
+    resizeHeight: Math.max(1, Math.round(height * scale)),
+    resizeQuality: "high",
   };
 }
 
@@ -388,6 +539,12 @@ export async function extractVideoFrames(
     video.load?.();
     await metadata;
     signal?.throwIfAborted();
+    if (!video.videoWidth || !video.videoHeight) {
+      throw new Error("The video has no readable dimensions");
+    }
+    // Reject decoder-surface bombs as soon as metadata is available, before
+    // asking the browser to materialize a video frame.
+    assertVideoFrameBudget(video.videoWidth, video.videoHeight);
     await waitForMediaEvent(
       video,
       "loadeddata",
@@ -396,10 +553,6 @@ export async function extractVideoFrames(
       signal,
     );
     signal?.throwIfAborted();
-
-    if (!video.videoWidth || !video.videoHeight) {
-      throw new Error("The video has no readable frames");
-    }
 
     let duration = video.duration;
     if (!Number.isFinite(duration)) {
@@ -439,6 +592,20 @@ export async function extractVideoFrames(
     video.removeAttribute?.("src");
     video.load?.();
     URL.revokeObjectURL(url);
+  }
+}
+
+function assertVideoFrameBudget(width: number, height: number): void {
+  if (
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width <= 0 ||
+    height <= 0 ||
+    width > MAX_VIDEO_FRAME_EDGE ||
+    height > MAX_VIDEO_FRAME_EDGE ||
+    width * height > MAX_VIDEO_FRAME_PIXELS
+  ) {
+    throw new Error("Video resolution is too large to extract safely.");
   }
 }
 

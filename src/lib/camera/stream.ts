@@ -1,4 +1,5 @@
 type Facing = "user" | "environment";
+const FOCUS_SETUP_TIMEOUT_MS = 1_000;
 
 export type ClipHandle = {
   stop: () => Promise<Blob>;
@@ -6,6 +7,9 @@ export type ClipHandle = {
 };
 
 export async function openRopeCamera(facing: Facing): Promise<MediaStream> {
+  if (typeof globalThis.isSecureContext === "boolean" && !globalThis.isSecureContext) {
+    throw new Error("Live camera requires HTTPS or localhost. Open this app in a secure context.");
+  }
   if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
     throw new Error("Live camera is not supported in this browser.");
   }
@@ -64,11 +68,28 @@ export async function applyFocus(stream: MediaStream) {
   if ("whiteBalanceMode" in caps) advanced.whiteBalanceMode = "continuous";
   if (Object.keys(advanced).length) {
     try {
-      await track.applyConstraints({ advanced: [advanced] } as MediaTrackConstraints);
+      await settleWithin(
+        track.applyConstraints({ advanced: [advanced] } as MediaTrackConstraints),
+        FOCUS_SETUP_TIMEOUT_MS,
+      );
     } catch {
       /* device refused */
     }
   }
+}
+
+function settleWithin(promise: Promise<unknown>, timeoutMs: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    let finished = false;
+    const finish = (applied: boolean) => {
+      if (finished) return;
+      finished = true;
+      globalThis.clearTimeout(timer);
+      resolve(applied);
+    };
+    const timer = globalThis.setTimeout(() => finish(false), timeoutMs);
+    void promise.then(() => finish(true), () => finish(false));
+  });
 }
 
 export async function setTorch(stream: MediaStream, on: boolean) {
@@ -77,10 +98,12 @@ export async function setTorch(stream: MediaStream, on: boolean) {
   try {
     const caps = (track.getCapabilities?.() ?? {}) as { torch?: boolean };
     if (!caps.torch) return false;
-    await track.applyConstraints({
-      advanced: [{ torch: on } as MediaTrackConstraintSet],
-    });
-    return true;
+    return await settleWithin(
+      track.applyConstraints({
+        advanced: [{ torch: on } as MediaTrackConstraintSet],
+      }),
+      FOCUS_SETUP_TIMEOUT_MS,
+    );
   } catch {
     return false;
   }

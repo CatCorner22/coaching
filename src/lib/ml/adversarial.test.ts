@@ -228,21 +228,43 @@ test("unsafe quality with keep-wrapping still gets halt language", () => {
   assert.match(draft.next, /stop|release/i);
 });
 
-test("a frame with no body is a stop, not a shrug", () => {
+test("unsafe self-label cannot preserve semantic high-consequence prose", () => {
+  for (const phrase of [
+    "Transfer the persons mass to the overhead line.",
+    "Raise both feet clear and leave the restraint in place.",
+    "Move away while the restraint remains secured.",
+    "Use the upper point to carry the body.",
+  ]) {
+    const { draft } = localAudit({
+      det: det(),
+      pred,
+      llm: llm({ quality: "unsafe", coaching: phrase, next: phrase, speak: phrase }),
+      stepIndex: 0,
+    });
+    const output = `${draft.coaching} ${draft.next} ${draft.speak}`;
+    assert.equal(draft.quality, "unsafe");
+    assert.doesNotMatch(output, /overhead line|both feet|move away|upper point|carry the body/i);
+    assert.match(output, /stop|release/i);
+  }
+});
+
+test("an equipment-only frame abstains without a false emergency or clearance", () => {
   const frame = img(80, 120, () => [20, 18, 16, 255]);
   const obs = observeFrame(frame);
   const d = buildDeterministic([obs]);
   assert.equal(obs.body, null);
-  assert.equal(d.recommend, "stop");
+  assert.equal(d.recommend, "adjust");
+  assert.equal(d.flags.some((flag) => flag.severity === "stop"), false);
+  assert.match(d.notes.join(" "), /does not infer physiology/i);
 });
 
-test("a uniform skin-colored wall cannot become a body or a continue signal", () => {
+test("a uniform skin-colored wall cannot become a body, emergency, or continue signal", () => {
   const frame = img(96, 144, () => [198, 142, 118, 255]);
   const obs = observeFrame(frame);
   const d = buildDeterministic([obs]);
   assert.equal(obs.body, null);
-  assert.equal(d.recommend, "stop");
-  assert.ok(d.flags.some((flag) => flag.code === "unknown"));
+  assert.equal(d.recommend, "adjust");
+  assert.equal(d.flags.some((flag) => flag.severity === "stop"), false);
 });
 
 test("banned coaching is stripped even if det is continue", () => {
@@ -323,7 +345,7 @@ test("negotiated no is a hard limit even if the model is enthusiastic", () => {
   });
   assert.equal(draft.quality, "unsafe");
   assert.ok(verdict.droppedClaims.length > 0);
-  assert.match(draft.next, /no list|stop/i);
+  assert.match(draft.next, /no list|stop|release/i);
 });
 
 test("short hard-no 'gag' still matches", () => {
@@ -428,7 +450,7 @@ test("pale and cyanotic hands are hand-tone", () => {
   assert.equal(isHandTone(140, 150, 190), true);
 });
 
-test("dark fiber in the neck zone is counted", () => {
+test("dark fiber over skin does not create a body or neck inference", () => {
   assert.equal(isDarkFiber(32, 30, 28), true);
   const frame = img(80, 120, (x, y) => {
     if (y >= 20 && y < 100 && x > 20 && x < 60) {
@@ -438,7 +460,8 @@ test("dark fiber in the neck zone is counted", () => {
     return [12, 11, 10, 255];
   });
   const obs = observeFrame(frame);
-  assert.ok(obs.neckRope > 0.05, `neckRope=${obs.neckRope}`);
+  assert.equal(obs.body, null);
+  assert.equal(obs.neckRope, 0);
 });
 
 test("empty / tiny frames do not throw", () => {
@@ -475,7 +498,7 @@ test("neck watch does not keep the original wrap coaching", () => {
     stepIndex: 0,
   });
   assert.doesNotMatch(draft.coaching, /keep wrapping/i);
-  assert.match(draft.coaching, /throat|empty/i);
+  assert.match(draft.coaching, /stop|release/i);
 });
 
 test("pickBest does not elevate paleness without validated hand evidence", () => {

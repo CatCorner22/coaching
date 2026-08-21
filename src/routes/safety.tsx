@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ARTICLES } from "@/lib/kb";
+import { SAFETY_SOURCES } from "@/lib/kb/sources";
 
 export const Route = createFileRoute("/safety")({ component: SafetyPage });
 
@@ -19,10 +20,10 @@ function SafetyPage() {
         of them proves a restraint is safe.
       </p>
       <div className="mt-8 grid gap-3">
-        <Callout title="Red" body="Everything stops. Rope comes off as fast as is safe. Aftercare starts." />
+        <Callout title="Red" body="Stop the activity. Support the person's position and release without creating a fall; escalate urgent symptoms immediately." />
         <Callout title="Direct checks" body="Ask about comfort, sensation, motion, and change; compare sides and baseline. Check whenever anything changes and release for concern—never wait for a timer." />
-        <Callout title="Radial" body="Outer upper arm, a few fingers below the deltoid. Wrist-drop is how TK becomes an injury." />
-        <Callout title="Peroneal" body="Outer knee. Futomomo cinches do not live here. Foot-drop is a walking injury." />
+        <Callout title="Neurologic change" body="New numbness, weakness, altered sensation, or loss of movement means release now. Seek prompt assessment if it persists or worsens; do not diagnose a nerve from an image or symptom pattern." />
+        <Callout title="Emergency" body="Call local emergency services for abnormal breathing, unresponsiveness, seizure, chest pain, a serious fall, stroke-like signs, major weakness, or concerning symptoms after neck pressure." />
       </div>
       <ul className="mt-10 space-y-2">
         {picks.map((a) => (
@@ -38,6 +39,24 @@ function SafetyPage() {
           </li>
         ))}
       </ul>
+      <section className="mt-12">
+        <h2 className="font-display text-3xl">Evidence and limits</h2>
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          The Shibari-specific evidence base is small and selected. These sources support consent,
+          symptom escalation, first-aid, and image-model limitations—not safe placement, safe
+          duration, individual diagnosis, or camera clearance.
+        </p>
+        <ul className="mt-4 space-y-3">
+          {SAFETY_SOURCES.map((source) => (
+            <li key={source.id} className="rounded-lg border border-border bg-surface p-4">
+              <a href={source.href} target="_blank" rel="noreferrer" className="text-sm text-fg underline">
+                {source.id} · {source.title}
+              </a>
+              <p className="mt-1 text-xs leading-relaxed text-muted">{source.note}</p>
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }

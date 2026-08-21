@@ -9,7 +9,7 @@ import {
   validateMediaFile,
   validateMediaSignature,
 } from "../src/lib/media.ts";
-import { openRopeCamera, startClip, torchAvailable } from "../src/lib/camera/stream.ts";
+import { applyFocus, openRopeCamera, startClip, torchAvailable } from "../src/lib/camera/stream.ts";
 
 test("dataUrlSize measures padded base64 payloads", () => {
   assert.equal(dataUrlSize("data:image/jpeg;base64,YWJjZA=="), 4);
@@ -50,6 +50,12 @@ test("validateMediaFile accepts supported files when the browser omits MIME type
   );
   assert.doesNotThrow(() =>
     validateMediaFile({ size: 10, type: "", name: "capture.MOV" }, "video"),
+  );
+  assert.doesNotThrow(() =>
+    validateMediaFile({ size: 10, type: "application/octet-stream", name: "capture.mov" }, "video"),
+  );
+  assert.doesNotThrow(() =>
+    validateMediaFile({ size: 10, type: "image/jpg", name: "capture.jpeg" }, "photo"),
   );
 });
 
@@ -98,8 +104,26 @@ test("validateMediaSignature rejects oversized PNG dimensions before decoding", 
   const bytes = new Uint8Array(24);
   bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   bytes.set([0x49, 0x48, 0x44, 0x52], 12);
-  new DataView(bytes.buffer).setUint32(16, 5000);
-  new DataView(bytes.buffer).setUint32(20, 5000);
+  new DataView(bytes.buffer).setUint32(16, 9000);
+  new DataView(bytes.buffer).setUint32(20, 9000);
+  await assert.rejects(validateMediaSignature(new Blob([bytes]), "photo"), /too large to score safely/i);
+});
+
+test("validateMediaSignature accepts a common 24 MP phone still", async () => {
+  const bytes = new Uint8Array(24);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  bytes.set([0x49, 0x48, 0x44, 0x52], 12);
+  new DataView(bytes.buffer).setUint32(16, 5712);
+  new DataView(bytes.buffer).setUint32(20, 4284);
+  await assert.doesNotReject(validateMediaSignature(new Blob([bytes]), "photo"));
+});
+
+test("validateMediaSignature rejects pathological single-edge image dimensions", async () => {
+  const bytes = new Uint8Array(24);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  bytes.set([0x49, 0x48, 0x44, 0x52], 12);
+  new DataView(bytes.buffer).setUint32(16, 1);
+  new DataView(bytes.buffer).setUint32(20, 32_000_000);
   await assert.rejects(validateMediaSignature(new Blob([bytes]), "photo"), /too large to score safely/i);
 });
 
@@ -108,6 +132,31 @@ test("validateMediaSignature handles a maximum-header ISO video without argument
   const view = new DataView(bytes.buffer);
   view.setUint32(0, bytes.length);
   bytes.set([0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d], 4); // ftyp + isom
+  await assert.doesNotReject(validateMediaSignature(new Blob([bytes]), "video"));
+});
+
+test("validateMediaSignature accepts registered ISO video brands used by common phones", async () => {
+  for (const brand of ["iso5", "iso6", "mp4v", "M4V ", "MSNV"]) {
+    const bytes = new Uint8Array(24);
+    const view = new DataView(bytes.buffer);
+    view.setUint32(0, bytes.length);
+    bytes.set([0x66, 0x74, 0x79, 0x70], 4);
+    bytes.set([...brand].map((char) => char.charCodeAt(0)), 8);
+    await assert.doesNotReject(validateMediaSignature(new Blob([bytes]), "video"), brand);
+  }
+});
+
+test("3GP MIME, extension, and ISO signature support are consistent", async () => {
+  assert.doesNotThrow(() =>
+    validateMediaFile({ size: 24, type: "video/3gpp", name: "capture.3gp" }, "video"),
+  );
+  assert.doesNotThrow(() =>
+    validateMediaFile({ size: 24, type: "application/octet-stream", name: "capture.3gp" }, "video"),
+  );
+  const bytes = new Uint8Array(24);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(0, bytes.length);
+  bytes.set([0x66, 0x74, 0x79, 0x70, 0x33, 0x67, 0x70, 0x34], 4);
   await assert.doesNotReject(validateMediaSignature(new Blob([bytes]), "video"));
 });
 
@@ -132,16 +181,18 @@ test("validateMediaSignature rejects every accepted WebP and HEIC dimension bomb
   vp8.set([0xff, 0x3f, 0xff, 0x3f], 26);
   await assert.rejects(validateMediaSignature(new Blob([vp8]), "photo"), /too large to score safely/i);
 
-  const heic = new Uint8Array(44);
-  const view = new DataView(heic.buffer);
-  view.setUint32(0, 24);
-  heic.set([0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63], 4); // ftypheic
-  heic.set([0x6d, 0x69, 0x66, 0x31], 16); // mif1 compatible brand
-  view.setUint32(24, 20);
-  heic.set([0x69, 0x73, 0x70, 0x65], 28); // ispe
-  view.setUint32(36, 16_384);
-  view.setUint32(40, 16_384);
+  const heic = makeHeic(16_384, 16_384);
   await assert.rejects(validateMediaSignature(new Blob([heic]), "photo"), /too large to score safely/i);
+});
+
+test("HEIC dimensions must be associated with the primary item", async () => {
+  await assert.rejects(
+    validateMediaSignature(new Blob([makeHeic(6000, 4000, false)]), "photo"),
+    /verify the image dimensions/i,
+  );
+  await assert.doesNotReject(
+    validateMediaSignature(new Blob([makeHeic(6000, 4000, true)]), "photo"),
+  );
 });
 
 test("openRopeCamera retries constraint failures but not permission denials", async (t) => {
@@ -183,6 +234,23 @@ test("openRopeCamera retries constraint failures but not permission denials", as
   assert.equal(calls, 1);
 });
 
+test("openRopeCamera explains the HTTPS requirement before requesting permission", async (t) => {
+  const secureDescriptor = Object.getOwnPropertyDescriptor(globalThis, "isSecureContext");
+  const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  t.after(() => {
+    restoreGlobal("isSecureContext", secureDescriptor);
+    restoreGlobal("navigator", navigatorDescriptor);
+  });
+  let calls = 0;
+  Object.defineProperty(globalThis, "isSecureContext", { configurable: true, value: false });
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { mediaDevices: { getUserMedia: async () => { calls += 1; } } },
+  });
+  await assert.rejects(openRopeCamera("environment"), /HTTPS or localhost/i);
+  assert.equal(calls, 0);
+});
+
 test("openRopeCamera stops every acquired stream when post-acquisition setup throws", async (t) => {
   const original = Object.getOwnPropertyDescriptor(globalThis, "navigator");
   t.after(() => restoreGlobal("navigator", original));
@@ -207,11 +275,67 @@ test("openRopeCamera stops every acquired stream when post-acquisition setup thr
   assert.equal(stopped, 3);
 });
 
+test("applyFocus is bounded when a device never settles constraints", async (t) => {
+  const timeoutDescriptor = Object.getOwnPropertyDescriptor(globalThis, "setTimeout");
+  const clearDescriptor = Object.getOwnPropertyDescriptor(globalThis, "clearTimeout");
+  t.after(() => {
+    restoreGlobal("setTimeout", timeoutDescriptor);
+    restoreGlobal("clearTimeout", clearDescriptor);
+  });
+  Object.defineProperty(globalThis, "setTimeout", {
+    configurable: true,
+    value: (callback) => {
+      queueMicrotask(callback);
+      return 1;
+    },
+  });
+  Object.defineProperty(globalThis, "clearTimeout", {
+    configurable: true,
+    value: () => undefined,
+  });
+  let attempts = 0;
+  const stream = {
+    getVideoTracks: () => [{
+      getCapabilities: () => ({ focusMode: ["continuous"] }),
+      applyConstraints: () => {
+        attempts += 1;
+        return new Promise(() => undefined);
+      },
+    }],
+  };
+  await applyFocus(stream);
+  assert.equal(attempts, 1);
+});
+
 test("torch capability races fail closed instead of throwing", () => {
   assert.equal(
     torchAvailable({ getVideoTracks: () => [{ getCapabilities: () => { throw new DOMException("ended", "InvalidStateError"); } }] }),
     false,
   );
+});
+
+test("torch application is bounded when device constraints never settle", async (t) => {
+  const timeoutDescriptor = Object.getOwnPropertyDescriptor(globalThis, "setTimeout");
+  const clearDescriptor = Object.getOwnPropertyDescriptor(globalThis, "clearTimeout");
+  t.after(() => {
+    restoreGlobal("setTimeout", timeoutDescriptor);
+    restoreGlobal("clearTimeout", clearDescriptor);
+  });
+  Object.defineProperty(globalThis, "setTimeout", {
+    configurable: true,
+    value: (callback) => {
+      queueMicrotask(callback);
+      return 1;
+    },
+  });
+  Object.defineProperty(globalThis, "clearTimeout", { configurable: true, value: () => undefined });
+  const stream = {
+    getVideoTracks: () => [{
+      getCapabilities: () => ({ torch: true }),
+      applyConstraints: () => new Promise(() => undefined),
+    }],
+  };
+  assert.equal(await (await import("../src/lib/camera/stream.ts")).setTorch(stream, true), false);
 });
 
 test("startClip reports unsupported browsers and returns the native recorded type", async (t) => {
@@ -358,6 +482,7 @@ test("a bitmap that resolves after its decode timeout is still closed", async (t
   });
 
   let closes = 0;
+  let decodeCalls = 0;
   Object.defineProperties(globalThis, {
     window: {
       configurable: true,
@@ -370,17 +495,21 @@ test("a bitmap that resolves after its decode timeout is still closed", async (t
     HTMLImageElement: { configurable: true, value: class {} },
     createImageBitmap: {
       configurable: true,
-      value: () =>
-        new Promise((resolve) =>
+      value: () => {
+        decodeCalls += 1;
+        return new Promise((resolve) =>
           realSetTimeout(
             () => resolve({ width: 10, height: 10, close: () => { closes += 1; } }),
             20,
           ),
-        ),
+        );
+      },
     },
   });
 
   await assert.rejects(processMediaFrame(new Blob(["image"])), /decode timed out/i);
+  await assert.rejects(processMediaFrame(new Blob(["image"])), /previous image decode is still finishing/i);
+  assert.equal(decodeCalls, 1);
   await new Promise((resolve) => realSetTimeout(resolve, 35));
   assert.equal(closes, 1);
 });
@@ -416,6 +545,19 @@ test("extractVideoFrames rejects overlong uploads and still cleans up", async (t
   );
   assert.equal(dom.revoked.length, 1);
   assert.equal(dom.video.sourceCleared, true);
+});
+
+test("extractVideoFrames rejects oversized decoder surfaces at metadata", async (t) => {
+  const dom = installFakeVideoDom({ duration: 2 });
+  t.after(dom.restore);
+  dom.video.videoWidth = 7680;
+  dom.video.videoHeight = 4320;
+  await assert.rejects(
+    extractVideoFrames(new Blob(["video"], { type: "video/mp4" }), 2),
+    /resolution is too large/i,
+  );
+  assert.equal(dom.seekTimes.length, 0);
+  assert.equal(dom.revoked.length, 1);
 });
 
 test("extractVideoFrames rejects an indeterminate non-seekable duration", async (t) => {
@@ -483,6 +625,41 @@ test("extractVideoFrames aborts an in-flight seek and removes the source", async
 function restoreGlobal(name, descriptor) {
   if (descriptor) Object.defineProperty(globalThis, name, descriptor);
   else delete globalThis[name];
+}
+
+function makeHeic(width, height, associated = true) {
+  const bytes = new Uint8Array(106);
+  const view = new DataView(bytes.buffer);
+  const type = (offset, value) => bytes.set([...value].map((char) => char.charCodeAt(0)), offset);
+
+  view.setUint32(0, 24);
+  type(4, "ftyp");
+  type(8, "heic");
+  type(16, "mif1");
+  type(20, "heic");
+
+  view.setUint32(24, 82);
+  type(28, "meta");
+  view.setUint32(36, 14);
+  type(40, "pitm");
+  view.setUint16(48, 1);
+
+  view.setUint32(50, 56);
+  type(54, "iprp");
+  view.setUint32(58, 28);
+  type(62, "ipco");
+  view.setUint32(66, 20);
+  type(70, "ispe");
+  view.setUint32(78, width);
+  view.setUint32(82, height);
+
+  view.setUint32(86, 20);
+  type(90, "ipma");
+  view.setUint32(98, 1);
+  view.setUint16(102, associated ? 1 : 2);
+  bytes[104] = 1;
+  bytes[105] = 1;
+  return bytes;
 }
 
 function installFakeVideoDom({ duration, silentLoad = false, onSeek = undefined }) {

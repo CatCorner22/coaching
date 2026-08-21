@@ -1,6 +1,8 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { BookOpen, Camera, House, Library, Shield } from "lucide-react";
+import { useEffect } from "react";
 import { ConsentGate } from "@/components/consent-gate";
+import { subscribeToLocalDataErase } from "@/lib/privacy/local-data";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -29,6 +31,10 @@ const MORE = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  useEffect(
+    () => subscribeToLocalDataErase(() => window.location.reload()),
+    [],
+  );
   if (pathname === "/emergency") {
     return <div className="min-h-dvh bg-bg text-fg">{children}</div>;
   }
@@ -71,7 +77,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
           <p className="px-3 text-[11px] leading-relaxed text-subtle">
-            Private. Local journal. Shears before rope.
+            Local notes are unencrypted. Analyze uses cloud services. Shears before rope.
           </p>
         </aside>
         <div className="md:pl-56">

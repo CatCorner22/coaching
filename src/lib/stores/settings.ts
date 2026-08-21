@@ -32,12 +32,12 @@ const defaults: Settings = {
   safeword: "red",
   yellowWord: "yellow",
   greenWord: "green",
-  voice: true,
+  voice: false,
   listen: false,
   circulationMins: 4,
 };
 
-const RESERVED = new Set(["next", "analyze", "hands", "stop"]);
+const RESERVED = new Set(["next", "analyze", "hands", "stop", "pause", "release"]);
 
 function clampWord(v: unknown, fallback: string) {
   const s = typeof v === "string" ? v.trim().slice(0, 24) : "";
@@ -66,7 +66,7 @@ export const useSettings = create<SettingsState>()(
               ? Math.min(12, Math.max(2, Number(p.circulationMins) || s.circulationMins))
               : s.circulationMins,
         })),
-      enter: () => set({ consentVersion: 3, consented: true, adults: true, shears: true, photosOk: true }),
+      enter: () => set({ consentVersion: 4, consented: true, adults: true, shears: true, photosOk: true }),
     }),
     {
       name: "musubi-settings",
@@ -75,8 +75,8 @@ export const useSettings = create<SettingsState>()(
         const adults = p.adults === true;
         const shears = p.shears === true;
         const photosOk = p.photosOk === true;
-        const consentVersion = p.consentVersion === 3 ? 3 : 0;
-        const consented = p.consented === true && adults && shears && photosOk && consentVersion === 3;
+        const consentVersion = p.consentVersion === 4 ? 4 : 0;
+        const consented = p.consented === true && adults && shears && photosOk && consentVersion === 4;
         return {
           ...current,
           ...p,
@@ -93,8 +93,8 @@ export const useSettings = create<SettingsState>()(
           bottomName: String(p.bottomName ?? current.bottomName).slice(0, 40),
           honorific: String(p.honorific ?? current.honorific).slice(0, 24),
           style: p.style === "peer" || p.style === "ds" ? p.style : current.style,
-          voice: p.voice !== false,
-          listen: consentVersion === 3 && p.listen === true,
+          voice: consentVersion === 4 && p.voice === true,
+          listen: consentVersion === 4 && p.listen === true,
         };
       },
     },

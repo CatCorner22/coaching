@@ -331,8 +331,18 @@ export function localAudit(opts: {
   }
 
   // Model prose is untrusted and can evade lexical filters through paraphrase.
-  // The camera path therefore exposes only reviewed, non-procedural actions.
-  if (quality !== "unsafe") {
+  // The camera path therefore exposes only fixed, reviewed action text for both
+  // stop and non-stop branches. A model cannot preserve its own prose merely by
+  // self-labeling it "unsafe".
+  if (quality === "unsafe") {
+    coaching = STOP_COACH;
+    next = STOP_NEXT;
+    speak = STOP_SPEAK;
+    circulation = true;
+    if (!overrides.includes("Unsafe action prose replaced with fixed halt guidance.")) {
+      overrides.push("Unsafe action prose replaced with fixed halt guidance.");
+    }
+  } else {
     quality = "adjust";
     coaching = OBSERVATION_COACH;
     next = OBSERVATION_NEXT;
@@ -414,9 +424,12 @@ export function applyModelSelfAudit(
     return {
       ...clean,
       quality: "unsafe",
-      coaching: "I will not coach neck restraint, breath play, or full suspension. Stay on the floor tie in front of you.",
-      next: "Stop. That suggestion is outside what this atelier will coach.",
-      speak: "I will not coach that. Return to a floor tie and check her.",
+      coaching:
+        "I cannot coach neck restraint, breath restriction, suspension, or another high-consequence setup from an image. Stop and fully release it.",
+      next:
+        "Do not proceed from camera feedback. If symptoms or immediate danger are present, follow the emergency guidance; otherwise use a qualified in-person instructor.",
+      speak:
+        "Stop and fully release the setup. Camera feedback cannot clear this activity.",
       circulation: true,
     };
   }
@@ -425,8 +438,10 @@ export function applyModelSelfAudit(
       ...clean,
       quality: "unsafe",
       coaching: STOP_COACH,
-      next: "Stop. The still disagrees with that grade. Check her hands and throat.",
-      speak: "Stop. Trust what you see on her, not the flattering grade.",
+      next:
+        "Stop and fully release the setup. Use direct, nonvisual checks and escalate based on symptoms, not an image grade.",
+      speak:
+        "Stop and release. Treat the conflicting image grade as unreliable.",
       circulation: true,
     };
   }

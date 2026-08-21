@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { Disposition, SourceId } from "@/lib/observation/report";
 
 export type JournalEntry = {
   id: string;
@@ -7,9 +8,10 @@ export type JournalEntry = {
   tieSlug?: string;
   minutes: number;
   notes: string;
-  rating: number;
   flags: string[];
-  photoCount: number;
+  disposition: Disposition;
+  limitations: string[];
+  sourceIds: SourceId[];
 };
 
 type JournalState = {
@@ -17,6 +19,7 @@ type JournalState = {
   nerveHits: number;
   add: (e: Omit<JournalEntry, "id" | "at">) => string;
   remove: (id: string) => void;
+  clear: () => void;
 };
 
 export const useJournal = create<JournalState>()(
@@ -36,6 +39,7 @@ export const useJournal = create<JournalState>()(
       remove: (id) => {
         set({ entries: get().entries.filter((x) => x.id !== id) });
       },
+      clear: () => set({ entries: [], nerveHits: 0 }),
     }),
     { name: "musubi-journal" },
   ),

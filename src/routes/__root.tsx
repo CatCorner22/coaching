@@ -14,7 +14,7 @@ export const Route = createRootRoute({
       { title: APP_NAME },
       {
         name: "description",
-        content: "Knotty — a private rope studio. Ties, knots, photo coaching, floor work.",
+        content: "Knotty — adult-only rope education with privacy-minimized, observation-only camera reports.",
       },
       { name: "theme-color", content: "#0b0a09" },
     ],

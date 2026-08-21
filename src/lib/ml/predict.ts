@@ -1,5 +1,5 @@
 import type { Tie } from "@/lib/kb/types";
-import { clamp01, linearSlope, mean } from "./signal";
+import { clamp01, mean } from "./signal";
 import type {
   DeterministicReport,
   FrameObservation,
@@ -33,12 +33,11 @@ export function buildDeterministic(
 ): DeterministicReport {
   const last = frames[frames.length - 1];
   const wrapBands = last?.wrapBands ?? [];
-  const palenessSeries = frames.map((f) => f.paleness);
-  const paleness = Math.max(0, ...frames.map((f) => f.paleness), last?.paleness ?? 0);
-  const palenessDelta = palenessSeries.length > 1 ? linearSlope(palenessSeries) : 0;
+  // Physiology and body localization are intentionally not inferred from pixels.
+  const paleness = 0;
+  const palenessDelta = 0;
   const neckRope = Math.max(0, ...frames.map((f) => f.neckRope), last?.neckRope ?? 0);
   const motion = last?.motion ?? 0;
-  const blueness = Math.max(0, ...frames.map((f) => f.blueness ?? 0));
   void baseline;
 
   const flags: SafetyFlag[] = [];
@@ -49,20 +48,11 @@ export function buildDeterministic(
       note: "Possible neck or throat overlap in this view. Stop and release; an image cannot establish contact or pressure.",
     });
   }
-  if (blueness > 0.45) {
-    flags.push({
-      code: "circulation",
-      severity: "watch",
-      note: "Possible blue color shift in this frame. Camera color is unreliable; pause and verify directly, releasing for any concerning change or symptom.",
-    });
-  }
-  if (!last || (last.width * last.height) < 16 || Number.isNaN(last.ropeShare) || !last.body) {
+  if (!last || (last.width * last.height) < 16 || Number.isNaN(last.ropeShare)) {
     flags.push({
       code: "unknown",
-      severity: last?.body ? "watch" : "stop",
-      note: last?.body
-        ? "The frame is unusable. Pause and rely on direct checks, not another image, before any change."
-        : "No stable relevant region was detected. Stop relying on the image and assess directly.",
+      severity: "watch",
+      note: "The frame is unusable for even broad observation. Treat it as an insufficient view, not an all-clear or an emergency finding.",
     });
   }
 
@@ -73,8 +63,8 @@ export function buildDeterministic(
       : "adjust";
 
   const notes: string[] = [];
-  if (!last?.body) notes.push("No clear relevant region was detected in this limited view.");
-  else notes.push(`The image heuristic found ${wrapBands.length} possible horizontal rope-like feature${wrapBands.length === 1 ? "" : "s"}.`);
+  notes.push(`An unvalidated color/edge heuristic marked ${wrapBands.length} possible horizontal rope-like feature${wrapBands.length === 1 ? "" : "s"}.`);
+  notes.push("The app does not use skin color to localize a body or hands and does not infer physiology.");
   if ((last?.ropeShare ?? 0) < 0.01) notes.push("Very little rope-colored signal was visible; an image may not be useful.");
 
   return {

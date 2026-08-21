@@ -1,6 +1,7 @@
+import { memo } from "react";
 import type { FrameObservation } from "@/lib/ml/types";
 
-export function WrapOverlay({
+export const WrapOverlay = memo(function WrapOverlay({
   src,
   obs,
 }: {
@@ -51,7 +52,7 @@ export function WrapOverlay({
                   y={y - 6}
                   fill="#ded8cf"
                   fontSize="11"
-                  fontFamily="Figtree, sans-serif"
+                  fontFamily="system-ui, sans-serif"
                 >
                   possible rope-like feature {i + 1}
                 </text>
@@ -65,10 +66,10 @@ export function WrapOverlay({
       </div>
       {neck && (
         <p className="absolute left-3 top-3 rounded-full bg-danger px-2 py-0.5 text-[11px] uppercase tracking-wide text-danger-fg">
-          Possible neck overlap — stop and verify directly
+          Possible neck overlap — stop and release now
         </p>
       )}
       </div>
     </div>
   );
-}
+});

@@ -1,5 +1,5 @@
 import { Camera, Flashlight, ImagePlus, SwitchCamera, Video } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   openRopeCamera,
@@ -32,14 +32,28 @@ export type CaptureResult = {
 
 export type MediaConsent = {
   adults: true;
+  nonExplicit: true;
+  nonSecret: true;
+  nonCoerced: true;
+  allPeopleConsented: true;
   activity: true;
   recording: true;
   upload: true;
   output: true;
+  batchId: string;
   confirmedAt: number;
 };
 
-type PermissionKey = "adults" | "activity" | "recording" | "upload" | "output";
+type PermissionKey =
+  | "adults"
+  | "nonExplicit"
+  | "nonSecret"
+  | "nonCoerced"
+  | "allPeopleConsented"
+  | "activity"
+  | "recording"
+  | "upload"
+  | "output";
 type PendingVideoFrame = {
   id: string;
   jpeg: string;
@@ -49,6 +63,10 @@ type PendingVideoFrame = {
 
 const EMPTY_PERMISSIONS: Record<PermissionKey, boolean> = {
   adults: false,
+  nonExplicit: false,
+  nonSecret: false,
+  nonCoerced: false,
+  allPeopleConsented: false,
   activity: false,
   recording: false,
   upload: false,
@@ -56,9 +74,9 @@ const EMPTY_PERMISSIONS: Record<PermissionKey, boolean> = {
 };
 const BATCH_PERMISSION_MAX_AGE_MS = 60 * 60 * 1000;
 
-type Guide = "torso" | "back" | "hands" | "legs";
+type Guide = "equipment" | "context" | "detail" | "label";
 
-export function CameraCapture({
+export const CameraCapture = memo(function CameraCapture({
   onCapture,
   onDiscard,
   disabled = false,
@@ -74,6 +92,8 @@ export function CameraCapture({
   const recordStartedAtRef = useRef<number | null>(null);
   const cameraRequestRef = useRef(0);
   const mediaOperationRef = useRef<AbortController | null>(null);
+  const mediaOperationIdRef = useRef(0);
+  const torchRequestRef = useRef(0);
   const permissionsRef = useRef(EMPTY_PERMISSIONS);
   const permissionConfirmedAtRef = useRef<number | null>(null);
   const permissionExpiryTimerRef = useRef<number | null>(null);
@@ -87,7 +107,7 @@ export function CameraCapture({
   const [recording, setRecording] = useState(false);
   const [torch, setTorchOn] = useState(false);
   const [hasTorch, setHasTorch] = useState(false);
-  const [guide, setGuide] = useState<Guide>("torso");
+  const [guide, setGuide] = useState<Guide>("equipment");
   const [hint, setHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [permissions, setPermissions] = useState(EMPTY_PERMISSIONS);
@@ -102,6 +122,8 @@ export function CameraCapture({
     return () => {
       mountedRef.current = false;
       mediaOperationRef.current?.abort();
+      mediaOperationIdRef.current += 1;
+      torchRequestRef.current += 1;
       cameraRequestRef.current += 1;
       if (recordTimerRef.current !== null) {
         window.clearTimeout(recordTimerRef.current);
@@ -136,6 +158,8 @@ export function CameraCapture({
   useEffect(() => {
     if (!disabled) return;
     mediaOperationRef.current?.abort();
+    mediaOperationIdRef.current += 1;
+    torchRequestRef.current += 1;
     cameraRequestRef.current += 1;
     if (recordTimerRef.current !== null) {
       window.clearTimeout(recordTimerRef.current);
@@ -174,11 +198,16 @@ export function CameraCapture({
     }
   }
 
-  function beginMediaOperation(): AbortSignal {
+  function beginMediaOperation(): { signal: AbortSignal; id: number } {
     mediaOperationRef.current?.abort();
     const controller = new AbortController();
     mediaOperationRef.current = controller;
-    return controller.signal;
+    const id = ++mediaOperationIdRef.current;
+    return { signal: controller.signal, id };
+  }
+
+  function ownsMediaOperation(id: number): boolean {
+    return mountedRef.current && mediaOperationIdRef.current === id;
   }
 
   function updatePermission(key: PermissionKey, checked: boolean) {
@@ -263,7 +292,7 @@ export function CameraCapture({
   async function startLive(next: "user" | "environment" = facing) {
     if (disabledRef.current || batchCommitted) return;
     if (!Object.values(permissionsRef.current).every(Boolean)) {
-      setError("Confirm adult status and all four permissions before opening the camera.");
+      setError("Confirm adult status, every media-scope item, and all four permissions before opening the camera.");
       return;
     }
     if (!hasCurrentBatchPermissions()) return;
@@ -338,6 +367,8 @@ export function CameraCapture({
   function stopLive() {
     cameraRequestRef.current += 1;
     mediaOperationRef.current?.abort();
+    mediaOperationIdRef.current += 1;
+    torchRequestRef.current += 1;
     clearRecordTimer();
     clipRef.current?.cancel();
     clipRef.current = null;
@@ -366,7 +397,7 @@ export function CameraCapture({
   ) {
     if (!mountedRef.current || disabledRef.current) return;
     if (!Object.values(permissionsRef.current).every(Boolean)) {
-      throw new Error("Reconfirm adult status and all four permissions for this batch.");
+      throw new Error("Reconfirm adult status, every media-scope item, and all four permissions for this batch.");
     }
     const confirmedAt = confirmedAtForBatch();
     if (!jpegs.length || !observations.length) throw new Error("No readable frame was captured.");
@@ -384,10 +415,15 @@ export function CameraCapture({
       quality,
       consent: {
         adults: true,
+        nonExplicit: true,
+        nonSecret: true,
+        nonCoerced: true,
+        allPeopleConsented: true,
         activity: true,
         recording: true,
         upload: true,
         output: true,
+        batchId: crypto.randomUUID(),
         confirmedAt,
       },
     });
@@ -409,7 +445,8 @@ export function CameraCapture({
     setSelectedFrames([]);
     setBusy(true);
     setError(null);
-    const signal = beginMediaOperation();
+    const operation = beginMediaOperation();
+    const { signal } = operation;
     try {
       const frames: { jpeg: string; imageData: ImageData }[] = [];
       for (let i = 0; i < 3; i++) {
@@ -436,11 +473,11 @@ export function CameraCapture({
         [scoreFrame(chosen.imageData)],
       );
     } catch (cause) {
-      if (!(cause instanceof DOMException && cause.name === "AbortError")) {
+      if (ownsMediaOperation(operation.id) && !(cause instanceof DOMException && cause.name === "AbortError")) {
         setError(cause instanceof Error ? cause.message : "Could not capture a photo.");
       }
     } finally {
-      if (mountedRef.current) setBusy(false);
+      if (ownsMediaOperation(operation.id)) setBusy(false);
     }
   }
 
@@ -489,23 +526,30 @@ export function CameraCapture({
       return;
     }
     setBusy(true);
-    const signal = beginMediaOperation();
+    const operation = beginMediaOperation();
+    const { signal } = operation;
     try {
+      const stoppedAt = Date.now();
       const blob = await handle.stop();
       signal.throwIfAborted();
-      const durationHint = startedAt === null ? undefined : Math.max(0.05, (Date.now() - startedAt) / 1000);
-      await ingestVideo(blob, signal, durationHint);
+      const durationHint = startedAt === null ? undefined : Math.max(0.05, (stoppedAt - startedAt) / 1000);
+      await ingestVideo(blob, operation, durationHint);
     } catch (e) {
-      if (!(e instanceof DOMException && e.name === "AbortError")) {
+      if (ownsMediaOperation(operation.id) && !(e instanceof DOMException && e.name === "AbortError")) {
         setError(e instanceof Error ? e.message : "Could not record");
       }
     } finally {
       recordTransitionRef.current = false;
-      if (mountedRef.current) setBusy(false);
+      if (ownsMediaOperation(operation.id)) setBusy(false);
     }
   }
 
-  async function ingestVideo(file: Blob, signal = beginMediaOperation(), durationHintSeconds?: number) {
+  async function ingestVideo(
+    file: Blob,
+    operation: { signal: AbortSignal; id: number },
+    durationHintSeconds?: number,
+  ) {
+    const { signal } = operation;
     if (!file.size) throw new Error("The video is empty.");
     if (file.size > 100 * 1024 * 1024) {
       throw new Error("Video is too large. Choose one under 100 MB.");
@@ -518,7 +562,7 @@ export function CameraCapture({
       return { f, obs };
     });
     signal.throwIfAborted();
-    if (!mountedRef.current || disabledRef.current) return;
+    if (!ownsMediaOperation(operation.id) || disabledRef.current) return;
     setVideoFrames(
       observed.map((x, index) => ({
         id: `F${String(index + 1).padStart(2, "0")}`,
@@ -565,25 +609,25 @@ export function CameraCapture({
     setSelectedFrames([]);
     setBusy(true);
     setError(null);
-    const signal = beginMediaOperation();
+    const operation = beginMediaOperation();
+    const { signal } = operation;
     try {
       const actualKind = file.type.startsWith("video/") ? "video" : kind;
       validateMediaFile(file, actualKind);
-      await validateMediaSignature(file, actualKind);
+      const dimensions = await validateMediaSignature(file, actualKind);
       signal.throwIfAborted();
       if (actualKind === "video") {
-        await ingestVideo(file, signal);
+        await ingestVideo(file, operation);
       } else {
-        const { jpeg, imageData } = await processMediaFrame(file, 768, 240, 0.74);
-        signal.throwIfAborted();
+        const { jpeg, imageData } = await processMediaFrame(file, 768, 240, 0.74, dimensions);
         await emitFromMedia("photo", [jpeg], [observeFrame(imageData)], [scoreFrame(imageData)]);
       }
     } catch (e) {
-      if (!(e instanceof DOMException && e.name === "AbortError")) {
+      if (ownsMediaOperation(operation.id) && !(e instanceof DOMException && e.name === "AbortError")) {
         setError(e instanceof Error ? e.message : "Could not read media");
       }
     } finally {
-      if (mountedRef.current) setBusy(false);
+      if (ownsMediaOperation(operation.id)) setBusy(false);
     }
   }
 
@@ -591,12 +635,14 @@ export function CameraCapture({
     const stream = streamRef.current;
     if (!stream) return;
     const request = cameraRequestRef.current;
+    const torchRequest = ++torchRequestRef.current;
     const next = !torch;
     const ok = await setTorch(stream, next);
     if (
       !mountedRef.current ||
       disabledRef.current ||
       request !== cameraRequestRef.current ||
+      torchRequest !== torchRequestRef.current ||
       streamRef.current !== stream
     ) return;
     setTorchOn(ok ? next : false);
@@ -605,18 +651,38 @@ export function CameraCapture({
 
   return (
     <div className="space-y-3">
-      <fieldset className="rounded-lg border border-border bg-surface p-3">
+      <fieldset disabled={disabled} className="rounded-lg border border-border bg-surface p-3 disabled:opacity-60">
         <legend className="px-1 text-xs uppercase tracking-wide text-subtle">Permission for this batch</legend>
         <p className="mb-2 text-xs leading-relaxed text-muted">
-          Confirm legal-adult status plus all four permissions separately for each batch. Prefer
-          equipment-only or clothed, non-identifying stills; exclude faces, nudity, tattoos,
-          screens, mail, and room details when possible.
+          Confirm legal-adult status, non-explicit media scope, and all four permissions separately
+          for each batch. Prefer equipment-only, clothed, non-identifying stills. Exclude faces,
+          nudity, intimate contact, tattoos, screens, mail, and room details.
         </p>
         <div className="space-y-2 text-xs text-fg">
           <PermissionCheck
             checked={permissions.adults}
             onChange={(checked) => updatePermission("adults", checked)}
             label="I confirm every depicted person is a legal adult. The app cannot infer age from media."
+          />
+          <PermissionCheck
+            checked={permissions.nonExplicit}
+            onChange={(checked) => updatePermission("nonExplicit", checked)}
+            label="I confirm this batch is clothed and non-explicit."
+          />
+          <PermissionCheck
+            checked={permissions.nonSecret}
+            onChange={(checked) => updatePermission("nonSecret", checked)}
+            label="I confirm this batch was not recorded secretly."
+          />
+          <PermissionCheck
+            checked={permissions.nonCoerced}
+            onChange={(checked) => updatePermission("nonCoerced", checked)}
+            label="I confirm neither the activity nor media permission was coerced."
+          />
+          <PermissionCheck
+            checked={permissions.allPeopleConsented}
+            onChange={(checked) => updatePermission("allPeopleConsented", checked)}
+            label="I confirm every depicted person consented and there are no unconsented bystanders."
           />
           <PermissionCheck
             checked={permissions.activity}
@@ -626,25 +692,31 @@ export function CameraCapture({
           <PermissionCheck
             checked={permissions.recording}
             onChange={(checked) => updatePermission("recording", checked)}
-            label="Every depicted adult currently agrees to this photo or video recording."
+            label="I directly confirmed every depicted adult currently agrees to this specific photo or video recording."
           />
           <PermissionCheck
             checked={permissions.upload}
             onChange={(checked) => updatePermission("upload", checked)}
-            label="Every depicted adult agrees to send only the selected compressed stills to xAI."
+            label="I directly confirmed every depicted adult agrees to send the selected compressed stills and generic frame labels to xAI in this submission."
           />
           <PermissionCheck
             checked={permissions.output}
             onChange={(checked) => updatePermission("output", checked)}
-            label="Every depicted adult agrees to this app producing an observation report for this operator."
+            label="I directly confirmed every depicted adult agrees that this operator may read the report, optionally save a text-only summary on this device, and share or discuss it only within the agreed audience and deletion plan."
           />
+          <p className="text-subtle">
+            Withdrawal discards the pending local batch and suppresses its result, but it cannot
+            recall a request that was already transmitted to xAI.
+          </p>
         </div>
       </fieldset>
       {batchCommitted && (
         <div className="rounded-md border border-accent/30 bg-accent/10 p-3 text-xs text-muted">
           <p>
-            This batch is locked to the permissions above. Uncheck any item to withdraw permission
-            and discard it, or discard it before starting another batch.
+            This page locks the batch to the attestations above and submits it at most once from this
+            view. The running server also rejects a repeated batch token, but that replay check is not
+            durable across a deployment restart. Uncheck any item to withdraw permission and discard
+            it, or discard it before starting another batch.
           </p>
           <Button className="mt-2" variant="outline" size="sm" onClick={startNewBatch}>
             Discard batch and start another
@@ -676,11 +748,12 @@ export function CameraCapture({
         )}
       </div>
       <div className="flex flex-wrap gap-1.5">
-        {(["torso", "back", "hands", "legs"] as Guide[]).map((g) => (
+        {(["equipment", "context", "detail", "label"] as Guide[]).map((g) => (
           <button
             key={g}
             type="button"
             onClick={() => setGuide(g)}
+            aria-pressed={guide === g}
             className={cn(
               "rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-wide",
               guide === g ? "border-accent text-fg" : "border-border text-muted",
@@ -853,7 +926,7 @@ export function CameraCapture({
       )}
     </div>
   );
-}
+});
 
 function cameraErrorMessage(cause: unknown): string {
   if (typeof DOMException !== "undefined" && cause instanceof DOMException) {
@@ -872,13 +945,13 @@ function cameraErrorMessage(cause: unknown): string {
 
 function GuideOverlay({ guide }: { guide: Guide }) {
   const box =
-    guide === "hands"
-      ? "inset-[58%_12%_8%_12%]"
-      : guide === "legs"
-        ? "inset-[48%_18%_6%_18%]"
-        : guide === "back"
-          ? "inset-[10%_16%_18%_16%]"
-          : "inset-[12%_14%_22%_14%]";
+    guide === "detail"
+      ? "inset-[28%_22%_28%_22%]"
+      : guide === "label"
+        ? "inset-[35%_18%_35%_18%]"
+        : guide === "context"
+          ? "inset-[8%_8%_12%_8%]"
+          : "inset-[14%_14%_20%_14%]";
   return (
     <div className="pointer-events-none absolute inset-0">
       <div className={cn("absolute rounded-md border border-accent/70", box)} />

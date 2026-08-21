@@ -1,377 +1,147 @@
 import type { Tie } from "./types";
 
-const floor = {
-  wrapBands: 2,
-  pose: "kneel" as const,
-  view: "front" as const,
-  handsVisible: true,
-  neckClear: true,
+type InstructorRouteInput = Pick<Tie, "slug" | "name" | "jp" | "summary" | "nerves" | "intent"> & {
+  risks: string;
+  alternative: string;
 };
 
+function instructorRoute(input: InstructorRouteInput): Tie {
+  return {
+    slug: input.slug,
+    name: `${input.name}: Instructor Route`,
+    jp: input.jp,
+    summary: input.summary,
+    level: "advanced",
+    minutes: [0, 0],
+    ropes: [],
+    position: "theory",
+    prereqs: [],
+    knots: [],
+    nerves: input.nerves,
+    intent: [...input.intent, "instructor-only", "risk-awareness"],
+    why: `${input.risks} A remote description, timer, checklist, or image cannot establish fit, pressure, tolerance, consent, or release competence.`,
+    stop: [
+      "Do not construct this tie from app instructions",
+      "Release for any symptom, distress, communication change, withdrawn consent, or uncertainty",
+    ],
+    steps: [
+      {
+        title: "Recognition, negotiation, and qualified instruction",
+        rigger:
+          "Use this entry to recognize the category and prepare questions. Learn construction, person-specific fit, monitoring, and rapid release hands-on from a qualified, consent-centered adult instructor.",
+        bottom:
+          "A role, prior scene, checklist, normal appearance, or camera result never replaces current consent or your right to stop.",
+        check: input.alternative,
+        speak: "Instructor-only. This app does not coach, modify, or clear this restraint.",
+        expected: {
+          wrapBands: 0,
+          pose: "stand",
+          view: "front",
+          handsVisible: true,
+          neckClear: true,
+        },
+        wraps: [],
+      },
+    ],
+    mistakes: [
+      {
+        title: "Remote clearance",
+        body: "A photo, timer, symptom-free moment, or model response cannot validate construction, anatomy, physiology, or safety.",
+      },
+    ],
+    aftercare:
+      "For an incident, stop and release. Call emergency services for emergency signs; seek prompt medical assessment for persistent or worsening symptoms. Do not re-tie to test recovery.",
+    variations: [],
+  };
+}
+
 export const MORE_TIES: Tie[] = [
-  {
+  instructorRoute({
     slug: "frog-tie",
     name: "Frog Tie",
     jp: "開脚",
     summary:
-      "Each calf bound to its own thigh, knees out. A floor position for the bench, the pad, or in front of the machine. It loads the knee and the peroneal nerve. It is not a hang.",
-    level: "building",
-    minutes: [8, 18],
-    ropes: [{ lengthM: 8, count: 2 }],
-    position: "floor",
-    prereqs: ["futomomo", "single-column"],
-    knots: ["somerville-bowline", "wrap-cinch"],
+      "A folded-leg restraint category with joint, nerve, circulation, mobility, and rapid-release risks. This app provides recognition, not construction or placement instructions.",
     nerves: ["peroneal", "femoral"],
-    intent: ["legs", "open", "floor"],
-    why: "A frog opens the hips without a spreader bar. The clock is the whole tie.",
-    stop: [
-      "Pins and needles on the top of the foot",
-      "Knee pain (not stretch)",
-      "Foot going pale or cold",
-      "Used as a hang from the knees",
-    ],
-    steps: [
-      {
-        title: "One leg first",
-        rigger:
-          "She sits or lies back. Fold one calf to the thigh as in a futomomo. Somerville or wrap-cinch on the thigh, not in the knee pit, not on the outer fibular head.",
-        bottom: "Flex the foot on cue. The top of the foot going numb is a stop, not a wait.",
-        check: "Outer knee is empty of rope. Two-finger space. Foot is pink.",
-        speak: "One futomomo. Rope off the outer knee. Foot stays pink.",
-        expected: { ...floor, wrapBands: 2, pose: "sit" },
-        wraps: [{ kind: "futomomo", side: "l" }],
-      },
-      {
-        title: "Match the other",
-        rigger: "Same structure, same tension. Knees point out only as far as her hips already go unbound.",
-        bottom: "Do not help by yanking the second knee wider than the first.",
-        check: "Both feet warm. She can still talk in full sentences.",
-        speak: "Match the second leg. Do not force the straddle.",
-        expected: { ...floor, wrapBands: 4, pose: "sit" },
-        wraps: [
-          { kind: "futomomo", side: "l" },
-          { kind: "futomomo", side: "r" },
-        ],
-      },
-      {
-        title: "Optional stem",
-        rigger:
-          "A stem between the two thighs can keep the straddle. Leave slack she can use. Never hoist from this.",
-        bottom: "If the stem is doing the splits for you, say yellow.",
-        check: "Stem is on rope, not in the groin crease.",
-        speak: "Optional stem between thighs. Not a hoist. Groin stays clear.",
-        expected: { ...floor, wrapBands: 4, pose: "sit" },
-        wraps: [
-          { kind: "futomomo", side: "both" },
-          { kind: "hip" },
-        ],
-      },
-    ],
-    mistakes: [
-      {
-        title: "Rope on the fibular head",
-        body: "The peroneal nerve is right there. Numb top of foot means cut the futomomo, not 'wiggle it out'.",
-      },
-      {
-        title: "Hanging from the frogs",
-        body: "Knees are not hard points. This app will not coach a lift from a frog.",
-      },
-    ],
-    aftercare:
-      "Straighten each knee slowly. Rub the outer knee and the top of the foot. She does not stand until both feet are hers.",
-    variations: [
-      { name: "On the bench", body: "Hips at the edge, frogs on the pad. Machine in front of you, not instead of you." },
-      { name: "One-legged", body: "One frog, one free leg, is often the better first version." },
-    ],
-  },
-  {
+    intent: ["legs", "floor"],
+    risks: "Folding and restraining both legs can limit independent repositioning and make symptoms harder to respond to.",
+    alternative: "Practice rope handling on an unoccupied form or choose an unrestrained, self-selected position.",
+  }),
+  instructorRoute({
     slug: "mermaid",
     name: "Mermaid",
     jp: "人魚",
     summary:
-      "Legs bound together from thigh to calf, arms free or cuffed. A compact, pretty restraint for the table or the bed. Watch the peroneal nerve where wraps cross the outer knee.",
-    level: "foundation",
-    minutes: [8, 16],
-    ropes: [{ lengthM: 8, count: 2 }],
-    position: "floor",
-    prereqs: ["double-column", "single-column"],
-    knots: ["wrap-cinch", "somerville-bowline"],
+      "A legs-together restraint category that can limit movement and concentrate pressure. This app provides recognition only.",
     nerves: ["peroneal"],
-    intent: ["legs", "compact", "decorative"],
-    why: "Mermaid is double-column thinking repeated down the legs. The gap between the legs is still the trick.",
-    stop: ["Feet go dusky", "No gap between the thighs", "Wraps sitting on the outer knee"],
-    steps: [
-      {
-        title: "Thighs as a column",
-        rigger: "She sits or lies. Thighs parallel with a finger of space. Two or three wraps, cinch in the gap.",
-        bottom: "Keep the knees soft. Pointing hard is how the outer knee finds the rope.",
-        check: "Visible gap. Outer knees empty.",
-        speak: "Thighs as a double column. Gap. Rope off the outer knees.",
-        expected: { wrapBands: 2, pose: "sit", view: "front", handsVisible: true, neckClear: true },
-        wraps: [{ kind: "band", y: 0.62, w: 0.08 }],
-      },
-      {
-        title: "Down the calves",
-        rigger: "A second band below the knees, same gap rule. Do not figure-eight across the knee joint itself.",
-        bottom: "Wiggle toes on cue.",
-        check: "Toes pink. She can still flex both feet.",
-        speak: "Second band on the calves. Not across the knee joint.",
-        expected: { wrapBands: 4, pose: "sit", view: "front", handsVisible: true, neckClear: true },
-        wraps: [
-          { kind: "band", y: 0.62, w: 0.08 },
-          { kind: "band", y: 0.78, w: 0.08 },
-        ],
-      },
-    ],
-    mistakes: [
-      { title: "Solid wrap, no gap", body: "You built a tourniquet for two legs. Rebuild with space." },
-    ],
-    aftercare: "Separate the legs and let her shake them. Compare both feet.",
-    variations: [
-      { name: "Ankles only", body: "Stop at a double-column ankle if the full mermaid is too much clock." },
-      { name: "On the table", body: "Massage table, hips supported, mermaid as the only restraint. Keep a way to sit her up." },
-    ],
-  },
-  {
+    intent: ["legs", "decorative"],
+    risks: "Multiple bands across two legs can complicate monitoring and rapid release.",
+    alternative: "Rehearse the visual pattern on an unoccupied bolster without tightening or body loading.",
+  }),
+  instructorRoute({
     slug: "starfish",
     name: "Starfish",
     jp: "星",
     summary:
-      "Wrists and ankles out on the bed or the table, each to its own column. A floor spread, not a hang. Furniture holds. Rope dresses.",
-    level: "foundation",
-    minutes: [6, 14],
-    ropes: [{ lengthM: 8, count: 2 }],
-    position: "floor",
-    prereqs: ["single-column"],
-    knots: ["somerville-bowline"],
+      "A multi-point furniture-restraint category with fall, joint, circulation, abandonment, and release-path risks. This app does not teach attachment.",
     nerves: ["ulnar", "radial", "peroneal"],
-    intent: ["spread", "bed", "restraint"],
-    why: "Four independent non-cinching cuffs beat one clever web she cannot get out of in a hurry.",
-    stop: ["Any cuff cinches when she pulls", "Shoulders yanked past her range", "Tied to a ceiling ring"],
-    steps: [
-      {
-        title: "Two wrists",
-        rigger: "Somerville on each wrist. Attach to bed frame or table rail at a height that does not shrug her shoulders into her ears.",
-        bottom: "If a shoulder is already complaining unbound, that arm stays closer.",
-        check: "Two-finger cuffs. Shoulders down.",
-        speak: "Two Somervilles. Attach low. Shoulders stay down.",
-        expected: { wrapBands: 2, pose: "supine", view: "front", handsVisible: true, neckClear: true },
-        wraps: [
-          { kind: "cuff", at: "lw" },
-          { kind: "cuff", at: "rw" },
-        ],
-      },
-      {
-        title: "Two ankles",
-        rigger: "Same knot, larger column. Off the Achilles. Off the front of the ankle.",
-        bottom: "A spread she already has in yoga, not a new personal record.",
-        check: "Feet pink. Knees unlocked.",
-        speak: "Ankle cuffs off the Achilles. Spread she already has.",
-        expected: { wrapBands: 4, pose: "supine", view: "front", handsVisible: true, neckClear: true },
-        wraps: [
-          { kind: "cuff", at: "lw" },
-          { kind: "cuff", at: "rw" },
-          { kind: "cuff", at: "ll" },
-          { kind: "cuff", at: "rl" },
-        ],
-      },
-    ],
-    mistakes: [
-      { title: "One rope, four limbs", body: "A single line that cinches the whole star is a nightmare to cut in order. Independent cuffs." },
-    ],
-    aftercare: "Release one limb at a time. Shoulders first if they were loaded.",
-    variations: [
-      { name: "Three-point", body: "Two wrists and a mermaid is often enough. Leave one exit." },
-    ],
-  },
-  {
+    intent: ["furniture", "restraint"],
+    risks: "Independent attachment of several limbs can remove ordinary movement and create several failure points.",
+    alternative: "Keep the furniture unoccupied and practice identifying exits, controls, and release-tool access.",
+  }),
+  instructorRoute({
     slug: "hogtie-floor",
-    name: "Floor Hogtie: Instructor Route",
+    name: "Floor Hogtie",
     jp: "後手海老",
     summary:
-      "A compact restraint-position category associated with breathing, joint, nerve, panic, mobility, and release risk. This app identifies the term but does not teach or remotely assess it.",
-    level: "advanced",
-    minutes: [0, 0],
-    ropes: [],
-    position: "floor",
-    prereqs: [],
-    knots: [],
+      "A compact restraint-position category associated with breathing, joint, nerve, panic, mobility, and release risk. This app identifies the term but does not teach or assess it.",
     nerves: ["radial", "peroneal"],
-    intent: ["instructor-only", "risk-awareness"],
-    why: "A remote description or still cannot establish breathing, mobility, distress, joint range, load paths, or release access.",
-    stop: ["Do not begin from this app", "Release for any symptom, distress, or uncertainty"],
-    steps: [
-      {
-        title: "Qualified in-person instruction",
-        rigger: "Do not construct, modify, or assess this position from app instructions or camera output. Use a qualified adult educator for hands-on risk recognition and release practice.",
-        bottom: "Do not accept a photo, timer, or speech check as proof that this position is tolerable or safe.",
-        check: "Choose a lower-consequence, neutral-position, ground-level rehearsal instead.",
-        speak: "Instructor-only. This app does not coach or clear compact restraint positions.",
-        expected: { wrapBands: 0, pose: "prone", view: "back", handsVisible: true, neckClear: true },
-        wraps: [],
-      },
-    ],
-    mistakes: [{ title: "Remote clearance", body: "A photo, checklist, or model response cannot validate this position." }],
-    aftercare: "For symptoms or an incident, release, do not re-tie, and seek appropriate medical care.",
-    variations: [],
-  },
-  {
+    intent: ["compact", "restraint"],
+    risks: "Compact positions can compromise movement, communication, breathing, and rapid release without any single visible warning.",
+    alternative: "Choose a neutral, unrestrained, ground-level rehearsal and discuss risk recognition with an instructor.",
+  }),
+  instructorRoute({
     slug: "tesuji",
     name: "Tesuji",
     jp: "手筋",
     summary:
-      "Forearm to upper arm, a folded-arm cuff. Compact, useful on the cross and the chair. The radial nerve on the outer upper arm is the whole watch.",
-    level: "foundation",
-    minutes: [4, 9],
-    ropes: [{ lengthM: 8, count: 1 }],
-    position: "floor",
-    prereqs: ["single-column", "double-column"],
-    knots: ["somerville-bowline", "wrap-cinch"],
+      "A folded-arm restraint category with joint, nerve, circulation, and release risks. Anatomical landmarks in an app are not placement instructions.",
     nerves: ["radial", "ulnar"],
-    intent: ["arms", "compact", "cross"],
-    why: "A tesuji lets you restrain an arm without taking it behind the back.",
-    stop: ["Thumb and first two fingers going numb", "Rope in the radial groove"],
-    steps: [
-      {
-        title: "Fold the arm",
-        rigger: "Hand toward the shoulder, comfortable. Wrap the forearm to the upper arm as a double column with a gap at the inner elbow.",
-        bottom: "Keep the fist soft. A hard fist drives the ulnar nerve into the rope.",
-        check: "Inner elbow empty. Outer upper arm empty of a tight band.",
-        speak: "Forearm to upper arm. Gap at the inner elbow. Radial groove empty.",
-        expected: { wrapBands: 2, pose: "stand", view: "side", handsVisible: true, neckClear: true },
-        wraps: [
-          { kind: "cuff", at: "lw" },
-          { kind: "cuff", at: "la" },
-        ],
-      },
-    ],
-    mistakes: [
-      { title: "Band on the radial groove", body: "Outer upper arm, a few inches down from the deltoid. That stripe going numb is a cut-down, not a wait." },
-    ],
-    aftercare: "Straighten the elbow slowly. Compare both hands.",
-    variations: [
-      { name: "On the cross", body: "Tesuji plus a single column to the ring keeps the arm bent and shortens the clock. Arms-up on a cross is already a clock." },
-    ],
-  },
-  {
+    intent: ["arms", "compact"],
+    risks: "A folded arm can develop concerning symptoms even when appearance and simple movement checks seem normal.",
+    alternative: "Use an unoccupied padded form to discuss the category; keep people unrestrained until hands-on instruction.",
+  }),
+  instructorRoute({
     slug: "bunny",
     name: "Bunny Tie",
     jp: "兎",
     summary:
-      "Wrists at the back of the head or high on the chest, ears optional as decorative loops. Pretty, shoulder-loaded, short. Not a first-night TK substitute.",
-    level: "building",
-    minutes: [8, 15],
-    ropes: [{ lengthM: 8, count: 1 }],
-    position: "floor",
-    prereqs: ["double-column", "shinju"],
-    knots: ["somerville-bowline", "larks-head"],
+      "A hands-high restraint category with shoulder, nerve, circulation, neck-migration, and release risks. This app provides recognition only.",
     nerves: ["radial", "brachial"],
-    intent: ["shape", "shoulders", "decorative"],
-    why: "The bunny is a silhouette. If she cannot hold hands-high unbound, skip the ears.",
-    stop: ["Hands above the head going numb", "Anything around the neck as 'ears'"],
-    steps: [
-      {
-        title: "Hands high",
-        rigger: "Wrists together at the back of the head or at the crown, double column with a gap. No collar. Decorative loops live on the wrist cuff, not on the throat.",
-        bottom: "Shoulders down even if the hands are high. If a hand buzzes, say it.",
-        check: "Neck empty. Shoulders not shrugged into the ears.",
-        speak: "Wrists high with a gap. Neck empty. Ears are not a collar.",
-        expected: { wrapBands: 2, pose: "stand", view: "front", handsVisible: true, neckClear: true },
-        wraps: [
-          { kind: "cuff", at: "lw" },
-          { kind: "cuff", at: "rw" },
-        ],
-      },
-    ],
-    mistakes: [
-      { title: "Ears around the neck", body: "Decorative loops that close on the throat are a neck tie. Untie. This app will not coach it." },
-    ],
-    aftercare: "Hands down slowly. Shoulders in circles.",
-    variations: [{ name: "One ear", body: "A single decorative loop off the wrist cuff. Still not a collar." }],
-  },
-  {
+    intent: ["shape", "shoulders"],
+    risks: "Hands-high positions can change risk quickly and a brief unrestrained pose does not clear a restrained version.",
+    alternative: "Create decorative loops on an unoccupied prop, with no body or neck application.",
+  }),
+  instructorRoute({
     slug: "pole-cuffs",
     name: "Pole Cuffs",
     jp: "ポール",
     summary:
-      "Single columns to the stripper pole. The pole is a vertical object, not a rated hard point. She stands on the floor. You do not hoist.",
-    level: "foundation",
-    minutes: [5, 12],
-    ropes: [{ lengthM: 8, count: 1 }],
-    position: "floor",
-    prereqs: ["single-column"],
-    knots: ["somerville-bowline", "munter"],
+      "A pole-attachment category with structural, fall, shoulder, circulation, and abandonment risks. This app does not teach attachment.",
     nerves: ["ulnar", "radial"],
-    intent: ["pole", "restraint", "impact"],
-    why: "Cuffing someone to a pole is object bondage. The floor is still holding her.",
-    stop: ["Feet off the floor", "Arms yanked up the pole", "Spinning her while loaded"],
-    steps: [
-      {
-        title: "Two columns",
-        rigger: "Somerville on each wrist. Hitch to the pole at a height she can stand with shoulders down. A munter or two half-hitches onto the pole, not a cinch around the wrist.",
-        bottom: "Keep weight in your feet. The pole is scenery.",
-        check: "Feet planted. Two-finger cuffs. Shears in reach.",
-        speak: "Cuffs to the pole. Feet stay planted. Do not hoist.",
-        expected: { wrapBands: 2, pose: "stand", view: "front", handsVisible: true, neckClear: true },
-        wraps: [
-          { kind: "cuff", at: "lw" },
-          { kind: "cuff", at: "rw" },
-        ],
-      },
-    ],
-    mistakes: [
-      { title: "Using the pole as an upline", body: "Spinning dance poles are not rated anchors. If both feet leave the floor, you are inventing a hang." },
-    ],
-    aftercare: "Unhitch from the pole first, then the cuffs. Let her walk a circle.",
-    variations: [
-      { name: "Facing the pole", body: "A hug around the pole with a double column is often enough. Keep a gap." },
-    ],
-  },
-  {
+    intent: ["pole", "restraint"],
+    risks: "A dance pole and its installation are not verified rope anchors, even if feet are intended to remain on the floor.",
+    alternative: "Keep pole use and rope practice separate; inspect unoccupied labels and clear floor space only.",
+  }),
+  instructorRoute({
     slug: "bench-drape",
     name: "Bench Drape",
     jp: "ベンチ",
     summary:
-      "Hips on the sex bench or massage table, chest supported, wrists and optional frogs. Built for your bench and the Hismith in front of you.",
-    level: "building",
-    minutes: [10, 20],
-    ropes: [{ lengthM: 8, count: 2 }],
-    position: "floor",
-    prereqs: ["single-column", "frog-tie"],
-    knots: ["somerville-bowline"],
+      "A furniture-restraint category that may involve prone positioning or powered equipment. This app does not provide a body configuration.",
     nerves: ["ulnar", "peroneal", "femoral"],
-    intent: ["bench", "machine", "hips"],
-    why: "The bench holds. Rope only stops a slide. If the bench is doing its job, you need less rope than you think.",
-    stop: ["Hips sliding off", "Chest hanging with no support", "Machine on while you leave the room"],
-    steps: [
-      {
-        title: "Park the hips",
-        rigger: "Hips on the pad, chest on the pad or a bolster. Adjust the bench before you rope. The machine is off.",
-        bottom: "Find the height that does not crank your low back.",
-        check: "Chest supported. Machine off. Shears on the bench rail.",
-        speak: "Hips parked. Chest supported. Machine off.",
-        expected: { wrapBands: 0, pose: "prone", view: "side", handsVisible: true, neckClear: true },
-        wraps: [],
-      },
-      {
-        title: "Wrists, then optional frogs",
-        rigger: "Somervilles to the bench rails or a simple tesuji. Add frogs only if the knees are happy. Leave a way to lift a crotch rope without untying the night.",
-        bottom: "If the pad is the only thing holding your chest, say so.",
-        check: "Full sentence. Hands pink. You can reach the machine kill switch.",
-        speak: "Cuffs to the rails. Optional frogs. You can still kill the machine.",
-        expected: { wrapBands: 2, pose: "prone", view: "side", handsVisible: true, neckClear: true },
-        wraps: [
-          { kind: "cuff", at: "lw" },
-          { kind: "cuff", at: "rw" },
-        ],
-      },
-    ],
-    mistakes: [
-      { title: "Rope instead of the pad", body: "If you are using rope to keep her from falling off a too-narrow bench, fix the bench." },
-    ],
-    aftercare: "Machine off first. Then frogs. Then wrists. Sit her up on the pad before she stands.",
-    variations: [
-      { name: "Supine on the table", body: "Massage table, starfish or mermaid, no machine. Same rule: furniture holds." },
-    ],
-  },
+    intent: ["bench", "machine"],
+    risks: "Furniture restraint can combine fall, breathing, mobility, pressure, machine-control, and rapid-release hazards.",
+    alternative: "Keep equipment off and unoccupied; identify controls, guards, exits, and release access without attaching anyone.",
+  }),
 ];

@@ -1,8 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { emergencyNumberHref, readEmergencyNumber } from "@/lib/privacy/local-data";
 
 export const Route = createFileRoute("/emergency")({ component: EmergencyPage });
 
 function EmergencyPage() {
+  const [emergencyNumber, setEmergencyNumber] = useState("");
+  useEffect(() => setEmergencyNumber(readEmergencyNumber()), []);
+  const callHref = emergencyNumberHref(emergencyNumber);
   return (
     <div className="mx-auto max-w-xl px-5 py-10">
       <p className="text-xs uppercase tracking-[0.22em] text-danger">Stop</p>
@@ -29,12 +34,22 @@ function EmergencyPage() {
           <p>Do not re-tie, delay care for a photo, or use normal-looking color or an app result to rule out injury.</p>
         </li>
       </ol>
-      <a
-        href="tel:911"
-        className="mt-8 flex h-12 items-center justify-center rounded-md bg-danger text-sm font-medium text-danger-fg"
-      >
-        Call 911
-      </a>
+      {callHref ? (
+        <a
+          href={callHref}
+          className="mt-8 flex h-12 items-center justify-center rounded-md bg-danger text-sm font-medium text-danger-fg"
+        >
+          Call configured emergency number {emergencyNumber}
+        </a>
+      ) : (
+        <div className="mt-8 rounded-md border border-danger bg-danger/10 p-4 text-sm" role="alert">
+          <p className="font-medium text-danger">Call your local emergency-services number now.</p>
+          <p className="mt-1 text-muted">
+            Use the device's phone dialer. No number is configured in Knotty, and the app will not
+            guess from browser language or location.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
