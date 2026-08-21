@@ -171,6 +171,9 @@ export default defineConfig(({ command, isPreview }) => ({
       ? [
           nitro({
             preset: "vercel",
+            // Keep the Vercel function in one server bundle. Splitting this
+            // graph can create a circular namespace chunk that Node rejects.
+            inlineDynamicImports: true,
             // Auto-registers server/middleware/* (the PWA install page +
             // manifest + head-tag middleware). Nitro v3 defaults serverDir to
             // false, so removing this silently unwires /?install=1 on deploys.
