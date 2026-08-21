@@ -67,7 +67,9 @@ jobs:
             echo "Production build did not emit a functions directory."
             exit 1
           fi
-          if rg --line-number 'pglite\.(data|wasm)|initdb\.wasm' "$functions_dir"; then
+          if grep --recursive --line-number --binary-files=without-match \
+            --extended-regexp --include='*.mjs' --include='*.js' \
+            'pglite\.(data|wasm)|initdb\.wasm' "$functions_dir"; then
             echo "Production server output retained a PGLite WASM/data loader."
             exit 1
           else

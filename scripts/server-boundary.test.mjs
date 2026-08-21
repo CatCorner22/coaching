@@ -67,6 +67,7 @@ test("the compile-time dev-server boundary owns PGLite and preview credentials",
   assert.match(vite, /await mod\.ensureDbReady\(\)/);
   assert.match(config, /problems\.push\("DATABASE_URL is required"\)/);
   assert.match(workflow, /pglite\\\.\(data\|wasm\)\|initdb\\\.wasm/);
+  assert.match(workflow, /grep --recursive --line-number --binary-files=without-match/);
   assert.match(workflow, /\[\[ ! -d "\$functions_dir" \]\]/);
   assert.match(workflow, /"\$\{#modules\[@\]\}" -eq 0/);
   assert.match(workflow, /scan_status=\$\?/);
