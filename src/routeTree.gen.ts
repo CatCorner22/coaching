@@ -21,6 +21,7 @@ import { Route as JournalRouteImport } from './routes/journal'
 import { Route as KnotsRouteImport } from './routes/knots'
 import { Route as KnowledgeRouteImport } from './routes/knowledge'
 import { Route as LibraryRouteImport } from './routes/library'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as NegotiateRouteImport } from './routes/negotiate'
 import { Route as NervesRouteImport } from './routes/nerves'
 import { Route as PlanRouteImport } from './routes/plan'
@@ -30,6 +31,7 @@ import { Route as StudioRouteImport } from './routes/studio'
 import { Route as ArticleSlugRouteImport } from './routes/article.$slug'
 import { Route as KnotSlugRouteImport } from './routes/knot.$slug'
 import { Route as TieSlugRouteImport } from './routes/tie.$slug'
+import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -91,6 +93,11 @@ const LibraryRoute = LibraryRouteImport.update({
   path: '/library',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const NegotiateRoute = NegotiateRouteImport.update({
   id: '/negotiate',
   path: '/negotiate',
@@ -136,6 +143,11 @@ const TieSlugRoute = TieSlugRouteImport.update({
   path: '/tie/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -150,6 +162,7 @@ export interface FileRoutesByFullPath {
   '/knots': typeof KnotsRoute
   '/knowledge': typeof KnowledgeRoute
   '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
   '/negotiate': typeof NegotiateRoute
   '/nerves': typeof NervesRoute
   '/plan': typeof PlanRoute
@@ -159,6 +172,7 @@ export interface FileRoutesByFullPath {
   '/article/$slug': typeof ArticleSlugRoute
   '/knot/$slug': typeof KnotSlugRoute
   '/tie/$slug': typeof TieSlugRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -173,6 +187,7 @@ export interface FileRoutesByTo {
   '/knots': typeof KnotsRoute
   '/knowledge': typeof KnowledgeRoute
   '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
   '/negotiate': typeof NegotiateRoute
   '/nerves': typeof NervesRoute
   '/plan': typeof PlanRoute
@@ -182,6 +197,7 @@ export interface FileRoutesByTo {
   '/article/$slug': typeof ArticleSlugRoute
   '/knot/$slug': typeof KnotSlugRoute
   '/tie/$slug': typeof TieSlugRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -197,6 +213,7 @@ export interface FileRoutesById {
   '/knots': typeof KnotsRoute
   '/knowledge': typeof KnowledgeRoute
   '/library': typeof LibraryRoute
+  '/login': typeof LoginRoute
   '/negotiate': typeof NegotiateRoute
   '/nerves': typeof NervesRoute
   '/plan': typeof PlanRoute
@@ -206,6 +223,7 @@ export interface FileRoutesById {
   '/article/$slug': typeof ArticleSlugRoute
   '/knot/$slug': typeof KnotSlugRoute
   '/tie/$slug': typeof TieSlugRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -222,6 +240,7 @@ export interface FileRouteTypes {
     | '/knots'
     | '/knowledge'
     | '/library'
+    | '/login'
     | '/negotiate'
     | '/nerves'
     | '/plan'
@@ -231,6 +250,7 @@ export interface FileRouteTypes {
     | '/article/$slug'
     | '/knot/$slug'
     | '/tie/$slug'
+    | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -245,6 +265,7 @@ export interface FileRouteTypes {
     | '/knots'
     | '/knowledge'
     | '/library'
+    | '/login'
     | '/negotiate'
     | '/nerves'
     | '/plan'
@@ -254,6 +275,7 @@ export interface FileRouteTypes {
     | '/article/$slug'
     | '/knot/$slug'
     | '/tie/$slug'
+    | '/api/auth/$'
   id:
     | '__root__'
     | '/'
@@ -268,6 +290,7 @@ export interface FileRouteTypes {
     | '/knots'
     | '/knowledge'
     | '/library'
+    | '/login'
     | '/negotiate'
     | '/nerves'
     | '/plan'
@@ -277,6 +300,7 @@ export interface FileRouteTypes {
     | '/article/$slug'
     | '/knot/$slug'
     | '/tie/$slug'
+    | '/api/auth/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -292,6 +316,7 @@ export interface RootRouteChildren {
   KnotsRoute: typeof KnotsRoute
   KnowledgeRoute: typeof KnowledgeRoute
   LibraryRoute: typeof LibraryRoute
+  LoginRoute: typeof LoginRoute
   NegotiateRoute: typeof NegotiateRoute
   NervesRoute: typeof NervesRoute
   PlanRoute: typeof PlanRoute
@@ -301,6 +326,7 @@ export interface RootRouteChildren {
   ArticleSlugRoute: typeof ArticleSlugRoute
   KnotSlugRoute: typeof KnotSlugRoute
   TieSlugRoute: typeof TieSlugRoute
+  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -389,6 +415,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LibraryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/negotiate': {
       id: '/negotiate'
       path: '/negotiate'
@@ -452,6 +485,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TieSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -468,6 +508,7 @@ const rootRouteChildren: RootRouteChildren = {
   KnotsRoute: KnotsRoute,
   KnowledgeRoute: KnowledgeRoute,
   LibraryRoute: LibraryRoute,
+  LoginRoute: LoginRoute,
   NegotiateRoute: NegotiateRoute,
   NervesRoute: NervesRoute,
   PlanRoute: PlanRoute,
@@ -477,6 +518,7 @@ const rootRouteChildren: RootRouteChildren = {
   ArticleSlugRoute: ArticleSlugRoute,
   KnotSlugRoute: KnotSlugRoute,
   TieSlugRoute: TieSlugRoute,
+  ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

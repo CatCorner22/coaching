@@ -59,8 +59,8 @@ test("all routed catalog slugs are globally unique", () => {
 
 test("all cross-catalog references resolve to a routeable item", () => {
   const related = new Set([...ARTICLES, ...TIES, ...KNOTS].map((item) => item.slug));
-  const nerveSlugs = new Set(NERVES.map((nerve) => nerve.slug));
-  const dungeonSlugs = new Set(DUNGEON.map((piece) => piece.slug));
+  const nerveSlugs = new Set<string>(NERVES.map((nerve) => nerve.slug));
+  const dungeonSlugs = new Set<string>(DUNGEON.map((piece) => piece.slug));
   for (const article of ARTICLES) {
     for (const slug of article.related) {
       assert.ok(related.has(slug), `article ${article.slug} has unresolved related slug ${slug}`);

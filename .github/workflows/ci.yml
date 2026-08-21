@@ -22,17 +22,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # Bootstrap the first lockfile with the exact runtime that will verify it.
-      # The second setup-node invocation can then key npm's cache from that file.
       - name: Set up exact Node runtime
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 22.23.2
-
-      - name: Generate dependency lockfile
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-
-      - name: Enable npm cache from generated lockfile
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22.23.2
@@ -40,12 +30,15 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies without lifecycle scripts
-        run: npm install --ignore-scripts --no-audit --no-fund
+        run: npm ci --ignore-scripts --no-audit --no-fund
 
       # TanStack's production build generates src/routeTree.gen.ts. Build it
       # before typechecking so newly added file routes are part of the graph.
       - name: Build production bundle and generate route tree
         run: npm run build
+
+      - name: Verify generated artifacts are committed
+        run: git diff --exit-code -- package-lock.json src/routeTree.gen.ts
 
       - name: Typecheck generated application
         run: npm run typecheck
@@ -67,17 +60,6 @@ jobs:
           cp vite.config.ts "$fixture_root/vite.config.ts"
           cd "$fixture_root"
           node --test scripts/grok-pwa-plugin.test.mjs
-
-      - name: Upload reproducibility bootstrap files
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: reproducibility-bootstrap
-          path: |
-            package-lock.json
-            src/routeTree.gen.ts
-          if-no-files-found: error
-          retention-days: 7
 
       - name: Install Chromium for production smoke test
         run: ./node_modules/.bin/playwright install --with-deps chromium

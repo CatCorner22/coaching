@@ -21,12 +21,11 @@ The project targets Node 22.
 The supported npm wrappers default standalone development to `VITE_AUTH_ENABLED=false`; production must explicitly set it to `true` and provide the configured identity service. Do not start Vite directly, because that bypasses the shared environment wrapper.
 
 ```sh
-npm install
+npm ci --ignore-scripts
+npm run build
 npm run typecheck
 npm run lint
-npm run test:core
-npm run test:stores
-npm run build
+npm test
 ```
 
 Camera and media behavior still requires real-device checks on current iOS Safari, Android Chrome, desktop Chromium, Firefox, and Safari. Unit tests cannot establish camera permissions, decoder support, MediaRecorder interoperability, accessibility, or safe real-world use.
@@ -38,8 +37,8 @@ Camera and media behavior still requires real-device checks on current iOS Safar
 - Set provider-level spend/concurrency limits in addition to the per-user, per-instance application limits.
 - Enable real authentication for production AI. Cost-bearing endpoints reject the shared development identity and require a same-origin browser request in production.
 - Confirm the applicable xAI account terms, retention configuration, and availability of Zero Data Retention before accepting personal data. The UI assumes already-transmitted requests cannot be recalled.
-- Generate and commit `package-lock.json` from a trusted network before release, then change CI and local setup to `npm ci`. This reconstruction cannot fetch the registry, so the lockfile remains an explicit release blocker.
-- Validate from a clean provider workspace with its generated `.grok/app-env.json`. The PWA icon exists on GitHub `main` but is absent from this reconstructed local snapshot; preserve it through the final tree. Focused source-owned tests run in CI now, and release remains blocked until the full template/build gates pass with the app-specific site identity.
+- Install from the committed `package-lock.json` with `npm ci --ignore-scripts`. CI uses exact Node 22.23.2 and fails if a production build changes the committed lockfile or generated route tree.
+- Validate from a clean provider workspace with its generated `.grok/app-env.json`. CI runs the app-specific PWA fixture plus production desktop/mobile browser smoke, but provider authentication and camera hardware still require environment testing.
 
 ## Camera release matrix
 
