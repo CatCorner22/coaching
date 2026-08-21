@@ -14,12 +14,13 @@ function SafetyPage() {
       <p className="text-xs uppercase tracking-[0.22em] text-muted">安</p>
       <h1 className="mt-2 font-display text-4xl">Safety</h1>
       <p className="mt-4 text-sm leading-relaxed text-muted">
-        Shears in reach. Traffic lights. Two fingers. Outer upper arm and outer knee are no-cinch
-        zones. Neck is not a column. Full suspension is not in this app.
+        Shears in reach. Traffic lights. Keep the neck empty. Release for symptoms, distress, or
+        uncertainty. Fit rules, timers, direct checks, and camera output can reveal concern; none
+        of them proves a restraint is safe.
       </p>
       <div className="mt-8 grid gap-3">
         <Callout title="Red" body="Everything stops. Rope comes off as fast as is safe. Aftercare starts." />
-        <Callout title="Hands" body="Color, temperature, capillary refill, squeeze, which finger. Every few minutes, out loud." />
+        <Callout title="Direct checks" body="Ask about comfort, sensation, motion, and change; compare sides and baseline. Check whenever anything changes and release for concern—never wait for a timer." />
         <Callout title="Radial" body="Outer upper arm, a few fingers below the deltoid. Wrist-drop is how TK becomes an injury." />
         <Callout title="Peroneal" body="Outer knee. Futomomo cinches do not live here. Foot-drop is a walking injury." />
       </div>

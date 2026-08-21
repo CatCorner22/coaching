@@ -164,7 +164,7 @@ export const DUNGEON: DungeonPiece[] = [
       "Do not combine a too-large toy, a crotch rope that prevents backing off, and a gag.",
       "Do not 'just see if it fits' while she is already in a TK. Hands are busy being tied.",
     ],
-    studio: "Coach the rope, not the toy. Photograph harness clearance at the groin, not pornography for the model.",
+    studio: "Keep intimate media out of the app. A photo cannot assess groin placement, pressure, consent, or safety; use direct communication and qualified in-person instruction.",
     ties: ["karada", "futomomo", "single-column"],
     minutes: [15, 40],
   },

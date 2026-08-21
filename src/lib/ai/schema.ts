@@ -2,6 +2,7 @@ import type { CoachReport, DeterministicReport, LlmDraft } from "@/lib/ml/types"
 
 export type AnalyzeInput = {
   images: string[];
+  frameLabels?: string[];
   deterministic: DeterministicReport;
   tieSlug?: string;
   stepIndex?: number;
@@ -10,6 +11,14 @@ export type AnalyzeInput = {
   furnitureSlug?: string;
   hardNos?: string[];
   protocol?: { rigger: string; bottom: string; style: "peer" | "ds" };
+  consent: {
+    adults: true;
+    activity: true;
+    recording: true;
+    upload: true;
+    output: true;
+    confirmedAt: number;
+  };
 };
 
 export type AnalyzeResult =

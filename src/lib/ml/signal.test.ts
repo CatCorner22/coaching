@@ -12,6 +12,22 @@ test("findPeaks locates wrap bands", () => {
   assert.equal(peaks[0]?.index, 3);
 });
 
+test("findPeaks rejects a uniform field instead of inventing repeated bands", () => {
+  assert.deepEqual(findPeaks(Array.from({ length: 120 }, () => 8), 0.4), []);
+});
+
+test("findPeaks collapses plateaus and applies scale-aware non-maximum suppression", () => {
+  const series = Array.from({ length: 240 }, () => 0);
+  for (let i = 30; i <= 34; i++) series[i] = 10;
+  series[37] = 9;
+  series[100] = 8;
+
+  assert.deepEqual(findPeaks(series, 0.4), [
+    { index: 32, value: 10 },
+    { index: 100, value: 8 },
+  ]);
+});
+
 test("inferStep stays near previous when wrap count is noisy", () => {
   const r = inferStep(3, [0, 1, 3, 4, 5], 2);
   assert.equal(r.step, 2);
@@ -55,9 +71,8 @@ test("local audit vetoes a sound grade on deterministic stop", () => {
   });
   assert.equal(draft.quality, "unsafe");
   assert.ok(verdict.overrides.length + verdict.droppedClaims.length > 0);
-  assert.match(draft.next, /stop/i);
+  assert.match(draft.next, /stop|release/i);
   assert.doesNotMatch(draft.next, /add a neck/i);
   assert.doesNotMatch(draft.speak, /neck rope for style/i);
   assert.doesNotMatch(draft.speak, /before you add rope/i);
 });
-

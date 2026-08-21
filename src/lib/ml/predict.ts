@@ -6,7 +6,7 @@ import type {
   Prediction,
   SafetyFlag,
 } from "./types";
-import { deltaE, type RGB } from "./color";
+import type { RGB } from "./color";
 
 export function inferStep(
   wrapCount: number,
@@ -39,31 +39,21 @@ export function buildDeterministic(
   const neckRope = Math.max(0, ...frames.map((f) => f.neckRope), last?.neckRope ?? 0);
   const motion = last?.motion ?? 0;
   const blueness = Math.max(0, ...frames.map((f) => f.blueness ?? 0));
-  const palenessVsBase =
-    baseline && last
-      ? Math.min(1, deltaE(baseline, { r: 220 - paleness * 80, g: 180, b: 160 + paleness * 40 }) / 40)
-      : paleness;
+  void baseline;
 
   const flags: SafetyFlag[] = [];
   if (neckRope > 0.08) {
     flags.push({
       code: "neck",
-      severity: neckRope > 0.16 ? "stop" : "watch",
-      note: "Rope density in the neck zone. Confirm the throat is empty before you continue.",
-    });
-  }
-  if (paleness > 0.62 || palenessDelta > 0.12) {
-    flags.push({
-      code: "circulation",
-      severity: paleness > 0.78 ? "stop" : "watch",
-      note: "Extremities look paler or cooler than they should. Check nail-bed refill and temperature.",
+      severity: "stop",
+      note: "Possible neck or throat overlap in this view. Stop and release; an image cannot establish contact or pressure.",
     });
   }
   if (blueness > 0.45) {
     flags.push({
       code: "circulation",
-      severity: "stop",
-      note: "Blue shift on the hands. Strip distal rope.",
+      severity: "watch",
+      note: "Possible blue color shift in this frame. Camera color is unreliable; pause and verify directly, releasing for any concerning change or symptom.",
     });
   }
   if (!last || (last.width * last.height) < 16 || Number.isNaN(last.ropeShare) || !last.body) {
@@ -71,8 +61,8 @@ export function buildDeterministic(
       code: "unknown",
       severity: last?.body ? "watch" : "stop",
       note: last?.body
-        ? "Frame is unusable. Do not add rope until you have a still that shows her."
-        : "I cannot see a body. Do not add rope. Photograph her, not the wall.",
+        ? "The frame is unusable. Pause and rely on direct checks, not another image, before any change."
+        : "No stable relevant region was detected. Stop relying on the image and assess directly.",
     });
   }
 
@@ -80,18 +70,18 @@ export function buildDeterministic(
     ? "stop"
     : flags.some((f) => f.severity === "watch")
       ? "adjust"
-      : "continue";
+      : "adjust";
 
   const notes: string[] = [];
-  if (!last?.body) notes.push("I cannot see a clear body region. Step back or add light.");
-  else notes.push(`I count about ${wrapBands.length} wrap band${wrapBands.length === 1 ? "" : "s"}.`);
-  if ((last?.ropeShare ?? 0) < 0.01) notes.push("Very little rope-colored signal. Photograph the wraps, not the room.");
+  if (!last?.body) notes.push("No clear relevant region was detected in this limited view.");
+  else notes.push(`The image heuristic found ${wrapBands.length} possible horizontal rope-like feature${wrapBands.length === 1 ? "" : "s"}.`);
+  if ((last?.ropeShare ?? 0) < 0.01) notes.push("Very little rope-colored signal was visible; an image may not be useful.");
 
   return {
     wrapCount: wrapBands.length,
     wrapBands,
     neckRope,
-    paleness: Math.max(paleness, palenessVsBase * 0.5),
+    paleness,
     palenessDelta,
     motion,
     flags,
@@ -108,54 +98,17 @@ export function predict(opts: {
   elapsedSec: number;
   priorNerveHits: number;
 }): Prediction {
-  const expected = opts.tie?.steps.map((s) => s.expected.wrapBands) ?? [];
-  const inferred = inferStep(opts.det.wrapCount, expected, opts.stepIndex);
-  const typicalMax = (opts.tie?.minutes[1] ?? 20) * 60;
-  const time = clamp01(opts.elapsedSec / Math.max(90, typicalMax));
-  const circulation = clamp01(
-    opts.det.paleness * 0.7 + Math.max(0, opts.det.palenessDelta) * 2.2,
-  );
-  const neck = clamp01(opts.det.neckRope * 6);
-  const nerve = clamp01(
-    (opts.tie?.nerves.includes("radial") ? 0.22 : 0.08) +
-      opts.priorNerveHits * 0.2 +
-      (opts.det.wrapCount > 4 ? 0.1 : 0),
-  );
-  const breathing = clamp01(
-    (opts.tie?.slug === "takate-kote" || opts.tie?.slug === "ebi" ? 0.25 : 0.05) +
-      time * 0.2,
-  );
-
-  const risks = { circulation, nerve, neck, time, breathing };
-  const top = (Object.entries(risks) as [keyof typeof risks, number][]).sort(
-    (a, b) => b[1] - a[1],
-  )[0]!;
-
-  let nextFailure = "Even tension and a circulation check.";
-  if (top[0] === "neck" && top[1] > 0.35) nextFailure = "Throat migration if the next stem climbs.";
-  else if (top[0] === "circulation" && top[1] > 0.4) nextFailure = "Hands going quiet in the next few minutes.";
-  else if (top[0] === "nerve" && top[1] > 0.4) nextFailure = "Radial or peroneal complaint if a cinch lands on a groove.";
-  else if (top[0] === "time" && top[1] > 0.7) nextFailure = "Overtime on this tie — the body is done before you are.";
-  else if (top[0] === "breathing" && top[1] > 0.45) nextFailure = "Shallower breath as chest bands settle.";
-
-  const recommend: Prediction["recommend"] =
-    opts.det.recommend === "stop" || neck > 0.55 || circulation > 0.72
-      ? "stop"
-      : neck > 0.3 || circulation > 0.45 || time > 0.85 || opts.det.recommend === "adjust"
-        ? "adjust"
-        : "continue";
-
-  const etaMinutes =
-    circulation > 0.3 && opts.det.palenessDelta > 0
-      ? Math.max(1, Math.round((0.72 - circulation) / Math.max(0.04, opts.det.palenessDelta * 6)))
-      : null;
+  // A camera cannot produce medical risk probabilities, validate a tie step, or
+  // forecast time-to-injury. Keep this legacy shape neutral until callers migrate.
+  const risks = { circulation: 0, nerve: 0, neck: 0, time: 0, breathing: 0 };
+  const recommend: Prediction["recommend"] = opts.det.recommend === "stop" ? "stop" : "adjust";
 
   return {
-    stepIndex: inferred.step,
-    stepConfidence: inferred.confidence,
+    stepIndex: Math.max(0, Number.isFinite(opts.stepIndex) ? Math.floor(opts.stepIndex) : 0),
+    stepConfidence: 0,
     risks,
-    nextFailure,
-    etaMinutes,
+    nextFailure: "Images cannot predict nerve, circulation, breathing, load, or future condition.",
+    etaMinutes: null,
     recommend,
   };
 }

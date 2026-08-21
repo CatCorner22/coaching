@@ -13,6 +13,9 @@ export function observeFrame(
   let skinN = 0;
   let motionAcc = 0;
   let motionN = 0;
+  let lumaSum = 0;
+  let lumaSquaredSum = 0;
+  let sampledPixels = 0;
   let minX = width;
   let minY = height;
   let maxX = 0;
@@ -26,6 +29,17 @@ export function observeFrame(
       const r = buf[i]!;
       const g = buf[i + 1]!;
       const b = buf[i + 2]!;
+      const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      lumaSum += luminance;
+      lumaSquaredSum += luminance * luminance;
+      sampledPixels++;
+      if (previous) {
+        const dr = r - previous[i]!;
+        const dg = g - previous[i + 1]!;
+        const db = b - previous[i + 2]!;
+        motionAcc += Math.abs(dr) + Math.abs(dg) + Math.abs(db);
+        motionN++;
+      }
       if (isDark(r, g, b) && !isDarkFiber(r, g, b)) continue;
       if (isRope(r, g, b) || isDarkFiber(r, g, b)) {
         ropeN++;
@@ -38,21 +52,24 @@ export function observeFrame(
         if (x > maxX) maxX = x;
         if (y > maxY) maxY = y;
       }
-      if (previous) {
-        const dr = r - previous[i]!;
-        const dg = g - previous[i + 1]!;
-        const db = b - previous[i + 2]!;
-        motionAcc += Math.abs(dr) + Math.abs(dg) + Math.abs(db);
-        motionN++;
-      }
     }
     rowRope[y] = ropeOnRow;
     if (step === 2 && y + 1 < height) rowRope[y + 1] = ropeOnRow;
   }
 
   const sampled = Math.max(1, Math.ceil(width / step) * Math.ceil(height / step));
+  const meanLuma = lumaSum / Math.max(1, sampledPixels);
+  const lumaVariance = Math.max(0, lumaSquaredSum / Math.max(1, sampledPixels) - meanLuma ** 2);
+  const skinShare = skinN / sampled;
   const body =
-    skinN > 30 && maxX > minX
+    skinN > 30 &&
+    maxX > minX &&
+    maxY > minY &&
+    Math.sqrt(lumaVariance) >= 8 &&
+    skinShare >= 0.015 &&
+    skinShare <= 0.82 &&
+    maxX - minX >= width * 0.12 &&
+    maxY - minY >= height * 0.12
       ? { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
       : null;
 
@@ -132,7 +149,7 @@ export function observeFrame(
     width,
     height,
     ropeShare: ropeN / sampled,
-    skinShare: skinN / sampled,
+    skinShare,
     wrapBands,
     neckRope,
     paleness,

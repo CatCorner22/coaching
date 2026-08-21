@@ -8,11 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { analyzeRope } from "@/lib/ai/analyze";
 import { DUNGEON, TIES, getTie } from "@/lib/kb";
-import { sampleHands } from "@/lib/ml/detect";
 import { fuseCoach } from "@/lib/ml/fuse";
-import { toImageData, validateMediaFile } from "@/lib/media";
 import type { CoachReport } from "@/lib/ml/types";
-import type { RGB } from "@/lib/ml/color";
 import { useJournal } from "@/lib/stores/journal";
 import { useNegotiate } from "@/lib/stores/negotiate";
 import { useSession } from "@/lib/stores/session";
@@ -28,6 +25,35 @@ export const Route = createFileRoute("/studio")({
   component: StudioPage,
 });
 
+const TIE_LIMIT_IDS: Record<string, string[]> = {
+  "takate-kote": ["gote"],
+  ebi: ["gote", "predicament"],
+  "gyaku-ebi": ["gote", "predicament"],
+  "hogtie-floor": ["predicament"],
+  matanawa: ["crotch"],
+  karada: ["torso"],
+  shinju: ["torso"],
+  tasuki: ["torso"],
+  hishi: ["torso"],
+  kikkou: ["torso"],
+  "partial-suspension": ["suspension"],
+};
+
+const FURNITURE_LIMIT_IDS: Record<string, string[]> = {
+  "massage-table": ["bench"],
+  "sex-bench": ["bench"],
+  "st-andrews-cross": ["cross"],
+  "sex-swing": ["swing"],
+  pole: ["pole"],
+  floggers: ["impact"],
+  hismith: ["machine"],
+  "bad-dragon": ["toys"],
+};
+
+function blockedByIds(slug: string | undefined, table: Record<string, string[]>, noIds: Set<string>) {
+  return !!slug && (table[slug] ?? []).some((id) => noIds.has(id));
+}
+
 function StudioPage() {
   const search = Route.useSearch();
   const settings = useSettings();
@@ -36,18 +62,33 @@ function StudioPage() {
   const addEntry = useJournal((j) => j.add);
   const items = useNegotiate((s) => s.items);
   const hardNos = useMemo(() => items.filter((i) => i.rank === "no"), [items]);
+  const hardNoIds = useMemo(() => new Set(hardNos.map((item) => item.id)), [hardNos]);
+  const hardNoKey = useMemo(() => hardNos.map((item) => `${item.id}:${item.label}`).sort().join("\u0000"), [hardNos]);
   const [capture, setCapture] = useState<CaptureResult | null>(null);
-  const [prior, setPrior] = useState<CaptureResult | null>(null);
-  const [baseline, setBaseline] = useState<RGB | null>(null);
   const [report, setReport] = useState<CoachReport | null>(null);
   const [pending, setPending] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [calibrationError, setCalibrationError] = useState<string | null>(null);
   const [refusal, setRefusal] = useState(false);
   const [saved, setSaved] = useState(false);
   const [question, setQuestion] = useState("");
+  const [micArmed, setMicArmed] = useState(false);
+  const [micStatus, setMicStatus] = useState<"idle" | "starting" | "active" | "error" | "unsupported">("idle");
   const analysisRequestRef = useRef(0);
   const tie = getTie(session.tieSlug ?? "");
+  const tieBlocked = blockedByIds(session.tieSlug, TIE_LIMIT_IDS, hardNoIds);
+  const furnitureBlocked = blockedByIds(session.furnitureSlug, FURNITURE_LIMIT_IDS, hardNoIds);
+  const mediaBlocked = hardNoIds.has("photos");
+
+  useEffect(() => {
+    if (tieBlocked) useSession.getState().setTie(undefined);
+    if (furnitureBlocked) useSession.getState().setFurniture(undefined);
+    if (mediaBlocked) {
+      analysisRequestRef.current += 1;
+      setCapture(null);
+      setReport(null);
+      setPending(false);
+    }
+  }, [tieBlocked, furnitureBlocked, mediaBlocked]);
 
   useEffect(() => {
     if (search.tie) session.setTie(search.tie);
@@ -60,39 +101,34 @@ function StudioPage() {
   const stopSession = useSession((s) => s.stop);
   const setStep = useSession((s) => s.setStep);
   const checked = useSession((s) => s.checked);
-  const analyzeRef = useRef<() => void>(() => undefined);
   const nagged = useRef(false);
 
   useEffect(() => {
-    if (!settings.listen) return;
+    if (!settings.listen || !micArmed) return;
     return listenForWords(
-      [settings.safeword, settings.yellowWord, settings.greenWord, "red", "next", "analyze", "hands"],
+      [settings.safeword, settings.yellowWord, settings.greenWord, "red"],
       (w) => {
         const t = w.toLowerCase();
         if (t === settings.safeword.toLowerCase() || t === "red") stopSession("safeword");
         else if (t === settings.yellowWord.toLowerCase()) {
           if (useSession.getState().stopped) return;
-          checked();
-          if (settings.voice) void playCoachVoice("Yellow. Check color, heat, squeeze. Do not add rope.");
+          stopSession("yellow");
         } else if (t === settings.greenWord.toLowerCase()) {
           if (useSession.getState().stopped) return;
           checked();
-          if (settings.voice) void playCoachVoice("Green. Continue.");
-        } else if (t === "next") {
-          const s = useSession.getState();
-          if (s.stopped) return;
-          const max = getTie(s.tieSlug ?? "")?.steps.length ?? 1;
-          s.setStep(Math.min(s.stepIndex + 1, Math.max(0, max - 1)));
-        } else if (t === "analyze") {
-          if (useSession.getState().stopped) return;
-          analyzeRef.current();
-        } else if (t === "hands") {
-          checked();
+          if (settings.voice) void playCoachVoice("Green received. Keep checking consent and symptoms directly.");
+        }
+      },
+      (status) => {
+        setMicStatus(status);
+        if (status === "error" || status === "unsupported" || status === "idle") {
+          setMicArmed(false);
         }
       },
     );
   }, [
     settings.listen,
+    micArmed,
     settings.safeword,
     settings.yellowWord,
     settings.greenWord,
@@ -106,11 +142,21 @@ function StudioPage() {
     analysisRequestRef.current += 1;
     setPending(false);
     setAnalysisError(null);
-  }, [capture]);
+  }, [
+    capture,
+    session.tieSlug,
+    session.stepIndex,
+    session.furnitureSlug,
+    question,
+    hardNoKey,
+    settings.riggerName,
+    settings.bottomName,
+    settings.style,
+  ]);
   const det = useMemo(() => {
     if (!capture) return null;
-    return buildDeterministic(capture.observations, baseline);
-  }, [capture, baseline]);
+    return buildDeterministic(capture.observations, null);
+  }, [capture]);
 
   const stopped = useSession((s) => s.stopped);
   const stepIndex = useSession((s) => s.stepIndex);
@@ -123,9 +169,9 @@ function StudioPage() {
     if (!stopped) return;
     analysisRequestRef.current += 1;
     stopCoachVoice();
+    setMicArmed(false);
     setPending(false);
     setCapture(null);
-    setPrior(null);
     setReport(null);
   }, [stopped]);
 
@@ -148,7 +194,7 @@ function StudioPage() {
 
   async function runAnalyze() {
     if (!capture || !det) return;
-    if (session.stopped) return;
+    if (session.stopped || mediaBlocked) return;
     const request = ++analysisRequestRef.current;
     setPending(true);
     setRefusal(false);
@@ -157,18 +203,20 @@ function StudioPage() {
       const res = await analyzeRope({
         data: {
           images: capture.jpegs.slice(0, 3),
+          frameLabels: capture.frameLabels.slice(0, 3),
           deterministic: det,
           tieSlug,
           stepIndex,
           elapsedSec: elapsed,
           question: question || undefined,
           furnitureSlug,
-          hardNos: hardNos.map((n) => n.label),
+          hardNos: hardNos.map((n) => `${n.id}: ${n.label}`),
           protocol: {
             rigger: settings.riggerName || "rigger",
-            bottom: settings.bottomName || "your wife",
+            bottom: settings.bottomName || "partner",
             style: settings.style,
           },
+          consent: capture.consent,
         },
       });
       if (request !== analysisRequestRef.current || useSession.getState().stopped) return;
@@ -188,9 +236,22 @@ function StudioPage() {
       if (request === analysisRequestRef.current) setPending(false);
     }
   }
-  analyzeRef.current = () => {
-    void runAnalyze();
-  };
+
+  function acceptCapture(next: CaptureResult) {
+    analysisRequestRef.current += 1;
+    setPending(false);
+    setAnalysisError(null);
+    setReport(null);
+    setCapture(next);
+  }
+
+  function discardCapture() {
+    analysisRequestRef.current += 1;
+    setPending(false);
+    setAnalysisError(null);
+    setReport(null);
+    setCapture(null);
+  }
 
   const spoke = useRef<number | null>(null);
   useEffect(() => {
@@ -212,23 +273,10 @@ function StudioPage() {
   useEffect(() => {
     if (dueCheck && settings.voice && !session.stopped && !nagged.current) {
       nagged.current = true;
-      void playCoachVoice("Circulation check. Color, heat, squeeze.");
+      void playCoachVoice("Direct-check reminder. Ask about comfort, sensation, motion, and change. Release for concern.");
     }
     if (!dueCheck) nagged.current = false;
   }, [dueCheck, settings.voice]);
-
-  async function calibrate(file: File) {
-    setCalibrationError(null);
-    try {
-      validateMediaFile(file, "photo");
-      const imageData = await toImageData(file, 240);
-      const rgb = sampleHands(imageData);
-      if (!rgb) throw new Error("No readable hand area was found. Try a closer, brighter photo.");
-      setBaseline(rgb);
-    } catch (cause) {
-      setCalibrationError(cause instanceof Error ? cause.message : "Could not read the calibration photo.");
-    }
-  }
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
@@ -248,7 +296,6 @@ function StudioPage() {
                 analysisRequestRef.current += 1;
                 stopCoachVoice();
                 setCapture(null);
-                setPrior(null);
                 setReport(null);
                 session.reset();
               }}
@@ -274,7 +321,7 @@ function StudioPage() {
           <ClockRing
             elapsed={session.elapsed}
             limitSec={settings.circulationMins * 60}
-            label="hands"
+            label="reminder"
           />
         </div>
       </div>
@@ -283,9 +330,29 @@ function StudioPage() {
           Negotiated no: {hardNos.map((n) => n.label).join(" · ")}
         </p>
       )}
+      {settings.listen && !session.stopped && (
+        <div className="mt-3 rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted">
+          <button
+            type="button"
+            className="font-medium text-fg underline-offset-2 hover:underline"
+            onClick={() => {
+              if (micArmed) {
+                setMicArmed(false);
+                setMicStatus("idle");
+              } else {
+                setMicStatus("starting");
+                setMicArmed(true);
+              }
+            }}
+          >
+            {micArmed ? "Turn off optional mic word detection" : "Enable optional mic word detection for this session"}
+          </button>
+          <span className="ml-2">Status: {micStatus}. Convenience only; never a safety control.</span>
+        </div>
+      )}
       {dueCheck && (
         <p className="mt-4 rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-warn">
-          Circulation check is due. Color, heat, refill, squeeze, which finger.{" "}
+          The optional direct-check reminder elapsed. It is not a safety deadline or clearance.{" "}
           <Link to="/checkin" className="underline">
             Log it
           </Link>
@@ -302,8 +369,12 @@ function StudioPage() {
           >
             <option value="">Freeform</option>
             {TIES.map((t) => (
-              <option key={t.slug} value={t.slug}>
-                {t.name}
+              <option
+                key={t.slug}
+                value={t.slug}
+                disabled={blockedByIds(t.slug, TIE_LIMIT_IDS, hardNoIds)}
+              >
+                {t.name}{blockedByIds(t.slug, TIE_LIMIT_IDS, hardNoIds) ? " — negotiated no" : ""}
               </option>
             ))}
           </select>
@@ -316,8 +387,12 @@ function StudioPage() {
           >
             <option value="">Floor / bed</option>
             {DUNGEON.map((d) => (
-              <option key={d.slug} value={d.slug}>
-                {d.name}
+              <option
+                key={d.slug}
+                value={d.slug}
+                disabled={blockedByIds(d.slug, FURNITURE_LIMIT_IDS, hardNoIds)}
+              >
+                {d.name}{blockedByIds(d.slug, FURNITURE_LIMIT_IDS, hardNoIds) ? " — negotiated no" : ""}
               </option>
             ))}
           </select>
@@ -378,35 +453,26 @@ function StudioPage() {
               </div>
               {det && (
                 <p className="text-center text-xs tabular-nums text-subtle">
-                  Camera sees {det.wrapCount} wrap{det.wrapCount === 1 ? "" : "s"} · this step wants{" "}
-                  {tie.steps[session.stepIndex]?.expected.wrapBands ?? "—"}
+                  Image heuristic marked {det.wrapCount} possible horizontal rope-like feature
+                  {det.wrapCount === 1 ? "" : "s"}. This does not validate the selected tie or step.
                 </p>
               )}
             </div>
           )}
           <div className="mt-4">
+            {mediaBlocked && (
+              <p className="mb-3 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
+                Media is a negotiated no. Change that decision together before enabling photo or video capture.
+              </p>
+            )}
             <CameraCapture
-              onCapture={(c) => {
-                setPrior(capture);
-                setCapture(c);
-              }}
-              disabled={session.stopped}
+              onCapture={acceptCapture}
+              onDiscard={discardCapture}
+              disabled={session.stopped || mediaBlocked}
             />
           </div>
           {capture && (
             <WrapOverlay src={capture.preview} obs={capture.previewObservation} />
-          )}
-          {prior && capture && (
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <figure>
-                <img src={prior.preview} alt="Previous still" className="w-full rounded-md border border-border" />
-                <figcaption className="mt-1 text-[11px] text-subtle">Previous</figcaption>
-              </figure>
-              <figure>
-                <img src={capture.preview} alt="Current still" className="w-full rounded-md border border-border" />
-                <figcaption className="mt-1 text-[11px] text-subtle">Now</figcaption>
-              </figure>
-            </div>
           )}
         </div>
         <div className="space-y-4">
@@ -419,15 +485,16 @@ function StudioPage() {
           />
           <textarea
             className="h-20 w-full rounded-md border border-border bg-elevated p-3 text-sm"
-            placeholder="Optional: what you want coached in this still"
+            placeholder="Optional: which visible area or image limitation should the report describe?"
+            aria-label="Optional observation question"
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             disabled={session.stopped}
           />
           {analysisError && <p className="text-sm text-danger" role="alert">{analysisError}</p>}
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => void runAnalyze()} disabled={!capture || pending || session.stopped}>
-              Ask Grok
+            <Button onClick={() => void runAnalyze()} disabled={!capture || pending || session.stopped || mediaBlocked}>
+              Observe selected stills
             </Button>
             <Button variant="outline" onClick={() => session.checked()} disabled={session.stopped}>
               Hands checked
@@ -436,21 +503,6 @@ function StudioPage() {
               {settings.safeword}
             </Button>
           </div>
-          <label className="block text-xs text-muted">
-            Calibration still (unbound hands)
-            <input
-              type="file"
-              accept="image/*"
-              className="mt-1 block w-full text-xs"
-              disabled={session.stopped}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) void calibrate(f);
-              }}
-            />
-            {baseline && <span className="text-ok"> Baseline stored on this device.</span>}
-            {calibrationError && <span className="block text-danger" role="alert">{calibrationError}</span>}
-          </label>
           <Button
             variant="ghost"
             size="sm"

@@ -97,8 +97,8 @@ const CORE_ARTICLES: Article[] = [
       {
         type: "ul",
         items: [
-          "Yes: single column, futomomo, karada, shinju, photography, sex after",
-          "Maybe: TK, crotch rope, predicament, light impact on a harness, partial lift",
+          "Yes: only specific activities both adults explicitly choose for this session",
+          "Maybe: discuss further; maybe is not permission and defaults to no until clarified",
           "No: neck rope, gag, full suspension from a tutorial, breath play, leaving the house, surprise visitors",
         ],
       },
@@ -122,7 +122,7 @@ const CORE_ARTICLES: Article[] = [
       },
       {
         type: "p",
-        text: "Kinbaku history includes torture positions and hojojutsu captures. Knowing that history is not the same as recreating it on someone you love. Punishment ties (ebi as torment, hair suspension, strappado) are either time-boxed with a clock or they are not happening.",
+        text: "Kinbaku history includes torture positions and hojojutsu captures. Knowing that history is not permission or instruction to recreate high-consequence positions. This app routes those activities to qualified, hands-on adult education.",
       },
     ],
   },
@@ -172,7 +172,7 @@ const CORE_ARTICLES: Article[] = [
     title: "Circulation",
     section: "body",
     minutes: 6,
-    summary: "Color, temperature, capillary refill, motion, feeling. Five checks, every few minutes, out loud.",
+    summary: "Direct communication and comparison checks can reveal a reason to release, but no interval or threshold proves safety.",
     related: ["nerve-atlas", "emergency-stop"],
     blocks: [
       {
@@ -180,14 +180,14 @@ const CORE_ARTICLES: Article[] = [
         items: [
           "Color — pink, not white, not dusky, not blue",
           "Temperature — compare to the unbound hand",
-          "Capillary refill — press a nail bed, color back in under two seconds",
+          "Appearance after gentle nail-bed pressure — compare sides and baseline; do not use a universal cutoff as clearance",
           "Motion — squeeze, thumb extension, ankle pump",
           "Feeling — can she tell which finger you are touching without looking",
         ],
       },
       {
         type: "p",
-        text: "Knotty's studio can compare hand color to a calibration photo you take unbound. It is a hint, not a doctor. Pale plus cold plus slow refill is a reason to strip rope, not a reason to 'see how she does'.",
+        text: "A camera cannot assess circulation, nerve function, pain, sensation, breathing, or injury. Directly ask, compare both sides and baseline, and release for any concerning change or uncertainty rather than waiting for an app or a fixed threshold.",
       },
       {
         type: "warn",
@@ -383,7 +383,7 @@ const CORE_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "Photos of a bound partner are easy to take and impossible to un-take. Agree: who keeps them, whether faces are in frame, whether they leave the house, whether they go to an AI coach (they do, compressed, when you tap Analyze), and what happens if the relationship ever changes. Knotty stores the journal on this device, not on our servers. Analysis stills go to Grok for the coaching pass you asked for. If that sentence bothers either of you, use the written guides and leave the camera off.",
+        text: "For every batch, obtain four separate current permissions: the depicted activity, recording, upload of selected stills, and the generated output. Prefer equipment-only or clothed non-identifying frames; exclude faces, nudity, tattoos, screens, mail, and room details when possible. New journal entries store notes, not captures. Analyze sends only selected compressed stills to xAI under the workspace's retention settings. If any permission is absent or withdrawn, keep the camera off and delete the batch.",
       },
     ],
   },
@@ -414,12 +414,12 @@ const CORE_ARTICLES: Article[] = [
     title: "Suspension Reality",
     section: "risk",
     minutes: 6,
-    summary: "Why this app will teach partial load and then send you to a human.",
+    summary: "Why all load-bearing rope is routed to qualified in-person instruction.",
     related: ["partial-suspension", "hip-harness", "emergency-stop"],
     blocks: [
       {
         type: "p",
-        text: "Full suspension is not a harder TK. It is a different sport: rated anchors, upline management, crash pads, spotters, and a lowering plan that works when she panics. People die from getting this wrong. People also lose hands. Knotty will coach a few kilos off one foot, on a real harness, with a munter. It will not coach you to hang her from a ceiling fan.",
+        text: "Partial or full suspension, inversion, dynamic transitions, anchors, and loaded rope are high-consequence activities. This app does not teach or validate their construction, placement, load path, equipment, or emergency release. Use a qualified in-person instructor with hands-on emergency practice. For app-based learning, stay with a clothed, ground-level, non-loaded rehearsal.",
       },
     ],
   },
@@ -475,7 +475,7 @@ const CORE_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "A solid chair with no wheels is a gift. A four-poster is not automatically rated. A door hook will extract from drywall at the worst time. If you want a hard point, buy one, install it into structure, and know the rating. Until then, floor work and furniture as shape — not as an anchor — will give you years of scenes.",
+        text: "Furniture and household fixtures are not established load paths. This app cannot assess structure, installation, capacity, redundancy, or condition from a description or image. Keep app-guided practice ground-level and non-loaded; route any anchor or load-bearing question to qualified in-person instruction and appropriate structural expertise.",
       },
     ],
   },
@@ -503,7 +503,7 @@ const CORE_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "A TK might be honest for fifteen minutes on a given body and dishonest at minute sixteen. Futomomo is often done before you are done looking at it. Decorative hishi can run long because it is not load, but her feet are still her feet. Set timers. Knotty will nag you. That nag is the feature.",
+        text: "Time ranges in this library are planning estimates, never safe-duration guarantees. Risk can change immediately with position, movement, construction, health, communication, or equipment. A reminder prompts a direct check; it is not permission to wait, continue, or escalate.",
       },
     ],
   },

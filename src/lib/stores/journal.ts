@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { isCameraDataUrl } from "@/lib/ml/sanitize";
 
 export type JournalEntry = {
   id: string;
@@ -35,7 +34,6 @@ export const useJournal = create<JournalState>()(
         return id;
       },
       remove: (id) => {
-        void deleteStill(id);
         set({ entries: get().entries.filter((x) => x.id !== id) });
       },
     }),
@@ -45,47 +43,12 @@ export const useJournal = create<JournalState>()(
 
 const PHOTO_DB = "musubi-photos";
 
-function openPhotos() {
-  return new Promise<IDBDatabase>((resolve, reject) => {
-    const req = indexedDB.open(PHOTO_DB, 1);
-    req.onupgradeneeded = () => {
-      req.result.createObjectStore("stills");
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-export async function saveStill(entryId: string, dataUrl: string) {
-  if (!isCameraDataUrl(dataUrl)) return;
-  const db = await openPhotos();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction("stills", "readwrite");
-    tx.objectStore("stills").put(dataUrl, entryId);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-export async function loadStill(entryId: string): Promise<string | null> {
-  const db = await openPhotos();
+export function purgeLegacyStills(): Promise<void> {
+  if (typeof indexedDB === "undefined") return Promise.resolve();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction("stills", "readonly");
-    const req = tx.objectStore("stills").get(entryId);
-    req.onsuccess = () => {
-      const v = req.result;
-      resolve(typeof v === "string" && isCameraDataUrl(v) ? v : null);
-    };
-    req.onerror = () => reject(req.error);
-  });
-}
-
-export async function deleteStill(entryId: string) {
-  const db = await openPhotos();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction("stills", "readwrite");
-    tx.objectStore("stills").delete(entryId);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
+    const request = indexedDB.deleteDatabase(PHOTO_DB);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error ?? new Error("Could not delete legacy stills"));
+    request.onblocked = () => reject(new Error("Close other Knotty tabs, then try again."));
   });
 }

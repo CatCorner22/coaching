@@ -21,15 +21,15 @@ export function CoachPanel({
   if (pending) {
     return (
       <div className="rounded-lg border border-border bg-elevated p-4 text-sm text-muted">
-        Grok is reading the rope…
+        xAI is preparing a limited report from the selected stills…
       </div>
     );
   }
   if (!report) {
     return (
       <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted">
-        Capture a still or a short clip. On-device vision grades wraps immediately. Ask Grok for
-        the full coach pass.
+        Capture a still or short clip for limited visible observations. The camera cannot clear a
+        tie, assess physiology or consent, or replace direct checks and an in-person instructor.
       </div>
     );
   }
@@ -38,7 +38,7 @@ export function CoachPanel({
     <div className="space-y-3 rounded-lg border border-border bg-elevated p-4">
       <div className="flex items-center justify-between gap-2">
         <Badge variant={rec === "stop" ? "danger" : rec === "adjust" ? "warn" : "ok"}>
-          {rec}
+          {rec === "stop" ? "stop now" : "observation only"}
         </Badge>
         <span className="text-[11px] uppercase tracking-wide text-subtle">
           {report.audit.source}
@@ -47,12 +47,12 @@ export function CoachPanel({
       </div>
       {refusal && (
         <p className="text-xs text-muted">
-          The vision model declined the still. Local rope geometry is still coaching you.
+          The vision model declined the still. Only limited local image observations are shown.
         </p>
       )}
       <p className="text-sm leading-relaxed text-fg">{report.final.coaching}</p>
       <p className="text-sm text-muted">
-        <span className="text-fg">Next. </span>
+        <span className="text-fg">Nonvisual check. </span>
         {report.final.next}
       </p>
       {report.final.flags.length > 0 && (
@@ -70,13 +70,10 @@ export function CoachPanel({
           ))}
         </ul>
       )}
-      <div className="grid grid-cols-2 gap-2 pt-1 text-[11px] text-muted">
-        <Risk label="Circulation" v={report.prediction.risks.circulation} />
-        <Risk label="Nerve" v={report.prediction.risks.nerve} />
-        <Risk label="Throat" v={report.prediction.risks.neck} />
-        <Risk label="Time" v={report.prediction.risks.time} />
-      </div>
-      <p className="text-xs text-subtle">If this keeps going: {report.prediction.nextFailure}</p>
+      <p className="text-xs text-subtle">
+        No visible concern is never an all-clear. Images cannot establish consent, sensation,
+        circulation, breathing, pressure, load, or future condition.
+      </p>
       {voice && !halted && (
         <Button
           variant="outline"
@@ -87,23 +84,6 @@ export function CoachPanel({
           Speak it
         </Button>
       )}
-    </div>
-  );
-}
-
-function Risk({ label, v }: { label: string; v: number }) {
-  return (
-    <div>
-      <div className="mb-1 flex justify-between">
-        <span>{label}</span>
-        <span className="tabular-nums">{Math.round(v * 100)}</span>
-      </div>
-      <div className="h-1 overflow-hidden rounded-full bg-bg">
-        <div
-          className={cn("h-full bg-accent", v > 0.65 && "bg-danger", v > 0.4 && v <= 0.65 && "bg-warn")}
-          style={{ width: `${Math.round(v * 100)}%` }}
-        />
-      </div>
     </div>
   );
 }

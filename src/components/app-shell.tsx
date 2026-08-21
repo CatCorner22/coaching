@@ -29,6 +29,9 @@ const MORE = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  if (pathname === "/emergency") {
+    return <div className="min-h-dvh bg-bg text-fg">{children}</div>;
+  }
   return (
     <ConsentGate>
       <div className="min-h-dvh bg-bg text-fg">

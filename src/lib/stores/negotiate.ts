@@ -8,23 +8,23 @@ export type NegItem = { id: string; label: string; rank: Rank };
 export const LOCKED_NO = new Set(["neck", "breath", "suspension", "alone"]);
 
 const STARTER: NegItem[] = [
-  { id: "photos", label: "Nude photos / video for coaching", rank: "yes" },
-  { id: "voice", label: "Being spoken to in protocol", rank: "yes" },
-  { id: "cuffs", label: "Wrist and ankle cuffs", rank: "yes" },
-  { id: "torso", label: "Chest / karada harnesses", rank: "yes" },
-  { id: "gote", label: "Takate-kote (box tie)", rank: "maybe" },
-  { id: "crotch", label: "Crotch rope", rank: "maybe" },
-  { id: "gag", label: "Gags (with hands-free safeword)", rank: "maybe" },
-  { id: "predicament", label: "Predicament / endurance", rank: "maybe" },
-  { id: "marks", label: "Marks that last past tomorrow", rank: "maybe" },
-  { id: "impact", label: "Impact on tied flesh", rank: "maybe" },
-  { id: "cross", label: "Saint Andrew's Cross (arms up)", rank: "yes" },
-  { id: "swing", label: "Sex swing as support (not a hang)", rank: "yes" },
-  { id: "pole", label: "Cuffed to the pole", rank: "maybe" },
-  { id: "bench", label: "Bench / table bondage", rank: "yes" },
-  { id: "machine", label: "Hismith while bound", rank: "maybe" },
-  { id: "toys", label: "Large toys while bound", rank: "maybe" },
-  { id: "face", label: "Face in photos", rank: "maybe" },
+  { id: "photos", label: "Photos / video for coaching", rank: "no" },
+  { id: "voice", label: "Being spoken to in protocol", rank: "no" },
+  { id: "cuffs", label: "Wrist and ankle cuffs", rank: "no" },
+  { id: "torso", label: "Chest / karada harnesses", rank: "no" },
+  { id: "gote", label: "Takate-kote (box tie)", rank: "no" },
+  { id: "crotch", label: "Crotch rope", rank: "no" },
+  { id: "gag", label: "Gags", rank: "no" },
+  { id: "predicament", label: "Predicament / endurance", rank: "no" },
+  { id: "marks", label: "Marks that last past tomorrow", rank: "no" },
+  { id: "impact", label: "Impact on tied flesh", rank: "no" },
+  { id: "cross", label: "Saint Andrew's Cross (arms up)", rank: "no" },
+  { id: "swing", label: "Sex swing as support", rank: "no" },
+  { id: "pole", label: "Cuffed to the pole", rank: "no" },
+  { id: "bench", label: "Bench / table bondage", rank: "no" },
+  { id: "machine", label: "Machine use while bound", rank: "no" },
+  { id: "toys", label: "Large toys while bound", rank: "no" },
+  { id: "face", label: "Face in photos", rank: "no" },
   { id: "public", label: "Anyone else seeing the stills", rank: "no" },
   { id: "neck", label: "Anything on the neck", rank: "no" },
   { id: "breath", label: "Breath play", rank: "no" },
@@ -33,7 +33,7 @@ const STARTER: NegItem[] = [
 ];
 
 function clampRank(r: unknown): Rank {
-  return r === "yes" || r === "maybe" || r === "no" ? r : "maybe";
+  return r === "yes" || r === "maybe" || r === "no" ? r : "no";
 }
 
 function lockItems(items: NegItem[]): NegItem[] {
@@ -50,6 +50,7 @@ function lockItems(items: NegItem[]): NegItem[] {
 }
 
 type State = {
+  negotiationVersion: number;
   items: NegItem[];
   notes: string;
   setRank: (id: string, rank: Rank) => void;
@@ -60,6 +61,7 @@ type State = {
 export const useNegotiate = create<State>()(
   persist(
     (set, get) => ({
+      negotiationVersion: 2,
       items: STARTER,
       notes: "",
       setRank: (id, rank) =>
@@ -75,7 +77,7 @@ export const useNegotiate = create<State>()(
         set({
           items: [
             ...get().items,
-            { id: crypto.randomUUID(), label: clean, rank: "maybe" as Rank },
+            { id: crypto.randomUUID(), label: clean, rank: "no" as Rank },
           ].slice(0, 40),
         });
       },
@@ -84,10 +86,14 @@ export const useNegotiate = create<State>()(
       name: "musubi-negotiate",
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<State>;
-        const items = Array.isArray(p.items) && p.items.length ? lockItems(p.items as NegItem[]) : current.items;
+        const currentPolicy = p.negotiationVersion === 2;
+        const items = currentPolicy && Array.isArray(p.items) && p.items.length
+          ? lockItems(p.items as NegItem[])
+          : current.items;
         return {
           ...current,
           ...p,
+          negotiationVersion: 2,
           items,
           notes: typeof p.notes === "string" ? p.notes.slice(0, 600) : current.notes,
         };

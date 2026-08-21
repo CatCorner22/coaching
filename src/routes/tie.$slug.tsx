@@ -35,6 +35,10 @@ function TiePage() {
         </div>
         <p className="mt-4 text-sm leading-relaxed text-muted">{tie.summary}</p>
         <p className="mt-3 text-sm text-fg">{tie.why}</p>
+        <p className="mt-3 rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-xs leading-relaxed text-warn">
+          Planning estimates, fit rules, diagrams, and checklists are not safety clearance. Consent
+          and symptoms can change at any moment; pause and release for concern or uncertainty.
+        </p>
 
         <div className="mt-8 rounded-lg border border-border bg-surface p-4">
           <div className="flex items-center justify-between gap-3">

@@ -40,16 +40,16 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
         <p className="text-xs uppercase tracking-[0.22em] text-muted">Knotty</p>
         <h1 className="mt-3 font-display text-4xl leading-none text-fg">Enter the studio</h1>
         <p className="mt-4 text-sm leading-relaxed text-muted">
-          This is a private studio for a consenting adult couple. You will photograph and
-          record your partner — often nude — to coach rope. Stills stay on this device unless
-          you ask Grok to read them.
+          This adult-only app provides general education and limited image observations, never
+          consent verification, medical assessment, live monitoring, or safety clearance. Prefer
+          equipment-only or clothed, non-identifying media.
         </p>
         <ul className="mt-6 space-y-3 text-sm text-fg">
           <Check checked={adults} onChange={setAdults} label="Everyone involved is 18 or older." />
           <Check
             checked={consent}
             onChange={setConsent}
-            label="She has enthusiastic, ongoing consent, including being photographed in rope."
+            label="I will obtain separate, current permission for the activity, recording, upload, and generated output for every media batch."
           />
           <Check
             checked={shears}
@@ -59,7 +59,7 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
           <Check
             checked={photos}
             onChange={setPhotos}
-            label="I understand Analyze sends compressed frames to xAI, which may retain API inputs and outputs under the workspace's data-retention settings."
+            label="I understand Analyze sends only my selected compressed stills to xAI, which may retain API inputs and outputs under the workspace's data-retention settings."
           />
         </ul>
         <Button
@@ -75,7 +75,7 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
         </Button>
         <p className="mt-4 text-xs leading-relaxed text-subtle">
           An app cannot replace a teacher with hands on the rope. Knotty will refuse neck
-          restraint, breath play, and full suspension.
+          restraint, breath play, suspension, load-bearing rigging, and image-based clearance.
         </p>
       </div>
     </div>

@@ -32,7 +32,7 @@ function SettingsPage() {
         <Field label="Yellow" value={s.yellowWord} onChange={(v) => s.set({ yellowWord: v })} />
         <Field label="Green" value={s.greenWord} onChange={(v) => s.set({ greenWord: v })} />
         <label className="block text-sm">
-          <span className="text-xs uppercase tracking-wide text-subtle">Circulation check (minutes)</span>
+          <span className="text-xs uppercase tracking-wide text-subtle">Direct-check reminder (minutes; not a safety interval)</span>
           <input
             type="number"
             min={2}
@@ -48,8 +48,12 @@ function SettingsPage() {
         </label>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={s.listen} onChange={(e) => s.set({ listen: e.target.checked })} />
-          Listen for safewords
+          Optional microphone word detection
         </label>
+        <p className="text-xs leading-relaxed text-subtle">
+          Browser speech recognition can fail silently or use a cloud speech service. It is never a
+          safeword system or substitute for direct communication and agreed nonverbal signals.
+        </p>
         <Button variant="outline" onClick={() => s.set({ consented: false })}>
           Reset consent gate
         </Button>

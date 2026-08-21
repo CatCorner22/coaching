@@ -62,13 +62,21 @@ export async function playCoachVoice(text: string) {
 export function listenForWords(
   words: string[],
   onHit: (word: string) => void,
+  onStatus?: (status: "starting" | "active" | "idle" | "error" | "unsupported") => void,
 ): () => void {
   const SR =
     (window as unknown as { SpeechRecognition?: new () => Rec; webkitSpeechRecognition?: new () => Rec })
       .SpeechRecognition ??
     (window as unknown as { webkitSpeechRecognition?: new () => Rec }).webkitSpeechRecognition;
-  if (!SR) return () => undefined;
+  if (!SR) {
+    onStatus?.("unsupported");
+    return () => undefined;
+  }
   const rec = new SR();
+  let disposed = false;
+  const report = (status: "starting" | "active" | "idle" | "error" | "unsupported") => {
+    if (!disposed) onStatus?.(status);
+  };
   rec.continuous = true;
   rec.interimResults = false;
   rec.lang = "en-US";
@@ -92,13 +100,17 @@ export function listenForWords(
       }
     }
   };
-  rec.onerror = () => undefined;
+  rec.onstart = () => report("active");
+  rec.onerror = () => report("error");
+  rec.onend = () => report("idle");
+  report("starting");
   try {
     rec.start();
   } catch {
-    /* already started */
+    report("error");
   }
   return () => {
+    disposed = true;
     try {
       rec.stop();
     } catch {
@@ -113,6 +125,8 @@ type Rec = {
   lang: string;
   onresult: ((ev: unknown) => void) | null;
   onerror: ((ev: unknown) => void) | null;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
   start: () => void;
   stop: () => void;
 };

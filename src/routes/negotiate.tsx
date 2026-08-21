@@ -22,7 +22,8 @@ function NegotiatePage() {
       <p className="text-xs uppercase tracking-[0.22em] text-muted">Before rope</p>
       <h1 className="mt-2 font-display text-4xl">Negotiate</h1>
       <p className="mt-3 text-sm text-muted">
-        Yes / maybe / no, out loud, while she can still use her hands. No is a wall, not a dare.
+        Everything starts at no. Discuss yes / maybe / no out loud before the activity. Maybe is
+        not permission; no is a wall, not a dare.
       </p>
       <ul className="mt-8 space-y-2">
         {items.map((i) => (

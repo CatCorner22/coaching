@@ -1,5 +1,7 @@
 /** Camera skill: score stills so the coach sees rope, not blur. */
 
+import { isRope } from "../ml/color";
+
 export type FrameQuality = {
   sharpness: number;
   exposure: number;
@@ -55,17 +57,28 @@ export function ropeHint(data: ImageData): number {
   const buf = data.data;
   let rope = 0;
   let n = 0;
+  let lumaSum = 0;
+  let lumaSquaredSum = 0;
   for (let i = 0; i < buf.length; i += 16) {
     const r = buf[i]!;
     const g = buf[i + 1]!;
     const b = buf[i + 2]!;
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    const s = max === 0 ? 0 : (max - min) / max;
-    if (r > 70 && r > g && g >= b - 8 && s > 0.12 && r - b > 18) rope++;
+    const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    lumaSum += luma;
+    lumaSquaredSum += luma * luma;
+    if (isRope(r, g, b)) rope++;
     n++;
   }
-  return n ? rope / n : 0;
+  if (n < 4) return 0;
+
+  const meanLuma = lumaSum / n;
+  const lumaVariance = Math.max(0, lumaSquaredSum / n - meanLuma * meanLuma);
+  const share = rope / n;
+
+  // A flat brown/skin-colored surface is not evidence of rope. Require scene
+  // texture and some non-rope context before using color as a ranking hint.
+  if (Math.sqrt(lumaVariance) < 6 || share > 0.85) return 0;
+  return share;
 }
 
 export function scoreFrame(data: ImageData): FrameQuality {
@@ -84,18 +97,23 @@ export function pickBest<T>(
   items: { data: ImageData; item: T; neck?: number; paleness?: number }[],
   keep = 3,
 ): T[] {
-  const danger = items.filter((entry) => (entry.neck ?? 0) > 0.08 || (entry.paleness ?? 0) > 0.45);
+  // `paleness` is intentionally not used. The current color heuristic has no
+  // validated hand/body localization, so elevating it can select a pale wall
+  // over a usable subject frame. Keep the field temporarily for call-site
+  // compatibility while the observation contract is migrated.
+  const neckScore = (entry: { neck?: number }) =>
+    typeof entry.neck === "number" && Number.isFinite(entry.neck)
+      ? Math.max(0, Math.min(1, entry.neck))
+      : 0;
+  const danger = items.filter((entry) => neckScore(entry) > 0.08);
   const pool = danger.length ? danger : items;
   return pool
     .map((entry) => ({
       entry,
-      score:
-        scoreFrame(entry.data).score +
-        (entry.neck ?? 0) * 0.8 +
-        (entry.paleness ?? 0) * 0.4,
+      score: scoreFrame(entry.data).score + neckScore(entry) * 0.8,
     }))
     .sort((a, b) => b.score - a.score)
-    .slice(0, keep)
+    .slice(0, Number.isFinite(keep) ? Math.max(0, Math.floor(keep)) : 3)
     .map(({ entry }) => entry.item);
 }
 

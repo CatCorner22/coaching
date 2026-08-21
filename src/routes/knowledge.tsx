@@ -34,7 +34,8 @@ function KnowledgePage() {
       <p className="text-xs uppercase tracking-[0.22em] text-muted">Guide</p>
       <h1 className="mt-2 font-display text-4xl">Knowledge</h1>
       <p className="mt-3 text-sm text-muted">
-        Consent, nerves, scenes, aftercare. Ask in your words — answers are grounded in these essays.
+        Consent, risk recognition, privacy, and aftercare. Search in your words; results point to
+        reviewed entries without generating individualized rope instructions.
       </p>
       <div className="mt-6 flex gap-2">
         <input
@@ -45,7 +46,7 @@ function KnowledgePage() {
           className="h-11 flex-1 rounded-md border border-border bg-elevated px-3 text-sm"
         />
         <Button onClick={() => void ask()} disabled={pending}>
-          Ask
+          {pending ? "Searching…" : "Find entries"}
         </Button>
       </div>
       {answer && (

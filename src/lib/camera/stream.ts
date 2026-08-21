@@ -14,8 +14,8 @@ export async function openRopeCamera(facing: Facing): Promise<MediaStream> {
       audio: false,
       video: {
         facingMode: { ideal: facing },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
         frameRate: { ideal: 30 },
       },
     },
@@ -110,24 +110,73 @@ export function startClip(stream: MediaStream): ClipHandle {
   let recordedMime = rec.mimeType;
   let cancelled = false;
   let settled = false;
+  let stopRequested = false;
+  let stopTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
   let resolveDone!: (blob: Blob) => void;
   let rejectDone!: (error: Error) => void;
   const done = new Promise<Blob>((resolve, reject) => {
     resolveDone = resolve;
     rejectDone = reject;
   });
+  // Recorder errors can arrive before the UI calls stop(). Mark the promise as
+  // observed immediately while preserving its rejected state for stop().
+  void done.catch(() => undefined);
+
+  const clearStopTimer = () => {
+    if (stopTimer === null) return;
+    globalThis.clearTimeout(stopTimer);
+    stopTimer = null;
+  };
+  const settleError = (error: Error) => {
+    if (settled) return;
+    settled = true;
+    chunks.length = 0;
+    clearStopTimer();
+    rejectDone(error);
+  };
+  const settleBlob = () => {
+    if (settled) return;
+    let blob: Blob;
+    try {
+      blob = new Blob(cancelled ? [] : chunks, { type: recordedMime || "video/webm" });
+    } catch (cause) {
+      settleError(cause instanceof Error ? cause : new Error("Could not finalize video recording."));
+      return;
+    }
+    settled = true;
+    chunks.length = 0;
+    clearStopTimer();
+    resolveDone(blob);
+  };
+  const stopRecorderQuietly = () => {
+    try {
+      if (rec.state !== "inactive") rec.stop();
+    } catch {
+      // A concurrent track-ending transition may have already stopped it.
+    }
+  };
+  const requestStop = () => {
+    if (settled || stopRequested) return;
+    stopRequested = true;
+    stopTimer = globalThis.setTimeout(() => {
+      stopTimer = null;
+      stopRecorderQuietly();
+      settleError(new Error("Video recorder did not finish stopping. Try a shorter clip."));
+    }, 5_000);
+    try {
+      if (rec.state !== "inactive") rec.stop();
+    } catch (cause) {
+      settleError(cause instanceof Error ? cause : new Error("Could not stop video recording."));
+    }
+  };
 
   rec.ondataavailable = (e) => {
-    if (!cancelled && e.data.size) {
+    if (!settled && !cancelled && e.data.size) {
       recordedBytes += e.data.size;
       if (recordedBytes > maxBytes) {
         cancelled = true;
-        chunks.length = 0;
-        if (!settled) {
-          settled = true;
-          rejectDone(new Error("Recording is too large. Keep clips under 100 MB."));
-        }
-        if (rec.state !== "inactive") rec.stop();
+        settleError(new Error("Recording is too large. Keep clips under 100 MB."));
+        stopRecorderQuietly();
         return;
       }
       recordedMime ||= e.data.type;
@@ -135,27 +184,25 @@ export function startClip(stream: MediaStream): ClipHandle {
     }
   };
   rec.onerror = () => {
-    if (settled) return;
-    settled = true;
-    rejectDone(new Error("Video recording failed."));
+    settleError(new Error("Video recording failed."));
+    stopRecorderQuietly();
   };
   rec.onstop = () => {
-    if (settled) return;
-    settled = true;
-    resolveDone(new Blob(cancelled ? [] : chunks, { type: recordedMime || "video/webm" }));
+    settleBlob();
   };
   rec.start(200);
 
   return {
     stop: () => {
-      if (rec.state !== "inactive") rec.stop();
+      requestStop();
       return done;
     },
     cancel: () => {
+      if (cancelled) return;
       cancelled = true;
       chunks.length = 0;
-      void done.catch(() => undefined);
-      if (rec.state !== "inactive") rec.stop();
+      settleError(new DOMException("Recording cancelled.", "AbortError"));
+      stopRecorderQuietly();
     },
   };
 }

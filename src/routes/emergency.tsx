@@ -6,27 +6,27 @@ function EmergencyPage() {
   return (
     <div className="mx-auto max-w-xl px-5 py-10">
       <p className="text-xs uppercase tracking-[0.22em] text-danger">Stop</p>
-      <h1 className="mt-2 font-display text-5xl text-danger">Cut down</h1>
+      <h1 className="mt-2 font-display text-5xl text-danger">Release now</h1>
       <ol className="mt-8 space-y-4 text-base leading-relaxed">
         <li>
-          <span className="text-xs uppercase tracking-wide text-subtle">1 · Shears</span>
-          <p>Trauma shears. Not a kitchen knife. Slide the blunt edge against skin.</p>
+          <span className="text-xs uppercase tracking-wide text-subtle">1 · Stop and release</span>
+          <p>Stop the activity. Support the person's position and release restraint without creating a fall or another injury. Use the practiced rapid-release method within your training.</p>
         </li>
         <li>
-          <span className="text-xs uppercase tracking-wide text-subtle">2 · Tensioned stems first</span>
-          <p>Cut what is holding load. Then the wrap that is going pale. Then the rest.</p>
+          <span className="text-xs uppercase tracking-wide text-subtle">2 · Call emergency services</span>
+          <p>Call now for abnormal breathing, unresponsiveness, seizure, chest pain, severe bleeding, a serious fall, stroke-like symptoms, major weakness, or any neck pressure followed by concerning symptoms.</p>
         </li>
         <li>
-          <span className="text-xs uppercase tracking-wide text-subtle">3 · Airway</span>
-          <p>If she is quiet or blue, get rope off the chest and sit her up if she can. No neck rope should have existed.</p>
+          <span className="text-xs uppercase tracking-wide text-subtle">3 · Follow the dispatcher</span>
+          <p>Follow dispatcher instructions. Give CPR, AED care, or first aid only within your current training. Do not use this app instead of emergency care.</p>
         </li>
         <li>
-          <span className="text-xs uppercase tracking-wide text-subtle">4 · Hands</span>
-          <p>If a hand is white or she cannot move it, the rope is already too late — cut, then warmth, then medical if it does not return.</p>
+          <span className="text-xs uppercase tracking-wide text-subtle">4 · Prompt medical assessment</span>
+          <p>Seek prompt care for persistent or worsening numbness, weakness, pain, swelling, discoloration, temperature change, breathing or swallowing change, voice change, confusion, dizziness, or loss of function.</p>
         </li>
         <li>
-          <span className="text-xs uppercase tracking-wide text-subtle">5 · Call</span>
-          <p>Numbness that lasts, foot-drop, chest pain, fainting: emergency services. Pride is not a treatment.</p>
+          <span className="text-xs uppercase tracking-wide text-subtle">5 · Do not re-tie</span>
+          <p>Do not re-tie, delay care for a photo, or use normal-looking color or an app result to rule out injury.</p>
         </li>
       </ol>
       <a

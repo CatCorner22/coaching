@@ -9,7 +9,7 @@ const CORE_KNOTS: Knot[] = [
     summary:
       "The gold-standard single-column tie: a bowline variant that does not cinch when loaded. Use this on wrists, ankles, and any limb you intend to keep circulating.",
     cinches: false,
-    loadBearing: true,
+    loadBearing: false,
     usedIn: ["single-column", "takate-kote", "futomomo", "chair"],
     steps: [
       {
@@ -166,10 +166,10 @@ const CORE_KNOTS: Knot[] = [
     slug: "sheet-bend",
     name: "Sheet Bend",
     jp: "シートベンド",
-    summary: "Joins two ropes, including unequal diameters. How you add a second rope mid-tie without a lump against the body.",
+    summary: "Joins two ropes for non-loaded floor craft. This entry does not validate the knot for human load or suspension.",
     cinches: false,
-    loadBearing: true,
-    usedIn: ["takate-kote", "karada", "partial-suspension"],
+    loadBearing: false,
+    usedIn: ["takate-kote", "karada"],
     steps: [
       {
         title: "Bight in the old rope",
@@ -178,34 +178,29 @@ const CORE_KNOTS: Knot[] = [
       },
       {
         title: "New rope through",
-        body: "New working end up through the bight, around the collar, back under itself. Dress tight. For critical joins, make a double sheet bend.",
+        body: "New working end up through the bight, around the collar, back under itself. Dress the non-loaded floor-work join so it can be inspected and released.",
         speak: "New rope up, around, under itself. Dress tight.",
       },
     ],
-    watch: ["A square knot is the wrong join for two ropes of different thickness."],
+    watch: ["Do not use this app entry to select or validate a load-bearing join."],
   },
   {
     slug: "munter",
     name: "Munter Hitch",
     jp: "マンター",
     summary:
-      "A friction hitch around a carabiner or ring. Lets you lower someone slowly. Learn this before any partial suspension.",
+      "A load-management hitch named here only for instructor discussion. This app does not teach or validate its use with a person.",
     cinches: false,
-    loadBearing: true,
+    loadBearing: false,
     usedIn: ["partial-suspension"],
     steps: [
       {
-        title: "Twist",
-        body: "A crossing twist in the rope, clipped into the carabiner so the working end can pay out with friction.",
-        speak: "Twist, clip, confirm the working end pays out with friction.",
-      },
-      {
-        title: "Hand on the brake",
-        body: "The brake hand never leaves the working end. To lower, ease. To stop, hold. This is a lowering tool, not a parking brake — backup when you leave it.",
-        speak: "Brake hand stays on the working end.",
+        title: "Instructor-only",
+        body: "Learn load management, backups, failure response, and emergency release hands-on from a qualified in-person instructor. Do not load a person from this entry.",
+        speak: "Instructor-only. Do not load a person from this app.",
       },
     ],
-    watch: ["Never take your brake hand off to 'adjust something'. Park first."],
+    watch: ["A remote description or image cannot validate a lowering system."],
   },
   {
     slug: "surgeon",
@@ -266,20 +261,20 @@ const CORE_KNOTS: Knot[] = [
   },
   {
     slug: "figure-eight",
-    name: "Figure Eight on a Bight",
+    name: "Figure Eight on a Bight: Instructor Route",
     jp: "フィギュアエイト",
-    summary: "Climbing's workhorse. A bulky, trustworthy loop. Useful on uplines and ring attachments, overkill on the body.",
+    summary: "A loop category used in engineered systems. This app names it for recognition but does not teach or approve person-bearing use.",
     cinches: false,
-    loadBearing: true,
-    usedIn: ["partial-suspension"],
+    loadBearing: false,
+    usedIn: [],
     steps: [
       {
-        title: "Bight, eight, dress",
-        body: "Doubled rope traces an 8, feeds back through, and is dressed so every strand is parallel. Leave a hand-width tail.",
-        speak: "Trace an eight on a bight and dress every strand parallel.",
+        title: "Recognition only",
+        body: "Learn construction, inspection, compatibility, loading, backups, and release through qualified in-person instruction and the relevant manufacturer or standards guidance. Do not load a person from this entry.",
+        speak: "Recognition only. Do not load a person from this app.",
       },
     ],
-    watch: ["A sloppy eight can capsize. Dress it like a climber."],
+    watch: ["Visual similarity cannot validate the knot, rope, connector, anchor, or complete system."],
   },
 ];
 

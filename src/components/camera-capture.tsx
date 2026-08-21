@@ -10,10 +10,10 @@ import {
 } from "@/lib/camera/stream";
 import { pickBest, scoreFrame, type FrameQuality } from "@/lib/camera/quality";
 import {
-  compressToJpeg,
   extractVideoFrames,
-  toImageData,
+  processMediaFrame,
   validateMediaFile,
+  validateMediaSignature,
 } from "@/lib/media";
 import { observeFrame } from "@/lib/ml/detect";
 import type { FrameObservation } from "@/lib/ml/types";
@@ -23,26 +23,61 @@ export type CaptureResult = {
   preview: string;
   previewObservation: FrameObservation;
   jpegs: string[];
+  frameLabels: string[];
   observations: FrameObservation[];
   kind: "photo" | "video";
   quality: FrameQuality;
+  consent: MediaConsent;
 };
+
+export type MediaConsent = {
+  adults: true;
+  activity: true;
+  recording: true;
+  upload: true;
+  output: true;
+  confirmedAt: number;
+};
+
+type PermissionKey = "adults" | "activity" | "recording" | "upload" | "output";
+type PendingVideoFrame = {
+  id: string;
+  jpeg: string;
+  observation: FrameObservation;
+  quality: FrameQuality;
+};
+
+const EMPTY_PERMISSIONS: Record<PermissionKey, boolean> = {
+  adults: false,
+  activity: false,
+  recording: false,
+  upload: false,
+  output: false,
+};
+const BATCH_PERMISSION_MAX_AGE_MS = 60 * 60 * 1000;
 
 type Guide = "torso" | "back" | "hands" | "legs";
 
 export function CameraCapture({
   onCapture,
+  onDiscard,
   disabled = false,
 }: {
   onCapture: (c: CaptureResult) => void;
+  onDiscard: () => void;
   disabled?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const clipRef = useRef<ClipHandle | null>(null);
   const recordTimerRef = useRef<number | null>(null);
+  const recordStartedAtRef = useRef<number | null>(null);
   const cameraRequestRef = useRef(0);
   const mediaOperationRef = useRef<AbortController | null>(null);
+  const permissionsRef = useRef(EMPTY_PERMISSIONS);
+  const permissionConfirmedAtRef = useRef<number | null>(null);
+  const permissionExpiryTimerRef = useRef<number | null>(null);
+  const recordTransitionRef = useRef(false);
   const mountedRef = useRef(true);
   const disabledRef = useRef(disabled);
   disabledRef.current = disabled;
@@ -55,6 +90,12 @@ export function CameraCapture({
   const [guide, setGuide] = useState<Guide>("torso");
   const [hint, setHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [permissions, setPermissions] = useState(EMPTY_PERMISSIONS);
+  const [batchCommitted, setBatchCommitted] = useState(false);
+  const [videoFrames, setVideoFrames] = useState<PendingVideoFrame[]>([]);
+  const [selectedFrames, setSelectedFrames] = useState<number[]>([]);
+  const permissionsReady = Object.values(permissions).every(Boolean);
+  permissionsRef.current = permissions;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -66,8 +107,13 @@ export function CameraCapture({
         window.clearTimeout(recordTimerRef.current);
         recordTimerRef.current = null;
       }
+      if (permissionExpiryTimerRef.current !== null) {
+        window.clearTimeout(permissionExpiryTimerRef.current);
+        permissionExpiryTimerRef.current = null;
+      }
       clipRef.current?.cancel();
       clipRef.current = null;
+      recordStartedAtRef.current = null;
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
       if (videoRef.current) {
@@ -75,6 +121,16 @@ export function CameraCapture({
         videoRef.current.srcObject = null;
       }
     };
+  }, []);
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") stopLive();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+    // stopLive intentionally reads the latest refs and does not need resubscription.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -87,6 +143,7 @@ export function CameraCapture({
     }
     clipRef.current?.cancel();
     clipRef.current = null;
+    recordStartedAtRef.current = null;
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     if (videoRef.current) {
@@ -98,6 +155,16 @@ export function CameraCapture({
     setTorchOn(false);
     setHasTorch(false);
     setBusy(false);
+    setVideoFrames([]);
+    setSelectedFrames([]);
+    setBatchCommitted(false);
+    permissionsRef.current = EMPTY_PERMISSIONS;
+    permissionConfirmedAtRef.current = null;
+    setPermissions({ ...EMPTY_PERMISSIONS });
+    if (permissionExpiryTimerRef.current !== null) {
+      window.clearTimeout(permissionExpiryTimerRef.current);
+      permissionExpiryTimerRef.current = null;
+    }
   }, [disabled]);
 
   function clearRecordTimer() {
@@ -114,10 +181,96 @@ export function CameraCapture({
     return controller.signal;
   }
 
+  function updatePermission(key: PermissionKey, checked: boolean) {
+    const wasReady = Object.values(permissionsRef.current).every(Boolean);
+    const next = { ...permissionsRef.current, [key]: checked };
+    const isReady = Object.values(next).every(Boolean);
+    permissionsRef.current = next;
+    setPermissions(next);
+    if (isReady && !wasReady) {
+      const confirmedAt = Date.now();
+      permissionConfirmedAtRef.current = confirmedAt;
+      if (permissionExpiryTimerRef.current !== null) {
+        window.clearTimeout(permissionExpiryTimerRef.current);
+      }
+      permissionExpiryTimerRef.current = window.setTimeout(() => {
+        permissionExpiryTimerRef.current = null;
+        permissionConfirmedAtRef.current = null;
+        permissionsRef.current = EMPTY_PERMISSIONS;
+        setPermissions({ ...EMPTY_PERMISSIONS });
+        setBatchCommitted(false);
+        stopLive();
+        setVideoFrames([]);
+        setSelectedFrames([]);
+        onDiscard();
+        setHint("Batch permissions expired; the pending batch was discarded. Reconfirm all items.");
+      }, BATCH_PERMISSION_MAX_AGE_MS);
+    } else if (!isReady) {
+      permissionConfirmedAtRef.current = null;
+      if (permissionExpiryTimerRef.current !== null) {
+        window.clearTimeout(permissionExpiryTimerRef.current);
+        permissionExpiryTimerRef.current = null;
+      }
+    }
+    if (!checked) {
+      stopLive();
+      setBatchCommitted(false);
+      setVideoFrames([]);
+      setSelectedFrames([]);
+      onDiscard();
+      setHint("Permission withdrawn; the pending batch was discarded.");
+    }
+  }
+
+  function startNewBatch() {
+    stopLive();
+    if (permissionExpiryTimerRef.current !== null) {
+      window.clearTimeout(permissionExpiryTimerRef.current);
+      permissionExpiryTimerRef.current = null;
+    }
+    permissionConfirmedAtRef.current = null;
+    permissionsRef.current = EMPTY_PERMISSIONS;
+    setPermissions({ ...EMPTY_PERMISSIONS });
+    setBatchCommitted(false);
+    setVideoFrames([]);
+    setSelectedFrames([]);
+    onDiscard();
+    setHint("Previous batch discarded. Confirm each item for the new batch.");
+  }
+
+  function confirmedAtForBatch(): number {
+    const confirmedAt = permissionConfirmedAtRef.current;
+    if (
+      confirmedAt === null ||
+      Date.now() - confirmedAt < 0 ||
+      Date.now() - confirmedAt > BATCH_PERMISSION_MAX_AGE_MS
+    ) {
+      throw new Error("Batch permissions are no longer current. Reconfirm every item.");
+    }
+    return confirmedAt;
+  }
+
+  function hasCurrentBatchPermissions(): boolean {
+    try {
+      confirmedAtForBatch();
+      return true;
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Reconfirm every permission for this batch.");
+      return false;
+    }
+  }
+
   async function startLive(next: "user" | "environment" = facing) {
-    if (disabledRef.current) return;
+    if (disabledRef.current || batchCommitted) return;
+    if (!Object.values(permissionsRef.current).every(Boolean)) {
+      setError("Confirm adult status and all four permissions before opening the camera.");
+      return;
+    }
+    if (!hasCurrentBatchPermissions()) return;
     setError(null);
     stopLive();
+    setVideoFrames([]);
+    setSelectedFrames([]);
     const request = ++cameraRequestRef.current;
     let openedStream: MediaStream | null = null;
     setBusy(true);
@@ -136,15 +289,32 @@ export function CameraCapture({
       } else {
         throw new Error("Camera view is unavailable.");
       }
+      if (
+        !mountedRef.current ||
+        disabledRef.current ||
+        request !== cameraRequestRef.current ||
+        streamRef.current !== stream ||
+        videoRef.current?.srcObject !== stream
+      ) {
+        stream.getTracks().forEach((track) => track.stop());
+        if (streamRef.current === stream) streamRef.current = null;
+        if (videoRef.current?.srcObject === stream) {
+          videoRef.current.pause();
+          videoRef.current.srcObject = null;
+        }
+        return;
+      }
       setLive(true);
       setFacing(next);
-      stream.getVideoTracks()[0]?.addEventListener(
-        "ended",
-        () => {
-          if (streamRef.current === stream) stopLive();
-        },
-        { once: true },
-      );
+      const track = stream.getVideoTracks()[0];
+      const closeInterruptedCamera = () => {
+        if (streamRef.current === stream) {
+          setError("Camera access was interrupted. Reconfirm the view before reopening.");
+          stopLive();
+        }
+      };
+      track?.addEventListener("ended", closeInterruptedCamera, { once: true });
+      track?.addEventListener("mute", closeInterruptedCamera, { once: true });
     } catch (cause) {
       openedStream?.getTracks().forEach((track) => track.stop());
       if (streamRef.current === openedStream) {
@@ -171,9 +341,11 @@ export function CameraCapture({
     clearRecordTimer();
     clipRef.current?.cancel();
     clipRef.current = null;
+    recordStartedAtRef.current = null;
     setRecording(false);
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+    const stream = streamRef.current;
     streamRef.current = null;
+    stream?.getTracks().forEach((t) => t.stop());
     if (videoRef.current) {
       videoRef.current.pause();
       videoRef.current.srcObject = null;
@@ -181,6 +353,7 @@ export function CameraCapture({
     setLive(false);
     setTorchOn(false);
     setHasTorch(false);
+    setBusy(false);
   }
 
   async function emitFromMedia(
@@ -189,8 +362,13 @@ export function CameraCapture({
     observations: FrameObservation[],
     qualities: FrameQuality[],
     previewObservation = observations[0],
+    frameLabels = jpegs.map((_, index) => `S${String(index + 1).padStart(2, "0")}`),
   ) {
     if (!mountedRef.current || disabledRef.current) return;
+    if (!Object.values(permissionsRef.current).every(Boolean)) {
+      throw new Error("Reconfirm adult status and all four permissions for this batch.");
+    }
+    const confirmedAt = confirmedAtForBatch();
     if (!jpegs.length || !observations.length) throw new Error("No readable frame was captured.");
     const quality =
       [...qualities].sort((a, b) => b.score - a.score)[0] ??
@@ -200,18 +378,35 @@ export function CameraCapture({
       preview: jpegs[0] ?? "",
       previewObservation: previewObservation!,
       jpegs,
+      frameLabels,
       observations,
       kind,
       quality,
+      consent: {
+        adults: true,
+        activity: true,
+        recording: true,
+        upload: true,
+        output: true,
+        confirmedAt,
+      },
     });
+    stopLive();
+    setBatchCommitted(true);
+    setVideoFrames([]);
+    setSelectedFrames([]);
   }
 
   async function snapBurst() {
+    if (recording || batchCommitted) return;
+    if (!hasCurrentBatchPermissions()) return;
     const v = videoRef.current;
     if (!v || v.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !v.videoWidth) {
       setError("The camera is not ready yet.");
       return;
     }
+    setVideoFrames([]);
+    setSelectedFrames([]);
     setBusy(true);
     setError(null);
     const signal = beginMediaOperation();
@@ -219,10 +414,7 @@ export function CameraCapture({
       const frames: { jpeg: string; imageData: ImageData }[] = [];
       for (let i = 0; i < 3; i++) {
         signal.throwIfAborted();
-        frames.push({
-          jpeg: await compressToJpeg(v, 768, 0.74),
-          imageData: await toImageData(v, 240),
-        });
+        frames.push(await processMediaFrame(v, 768, 240, 0.74));
         await new Promise((r) => setTimeout(r, 90));
       }
       const observed = frames.map((frame) => ({ frame, observation: observeFrame(frame.imageData) }));
@@ -253,12 +445,23 @@ export function CameraCapture({
   }
 
   async function toggleRecord() {
+    if (recordTransitionRef.current) return;
+    if (batchCommitted) return;
     const stream = streamRef.current;
     if (!stream) return;
-    if (!recording) {
+    if (!clipRef.current) {
+      if (!hasCurrentBatchPermissions()) return;
       try {
         setError(null);
-        clipRef.current = startClip(stream);
+        setVideoFrames([]);
+        setSelectedFrames([]);
+        const handle = startClip(stream);
+        if (streamRef.current !== stream || disabledRef.current) {
+          handle.cancel();
+          return;
+        }
+        clipRef.current = handle;
+        recordStartedAtRef.current = Date.now();
         setRecording(true);
         recordTimerRef.current = window.setTimeout(() => {
           recordTimerRef.current = null;
@@ -273,71 +476,105 @@ export function CameraCapture({
   }
 
   async function finishRecord() {
+    if (recordTransitionRef.current) return;
+    recordTransitionRef.current = true;
     clearRecordTimer();
     const handle = clipRef.current;
+    const startedAt = recordStartedAtRef.current;
     clipRef.current = null;
+    recordStartedAtRef.current = null;
     setRecording(false);
-    if (!handle) return;
+    if (!handle) {
+      recordTransitionRef.current = false;
+      return;
+    }
     setBusy(true);
     const signal = beginMediaOperation();
     try {
       const blob = await handle.stop();
       signal.throwIfAborted();
-      await ingestVideo(blob, signal);
+      const durationHint = startedAt === null ? undefined : Math.max(0.05, (Date.now() - startedAt) / 1000);
+      await ingestVideo(blob, signal, durationHint);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not record");
+      if (!(e instanceof DOMException && e.name === "AbortError")) {
+        setError(e instanceof Error ? e.message : "Could not record");
+      }
     } finally {
+      recordTransitionRef.current = false;
       if (mountedRef.current) setBusy(false);
     }
   }
 
-  async function ingestVideo(file: Blob, signal = beginMediaOperation()) {
+  async function ingestVideo(file: Blob, signal = beginMediaOperation(), durationHintSeconds?: number) {
     if (!file.size) throw new Error("The video is empty.");
     if (file.size > 100 * 1024 * 1024) {
       throw new Error("Video is too large. Choose one under 100 MB.");
     }
-    const frames = await extractVideoFrames(file, 6, signal);
+    const frames = await extractVideoFrames(file, 6, signal, durationHintSeconds);
     let prev: Uint8ClampedArray | undefined;
     const observed = frames.map((f) => {
       const obs = observeFrame(f.imageData, prev);
       prev = f.imageData.data;
       return { f, obs };
     });
-    const ranked = pickBest(
-      observed.map((x) => ({
-        data: x.f.imageData,
-        item: x,
-        neck: x.obs.neckRope,
-        paleness: x.obs.paleness,
-      })),
-      3,
-    );
-    // Safety trends must stay chronological. Frame ranking is only for the
-    // three stills sent to the optional remote coach.
-    const observations = observed.map((x) => x.obs);
     signal.throwIfAborted();
+    if (!mountedRef.current || disabledRef.current) return;
+    setVideoFrames(
+      observed.map((x, index) => ({
+        id: `F${String(index + 1).padStart(2, "0")}`,
+        jpeg: x.f.jpeg,
+        observation: x.obs,
+        quality: scoreFrame(x.f.imageData),
+      })),
+    );
+    setSelectedFrames([]);
+    setHint("Choose one to three labeled stills from the clip. Nothing is analyzed remotely until you confirm.");
+  }
+
+  async function useSelectedVideoFrames() {
+    if (!hasCurrentBatchPermissions()) return;
+    const indices = [...selectedFrames].sort((a, b) => a - b).slice(0, 3);
+    const chosen = indices.map((index) => videoFrames[index]).filter(Boolean) as PendingVideoFrame[];
+    if (!chosen.length) {
+      setError("Select at least one still from the clip.");
+      return;
+    }
+    setError(null);
     await emitFromMedia(
       "video",
-      ranked.map((x) => x.f.jpeg),
-      observations,
-      ranked.map((x) => scoreFrame(x.f.imageData)),
-      ranked[0]?.obs ?? observations[0],
+      chosen.map((frame) => frame.jpeg),
+      chosen.map((frame) => frame.observation),
+      chosen.map((frame) => frame.quality),
+      chosen[0]?.observation,
+      chosen.map((frame) => frame.id),
     );
   }
 
+  function toggleSelectedFrame(index: number) {
+    setSelectedFrames((current) => {
+      if (current.includes(index)) return current.filter((value) => value !== index);
+      if (current.length >= 3) return current;
+      return [...current, index];
+    });
+  }
+
   async function onFile(file: File, kind: "photo" | "video") {
+    if (recording || batchCommitted) return;
+    if (!hasCurrentBatchPermissions()) return;
+    setVideoFrames([]);
+    setSelectedFrames([]);
     setBusy(true);
     setError(null);
     const signal = beginMediaOperation();
     try {
       const actualKind = file.type.startsWith("video/") ? "video" : kind;
       validateMediaFile(file, actualKind);
+      await validateMediaSignature(file, actualKind);
+      signal.throwIfAborted();
       if (actualKind === "video") {
         await ingestVideo(file, signal);
       } else {
-        const jpeg = await compressToJpeg(file, 768, 0.74);
-        signal.throwIfAborted();
-        const imageData = await toImageData(file, 240);
+        const { jpeg, imageData } = await processMediaFrame(file, 768, 240, 0.74);
         signal.throwIfAborted();
         await emitFromMedia("photo", [jpeg], [observeFrame(imageData)], [scoreFrame(imageData)]);
       }
@@ -353,18 +590,71 @@ export function CameraCapture({
   async function toggleTorch() {
     const stream = streamRef.current;
     if (!stream) return;
+    const request = cameraRequestRef.current;
     const next = !torch;
     const ok = await setTorch(stream, next);
+    if (
+      !mountedRef.current ||
+      disabledRef.current ||
+      request !== cameraRequestRef.current ||
+      streamRef.current !== stream
+    ) return;
     setTorchOn(ok ? next : false);
     if (!ok) setError("Torch is not available on this camera.");
   }
 
   return (
     <div className="space-y-3">
+      <fieldset className="rounded-lg border border-border bg-surface p-3">
+        <legend className="px-1 text-xs uppercase tracking-wide text-subtle">Permission for this batch</legend>
+        <p className="mb-2 text-xs leading-relaxed text-muted">
+          Confirm legal-adult status plus all four permissions separately for each batch. Prefer
+          equipment-only or clothed, non-identifying stills; exclude faces, nudity, tattoos,
+          screens, mail, and room details when possible.
+        </p>
+        <div className="space-y-2 text-xs text-fg">
+          <PermissionCheck
+            checked={permissions.adults}
+            onChange={(checked) => updatePermission("adults", checked)}
+            label="I confirm every depicted person is a legal adult. The app cannot infer age from media."
+          />
+          <PermissionCheck
+            checked={permissions.activity}
+            onChange={(checked) => updatePermission("activity", checked)}
+            label="Every depicted adult currently agrees to the activity."
+          />
+          <PermissionCheck
+            checked={permissions.recording}
+            onChange={(checked) => updatePermission("recording", checked)}
+            label="Every depicted adult currently agrees to this photo or video recording."
+          />
+          <PermissionCheck
+            checked={permissions.upload}
+            onChange={(checked) => updatePermission("upload", checked)}
+            label="Every depicted adult agrees to send only the selected compressed stills to xAI."
+          />
+          <PermissionCheck
+            checked={permissions.output}
+            onChange={(checked) => updatePermission("output", checked)}
+            label="Every depicted adult agrees to this app producing an observation report for this operator."
+          />
+        </div>
+      </fieldset>
+      {batchCommitted && (
+        <div className="rounded-md border border-accent/30 bg-accent/10 p-3 text-xs text-muted">
+          <p>
+            This batch is locked to the permissions above. Uncheck any item to withdraw permission
+            and discard it, or discard it before starting another batch.
+          </p>
+          <Button className="mt-2" variant="outline" size="sm" onClick={startNewBatch}>
+            Discard batch and start another
+          </Button>
+        </div>
+      )}
       <div className="relative overflow-hidden rounded-lg bg-elevated">
         <video
           ref={videoRef}
-          className={cn("aspect-[3/4] w-full object-cover", !live && "hidden")}
+          className={cn("aspect-[3/4] w-full object-contain", !live && "hidden")}
           playsInline
           muted
         />
@@ -374,8 +664,8 @@ export function CameraCapture({
             <div className="absolute inset-0 bg-bg/70" />
             <Camera className="relative size-8 text-muted" />
             <p className="relative px-6 text-center text-sm text-muted">
-              Photograph or record her in the tie. The camera skill picks the sharpest frame and
-              prefers close wraps over a full-room pose.
+              Use a clothed, non-identifying still of equipment or a limited setup whenever possible.
+              Video is converted to labeled stills that you choose yourself.
             </p>
           </div>
         )}
@@ -410,11 +700,60 @@ export function CameraCapture({
           {error}
         </p>
       )}
+      {videoFrames.length > 0 && (
+        <div className="rounded-lg border border-border bg-surface p-3">
+          <p className="text-xs leading-relaxed text-muted">
+            Select one to three stills. Labels preserve clip order; selection is not safety ranking or clearance.
+          </p>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {videoFrames.map((frame, index) => {
+              const selected = selectedFrames.includes(index);
+              return (
+                <button
+                  key={frame.id}
+                  type="button"
+                  className={cn(
+                    "relative overflow-hidden rounded-md border bg-elevated",
+                    selected ? "border-accent ring-1 ring-accent" : "border-border",
+                  )}
+                  aria-pressed={selected}
+                  onClick={() => toggleSelectedFrame(index)}
+                >
+                  <img src={frame.jpeg} alt={`${frame.id} video still`} className="aspect-[4/3] w-full object-contain" />
+                  <span className="absolute bottom-1 left-1 rounded bg-bg/85 px-1.5 py-0.5 text-[10px] text-fg">
+                    {frame.id}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-3 flex gap-2">
+            <Button
+              className="flex-1"
+              onClick={() => void useSelectedVideoFrames()}
+              disabled={!selectedFrames.length || disabled || !permissionsReady}
+            >
+              Use selected stills
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setVideoFrames([]);
+                setSelectedFrames([]);
+              }}
+            >
+              Discard clip
+            </Button>
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-2">
         <label
           className={cn(
             "inline-flex h-11 items-center justify-center gap-2 rounded-md bg-accent text-sm font-medium text-accent-fg",
-            busy || disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+            busy || recording || batchCommitted || disabled || !permissionsReady
+              ? "cursor-not-allowed opacity-50"
+              : "cursor-pointer",
           )}
         >
           <ImagePlus className="size-4" />
@@ -423,7 +762,7 @@ export function CameraCapture({
             type="file"
             accept="image/*"
             className="sr-only"
-            disabled={busy || disabled}
+            disabled={busy || recording || batchCommitted || disabled || !permissionsReady}
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (f) void onFile(f, "photo");
@@ -434,7 +773,9 @@ export function CameraCapture({
         <label
           className={cn(
             "inline-flex h-11 items-center justify-center gap-2 rounded-md border border-border bg-elevated text-sm font-medium",
-            busy || disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+            busy || recording || batchCommitted || disabled || !permissionsReady
+              ? "cursor-not-allowed opacity-50"
+              : "cursor-pointer",
           )}
         >
           <Video className="size-4" />
@@ -443,7 +784,7 @@ export function CameraCapture({
             type="file"
             accept="video/*"
             className="sr-only"
-            disabled={busy || disabled}
+            disabled={busy || recording || batchCommitted || disabled || !permissionsReady}
             onChange={(e) => {
               const f = e.target.files?.[0];
               if (f) void onFile(f, "video");
@@ -455,14 +796,18 @@ export function CameraCapture({
       <div className="flex flex-wrap gap-2">
         {live ? (
           <>
-            <Button className="flex-1" onClick={() => void snapBurst()} disabled={busy || disabled}>
-              Burst still
+            <Button
+              className="flex-1"
+              onClick={() => void snapBurst()}
+              disabled={busy || recording || batchCommitted || disabled || !permissionsReady}
+            >
+              Capture still
             </Button>
             <Button
               variant="secondary"
               className="flex-1"
               onClick={() => void toggleRecord()}
-              disabled={busy || disabled}
+              disabled={busy || batchCommitted || disabled || (!permissionsReady && !recording)}
             >
               {recording ? "Stop clip" : "Record 7s"}
             </Button>
@@ -495,7 +840,7 @@ export function CameraCapture({
             variant="outline"
             className="flex-1"
             onClick={() => void startLive()}
-            disabled={busy || disabled}
+            disabled={busy || batchCommitted || disabled || !permissionsReady}
           >
             Open live camera
           </Button>
@@ -538,8 +883,30 @@ function GuideOverlay({ guide }: { guide: Guide }) {
     <div className="pointer-events-none absolute inset-0">
       <div className={cn("absolute rounded-md border border-accent/70", box)} />
       <p className="absolute bottom-2 left-0 right-0 text-center text-[11px] uppercase tracking-wide text-accent">
-        Fill this frame with rope
+        Keep only the relevant, non-identifying area in frame
       </p>
     </div>
+  );
+}
+
+function PermissionCheck({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-2">
+      <input
+        type="checkbox"
+        className="mt-0.5 size-4 accent-accent"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <span>{label}</span>
+    </label>
   );
 }

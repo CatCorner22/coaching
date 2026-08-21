@@ -5,7 +5,9 @@ import {
   MAX_VIDEO_BYTES,
   dataUrlSize,
   extractVideoFrames,
+  processMediaFrame,
   validateMediaFile,
+  validateMediaSignature,
 } from "../src/lib/media.ts";
 import { openRopeCamera, startClip, torchAvailable } from "../src/lib/camera/stream.ts";
 
@@ -66,6 +68,82 @@ test("validateMediaFile rejects executable and unsupported media containers", ()
   );
 });
 
+test("validateMediaSignature rejects MIME-spoofed uploads and accepts supported headers", async () => {
+  await assert.rejects(
+    validateMediaSignature(new Blob(["<svg><script>bad()</script></svg>"], { type: "image/jpeg" }), "photo"),
+    /does not contain a supported media file/i,
+  );
+  await assert.doesNotReject(
+    validateMediaSignature(
+      new Blob([Uint8Array.from([
+        0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x00, 0x10, 0x00, 0x10,
+        0x03, 0x01, 0x11, 0x00, 0x02, 0x11, 0x00, 0x03, 0x11, 0x00,
+      ])]),
+      "photo",
+    ),
+  );
+  await assert.doesNotReject(
+    validateMediaSignature(
+      new Blob([Uint8Array.from([0x1a, 0x45, 0xdf, 0xa3, 0x01, 0x00])]),
+      "video",
+    ),
+  );
+  await assert.rejects(
+    validateMediaSignature(new Blob(["not a movie"], { type: "video/mp4" }), "video"),
+    /does not contain a supported media file/i,
+  );
+});
+
+test("validateMediaSignature rejects oversized PNG dimensions before decoding", async () => {
+  const bytes = new Uint8Array(24);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  bytes.set([0x49, 0x48, 0x44, 0x52], 12);
+  new DataView(bytes.buffer).setUint32(16, 5000);
+  new DataView(bytes.buffer).setUint32(20, 5000);
+  await assert.rejects(validateMediaSignature(new Blob([bytes]), "photo"), /too large to score safely/i);
+});
+
+test("validateMediaSignature handles a maximum-header ISO video without argument overflow", async () => {
+  const bytes = new Uint8Array(64 * 1024);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(0, bytes.length);
+  bytes.set([0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d], 4); // ftyp + isom
+  await assert.doesNotReject(validateMediaSignature(new Blob([bytes]), "video"));
+});
+
+test("validateMediaSignature rejects every accepted WebP and HEIC dimension bomb before decode", async () => {
+  const vp8x = new Uint8Array(30);
+  vp8x.set([0x52, 0x49, 0x46, 0x46], 0); // RIFF
+  vp8x.set([0x57, 0x45, 0x42, 0x50, 0x56, 0x50, 0x38, 0x58], 8); // WEBPVP8X
+  vp8x.fill(0xff, 24, 30);
+  await assert.rejects(validateMediaSignature(new Blob([vp8x]), "photo"), /too large to score safely/i);
+
+  const vp8l = new Uint8Array(30);
+  vp8l.set([0x52, 0x49, 0x46, 0x46], 0); // RIFF
+  vp8l.set([0x57, 0x45, 0x42, 0x50, 0x56, 0x50, 0x38, 0x4c], 8); // WEBPVP8L
+  vp8l[20] = 0x2f;
+  new DataView(vp8l.buffer).setUint32(21, 0xffffffff, true);
+  await assert.rejects(validateMediaSignature(new Blob([vp8l]), "photo"), /too large to score safely/i);
+
+  const vp8 = new Uint8Array(30);
+  vp8.set([0x52, 0x49, 0x46, 0x46], 0); // RIFF
+  vp8.set([0x57, 0x45, 0x42, 0x50, 0x56, 0x50, 0x38, 0x20], 8); // WEBPVP8
+  vp8.set([0x9d, 0x01, 0x2a], 23);
+  vp8.set([0xff, 0x3f, 0xff, 0x3f], 26);
+  await assert.rejects(validateMediaSignature(new Blob([vp8]), "photo"), /too large to score safely/i);
+
+  const heic = new Uint8Array(44);
+  const view = new DataView(heic.buffer);
+  view.setUint32(0, 24);
+  heic.set([0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63], 4); // ftypheic
+  heic.set([0x6d, 0x69, 0x66, 0x31], 16); // mif1 compatible brand
+  view.setUint32(24, 20);
+  heic.set([0x69, 0x73, 0x70, 0x65], 28); // ispe
+  view.setUint32(36, 16_384);
+  view.setUint32(40, 16_384);
+  await assert.rejects(validateMediaSignature(new Blob([heic]), "photo"), /too large to score safely/i);
+});
+
 test("openRopeCamera retries constraint failures but not permission denials", async (t) => {
   const original = Object.getOwnPropertyDescriptor(globalThis, "navigator");
   t.after(() => restoreGlobal("navigator", original));
@@ -76,11 +154,13 @@ test("openRopeCamera retries constraint failures but not permission denials", as
   };
   const stream = { getVideoTracks: () => [track] };
   let calls = 0;
+  const constraints = [];
   Object.defineProperty(globalThis, "navigator", {
     configurable: true,
     value: {
       mediaDevices: {
-        getUserMedia: async () => {
+        getUserMedia: async (requested) => {
+          constraints.push(requested);
           calls += 1;
           if (calls === 1) throw new DOMException("constraints", "OverconstrainedError");
           return stream;
@@ -91,6 +171,8 @@ test("openRopeCamera retries constraint failures but not permission denials", as
 
   assert.equal(await openRopeCamera("environment"), stream);
   assert.equal(calls, 2);
+  assert.deepEqual(constraints[0].video.width, { ideal: 1280 });
+  assert.deepEqual(constraints[0].video.height, { ideal: 720 });
 
   calls = 0;
   globalThis.navigator.mediaDevices.getUserMedia = async () => {
@@ -167,6 +249,142 @@ test("startClip reports unsupported browsers and returns the native recorded typ
   assert.equal(await blob.text(), "frame");
 });
 
+test("startClip stop is bounded and idempotent when a recorder omits its stop event", async (t) => {
+  const recorderDescriptor = Object.getOwnPropertyDescriptor(globalThis, "MediaRecorder");
+  const timeoutDescriptor = Object.getOwnPropertyDescriptor(globalThis, "setTimeout");
+  const realSetTimeout = globalThis.setTimeout;
+  t.after(() => {
+    restoreGlobal("MediaRecorder", recorderDescriptor);
+    restoreGlobal("setTimeout", timeoutDescriptor);
+  });
+
+  let stopCalls = 0;
+  class StuckRecorder {
+    state = "inactive";
+    mimeType = "video/webm";
+
+    start() {
+      this.state = "recording";
+    }
+
+    stop() {
+      stopCalls += 1;
+      this.state = "inactive";
+    }
+  }
+  Object.defineProperty(globalThis, "MediaRecorder", {
+    configurable: true,
+    value: StuckRecorder,
+  });
+  Object.defineProperty(globalThis, "setTimeout", {
+    configurable: true,
+    value: (callback, ms, ...args) =>
+      realSetTimeout(callback, ms === 5_000 ? 15 : ms, ...args),
+  });
+
+  const clip = startClip({});
+  await assert.rejects(clip.stop(), /did not finish stopping/i);
+  await assert.rejects(clip.stop(), /did not finish stopping/i);
+  assert.equal(stopCalls, 1);
+});
+
+test("startClip cancel settles immediately, stops once, and remains idempotent", async (t) => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "MediaRecorder");
+  t.after(() => restoreGlobal("MediaRecorder", original));
+
+  let stopCalls = 0;
+  class CancelRecorder {
+    state = "inactive";
+    mimeType = "video/mp4";
+
+    start() {
+      this.state = "recording";
+    }
+
+    stop() {
+      stopCalls += 1;
+      this.state = "inactive";
+    }
+  }
+  Object.defineProperty(globalThis, "MediaRecorder", {
+    configurable: true,
+    value: CancelRecorder,
+  });
+
+  const clip = startClip({});
+  clip.cancel();
+  clip.cancel();
+  await assert.rejects(clip.stop(), (error) => error?.name === "AbortError");
+  assert.equal(stopCalls, 1);
+});
+
+test("startClip observes recorder errors that arrive before the UI calls stop", async (t) => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "MediaRecorder");
+  t.after(() => restoreGlobal("MediaRecorder", original));
+
+  class ErrorRecorder {
+    state = "inactive";
+    mimeType = "video/webm";
+
+    start() {
+      this.state = "recording";
+      queueMicrotask(() => this.onerror?.());
+    }
+
+    stop() {
+      this.state = "inactive";
+      queueMicrotask(() => this.onstop?.());
+    }
+  }
+  Object.defineProperty(globalThis, "MediaRecorder", {
+    configurable: true,
+    value: ErrorRecorder,
+  });
+
+  const clip = startClip({});
+  await new Promise((resolve) => setImmediate(resolve));
+  await assert.rejects(clip.stop(), /video recording failed/i);
+});
+
+test("a bitmap that resolves after its decode timeout is still closed", async (t) => {
+  const names = ["window", "HTMLVideoElement", "HTMLImageElement", "createImageBitmap"];
+  const originals = new Map(
+    names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]),
+  );
+  const realSetTimeout = globalThis.setTimeout;
+  const realClearTimeout = globalThis.clearTimeout;
+  t.after(() => {
+    for (const [name, descriptor] of originals) restoreGlobal(name, descriptor);
+  });
+
+  let closes = 0;
+  Object.defineProperties(globalThis, {
+    window: {
+      configurable: true,
+      value: {
+        setTimeout: (callback) => realSetTimeout(callback, 0),
+        clearTimeout: realClearTimeout,
+      },
+    },
+    HTMLVideoElement: { configurable: true, value: class {} },
+    HTMLImageElement: { configurable: true, value: class {} },
+    createImageBitmap: {
+      configurable: true,
+      value: () =>
+        new Promise((resolve) =>
+          realSetTimeout(
+            () => resolve({ width: 10, height: 10, close: () => { closes += 1; } }),
+            20,
+          ),
+        ),
+    },
+  });
+
+  await assert.rejects(processMediaFrame(new Blob(["image"])), /decode timed out/i);
+  await new Promise((resolve) => realSetTimeout(resolve, 35));
+  assert.equal(closes, 1);
+});
+
 test("extractVideoFrames handles a zero-duration recording and always revokes its URL", async (t) => {
   const dom = installFakeVideoDom({ duration: 0 });
   t.after(dom.restore);
@@ -210,12 +428,64 @@ test("extractVideoFrames rejects an indeterminate non-seekable duration", async 
   assert.equal(dom.revoked.length, 1);
 });
 
+test("extractVideoFrames uses the caller's elapsed hint for an indeterminate recorded WebM", async (t) => {
+  const dom = installFakeVideoDom({ duration: Number.POSITIVE_INFINITY });
+  t.after(dom.restore);
+
+  const frames = await extractVideoFrames(
+    new Blob(["video"], { type: "video/webm" }),
+    2,
+    undefined,
+    2,
+  );
+  assert.equal(frames.length, 2);
+  assert.deepEqual(dom.seekTimes.map((time) => Number(time.toFixed(2))), [0.5, 1.5]);
+  assert.equal(dom.revoked.length, 1);
+});
+
+test("extractVideoFrames aborts a pending metadata read immediately and cleans up", async (t) => {
+  const dom = installFakeVideoDom({ duration: 2, silentLoad: true });
+  t.after(dom.restore);
+  const controller = new AbortController();
+
+  const pending = extractVideoFrames(
+    new Blob(["video"], { type: "video/mp4" }),
+    2,
+    controller.signal,
+  );
+  controller.abort();
+
+  await assert.rejects(pending, (error) => error?.name === "AbortError");
+  assert.equal(dom.revoked.length, 1);
+  assert.equal(dom.video.sourceCleared, true);
+});
+
+test("extractVideoFrames aborts an in-flight seek and removes the source", async (t) => {
+  const controller = new AbortController();
+  const dom = installFakeVideoDom({
+    duration: 2,
+    onSeek: () => controller.abort(),
+  });
+  t.after(dom.restore);
+
+  await assert.rejects(
+    extractVideoFrames(
+      new Blob(["video"], { type: "video/mp4" }),
+      2,
+      controller.signal,
+    ),
+    (error) => error?.name === "AbortError",
+  );
+  assert.equal(dom.seekTimes.length, 1);
+  assert.equal(dom.revoked.length, 1);
+});
+
 function restoreGlobal(name, descriptor) {
   if (descriptor) Object.defineProperty(globalThis, name, descriptor);
   else delete globalThis[name];
 }
 
-function installFakeVideoDom({ duration }) {
+function installFakeVideoDom({ duration, silentLoad = false, onSeek = undefined }) {
   const names = ["document", "window", "HTMLVideoElement", "HTMLImageElement", "ImageData"];
   const originals = new Map(
     names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]),
@@ -245,6 +515,7 @@ function installFakeVideoDom({ duration }) {
     #currentTime = 0;
 
     set src(_value) {
+      if (silentLoad) return;
       queueMicrotask(() => {
         this.readyState = 2;
         this.dispatchEvent(new Event("loadedmetadata"));
@@ -259,6 +530,7 @@ function installFakeVideoDom({ duration }) {
     set currentTime(value) {
       this.#currentTime = value;
       seekTimes.push(value);
+      onSeek?.(value);
       queueMicrotask(() => this.dispatchEvent(new Event("seeked")));
     }
 

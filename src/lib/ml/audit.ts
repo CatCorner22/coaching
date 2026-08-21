@@ -3,11 +3,17 @@ import { compactText, foldText, sanitizeDraft } from "./sanitize";
 import type { AuditVerdict, DeterministicReport, LlmDraft, Prediction } from "./types";
 
 const STOP_COACH =
-  "Stop. Shears first. Check hands and throat. Do not add rope until she is pink, warm, and talking in full sentences.";
-const STOP_NEXT = "Stop. Shears. Check hands and throat. Do not add rope.";
-const STOP_SPEAK = "Stop. Check her hands and throat. Cut if you cannot make it right.";
+  "Stop and release the restraint now without creating a fall. Call emergency services for abnormal breathing, unresponsiveness, seizure, chest pain, major weakness, or a serious fall.";
+const STOP_NEXT = "Release now. Do not re-tie or delay medical care for another image.";
+const STOP_SPEAK = "Stop and release now. Get emergency help for any serious symptom.";
 const BANNED_COACH =
-  "I will not coach neck restraint, breath play, or full suspension. Stay on the floor tie in front of you, shears in reach.";
+  "I will not provide procedural coaching for neck or breathing restriction, suspension, load-bearing rope, abandonment, or inaccessible release. Use a clothed, ground-level, non-loaded rehearsal with a qualified in-person instructor.";
+const OBSERVATION_COACH =
+  "Image-only observation cannot establish consent, circulation, nerve function, breathing, pressure, load, or technique correctness. Use direct communication and hands-on checks; release for any concerning symptom or uncertainty.";
+const OBSERVATION_NEXT =
+  "Pause before making any change. Confirm current consent, normal sensation and movement, ordinary breathing and speech, and immediate release readiness directly.";
+const OBSERVATION_SPEAK =
+  "Pause. Check consent, sensation, movement, breathing, and release readiness directly.";
 
 const BANNED = [
   /breath\s*play/i,
@@ -236,6 +242,23 @@ export function localAudit(opts: {
   const droppedClaims: string[] = [];
   const incoming = opts.llm ? sanitizeDraft(opts.llm) : null;
   const base = incoming ?? fallbackDraft(opts);
+  const tieGuess = opts.tie
+    ? `User-selected label: ${opts.tie.name}; not visually validated.`
+    : "Not identified from images.";
+  const stepGuess = opts.tie
+    ? "User-selected step context only; not inferred or validated from images."
+    : "Not inferred from images.";
+  const seen = [
+    "Limited image view only; age, consent, sensation, circulation, breathing, pressure, load, and technique are not observable.",
+  ];
+  if (
+    incoming &&
+    (incoming.tieGuess !== tieGuess ||
+      incoming.stepGuess !== stepGuess ||
+      incoming.seen.length > 0)
+  ) {
+    droppedClaims.push("Removed unverified model identification and nonvisual claims.");
+  }
 
   let quality = base.quality === "sound" || base.quality === "adjust" || base.quality === "unsafe" ? base.quality : "adjust";
   let coaching = base.coaching;
@@ -262,7 +285,7 @@ export function localAudit(opts: {
   }
   if (opts.det.recommend === "adjust" && quality === "sound") {
     quality = "adjust";
-    overrides.push("Local wrap/circulation model asked for an adjustment.");
+    overrides.push("Image analysis cannot issue a continuation clearance.");
   }
   if (opts.pred.recommend === "stop") {
     halt("Predictor vetoed continuation on rising risk.");
@@ -273,9 +296,9 @@ export function localAudit(opts: {
     droppedClaims.push("Removed disallowed coaching.");
     halt(
       "Banned coaching stripped.",
-      "Stop. That suggestion is outside what this atelier will coach.",
-      "I will not coach that. Stay with the floor tie. Check her throat and hands.",
-      "I will not coach neck restraint, breath play, or full suspension. Stay on the floor tie in front of you.",
+      STOP_NEXT,
+      STOP_SPEAK,
+      "That suggestion is outside this app's scope. Stop and release; do not use a model response to modify or clear the setup.",
     );
   }
 
@@ -285,24 +308,38 @@ export function localAudit(opts: {
     droppedClaims.push(`Honored negotiated no: ${no}`);
     halt(
       `Negotiated no (${no}) is a hard limit.`,
-      "Stop. That is on your no list. Do not add it.",
-      "That is a no. Do not add it. Check her.",
-      `You marked “${String(no).slice(0, 80)}” as a no. I will not coach it. Stay with what is already on her and keep the throat empty.`,
+      "Stop. That is on the negotiated no list. Do not begin or add it; if it is underway, release.",
+      "That is a negotiated no. Stop and release.",
+      `You marked “${String(no).slice(0, 80)}” as a no. The app will not coach it. Stop and release rather than modifying the setup.`,
     );
   }
 
   if (opts.det.neckRope > 0.1 && quality !== "unsafe") {
-    quality = "adjust";
-    next = "Look at the throat. Empty it. Do not add rope.";
-    coaching = "Neck-zone rope signal. Confirm the throat is empty. Do not add wraps until it is.";
-    speak = "Check the throat. Do not add rope.";
-    overrides.push("Neck-zone density forced a throat check.");
+    halt(
+      "Possible neck-zone overlap forced release.",
+      STOP_NEXT,
+      STOP_SPEAK,
+      "Possible neck or throat overlap appears in this view. Stop and release; the image cannot establish contact, pressure, breathing, or injury.",
+    );
   }
 
   if (opts.tie) {
     const max = Math.max(0, opts.tie.steps.length - 1);
     if (opts.stepIndex > max || opts.stepIndex < 0) {
       overrides.push("Step index clamped to the tie.");
+    }
+  }
+
+  // Model prose is untrusted and can evade lexical filters through paraphrase.
+  // The camera path therefore exposes only reviewed, non-procedural actions.
+  if (quality !== "unsafe") {
+    quality = "adjust";
+    coaching = OBSERVATION_COACH;
+    next = OBSERVATION_NEXT;
+    speak = OBSERVATION_SPEAK;
+    circulation = true;
+    if (!overrides.includes("Model action prose replaced with observation-only guidance.")) {
+      overrides.push("Model action prose replaced with observation-only guidance.");
     }
   }
 
@@ -314,6 +351,9 @@ export function localAudit(opts: {
   return {
     draft: {
       ...base,
+      tieGuess,
+      stepGuess,
+      seen,
       quality,
       coaching,
       next,
@@ -335,31 +375,26 @@ export function fallbackDraft(opts: {
   tie?: Tie;
   stepIndex: number;
 }): LlmDraft {
-  const step = opts.tie?.steps[opts.stepIndex];
   const quality =
     opts.det.recommend === "stop" || opts.pred.recommend === "stop"
       ? "unsafe"
       : opts.det.recommend === "adjust" || opts.pred.recommend === "adjust"
         ? "adjust"
-        : "sound";
+        : "adjust";
   const notes = opts.det.notes.join(" ");
   const coaching =
     quality === "unsafe"
       ? STOP_COACH
-      : step
-        ? `${notes} Expected now: ${step.rigger} Check: ${step.check}`
-        : `${notes} Freeform — build only what you can name and undo.`;
+      : `${notes} ${OBSERVATION_COACH}`;
   const speak =
     quality === "unsafe"
       ? STOP_SPEAK
-      : step
-        ? step.speak
-        : "Count the wraps. Two fingers of space. Ask her how the hands feel.";
+      : OBSERVATION_SPEAK;
   const next =
-    quality === "unsafe" ? STOP_NEXT : (step?.rigger ?? opts.pred.nextFailure);
+    quality === "unsafe" ? STOP_NEXT : OBSERVATION_NEXT;
   return {
     tieGuess: opts.tie?.name ?? "freeform",
-    stepGuess: step?.title ?? "observation",
+    stepGuess: "observation only",
     quality,
     seen: opts.det.notes,
     next,

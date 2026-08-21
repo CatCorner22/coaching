@@ -33,7 +33,7 @@ const defaults: Settings = {
   yellowWord: "yellow",
   greenWord: "green",
   voice: true,
-  listen: true,
+  listen: false,
   circulationMins: 4,
 };
 
@@ -66,7 +66,7 @@ export const useSettings = create<SettingsState>()(
               ? Math.min(12, Math.max(2, Number(p.circulationMins) || s.circulationMins))
               : s.circulationMins,
         })),
-      enter: () => set({ consentVersion: 2, consented: true, adults: true, shears: true, photosOk: true }),
+      enter: () => set({ consentVersion: 3, consented: true, adults: true, shears: true, photosOk: true }),
     }),
     {
       name: "musubi-settings",
@@ -75,8 +75,8 @@ export const useSettings = create<SettingsState>()(
         const adults = p.adults === true;
         const shears = p.shears === true;
         const photosOk = p.photosOk === true;
-        const consentVersion = p.consentVersion === 2 ? 2 : 0;
-        const consented = p.consented === true && adults && shears && photosOk && consentVersion === 2;
+        const consentVersion = p.consentVersion === 3 ? 3 : 0;
+        const consented = p.consented === true && adults && shears && photosOk && consentVersion === 3;
         return {
           ...current,
           ...p,
@@ -94,7 +94,7 @@ export const useSettings = create<SettingsState>()(
           honorific: String(p.honorific ?? current.honorific).slice(0, 24),
           style: p.style === "peer" || p.style === "ds" ? p.style : current.style,
           voice: p.voice !== false,
-          listen: p.listen !== false,
+          listen: consentVersion === 3 && p.listen === true,
         };
       },
     },
