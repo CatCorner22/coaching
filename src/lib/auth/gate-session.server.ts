@@ -186,10 +186,22 @@ export function gateIdentitySessions() {
               );
               const cookieHeader = inbound.get("cookie") ?? "";
               if (cookieHeader.includes(`${sessionCookieName}=`)) {
-                // These adapter operations intentionally have no local catch.
-                // If inspection or deletion fails, the outer APIError path
-                // rejects /get-session before handleOAuthUserInfo can mint a
-                // second valid identity alongside the stale session.
+                // findAccounts and deleteSession below intentionally have no local
+                // catch: if either fails, the outer APIError path rejects
+                // /get-session before handleOAuthUserInfo can mint a second
+                // valid identity alongside the stale session.
+                //
+                // That guarantee does NOT extend to this read. Better Auth's
+                // getSessionFromCtx ends in `.catch(() => null)`
+                // (better-auth/dist/api/routes/session.mjs), so a failed
+                // lookup is indistinguishable here from an expired session:
+                // both return null and both fall through to mint a new
+                // identity. Closing that would mean either throwing — which
+                // breaks the ordinary expired-session sign-in — or resolving
+                // the signed session token against the adapter directly, which
+                // reaches into internals this code should not depend on. The
+                // window is a lookup failure during gate sign-in; the comment
+                // is left honest rather than the behaviour left misdescribed.
                 const existing = await getSessionFromCtx(ctx, {
                   disableCookieCache: true,
                 });
