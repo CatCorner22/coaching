@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { getSafetySource, safetySourceAnchor } from "@/lib/kb/sources";
 import type { SourceId } from "@/lib/observation/report";
 
@@ -23,9 +24,16 @@ export function SourceEvidence({ sourceIds }: { sourceIds: readonly SourceId[] }
             >
               {source.id} · {source.title}
             </a>{" "}
-            <a href={`/safety#${safetySourceAnchor(source.id)}`} className="text-subtle underline">
+            {/* Client-side navigation: a raw href reloads the document, which
+                discards the page-memory capture and the one-use observation
+                report this panel is attached to. */}
+            <Link
+              to="/safety"
+              hash={safetySourceAnchor(source.id)}
+              className="text-subtle underline"
+            >
               Ledger
-            </a>
+            </Link>
             <span className="mt-0.5 block">{source.note}</span>
           </li>
         ))}

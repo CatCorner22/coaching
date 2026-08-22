@@ -72,6 +72,9 @@ export function UserButton({ compact = false }: { compact?: boolean }) {
   // shows it is working and cannot be fired twice.
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
+  // "Clear local data" erases settings, negotiated limits, plans and journal
+  // entries that cannot be regenerated, so it takes a deliberate second press.
+  const [confirmClear, setConfirmClear] = useState(false);
   const [capabilities, setCapabilities] = useState<AuthCapabilities | null>(null);
   const [capabilityFailed, setCapabilityFailed] = useState(false);
   useEffect(() => {
@@ -109,6 +112,10 @@ export function UserButton({ compact = false }: { compact?: boolean }) {
           disabled={signingOut}
           onClick={() => {
             setSignOutError(null);
+            if (localClearOnly && !confirmClear) {
+              setConfirmClear(true);
+              return;
+            }
             setSigningOut(true);
             const action = localClearOnly
               ? clearLocalAccountData()
@@ -132,8 +139,19 @@ export function UserButton({ compact = false }: { compact?: boolean }) {
                 ? "Clearing…"
                 : "Signing out…"
             : localClearOnly
-              ? "Clear local data"
+              ? confirmClear
+                ? "Confirm: erase local data"
+                : "Clear local data"
               : "Sign out"}
+        </button>
+      )}
+      {localClearOnly && confirmClear && !signingOut && (
+        <button
+          type="button"
+          onClick={() => setConfirmClear(false)}
+          className="cursor-pointer text-sm underline-offset-4 opacity-70 hover:underline"
+        >
+          Cancel
         </button>
       )}
       {localClearOnly && (

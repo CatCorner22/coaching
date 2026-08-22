@@ -47,6 +47,22 @@ export function mediaAuthorizationWasRevoked(
 }
 
 /**
+ * A stable signature of everything that gates Studio: the negotiated ranks plus
+ * the consent-bearing settings flags. Cross-tab invalidation compares this so an
+ * unrelated keystroke in another tab (a negotiation note, a name field) cannot
+ * reload an open Studio and discard a live capture, while a real policy or
+ * consent change still does.
+ */
+export function studioPolicySignature(
+  items: readonly NegItem[],
+  settings: { consented?: boolean; voice?: boolean; listen?: boolean },
+): string {
+  const { negotiationKey } = buildStudioNegotiationPolicy(items);
+  const flag = (value: unknown) => (value === true ? "1" : "0");
+  return `${negotiationKey}|${flag(settings.consented)}${flag(settings.voice)}${flag(settings.listen)}`;
+}
+
+/**
  * Resolve action-facing Studio policy from negotiation state. A maybe remains
  * unresolved and therefore blocks the same actions as no until it becomes yes.
  */

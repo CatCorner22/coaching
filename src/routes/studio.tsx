@@ -19,6 +19,7 @@ import { useSettings } from "@/lib/stores/settings";
 import {
   buildStudioNegotiationPolicy,
   mediaAuthorizationWasRevoked,
+  studioPolicySignature,
 } from "@/lib/studio/negotiation";
 import { listenForWords, playCoachVoice, stopCoachVoice } from "@/lib/voice/play";
 import { DIRECT_CHECK_REMINDER } from "@/lib/voice/reviewed-lines";
@@ -118,17 +119,35 @@ function StudioPage() {
   }, []);
 
   useEffect(() => {
+    const signature = () =>
+      studioPolicySignature(useNegotiate.getState().items, useSettings.getState());
+    let lastSignature = signature();
+    let pending: ReturnType<typeof setTimeout> | null = null;
     const invalidateAcrossTabs = (event: StorageEvent) => {
       if (event.key !== null && event.key !== "knotty-negotiate" && event.key !== "knotty-settings")
         return;
-      analysisRequestRef.current += 1;
-      captureContextAtCommitRef.current = null;
-      micArmedRef.current = false;
-      stopCoachVoice();
-      window.location.reload();
+      // The consent-bearing stores rehydrate from their own storage listeners;
+      // that resolves in a microtask, so compare on the next task. Reload only
+      // when the gating policy actually changed — a note or name keystroke in
+      // another tab must not reload-storm this page and discard a live capture.
+      if (pending !== null) clearTimeout(pending);
+      pending = setTimeout(() => {
+        pending = null;
+        const next = signature();
+        if (next === lastSignature) return;
+        lastSignature = next;
+        analysisRequestRef.current += 1;
+        captureContextAtCommitRef.current = null;
+        micArmedRef.current = false;
+        stopCoachVoice();
+        window.location.reload();
+      }, 0);
     };
     window.addEventListener("storage", invalidateAcrossTabs);
-    return () => window.removeEventListener("storage", invalidateAcrossTabs);
+    return () => {
+      if (pending !== null) clearTimeout(pending);
+      window.removeEventListener("storage", invalidateAcrossTabs);
+    };
   }, []);
 
   useEffect(() => {
