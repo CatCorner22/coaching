@@ -56,6 +56,10 @@ test("camera capability preflight stays passive and cannot certify a device or s
   assert.match(camera, /role="status"/);
   assert.match(camera, /aria-live="polite"/);
   assert.match(camera, /aria-atomic="true"/);
+  assert.match(
+    camera,
+    /onClick=\{\(\) => void checkBrowserCapabilities\(\)\}[\s\S]{0,160}disabled=\{disabled\}[\s\S]{0,160}aria-disabled=\{disabled \|\| checkingCapabilities\}/,
+  );
   assert.match(camera, /capabilityRequestRef\.current \+= 1/);
   assert.match(camera, /request === capabilityRequestRef\.current/);
   assert.match(camera, /aria-label="Live camera preview;/);

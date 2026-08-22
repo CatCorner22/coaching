@@ -760,7 +760,8 @@ export const CameraCapture = memo(function CameraCapture({
           variant="outline"
           className="mt-3 h-auto min-h-11 whitespace-normal py-2 text-left"
           onClick={() => void checkBrowserCapabilities()}
-          disabled={disabled || checkingCapabilities}
+          disabled={disabled}
+          aria-disabled={disabled || checkingCapabilities}
         >
           {checkingCapabilities
             ? "Checking browser capabilities…"
