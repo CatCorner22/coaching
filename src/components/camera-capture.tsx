@@ -105,6 +105,10 @@ export const CameraCapture = memo(function CameraCapture({
   const capabilityRequestRef = useRef(0);
   const mediaOperationRef = useRef<AbortController | null>(null);
   const mediaOperationIdRef = useRef(0);
+  // True only while a decode/import is actually running. The controller ref is
+  // never cleared, so testing it for null reported "in flight" forever after
+  // the first operation — every later app switch then claimed work was lost.
+  const mediaOperationActiveRef = useRef(false);
   const torchRequestRef = useRef(0);
   const torchBusyRef = useRef(false);
   const permissionsRef = useRef(EMPTY_PERMISSIONS);
@@ -140,6 +144,7 @@ export const CameraCapture = memo(function CameraCapture({
     return () => {
       mountedRef.current = false;
       mediaOperationRef.current?.abort();
+      mediaOperationActiveRef.current = false;
       cameraOpenRef.current?.abort();
       cameraOpenRef.current = null;
       capabilityRequestRef.current += 1;
@@ -171,7 +176,7 @@ export const CameraCapture = memo(function CameraCapture({
       // A local file decode holds no camera hardware, but it is aborted with
       // the rest of the teardown. Say so instead of leaving the capture area
       // blank with no explanation of where the import went.
-      const hadMediaOperation = mediaOperationRef.current !== null;
+      const hadMediaOperation = mediaOperationActiveRef.current;
       stopLive();
       if (hadMediaOperation) {
         setHint("Processing stopped when the app went to the background. Choose the file again.");
@@ -198,6 +203,7 @@ export const CameraCapture = memo(function CameraCapture({
     setCapabilityReport(null);
     setCapabilityError(null);
     mediaOperationRef.current?.abort();
+    mediaOperationActiveRef.current = false;
     cameraOpenRef.current?.abort();
     cameraOpenRef.current = null;
     mediaOperationIdRef.current += 1;
@@ -267,8 +273,10 @@ export const CameraCapture = memo(function CameraCapture({
 
   function beginMediaOperation(): { signal: AbortSignal; id: number } {
     mediaOperationRef.current?.abort();
+    mediaOperationActiveRef.current = false;
     const controller = new AbortController();
     mediaOperationRef.current = controller;
+    mediaOperationActiveRef.current = true;
     const id = ++mediaOperationIdRef.current;
     return { signal: controller.signal, id };
   }
@@ -456,6 +464,7 @@ export const CameraCapture = memo(function CameraCapture({
     cameraOpenRef.current?.abort();
     cameraOpenRef.current = null;
     mediaOperationRef.current?.abort();
+    mediaOperationActiveRef.current = false;
     mediaOperationIdRef.current += 1;
     torchRequestRef.current += 1;
     clearRecordTimer();
@@ -572,7 +581,10 @@ export const CameraCapture = memo(function CameraCapture({
         setError(cause instanceof Error ? cause.message : "Could not capture a photo.");
       }
     } finally {
-      if (ownsMediaOperation(operation.id)) setBusy(false);
+      if (ownsMediaOperation(operation.id)) {
+        mediaOperationActiveRef.current = false;
+        setBusy(false);
+      }
     }
   }
 
@@ -639,7 +651,10 @@ export const CameraCapture = memo(function CameraCapture({
       }
     } finally {
       recordTransitionRef.current = false;
-      if (ownsMediaOperation(operation.id)) setBusy(false);
+      if (ownsMediaOperation(operation.id)) {
+        mediaOperationActiveRef.current = false;
+        setBusy(false);
+      }
     }
   }
 
@@ -756,7 +771,10 @@ export const CameraCapture = memo(function CameraCapture({
         setError(e instanceof Error ? e.message : "Could not read media");
       }
     } finally {
-      if (ownsMediaOperation(operation.id)) setBusy(false);
+      if (ownsMediaOperation(operation.id)) {
+        mediaOperationActiveRef.current = false;
+        setBusy(false);
+      }
     }
   }
 
@@ -876,9 +894,10 @@ export const CameraCapture = memo(function CameraCapture({
         <p className="mb-2 text-xs leading-relaxed text-muted">
           Confirm legal-adult status, non-explicit media scope, and all four permissions separately
           for each batch. Prefer equipment-only, non-identifying stills. Clothed or intimate-wear
-          views of consenting adults are supported; full nudity and sexual activity are not. Exclude faces,
-          nudity, intimate contact, tattoos, screens, mail, and room details. The app does not
-          automatically detect or certify that media is non-explicit; do not select explicit media.
+          views of consenting adults are supported; full nudity and sexual activity are not. Exclude
+          faces, nudity, intimate contact, tattoos, screens, mail, and room details. The app does
+          not automatically detect or certify that media is non-explicit; do not select explicit
+          media.
         </p>
         <div className="space-y-2 text-xs text-fg">
           <PermissionCheck
@@ -960,8 +979,8 @@ export const CameraCapture = memo(function CameraCapture({
             <div className="absolute inset-0 bg-bg/70" />
             <Camera className="relative size-8 text-muted" />
             <p className="relative px-6 text-center text-sm text-muted">
-              Use a non-identifying still of equipment or a limited setup whenever
-              possible. Video is converted to labeled stills that you choose yourself.
+              Use a non-identifying still of equipment or a limited setup whenever possible. Video
+              is converted to labeled stills that you choose yourself.
             </p>
           </div>
         )}
@@ -1050,7 +1069,9 @@ export const CameraCapture = memo(function CameraCapture({
             <Button
               className="flex-1"
               onClick={() => void commitSelectedVideoFrames()}
-              disabled={!selectedFrames.length || disabled || !permissionsReady}
+              disabled={
+                !selectedFrames.length || busy || recording || disabled || !permissionsReady
+              }
             >
               Use selected stills
             </Button>
