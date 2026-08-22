@@ -174,14 +174,16 @@ cover 32,832 state combinations without an invalid report or throw.
 - Production builds have no migration side effect. Schema migration is an
   explicit `npm run db:migrate` deployment operation.
 - CI pins Node 22.23.2, installs without lifecycle scripts, builds before
-  typecheck, scans emitted JavaScript and credentials/database artifacts, runs
-  the full test/lint corpus, enforces client entry and complete eager-import
-  budgets, probes direct route loads, and captures root plus Studio desktop/mobile
-  evidence. The Studio browser storm keeps preflight passive, then uses a
+  typecheck, and fixes its standalone auth-off/no-database/no-provider contract
+  at both build and preview time. It scans emitted JavaScript and
+  credentials/database artifacts, runs the full test/lint corpus, enforces
+  client entry and complete eager-import budgets, probes direct route loads,
+  and captures root plus Studio desktop/mobile evidence. The Studio browser
+  storm keeps preflight passive, then uses a
   no-audio synthetic equipment feed to exercise live open, photo commit, batch
   reset, recording, labeled-still selection, video commit, track shutdown, and
-  the retryable pre-provider failure path without sending media or spending
-  provider quota.
+  the retryable pre-provider failure path without sending media to xAI or
+  spending provider quota.
 - A route validator no longer imports the knowledge-base barrel into the global
   registration graph. The root preview bridge now uses a small, tested closed
   message parser instead of eagerly loading Zod. This defers route-specific KB

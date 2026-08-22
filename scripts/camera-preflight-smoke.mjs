@@ -313,7 +313,7 @@ try {
     try {
       await page
         .getByRole("alert")
-        .filter({ hasText: "No media was sent. xAI is not available in this environment" })
+        .filter({ hasText: "No media was sent to xAI. The service is not available" })
         .waitFor({ state: "visible", timeout: 5_000 });
     } catch (cause) {
       const providerFailurePng = checkedOutputPath(

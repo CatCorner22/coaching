@@ -43,7 +43,12 @@ Return ONLY JSON in this exact shape:
   }
 }`;
 
-const triageValues = ["none", "prompt_medical", "emergency", "coercion_or_secret_recording"] as const;
+const triageValues = [
+  "none",
+  "prompt_medical",
+  "emergency",
+  "coercion_or_secret_recording",
+] as const;
 const modelResponseSchema = z
   .object({
     matches: z
@@ -96,12 +101,7 @@ const MODEL_RESPONSE_FORMAT = {
             procedural_content: { type: "boolean" },
             note: { type: "string", maxLength: 240 },
           },
-          required: [
-            "nonvisual_inference",
-            "exact_identification",
-            "procedural_content",
-            "note",
-          ],
+          required: ["nonvisual_inference", "exact_identification", "procedural_content", "note"],
           additionalProperties: false,
         },
       },
@@ -114,14 +114,15 @@ const MODEL_RESPONSE_FORMAT = {
 const analyzeInputSchema = z
   .object({
     images: z.array(z.string().min(32).max(450_000)).min(1).max(3),
-    frameLabels: z.array(z.string().regex(/^[FSV][0-9]{2}$/)).max(3).optional(),
+    frameLabels: z
+      .array(z.string().regex(/^[FSV][0-9]{2}$/))
+      .max(3)
+      .optional(),
     deterministic: z
       .object({
         wrapCount: z.number().finite().min(0).max(40),
         wrapBands: z
-          .array(
-            z.object({ yNorm: z.number().finite(), strength: z.number().finite() }).strict(),
-          )
+          .array(z.object({ yNorm: z.number().finite(), strength: z.number().finite() }).strict())
           .max(16),
         neckRope: z.number().finite(),
         paleness: z.number().finite(),
@@ -131,7 +132,15 @@ const analyzeInputSchema = z
           .array(
             z
               .object({
-                code: z.enum(["neck", "circulation", "time", "radial", "peroneal", "breathing", "unknown"]),
+                code: z.enum([
+                  "neck",
+                  "circulation",
+                  "time",
+                  "radial",
+                  "peroneal",
+                  "breathing",
+                  "unknown",
+                ]),
                 severity: z.enum(["info", "watch", "stop"]),
                 note: z.string().max(240),
               })
@@ -182,7 +191,8 @@ export const analyzeRope = createServerFn({ method: "POST" })
   .validator((input: unknown) => {
     const parsed = analyzeInputSchema.parse(input);
     for (const image of parsed.images) {
-      if (!isCameraDataUrl(image)) throw new Error("Stills must be camera captures, not remote URLs");
+      if (!isCameraDataUrl(image))
+        throw new Error("Stills must be camera captures, not remote URLs");
     }
     if (parsed.frameLabels && parsed.frameLabels.length !== parsed.images.length) {
       throw new Error("Each selected still needs one frame label");
@@ -197,7 +207,10 @@ export const analyzeRope = createServerFn({ method: "POST" })
       // Relabel the selected images by bounded batch position. Source clip
       // labels can be sparse and are not a trusted chronology declaration.
       frameLabels: parsed.images.map((_, index) => `F${String(index + 1).padStart(2, "0")}`),
-      hardNos: (parsed.hardNos ?? []).map((value) => sanitizeQuestion(value, 80)).filter(Boolean).slice(0, 24),
+      hardNos: (parsed.hardNos ?? [])
+        .map((value) => sanitizeQuestion(value, 80))
+        .filter(Boolean)
+        .slice(0, 24),
       deterministic: sanitizeDet(parsed.deterministic),
       stepIndex: Number.isFinite(parsed.stepIndex) ? Math.round(parsed.stepIndex as number) : 0,
       elapsedSec: Math.max(0, Math.min(8 * 3600, Number(parsed.elapsedSec) || 0)),
@@ -208,6 +221,22 @@ export const analyzeRope = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data, context }): Promise<AnalyzeResult> => {
+    // This bounded admission result cannot send media, consume quota, or touch
+    // per-user state. authMiddleware has already applied the auth-mode and
+    // same-site checks; returning here also lets an auth-off production preview
+    // exercise the retry contract without relaxing the configured-provider
+    // authorization boundary below.
+    if (data.triage === "none" && !grokProviderConfigured()) {
+      return {
+        ok: false,
+        error:
+          "No media was sent to xAI. The service is not available in this environment; retry after the deployment is configured.",
+        providerAttempted: false,
+        code: "AI_PROVIDER_UNAVAILABLE",
+        status: 503,
+        retryableBeforeProvider: true,
+      };
+    }
     const authorization = await authorizeAiRequest(context.userId);
     const det = closeClientHeuristic(sanitizeDet(data.deterministic));
     const tie = data.tieSlug ? getTie(data.tieSlug) : undefined;
@@ -223,23 +252,13 @@ export const analyzeRope = createServerFn({ method: "POST" })
       contradictsDet: false,
       hardLimit: false,
       invented: false,
-      note: triage === "none" ? "Remote classification not completed." : "Triage bypassed remote classification.",
+      note:
+        triage === "none"
+          ? "Remote classification not completed."
+          : "Triage bypassed remote classification.",
     };
 
     if (triage === "none") {
-      // Provider configuration is a retryable admission check. It must happen
-      // before the durable one-use reservation and quota charge; otherwise a
-      // missing credential consumes a batch even though no request can leave.
-      if (!grokProviderConfigured()) {
-        return {
-          ok: false,
-          error: "No media was sent. xAI is not available in this environment; retry after the deployment is configured.",
-          providerAttempted: false,
-          code: "AI_PROVIDER_UNAVAILABLE",
-          status: 503,
-          retryableBeforeProvider: true,
-        };
-      }
       const { consumeAiBudget } = await import("./rate-limit.server");
       const { consumeMediaBatch } = await import("./media-replay.server");
       try {
@@ -250,7 +269,7 @@ export const analyzeRope = createServerFn({ method: "POST" })
         if (error instanceof RateLimitError) {
           return {
             ok: false,
-            error: `No media was sent. AI request capacity is full; retry this batch in about ${Math.max(1, Math.ceil(error.retryAfterMs / 60_000))} minute(s).`,
+            error: `No media was sent to xAI. AI request capacity is full; retry this batch in about ${Math.max(1, Math.ceil(error.retryAfterMs / 60_000))} minute(s).`,
             providerAttempted: false,
             code: error.code,
             status: error.status,
@@ -261,7 +280,8 @@ export const analyzeRope = createServerFn({ method: "POST" })
         if (error instanceof MediaBatchReplayError) {
           return {
             ok: false,
-            error: "This batch was already submitted or reserved. Discard it and confirm a new batch.",
+            error:
+              "This batch was already submitted or reserved. Discard it and confirm a new batch.",
             providerAttempted: false,
             code: error.code,
             status: error.status,
@@ -271,7 +291,8 @@ export const analyzeRope = createServerFn({ method: "POST" })
         if (error instanceof MediaBatchReservationError) {
           return {
             ok: false,
-            error: "No media was sent. The one-use batch reservation could not be confirmed; discard this batch rather than retrying it.",
+            error:
+              "No media was sent to xAI. The one-use batch reservation could not be confirmed; discard this batch rather than retrying it.",
             providerAttempted: false,
             code: error.code,
             status: error.status,
@@ -324,7 +345,8 @@ export const analyzeRope = createServerFn({ method: "POST" })
           selfAudit = {
             contradictsDet: false,
             hardLimit: admitted.hardLimit,
-            invented: parsed.data.audit.nonvisual_inference || parsed.data.audit.exact_identification,
+            invented:
+              parsed.data.audit.nonvisual_inference || parsed.data.audit.exact_identification,
             note: admitted.hardLimit
               ? "Remote output reported a prohibited inference. High-consequence categories were kept; the rest was discarded."
               : sanitizeQuestion(parsed.data.audit.note, 240),
@@ -388,7 +410,9 @@ function closeClientHeuristic(det: DeterministicReport): DeterministicReport {
     palenessDelta: 0,
     flags,
     recommend: stop ? "stop" : "adjust",
-    notes: ["Client image hints are unvalidated and cannot establish age, consent, physiology, load, category absence, or technique."],
+    notes: [
+      "Client image hints are unvalidated and cannot establish age, consent, physiology, load, category absence, or technique.",
+    ],
   };
 }
 

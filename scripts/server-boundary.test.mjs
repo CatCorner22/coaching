@@ -58,7 +58,10 @@ test("the compile-time dev-server boundary owns PGLite and server-injected previ
   assert.doesNotMatch(auth, /void ensureDbReady\(\)/);
   assert.match(auth, /const production = !viteDevServer/);
   assert.match(auth, /env\("GROK_PREVIEW_CLIENT_SECRET"\)/);
-  assert.doesNotMatch(read("src/lib/auth/preview.ts"), /export const PREVIEW_CLIENT_SECRET|[a-f0-9]{64}/i);
+  assert.doesNotMatch(
+    read("src/lib/auth/preview.ts"),
+    /export const PREVIEW_CLIENT_SECRET|[a-f0-9]{64}/i,
+  );
   assert.match(auth, /: viteDevServer[\s\S]*?pgliteDialect/);
   assert.match(auth, /rateLimit: \{ enabled: true, window: 60, max: 100 \}/);
   assert.match(aiGuard, /userId === DEV_USER_ID && !viteDevServer/);
@@ -74,7 +77,11 @@ test("the compile-time dev-server boundary owns PGLite and server-injected previ
   assert.match(workflow, /"\$\{#modules\[@\]\}" -eq 0/);
   assert.match(workflow, /scan_status=\$\?/);
   assert.match(workflow, /"\$scan_status" -ne 1/);
-  assert.match(workflow, /NODE_ENV=development npm run preview/);
+  assert.match(workflow, /env:\s+VITE_AUTH_ENABLED: "false"\s+DATABASE_URL: ""\s+XAI_API_KEY: ""/);
+  assert.match(
+    workflow,
+    /XAI_API_KEY=\s+DATABASE_URL=\s+VITE_AUTH_ENABLED=false\s+NODE_ENV=development npm run preview/,
+  );
   assert.match(workflow, /api\/auth\/get-session/);
 });
 
@@ -151,7 +158,10 @@ test("preview OAuth stays inert until confirmed session and local-data preparati
   const popup = read("src/lib/auth/popup.server.ts");
   assert.match(client, /pending=1/);
   assert.match(client, /window\.open\(pendingUrl/);
-  assert.match(popup, /Static holding page: no OAuth, cookies, script, opener message, or redirect/);
+  assert.match(
+    popup,
+    /Static holding page: no OAuth, cookies, script, opener message, or redirect/,
+  );
   assert.match(client, /requestSignOut: requestConfirmedSignOut/);
   assert.match(client, /popupAttempt\?\.popup\.close\(\)/);
   const prepare = client.indexOf("await runPreSignInSignOut(");
@@ -160,7 +170,10 @@ test("preview OAuth stays inert until confirmed session and local-data preparati
   assert.ok(prepare >= 0 && prepare < erase && erase < activate);
   const failureCatch = client.indexOf("} catch (cause) {", activate);
   const finalErase = client.indexOf("await clearPriorAccountLocalData();", failureCatch);
-  const invalidate = client.indexOf('writeAccountMarker(JSON.stringify([1, "erase-unconfirmed"]))', finalErase);
+  const invalidate = client.indexOf(
+    'writeAccountMarker(JSON.stringify([1, "erase-unconfirmed"]))',
+    finalErase,
+  );
   const reload = client.indexOf("window.location.reload();", invalidate);
   assert.ok(
     failureCatch >= 0 &&
@@ -292,5 +305,7 @@ test("late or excessive voice requests cannot repopulate the cleared cache", () 
   assert.match(source, /MAX_INFLIGHT_VOICES = 2/);
   assert.match(source, /inflight\.size >= MAX_INFLIGHT_VOICES/);
   assert.match(source, /generation !== playbackGeneration/);
-  assert.ok(source.indexOf("generation !== playbackGeneration") < source.indexOf("cache.set(key, entry)"));
+  assert.ok(
+    source.indexOf("generation !== playbackGeneration") < source.indexOf("cache.set(key, entry)"),
+  );
 });

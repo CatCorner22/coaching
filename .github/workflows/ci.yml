@@ -16,6 +16,12 @@ jobs:
   verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    # Exercise the shipped standalone mode consistently at both build time and
+    # preview runtime, regardless of inherited runner configuration.
+    env:
+      VITE_AUTH_ENABLED: "false"
+      DATABASE_URL: ""
+      XAI_API_KEY: ""
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -146,7 +152,9 @@ jobs:
           # boundary, not this mutable variable, must keep PGLite disabled.
           # Keep the browser smoke deterministic and prove the verified
           # pre-provider failure path without spending quota or sending media.
-          XAI_API_KEY= NODE_ENV=development npm run preview > /workspace/screenshots/production-preview.log 2>&1 &
+          # Pin runtime auth off as well so the preview server cannot drift from
+          # the auth-off client bundle through an inherited runner variable.
+          XAI_API_KEY= DATABASE_URL= VITE_AUTH_ENABLED=false NODE_ENV=development npm run preview > /workspace/screenshots/production-preview.log 2>&1 &
           preview_pid=$!
           trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
 

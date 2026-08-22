@@ -141,11 +141,20 @@ test("direct triage invalidates stale visual coaching before rendering or journa
   );
 });
 
-test("only a verified pre-provider quota denial reopens a batch", () => {
+test("only verified pre-provider admission denials reopen a batch", () => {
   const analyze = read("src/lib/ai/analyze.ts");
-  const preflight = analyze.indexOf("if (!grokProviderConfigured())");
+  const preflight = analyze.indexOf('if (data.triage === "none" && !grokProviderConfigured())');
+  const authorization = analyze.indexOf("await authorizeAiRequest(context.userId)");
   const reservation = analyze.indexOf("await consumeMediaBatch(");
-  assert.ok(preflight >= 0 && preflight < reservation);
+  const quota = analyze.indexOf('consumeAiBudget("vision"');
+  const provider = analyze.indexOf("const grok = await grokChat(");
+  assert.ok(
+    preflight >= 0 &&
+      preflight < authorization &&
+      authorization < reservation &&
+      authorization < quota &&
+      authorization < provider,
+  );
   assert.match(
     analyze.slice(preflight, reservation),
     /providerAttempted: false[\s\S]*?code: "AI_PROVIDER_UNAVAILABLE"[\s\S]*?retryableBeforeProvider: true/,
