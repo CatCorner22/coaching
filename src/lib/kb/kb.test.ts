@@ -513,13 +513,13 @@ test("action-first routing covers release, delayed neck symptoms, consent, and m
   ]) {
     assert.equal(knowledgeDisposition(query).kind, "unsupported_media", query);
     assert.equal(searchKnowledge(query, 1)[0]?.slug, "photography-ethics", query);
-    assert.match(knowledgeAnswer(query), /^Unsupported media:/u, query);
-    assert.match(knowledgeAnswer(query), /does not automatically detect/u, query);
+    assert.match(knowledgeAnswer(query), /^Outside upload scope:/u, query);
+    assert.match(knowledgeAnswer(query), /the app cannot detect any of them for you/u, query);
   }
   for (const [query, secondaryAction] of [
-    ["nude photo and my fingers are numb", /Do not capture or upload unsupported media/u],
-    ["explicit image arm is blue", /Do not capture or upload unsupported media/u],
-    ["underage person has severe pain", /Do not capture or upload unsupported media/u],
+    ["nude photo and my fingers are numb", /Do not send this batch to analysis/u],
+    ["explicit image arm is blue", /Do not send this batch to analysis/u],
+    ["underage person has severe pain", /Do not send this batch to analysis/u],
     ["stop recording me, my hand is cold and pale", /Consent is absent or withdrawn/u],
   ] as const) {
     assert.equal(knowledgeDisposition(query).kind, "release_now", query);

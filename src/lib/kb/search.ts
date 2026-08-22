@@ -848,7 +848,7 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
         ? " Consent is absent or withdrawn: keep the camera off, delete any unsent local batch, and do not substitute another activity or upload."
         : "";
     const unsupportedMediaAction = unsupportedMedia
-      ? " Do not capture or upload unsupported media; ambiguous age, nudity, and explicit sexual activity are outside this app's camera scope."
+      ? " Do not send this batch to analysis; ambiguous age, full nudity, and explicit sexual activity are outside what this app uploads."
       : "";
     return {
       kind: "release_now",
@@ -872,7 +872,7 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
     return {
       kind: "unsupported_media",
       action:
-        "Unsupported media: do not capture or upload it. Camera analysis is limited to confirmed legal adults in non-explicit, consented images or selected video stills; clothed or intimate-wear views are within scope. The app does not automatically detect these conditions; ambiguous age, full nudity, explicit sexual activity, secret recording, and coerced media are prohibited and must not be selected or uploaded.",
+        "Outside upload scope: do not send this to analysis. Uploads are limited to confirmed legal adults in consented images or selected video stills; clothed and intimate-wear views are within scope. Ambiguous age, full nudity, explicit sexual activity, secret recording, and coerced media are not, and the app cannot detect any of them for you. The nudity and explicit limits are the analysis provider's policy on what may be sent, not a rule about what you photograph or keep; ambiguous age and non-consensual recording are refused outright.",
     };
   }
 
