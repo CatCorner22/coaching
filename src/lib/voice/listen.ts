@@ -47,17 +47,30 @@ export function listenForWords(
   rec.interimResults = false;
   rec.lang = "en-US";
   const last = new Map<string, number>();
+  // Recognizers are inconsistent about apostrophes and hyphens: the same word
+  // arrives as "don't" or "dont", "co-signed" or "co signed". Normalise both
+  // sides identically so a safeword spelled either way still matches.
+  const spoken = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/['’]/gu, "")
+      .replace(/[-–—]/gu, " ")
+      .replace(/\s+/gu, " ");
   rec.onresult = (ev: unknown) => {
+    // Browsers can flush a final result after stop(). Without this, taking the
+    // mic off and then being overheard saying the safeword stopped a session
+    // the user had just disarmed.
+    if (disposed) return;
     restartAttempts = 0;
     const e = ev as {
       resultIndex: number;
       results: ArrayLike<{ 0: { transcript: string }; isFinal?: boolean }>;
     };
     for (let i = e.resultIndex; i < e.results.length; i++) {
-      const t = ` ${e.results[i]![0]!.transcript.toLowerCase()} `;
+      const t = ` ${spoken(e.results[i]![0]!.transcript)} `;
       const now = Date.now();
       for (const w of words) {
-        const needle = w.toLowerCase().trim();
+        const needle = spoken(w).trim();
         if (!needle) continue;
         const re = new RegExp(`(?:^|[^a-z0-9])${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:[^a-z0-9]|$)`);
         if (!re.test(t)) continue;

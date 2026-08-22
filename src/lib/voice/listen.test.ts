@@ -175,3 +175,52 @@ test("safeword matching is bounded to whole words and debounced", async () => {
     h.restore();
   }
 });
+
+test("a result flushed after the mic is taken off is ignored", async () => {
+  // Browsers can deliver one more result after stop(). Acting on it stopped a
+  // session the user had just disarmed.
+  const h = harness();
+  try {
+    const { listenForWords } = await import("./listen.ts");
+    const hits: string[] = [];
+    const dispose = listenForWords(["red"], (word) => hits.push(word));
+    await h.flush();
+    const rec = FakeRecognition.instances[0]!;
+
+    rec.speak("red");
+    await h.flush();
+    assert.deepEqual(hits, ["red"], "an armed listener must hear the safeword");
+
+    dispose();
+    rec.running = true; // the browser still has one result queued
+    rec.speak("red");
+    await h.flush();
+    assert.deepEqual(hits, ["red"], "a result after disposal must be ignored");
+  } finally {
+    h.restore();
+  }
+});
+
+test("safewords still match when the recognizer punctuates them differently", async () => {
+  // The same word arrives as "don't" or "dont", "co-signed" or "co signed",
+  // depending on the recognizer. A safeword must not depend on which.
+  const h = harness();
+  try {
+    const { listenForWords } = await import("./listen.ts");
+    const hits: string[] = [];
+    listenForWords(["don't", "co-signed"], (word) => hits.push(word));
+    await h.flush();
+    const rec = FakeRecognition.instances[0]!;
+
+    rec.speak("she said dont");
+    await h.flush();
+    assert.deepEqual(hits, ["don't"], "an unpunctuated transcript must still match");
+
+    h.advance(3_000);
+    rec.speak("co signed");
+    await h.flush();
+    assert.deepEqual(hits, ["don't", "co-signed"], "a hyphen split across a space must match");
+  } finally {
+    h.restore();
+  }
+});
