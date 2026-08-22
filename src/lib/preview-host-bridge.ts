@@ -5,7 +5,6 @@
  * Top-level runs (download/export, local `npm run dev`, deployed sites) noop.
  */
 
-import { z } from "zod";
 import { resolveParentEmbedderOrigin } from "./preview-embedder-origin";
 
 export {
@@ -17,25 +16,34 @@ export {
 export const PREVIEW_BRIDGE_CHANNEL = "grok-preview-bridge" as const;
 export const PREVIEW_BRIDGE_VERSION = 1 as const;
 
-const EnvelopeSchema = z.object({
-  channel: z.literal(PREVIEW_BRIDGE_CHANNEL),
-  version: z.number().int().positive(),
-  type: z.string().min(1),
-});
+export type PreviewHostMessage =
+  | { type: "hello" }
+  | { type: "navigate"; path: string }
+  | { type: "history"; delta: -1 | 1 };
 
-const HelloSchema = EnvelopeSchema.extend({
-  type: z.literal("hello"),
-});
-
-const NavigateSchema = EnvelopeSchema.extend({
-  type: z.literal("navigate"),
-  path: z.string().min(1),
-});
-
-const HistorySchema = EnvelopeSchema.extend({
-  type: z.literal("history"),
-  delta: z.union([z.literal(-1), z.literal(1)]),
-});
+/** Parse the complete, deliberately tiny command surface accepted from the host. */
+export function parsePreviewHostMessage(value: unknown): PreviewHostMessage | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const message = value as Record<string, unknown>;
+  if (
+    message.channel !== PREVIEW_BRIDGE_CHANNEL ||
+    message.version !== PREVIEW_BRIDGE_VERSION
+  ) {
+    return null;
+  }
+  if (message.type === "hello") return { type: "hello" };
+  if (message.type === "navigate") {
+    return typeof message.path === "string" && message.path.length > 0
+      ? { type: "navigate", path: message.path }
+      : null;
+  }
+  if (message.type === "history") {
+    return message.delta === -1 || message.delta === 1
+      ? { type: "history", delta: message.delta }
+      : null;
+  }
+  return null;
+}
 
 export type PreviewHostBridgeOptions = {
   /** Prefer the app router when available; falls back to history.pushState. */
@@ -171,33 +179,28 @@ export function installPreviewHostBridge(
     if (event.source !== window.parent) return;
     if (event.origin !== parentOrigin) return;
 
-    const envelope = EnvelopeSchema.safeParse(event.data);
-    if (!envelope.success || envelope.data.version !== PREVIEW_BRIDGE_VERSION) return;
+    const message = parsePreviewHostMessage(event.data);
+    if (message === null) return;
 
     // Host re-handshake: it may have (re)mounted after our install-time
     // announce, or asked before we hydrated. Announce again.
-    if (envelope.data.type === "hello") {
-      if (!HelloSchema.safeParse(event.data).success) return;
+    if (message.type === "hello") {
       announce();
       return;
     }
 
-    if (envelope.data.type === "navigate") {
-      const parsed = NavigateSchema.safeParse(event.data);
-      if (!parsed.success) return;
-      navigate(parsed.data.path);
+    if (message.type === "navigate") {
+      navigate(message.path);
       // Router navigations often update location asynchronously; report after a tick.
       queueMicrotask(reportLocation);
       return;
     }
 
-    if (envelope.data.type === "history") {
-      const parsed = HistorySchema.safeParse(event.data);
-      if (!parsed.success) return;
+    if (message.type === "history") {
       // Do not history.go(-1) off the first entry — that leaves the preview.
-      if (parsed.data.delta === -1 && isAtHistoryRoot()) return;
+      if (message.delta === -1 && isAtHistoryRoot()) return;
       // Location sync comes from the popstate listener once history settles.
-      window.history.go(parsed.data.delta);
+      window.history.go(message.delta);
     }
   };
 

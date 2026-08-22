@@ -37,6 +37,9 @@ jobs:
       - name: Build production bundle and generate route tree
         run: npm run build
 
+      - name: Enforce client entry and eager-graph budgets
+        run: npm run check:client-bundle
+
       - name: Verify emitted server module syntax
         shell: bash
         run: |
@@ -67,6 +70,18 @@ jobs:
             echo "Production build did not emit a functions directory."
             exit 1
           fi
+          if grep --recursive --line-number --binary-files=without-match \
+            --extended-regexp --include='*.mjs' --include='*.js' \
+            'pglite\.(data|wasm)|initdb\.wasm' "$functions_dir"; then
+            echo "Production server output retained a PGLite WASM/data loader."
+            exit 1
+          else
+            scan_status=$?
+            if [[ "$scan_status" -ne 1 ]]; then
+              echo "Production artifact scan failed with status $scan_status."
+              exit "$scan_status"
+            fi
+          fi
 
       - name: Verify production excludes a baked preview OAuth secret
         shell: bash
@@ -82,18 +97,6 @@ jobs:
             scan_status=$?
             if [[ "$scan_status" -ne 1 ]]; then
               echo "Preview credential artifact scan failed with status $scan_status."
-              exit "$scan_status"
-            fi
-          fi
-          if grep --recursive --line-number --binary-files=without-match \
-            --extended-regexp --include='*.mjs' --include='*.js' \
-            'pglite\.(data|wasm)|initdb\.wasm' "$functions_dir"; then
-            echo "Production server output retained a PGLite WASM/data loader."
-            exit 1
-          else
-            scan_status=$?
-            if [[ "$scan_status" -ne 1 ]]; then
-              echo "Production artifact scan failed with status $scan_status."
               exit "$scan_status"
             fi
           fi
@@ -169,9 +172,23 @@ jobs:
           fi
           curl --silent --show-error --fail http://127.0.0.1:8081/ > /dev/null
 
+          for route in /studio /knowledge /nerves /article/consent-frameworks /emergency; do
+            curl --silent --show-error --fail "http://127.0.0.1:8081${route}" > /dev/null
+          done
+          emergency_html="${RUNNER_TEMP}/emergency.html"
+          curl --silent --show-error --fail http://127.0.0.1:8081/emergency > "$emergency_html"
+          if grep --extended-regexp 'assets/(kb|ties)-[A-Za-z0-9._-]+\.js' "$emergency_html"; then
+            echo "Emergency route eagerly preloaded a knowledge-base chunk."
+            exit 1
+          fi
+
           node scripts/browser-smoke.mjs \
             http://127.0.0.1:8081/ \
             /workspace/screenshots/production-preview.png
+
+          node scripts/camera-preflight-smoke.mjs \
+            http://127.0.0.1:8081/ \
+            /workspace/screenshots/camera-preflight.png
 
       - name: Upload production smoke evidence
         if: always()

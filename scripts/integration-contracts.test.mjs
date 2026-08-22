@@ -40,12 +40,46 @@ test("accepting a capture preserves the committed permission ledger", () => {
   assert.match(studio, /disabled=\{stopped \|\| mediaBlocked \|\| triage !== "none"\}/);
 });
 
+test("camera capability preflight stays passive and cannot certify a device or scene", () => {
+  const camera = read("src/components/camera-capture.tsx");
+  const preflight = between(
+    camera,
+    "async function checkBrowserCapabilities()",
+    "function clearRecordTimer()",
+  );
+  assert.match(preflight, /inspectCameraCapabilities\(/);
+  assert.doesNotMatch(preflight, /getUserMedia|enumerateDevices|openRopeCamera|startLive/);
+  assert.match(camera, /Check browser capabilities — camera stays off/);
+  assert.match(camera, /not\s+device certification or safety\s+clearance/i);
+  assert.match(camera, /file decoding is tested only after you select a file/i);
+  assert.match(camera, /recording\s+is\s+tested only when recording starts/i);
+  assert.match(camera, /role="status"/);
+  assert.match(camera, /aria-live="polite"/);
+  assert.match(camera, /aria-atomic="true"/);
+  assert.match(camera, /capabilityRequestRef\.current \+= 1/);
+  assert.match(camera, /request === capabilityRequestRef\.current/);
+  assert.match(camera, /aria-label="Live camera preview;/);
+  assert.match(camera, /aria-label="Recording in progress"/);
+  assert.match(camera, /aria-pressed=\{torch\}/);
+});
+
+test("route registration and the preview bridge keep heavy knowledge and schema graphs lazy", () => {
+  const nerves = read("src/routes/nerves.tsx");
+  assert.doesNotMatch(nerves, /from "@\/lib\/kb"/);
+  assert.match(nerves, /from "@\/lib\/kb\/nerves"/);
+  assert.match(nerves, /from "@\/lib\/kb\/ties"/);
+
+  const bridge = read("src/lib/preview-host-bridge.ts");
+  assert.doesNotMatch(bridge, /from "zod"/);
+  assert.match(bridge, /parsePreviewHostMessage\(event\.data\)/);
+});
+
 test("a cancelled photo import cannot commit after its decoder resolves", () => {
   const camera = read("src/components/camera-capture.tsx");
   const photoImport = between(
     camera,
     "const { jpeg, imageData } = await processMediaFrame(file",
-    '} catch (e) {',
+    "} catch (e) {",
   );
   assert.match(
     photoImport,
@@ -66,10 +100,7 @@ test("a late analysis response rechecks the current mic state before speaking", 
   const studio = read("src/routes/studio.tsx");
   const analyze = between(studio, "async function runAnalyze()", "const acceptCapture");
   assert.match(studio, /const micArmedRef = useRef\(false\)/);
-  assert.match(
-    studio,
-    /micArmedRef\.current = true;\s*setMicArmed\(true\)/,
-  );
+  assert.match(studio, /micArmedRef\.current = true;\s*setMicArmed\(true\)/);
   assert.match(analyze, /settings\.voice && !micArmedRef\.current/);
   assert.doesNotMatch(analyze, /settings\.voice && !micArmed\)/);
 });
@@ -100,7 +131,11 @@ test("only a verified pre-provider quota denial reopens a batch", () => {
     analyze.slice(preflight, reservation),
     /providerAttempted: false[\s\S]*?code: "AI_PROVIDER_UNAVAILABLE"[\s\S]*?retryableBeforeProvider: true/,
   );
-  const rateLimit = between(analyze, "if (error instanceof RateLimitError)", "if (error instanceof MediaBatchReplayError)");
+  const rateLimit = between(
+    analyze,
+    "if (error instanceof RateLimitError)",
+    "if (error instanceof MediaBatchReplayError)",
+  );
   assert.match(rateLimit, /providerAttempted: false/);
   assert.match(rateLimit, /retryableBeforeProvider: true/);
 

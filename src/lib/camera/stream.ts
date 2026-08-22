@@ -2,20 +2,112 @@ type Facing = "user" | "environment";
 const FOCUS_SETUP_TIMEOUT_MS = 1_000;
 const CAMERA_OPEN_TIMEOUT_MS = 20_000;
 const CAMERA_PLAY_TIMEOUT_MS = 5_000;
+const CAMERA_PERMISSION_QUERY_TIMEOUT_MS = 750;
+
+export type CameraCapabilityReport = {
+  secureContext: "secure" | "insecure" | "unknown";
+  cameraPolicy: "allowed" | "blocked" | "unknown";
+  liveCameraApi: "detected" | "unavailable";
+  clipRecordingApi: "detected" | "unavailable";
+  permission: "granted" | "prompt" | "denied" | "unknown";
+  /** A passive preflight never acquires a stream. */
+  cameraOpened: false;
+};
 
 export type ClipHandle = {
   stop: () => Promise<Blob>;
   cancel: () => void;
 };
 
+/**
+ * Inspect browser-exposed camera layers without prompting, enumerating devices,
+ * constructing a recorder, or acquiring a stream. This is deliberately not a
+ * hardware, codec, privacy, consent, or safety test.
+ */
+export async function inspectCameraCapabilities(
+  options: { permissionTimeoutMs?: number } = {},
+): Promise<CameraCapabilityReport> {
+  return {
+    secureContext: cameraSecureContextState(),
+    cameraPolicy: inspectCameraPolicy(),
+    liveCameraApi: hasLiveCameraApi() ? "detected" : "unavailable",
+    clipRecordingApi:
+      typeof globalThis.MediaRecorder === "function" ? "detected" : "unavailable",
+    permission: await inspectCameraPermission(
+      options.permissionTimeoutMs ?? CAMERA_PERMISSION_QUERY_TIMEOUT_MS,
+    ),
+    cameraOpened: false,
+  };
+}
+
+function cameraSecureContextState(): CameraCapabilityReport["secureContext"] {
+  if (typeof globalThis.isSecureContext !== "boolean") return "unknown";
+  return globalThis.isSecureContext ? "secure" : "insecure";
+}
+
+function hasLiveCameraApi(): boolean {
+  return (
+    typeof navigator !== "undefined" &&
+    typeof navigator.mediaDevices?.getUserMedia === "function"
+  );
+}
+
+function inspectCameraPolicy(): CameraCapabilityReport["cameraPolicy"] {
+  if (typeof document === "undefined") return "unknown";
+  const policyDocument = document as Document & {
+    permissionsPolicy?: { allowsFeature?: (feature: string) => unknown };
+    featurePolicy?: { allowsFeature?: (feature: string) => unknown };
+  };
+  const policy = policyDocument.permissionsPolicy ?? policyDocument.featurePolicy;
+  if (typeof policy?.allowsFeature !== "function") return "unknown";
+  try {
+    const result = policy.allowsFeature("camera");
+    return result === true ? "allowed" : result === false ? "blocked" : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+async function inspectCameraPermission(
+  timeoutMs: number,
+): Promise<CameraCapabilityReport["permission"]> {
+  if (typeof navigator === "undefined" || typeof navigator.permissions?.query !== "function") {
+    return "unknown";
+  }
+  const boundedTimeout = Number.isFinite(timeoutMs)
+    ? Math.max(1, Math.min(5_000, Math.trunc(timeoutMs)))
+    : CAMERA_PERMISSION_QUERY_TIMEOUT_MS;
+  const timedOut = Symbol("camera-permission-timeout");
+  let timer: ReturnType<typeof globalThis.setTimeout> | undefined;
+  try {
+    const query = Promise.resolve().then(() =>
+      navigator.permissions.query({ name: "camera" as PermissionName }),
+    );
+    const result = await Promise.race([
+      query,
+      new Promise<typeof timedOut>((resolve) => {
+        timer = globalThis.setTimeout(() => resolve(timedOut), boundedTimeout);
+      }),
+    ]);
+    if (result === timedOut) return "unknown";
+    return result.state === "granted" || result.state === "prompt" || result.state === "denied"
+      ? result.state
+      : "unknown";
+  } catch {
+    return "unknown";
+  } finally {
+    if (timer !== undefined) globalThis.clearTimeout(timer);
+  }
+}
+
 export async function openRopeCamera(
   facing: Facing,
   options: { signal?: AbortSignal; timeoutMs?: number } = {},
 ): Promise<MediaStream> {
-  if (typeof globalThis.isSecureContext === "boolean" && !globalThis.isSecureContext) {
+  if (cameraSecureContextState() === "insecure") {
     throw new Error("Live camera requires HTTPS or localhost. Open this app in a secure context.");
   }
-  if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+  if (!hasLiveCameraApi()) {
     throw new Error("Live camera is not supported in this browser.");
   }
   const tries: MediaStreamConstraints[] = [

@@ -12,7 +12,7 @@ capture, photo/video import, observation reports, knowledge routing, provider
 contracts, authentication, build behavior, and release automation.
 
 No remaining reproducible source-level release blocker was found after the final
-camera-to-report-to-knowledge re-probe. Local validation passed all 382
+camera-to-report-to-knowledge re-probe. Local validation passed all 401
 source-owned tests, TypeScript, zero-warning ESLint, the production build,
 generated server-module syntax checks, and secret/PGLite artifact scans. The
 exact Node 22.23.2 GitHub pipeline and its production Chromium smoke remain the
@@ -70,6 +70,11 @@ roles, then re-probed the integrated result:
    origin/issuer validation, quota reservation order, missing-provider config,
    credential exposure, build-time migrations, server artifacts, and exact-node
    CI behavior.
+7. Passive preflight and performance: insecure/unknown contexts, policy allow /
+   block / absence, permission grant / prompt / denial / rejection / timeout,
+   accidental device enumeration or acquisition, stale async ownership,
+   accessibility state, globally eager knowledge/schema graphs, cosmetic chunk
+   splitting, and largest-file-only budget false positives.
 
 The final focused camera/knowledge pass completed 107/107 cases and reported no
 remaining high-severity defect. A broader integrated focused pass completed
@@ -80,6 +85,14 @@ cover 32,832 state combinations without an invalid report or throw.
 
 ### Camera, photo, and video
 
+- Studio now offers a passive browser capability preflight after action-first
+  triage and before batch attestations. It inspects only secure-context,
+  effective document-policy, API-presence, and permission-state layers; it is
+  bounded, never opens or enumerates a camera, and explicitly disclaims device,
+  codec, consent, privacy, and safety certification.
+- Preflight results have latest-request and unmount ownership. Live preview has
+  an accessible name, recording is announced textually, and torch state exposes
+  `aria-pressed`.
 - Camera acquisition and `video.play()` are bounded and cancellation-aware.
   Late streams are stopped, the fallback path does not reopen after abort, and
   the capture surface provides a visible Cancel action.
@@ -155,35 +168,46 @@ cover 32,832 state combinations without an invalid report or throw.
   explicit `npm run db:migrate` deployment operation.
 - CI pins Node 22.23.2, installs without lifecycle scripts, builds before
   typecheck, scans emitted JavaScript and credentials/database artifacts, runs
-  the full test/lint corpus, and captures production desktop/mobile smoke
-  evidence.
+  the full test/lint corpus, enforces client entry and complete eager-import
+  budgets, probes direct route loads, and captures root plus Studio desktop/mobile
+  evidence. The Studio browser storm keeps preflight passive, then uses a
+  no-audio synthetic equipment feed to exercise live open, photo commit, batch
+  reset, recording, labeled-still selection, video commit, and track shutdown.
+- A route validator no longer imports the knowledge-base barrel into the global
+  registration graph. The root preview bridge now uses a small, tested closed
+  message parser instead of eagerly loading Zod. This defers route-specific KB
+  data and schema code rather than merely hiding the original chunk warning.
 
 ## Verification evidence
 
-- `npm test`: 382/382 passed, zero failures (groups: 253, 40, 80, and 9).
+- `npm test`: 401/401 passed, zero failures (groups: 261, 49, 82, and 9).
 - Integrated focused corpus: 155/155 passed.
 - Final independent camera/knowledge re-probe: 107/107 passed.
 - `tsc --noEmit`: passed.
 - `eslint . --max-warnings=0`: passed.
-- Production Vite/Nitro/Vercel build: passed; 2,063 client modules, 411 SSR
-  modules, and 2,473 Nitro modules transformed.
+- Production Vite/Nitro/Vercel build: passed; 1,984 client modules, 411 SSR
+  modules, and 2,475 Nitro modules transformed.
+- Client entry: 370,980 bytes raw / 115,787 bytes gzip, down from 536,396 /
+  165,560. The complete static entry graph is 477,749 bytes raw / 154,206
+  bytes gzip and passes committed regression budgets.
 - Every emitted server `.js`/`.mjs` module passed `node --check`.
 - Production artifact scans found neither a credential-shaped preview OAuth
   secret nor a PGLite WASM/data loader.
 - The built production preview returned HTTP 200 for `/`, `/knowledge`,
-  `/studio`, `/safety`, `/journal`, and auth-off `/api/auth/get-session`.
+  `/studio`, `/nerves`, `/article/consent-frameworks`, and `/emergency`; the
+  emergency response preloaded neither the KB nor ties chunks.
 - Migration command without `DATABASE_URL`: clean no-op, as designed.
 
 Local browser capture was not treated as passing: this managed environment had
-no Chromium executable, and its restricted download returned an empty archive.
-The dev server itself became healthy under a verification-only Node 24 network
-enumeration shim. No shim was committed and the deployment startup contract was
-not changed. GitHub's clean Ubuntu job installs Chromium and is the required
-visual/runtime merge gate.
+no Chromium executable, and the browser CDN failed certificate validation and
+returned empty archives. GitHub's clean Ubuntu job installs Chromium and is the
+required visual/runtime merge gate for the keyboard, focus, no-camera-call,
+synthetic photo/video lifecycle, track-shutdown, and mobile-overflow checks.
 
-The production build reports one optimization warning: the main client chunk is
-536.39 kB minified (165.56 kB gzip). It is not a correctness blocker, but route
-and feature code-splitting should be the next performance task.
+The prior 536.39 kB client warning is resolved through real route-boundary
+deferral. CI now fails if either the entry alone or its complete static import
+graph regresses beyond its measured budget, preventing manual-chunk-only false
+greens.
 
 ## External release validation still required
 
@@ -204,24 +228,20 @@ and feature code-splitting should be the next performance task.
 
 ## Researched product backlog
 
-1. **Capability preflight.** Before consent, show secure-context and iframe-policy
-   status plus supported capture/decoder formats without opening the camera.
-2. **Equipment-only default.** Start with unoccupied equipment; make the separate
+1. **Equipment-only default.** Start with unoccupied equipment; make the separate
    clothed-adult path deliberate and visibly higher-friction.
-3. **Local privacy workbench.** Add manual crop/blur/redaction and optional
+2. **Local privacy workbench.** Add manual crop/blur/redaction and optional
    on-device face/text/tattoo-region warnings. Never claim automated anonymity.
-4. **Responses API migration.** Chat Completions is now documented as legacy.
+3. **Responses API migration.** Chat Completions is now documented as legacy.
    Migrate only after strict schema, refusal, selected-image, timeout, and error
    behavior reach contract parity.
-5. **Knowledge review manifest.** Add reviewer role, source revision, claim tier,
+4. **Knowledge review manifest.** Add reviewer role, source revision, claim tier,
    checksum, next-review date, and stale flag; fail CI for broken provenance.
-6. **Route/feature splitting.** Lazy-load Studio/media/provider surfaces and
-   measure real interaction latency before and after the 536 kB chunk reduction.
-7. **Verified retention status.** Surface a server-derived provider/retention
+5. **Verified retention status.** Surface a server-derived provider/retention
    mode and verify `x-zero-data-retention` when claiming ZDR.
-8. **Shared abuse controls.** Move rate and concurrency budgets from per-process
+6. **Shared abuse controls.** Move rate and concurrency budgets from per-process
    memory to a bounded shared store before multi-replica scaling.
-9. **Release evidence dashboard.** Track build SHA, schema/ledger revision,
+7. **Release evidence dashboard.** Track build SHA, schema/ledger revision,
    browser-device matrix, accessibility results, provider errors, migration
    probes, and deletion checks without storing participant media.
 
@@ -236,5 +256,6 @@ and feature code-splitting should be the next performance task.
 - [xAI Enterprise Terms](https://x.ai/legal/terms-of-service-enterprise)
 - [W3C Media Capture and Streams](https://www.w3.org/TR/mediacapture-streams/)
 - [W3C MediaStream Recording](https://www.w3.org/TR/mediastream-recording/)
+- [W3C Permissions Policy](https://www.w3.org/TR/permissions-policy-1/)
 - [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
 - [PostgreSQL advisory-lock functions](https://www.postgresql.org/docs/current/functions-admin.html#FUNCTIONS-ADVISORY-LOCKS)

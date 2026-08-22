@@ -12,6 +12,7 @@ import {
 } from "../src/lib/media.ts";
 import {
   applyFocus,
+  inspectCameraCapabilities,
   openRopeCamera,
   playCameraPreview,
   setTorch,
@@ -208,6 +209,145 @@ test("HEIC dimensions must be associated with the primary item", async () => {
   );
   await assert.doesNotReject(
     validateMediaSignature(new Blob([makeHeic(6000, 4000, true)]), "photo"),
+  );
+});
+
+test("camera preflight reports only browser layers and never opens or enumerates a camera", async (t) => {
+  const originals = ["isSecureContext", "navigator", "document", "MediaRecorder"].map((name) => [
+    name,
+    Object.getOwnPropertyDescriptor(globalThis, name),
+  ]);
+  t.after(() => {
+    for (const [name, descriptor] of originals) restoreGlobal(name, descriptor);
+  });
+
+  let getUserMediaCalls = 0;
+  let enumerateDevicesCalls = 0;
+  let recorderConstructions = 0;
+  let permissionState = "granted";
+  Object.defineProperties(globalThis, {
+    isSecureContext: { configurable: true, value: true },
+    navigator: {
+      configurable: true,
+      value: {
+        mediaDevices: {
+          getUserMedia: () => {
+            getUserMediaCalls += 1;
+            throw new Error("preflight must not open a camera");
+          },
+          enumerateDevices: () => {
+            enumerateDevicesCalls += 1;
+            throw new Error("preflight must not enumerate devices");
+          },
+        },
+        permissions: { query: async () => ({ state: permissionState }) },
+      },
+    },
+    document: {
+      configurable: true,
+      value: { permissionsPolicy: { allowsFeature: (name) => name === "camera" } },
+    },
+    MediaRecorder: {
+      configurable: true,
+      value: class {
+        constructor() {
+          recorderConstructions += 1;
+        }
+      },
+    },
+  });
+
+  for (const state of ["granted", "prompt", "denied"]) {
+    permissionState = state;
+    const report = await inspectCameraCapabilities({ permissionTimeoutMs: 20 });
+    assert.deepEqual(report, {
+      secureContext: "secure",
+      cameraPolicy: "allowed",
+      liveCameraApi: "detected",
+      clipRecordingApi: "detected",
+      permission: state,
+      cameraOpened: false,
+    });
+  }
+  assert.equal(getUserMediaCalls, 0);
+  assert.equal(enumerateDevicesCalls, 0);
+  assert.equal(recorderConstructions, 0);
+});
+
+test("camera preflight distinguishes known blockers without attempting fallbacks", async (t) => {
+  const originals = ["isSecureContext", "navigator", "document", "MediaRecorder"].map((name) => [
+    name,
+    Object.getOwnPropertyDescriptor(globalThis, name),
+  ]);
+  t.after(() => {
+    for (const [name, descriptor] of originals) restoreGlobal(name, descriptor);
+  });
+
+  Object.defineProperties(globalThis, {
+    isSecureContext: { configurable: true, value: false },
+    navigator: {
+      configurable: true,
+      value: { permissions: { query: async () => { throw new Error("unsupported"); } } },
+    },
+    document: {
+      configurable: true,
+      value: { permissionsPolicy: { allowsFeature: () => false } },
+    },
+    MediaRecorder: { configurable: true, value: undefined },
+  });
+
+  assert.deepEqual(await inspectCameraCapabilities({ permissionTimeoutMs: 20 }), {
+    secureContext: "insecure",
+    cameraPolicy: "blocked",
+    liveCameraApi: "unavailable",
+    clipRecordingApi: "unavailable",
+    permission: "unknown",
+    cameraOpened: false,
+  });
+});
+
+test("camera preflight fails indeterminate and bounds stalled or malformed permission queries", async (t) => {
+  const originals = ["isSecureContext", "navigator", "document", "MediaRecorder"].map((name) => [
+    name,
+    Object.getOwnPropertyDescriptor(globalThis, name),
+  ]);
+  t.after(() => {
+    for (const [name, descriptor] of originals) restoreGlobal(name, descriptor);
+  });
+
+  let permissionResult = new Promise(() => undefined);
+  Object.defineProperties(globalThis, {
+    isSecureContext: { configurable: true, value: undefined },
+    navigator: {
+      configurable: true,
+      value: {
+        mediaDevices: { getUserMedia: () => Promise.reject(new Error("must not run")) },
+        permissions: { query: () => permissionResult },
+      },
+    },
+    document: {
+      configurable: true,
+      value: {
+        permissionsPolicy: { allowsFeature: () => { throw new Error("not exposed"); } },
+      },
+    },
+    MediaRecorder: { configurable: true, value: class {} },
+  });
+
+  const stalled = await inspectCameraCapabilities({ permissionTimeoutMs: 5 });
+  assert.deepEqual(stalled, {
+    secureContext: "unknown",
+    cameraPolicy: "unknown",
+    liveCameraApi: "detected",
+    clipRecordingApi: "detected",
+    permission: "unknown",
+    cameraOpened: false,
+  });
+
+  permissionResult = Promise.resolve({ state: "surprising" });
+  assert.equal(
+    (await inspectCameraCapabilities({ permissionTimeoutMs: 20 })).permission,
+    "unknown",
   );
 });
 
