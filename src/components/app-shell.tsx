@@ -28,7 +28,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       firstRenderRef.current = false;
       return;
     }
-    mainRef.current?.focus();
+    // preventScroll: focus must never fight the router's own hash/scroll
+    // restoration (verified: main spans the page so focus does not move scroll,
+    // but this keeps that true if the layout ever changes).
+    mainRef.current?.focus({ preventScroll: true });
   }, [pathname]);
   if (pathname === "/emergency") {
     return <div className="min-h-dvh bg-bg text-fg">{children}</div>;

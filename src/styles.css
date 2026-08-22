@@ -22,7 +22,7 @@
      The fill colour measures only 3.2-3.6:1 there, which fails AA on the
      safety-critical small text that uses it, so text sites use this instead.
      Kept separate so the solid button keeps its light-on-red pairing. */
-  --color-danger-text: #d4675a;
+  --color-danger-text: #d97064;
   --color-warn: #c4a56a;
   --color-ok: #7a9a7e;
   --color-ring: #ded8cf;

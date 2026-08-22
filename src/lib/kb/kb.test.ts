@@ -776,3 +776,52 @@ test("wrist drop, aspiration-behind-gag, and next-day symptoms route with the ri
     searchKnowledge("still numb next day weak hand", 6).some((hit) => hit.slug === "incident-response"),
   );
 });
+
+test("the equipment-age exemption cannot smuggle a person's age past the block", () => {
+  // Regression corpus. An earlier, looser guard treated any query with a rope
+  // word near an age as an equipment question, which let real child-safety
+  // reports route as ordinary. The exemption now requires that the equipment
+  // noun governs the age AND that no person is referenced at all.
+  for (const query of [
+    "photo of a 15 year old",
+    "she is 16 years old",
+    "he is 17 years old",
+    "15 years old",
+    "a 12 year old model",
+    "underage",
+    "the person looks young in the photo",
+    "she is 16 years old and we used rope",
+    "my rope partner is 16 years old",
+    "16 year old girlfriend rope photo",
+    "rope for my 14 year old",
+    "my kit and a 15 year old",
+    "the model is 16 years old rope harness",
+    "tying a 15 year old",
+    "my 16 year old cousin",
+    "can I tie a 17 year old with jute",
+    "17 year old sub",
+    "rope harness on a 16 year old girl",
+    "my daughter is 15 years old",
+    "bought rope for a 15 year old",
+    "her age is 16 and we have rope",
+    "the bottom is 17 years old",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "unsupported_media", query);
+  }
+
+  for (const query of [
+    "my rope is 5 years old should I retire it",
+    "this hemp is 3 years old",
+    "16 year old jute",
+    "a 10 year old harness",
+    "my kit is 7 years old",
+    "these ropes are 12 years old",
+    "my jute is about 4 years old",
+    "the webbing is 9 years old",
+    "carabiner is 6 years old",
+    "5 year old cotton rope",
+    "my shears are 8 years old",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "ordinary", query);
+  }
+});

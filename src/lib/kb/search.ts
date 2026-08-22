@@ -545,13 +545,27 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
   // Equipment age ("my rope is 5 years old", "16 year old jute") is not a
   // person's age. Gate only the otherwise-unconditional bare years-old pattern
   // on this; person/media-anchored age patterns below still fail closed.
-  const equipmentAgeContext =
-    /\b(?:rope|ropes|hemp|jute|jutes|cotton|nylon|mfp|cord|cords|line|lines|webbing|hardware|harness|harnesses|gear|equipment|kit|carabiner|ring|rings|it|this|these|they)\b[^.!?]{0,20}\b(?:is |are |was |were |'?s )?(?:[0-9]|1[0-7])[- ]years?[- ]old\b/u.test(
-      text,
-    ) ||
-    /\b(?:[0-9]|1[0-7])[- ]years?[- ]old\b[^.!?]{0,20}\b(?:rope|ropes|hemp|jute|cotton|nylon|mfp|cord|cords|line|lines|webbing|harness|harnesses|gear|equipment|kit)\b/u.test(
+  // Any reference to a person forbids the equipment reading outright. This
+  // guard exists only so "my rope is 5 years old" is not treated as a
+  // child-safety report, and it must fail closed: an earlier, looser version
+  // let "16 year old girlfriend rope photo" and "rope for my 14 year old"
+  // bypass the block simply because a rope word sat nearby.
+  const personReference =
+    /\b(?:he|him|his|she|her|hers|they|them|their|theirs|you|your|partner|girlfriend|boyfriend|wife|husband|spouse|model|person|people|someone|somebody|anyone|friend|sub|bottom|top|rigger|bunny|girl|boy|woman|women|man|men|lady|guy|kid|kids|child|children|son|daughter|niece|nephew|cousin|student|teen|teenager|minor|adult|adults)\b/u.test(
       text,
     );
+  const EQUIPMENT = "rope|ropes|hemp|jute|jutes|cotton|nylon|mfp|cord|cords|line|lines|webbing|hardware|harness|harnesses|gear|equipment|kit|carabiner|carabiners|ring|rings|shears|bamboo";
+  const equipmentAgeContext =
+    !personReference &&
+    // The equipment noun must actually govern the age through a copula, with at
+    // most one intervening word ("my rope is 5 years old", "these ropes are 12
+    // years old") — not merely appear within a window of it.
+    (new RegExp(
+      `\\b(?:${EQUIPMENT})\\b(?:\\s+\\w+)?\\s+(?:is|are|was|were)\\s+(?:about\\s+|around\\s+|roughly\\s+)?(?:[0-9]|1[0-7])[- ]years?[- ]old\\b`,
+      "u",
+    ).test(text) ||
+      // Or the age directly qualifies the equipment noun ("16 year old jute").
+      new RegExp(`\\b(?:[0-9]|1[0-7])[- ]years?[- ]old\\s+(?:${EQUIPMENT})\\b`, "u").test(text));
   const ambiguousAgeMedia =
     !minorNonAgeContext &&
     (/^(?:minor|underage|under[- ]?18|under eighteen|ambiguous age|child)$/u.test(text) ||
@@ -564,6 +578,10 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
         )) ||
     (mediaContext &&
       /\b(?:id|age) (?:was |is )?not (?:checked|verified|confirmed)\b/u.test(text)) ||
+    // "her age is 16" — a person's stated age without the "years old" wording.
+    // Requires a person reference so an equipment age ("the rope age is 5")
+    // is not swept in.
+    (personReference && /\bage (?:is |was )?(?:[0-9]|1[0-7])\b/u.test(text)) ||
     (!equipmentAgeContext &&
       /\b(?:(?:[0-9]|1[0-7])|(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen))[- ]years?[- ]old\b/u.test(
         text,
