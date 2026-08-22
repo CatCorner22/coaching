@@ -48,7 +48,7 @@ export function buildDeterministic(
       note: "Possible neck or throat overlap in this view. Stop and release; an image cannot establish contact or pressure.",
     });
   }
-  if (!last || (last.width * last.height) < 16 || Number.isNaN(last.ropeShare)) {
+  if (!last || (last.width * last.height) < 64 || Number.isNaN(last.ropeShare)) {
     flags.push({
       code: "unknown",
       severity: "watch",

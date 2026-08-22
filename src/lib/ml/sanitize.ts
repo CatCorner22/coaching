@@ -150,12 +150,16 @@ export function sanitizeDet(raw: unknown): DeterministicReport {
     );
   }
   if (paleness > 0.78) {
-    ensure("circulation", "stop", "Hands look too pale. Strip distal rope.");
+    ensure(
+      "circulation",
+      "stop",
+      "A pallor-like value was supplied with this report. The camera cannot assess circulation; stop and check the person directly.",
+    );
   } else if (paleness > 0.62) {
     ensure(
       "circulation",
       "watch",
-      "Extremities look paler or cooler than they should. Check nail-bed refill and temperature.",
+      "A pallor-like value was supplied with this report. The camera cannot assess circulation; ask directly about sensation, movement, and temperature, and release for any concern.",
     );
   }
   const validRecommend =

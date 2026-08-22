@@ -93,7 +93,17 @@ export function ropeHint(data: ImageData): number {
     const luma = 0.299 * r + 0.587 * g + 0.114 * b;
     lumaSum += luma;
     lumaSquaredSum += luma * luma;
-    if (isRope(r, g, b) || isDarkFiber(r, g, b) || isDarkJute(r, g, b)) rope++;
+    // Dark jute and deep skin tones are chromatically inseparable per pixel,
+    // and this hint steers which frame gets selected for transmission. Rope
+    // is textured at pixel scale while skin expanses are smooth, so a
+    // rope-colored pixel only counts beside pixel-local contrast — keeping a
+    // body-dominant frame from outranking an equipment-only frame.
+    const contrast =
+      i < 4 ||
+      Math.abs(
+        luma - (0.299 * buf[i - 4]! + 0.587 * buf[i - 3]! + 0.114 * buf[i - 2]!),
+      ) >= 5;
+    if (contrast && (isRope(r, g, b) || isDarkFiber(r, g, b) || isDarkJute(r, g, b))) rope++;
     n++;
   }
   if (n < 4) return 0;

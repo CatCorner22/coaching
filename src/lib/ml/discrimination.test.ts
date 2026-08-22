@@ -89,6 +89,28 @@ test("thin rope bands crossing a skin background are still detected", () => {
   assert.equal(obs.wrapBands.length, 2);
 });
 
+test("a tight stack of touching wraps still reads as a band cluster, not a blob", () => {
+  // Three touching 4-row wraps: the most common real cuff shape. The blob
+  // gate must not suppress it the way it suppresses a forearm or fabric.
+  const frame = img(96, 120, (_x, y) =>
+    y >= 30 && y < 42 ? [...JUTE, 255] : [...NEUTRAL_BG, 255],
+  );
+  const obs = observeFrame(frame);
+  assert.ok(obs.wrapBands.length >= 1, "stacked wraps were suppressed as a blob");
+});
+
+test("band strength is normalized to the 0-8 overlay scale by row coverage", () => {
+  const frame = img(96, 120, (_x, y) => {
+    if (y >= 40 && y <= 43) return [...JUTE, 255];
+    return [...NEUTRAL_BG, 255];
+  });
+  const obs = observeFrame(frame);
+  assert.ok(obs.wrapBands.length >= 1);
+  for (const band of obs.wrapBands) {
+    assert.ok(band.strength > 0 && band.strength <= 8, `strength ${band.strength} out of scale`);
+  }
+});
+
 test("a large rope-colored garment blob is suppressed instead of becoming bands", () => {
   const frame = img(96, 120, (_x, y) =>
     y >= 55 && y < 95 ? [...JUTE, 255] : [...NEUTRAL_BG, 255],

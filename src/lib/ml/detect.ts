@@ -54,7 +54,10 @@ export function observeFrame(
   // only local separator, and both gates fail toward "no band" on ambiguity.
   const coverage = ropeN / sampled;
   const saturated = coverage > 0.5;
-  const maxBandRows = Math.max(6, Math.round(height * 0.09));
+  // Wide enough that two or three touching wraps still read as one band
+  // cluster; tight enough that a forearm, a lace-covered region, or furniture
+  // (typically a quarter of the frame or more) stays suppressed.
+  const maxBandRows = Math.max(8, Math.round(height * 0.14));
   // A real wrap crosses a meaningful share of the row; scattered pixels that
   // leak past the color exclusions on noisy skin or fabric do not.
   const sampledCols = Math.ceil(width / step);
@@ -73,7 +76,10 @@ export function observeFrame(
         .filter((peak) => peak.value > minBandStrength && bandIsThin(peak))
         .map((peak) => ({
           yNorm: peak.index / Math.max(1, height),
-          strength: peak.value,
+          // Normalized to the 0..8 scale the sanitizer and overlay expect:
+          // 8 = the band crosses the full row. Raw sample counts saturated
+          // every band to the maximum stroke width regardless of coverage.
+          strength: Math.max(0.5, Math.min(8, (peak.value / sampledCols) * 8)),
         }));
 
   return {
