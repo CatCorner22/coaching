@@ -877,3 +877,91 @@ test("adversarial routing corpus: inflections, progressives, CJK, and craft cont
     assert.equal(knowledgeDisposition(query).kind, "ordinary", query);
   }
 });
+
+test("panic phrasings route away from an ordinary reading list", () => {
+  const urgent = new Set(["emergency", "prompt_medical", "release_now", "consent_withdrawn"]);
+  for (const query of [
+    // Contractions split by a phone keyboard.
+    "she can t breathe",
+    "she isn t breathing",
+    // The verb misspelt as the noun, which is the commonest way it is typed.
+    "cant breath",
+    "she cant breath",
+    // Apostrophe-less "wont", and the collapse reported as going limp.
+    "she wont wake up",
+    "she went limp",
+    "limp and unresponsive",
+    // Colour reported of the person rather than a named body part.
+    "shes turning purple",
+    "she is dusky",
+    "he is going grey",
+    // Chest symptoms as anyone actually types them.
+    "she says her chest hurts",
+    "pain in her chest",
+    "her chest feels tight",
+    // A rope reaching the neck through motion, and a noose that changed state.
+    "the rope slipped onto her throat",
+    "rope pulled against her neck",
+    "noose tightened",
+    "the noose slipped and wont loosen",
+    // Dense numbness reported as a dead limb.
+    "her arm is dead",
+    "my hand went dead",
+    "dead arm after the tie",
+    // Safeword use. The knowledge base teaches red, so a report of it must act.
+    "she said red",
+    "she safeworded",
+    "she used her safeword",
+    "she said stop stop stop",
+    "she is crying and wants out",
+    "she asked me to untie her",
+    "she withdrew consent",
+    "she took back consent",
+    // A bare cry for help.
+    "help",
+    "help???",
+    "HELP!!!",
+    "sos",
+  ]) {
+    assert.ok(urgent.has(knowledgeDisposition(query).kind), `should be urgent: ${query}`);
+  }
+});
+
+test("study phrasings and glossary lookups do not raise a false alarm", () => {
+  for (const query of [
+    // A lookup names nobody and reports nothing.
+    "reading about positional asphyxia",
+    "article about fainting",
+    "what is non fatal strangulation",
+    "definition of cyanosis",
+    "tell me about breath play",
+    // The safeword glossary entry, as opposed to a report that one was used.
+    "what is a safeword",
+    "safeword ideas",
+    "how do safewords work",
+    // Named colours that belong to equipment, not a person.
+    "red rope",
+    "she said red rope looks better",
+    "the rope is turning grey with age",
+    // Tying a noose is craft vocabulary until its state changes.
+    "how to tie a noose knot",
+    // Chest harnesses are ordinary rope vocabulary.
+    "chest harness pressure points",
+    "chest rope tutorial",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "ordinary", query);
+  }
+});
+
+test("a live report still routes even when phrased as a question", () => {
+  // The study guard must never swallow a report that happens to open with a
+  // question word.
+  for (const query of [
+    "what is happening she cant breathe",
+    "what is wrong she passed out",
+    "what do i do my wife is unresponsive",
+    "explain why she went limp",
+  ]) {
+    assert.notEqual(knowledgeDisposition(query).kind, "ordinary", query);
+  }
+});
