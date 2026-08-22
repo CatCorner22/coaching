@@ -537,6 +537,16 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
     );
   const minorNonAgeContext =
     /\bminor (?:damage|fraying|injur(?:y|ies)|issue|repair|rope|wear)\b/u.test(text);
+  // Equipment age ("my rope is 5 years old", "16 year old jute") is not a
+  // person's age. Gate only the otherwise-unconditional bare years-old pattern
+  // on this; person/media-anchored age patterns below still fail closed.
+  const equipmentAgeContext =
+    /\b(?:rope|ropes|hemp|jute|jutes|cotton|nylon|mfp|cord|cords|line|lines|webbing|hardware|harness|harnesses|gear|equipment|kit|carabiner|ring|rings|it|this|these|they)\b[^.!?]{0,20}\b(?:is |are |was |were |'?s )?(?:[0-9]|1[0-7])[- ]years?[- ]old\b/u.test(
+      text,
+    ) ||
+    /\b(?:[0-9]|1[0-7])[- ]years?[- ]old\b[^.!?]{0,20}\b(?:rope|ropes|hemp|jute|cotton|nylon|mfp|cord|cords|line|lines|webbing|harness|harnesses|gear|equipment|kit)\b/u.test(
+      text,
+    );
   const ambiguousAgeMedia =
     !minorNonAgeContext &&
     (/^(?:minor|underage|under[- ]?18|under eighteen|ambiguous age|child)$/u.test(text) ||
@@ -549,9 +559,10 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
         )) ||
     (mediaContext &&
       /\b(?:id|age) (?:was |is )?not (?:checked|verified|confirmed)\b/u.test(text)) ||
-    /\b(?:(?:[0-9]|1[0-7])|(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen))[- ]years?[- ]old\b/u.test(
-      text,
-    ) ||
+    (!equipmentAgeContext &&
+      /\b(?:(?:[0-9]|1[0-7])|(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen))[- ]years?[- ]old\b/u.test(
+        text,
+      )) ||
     /\b(?:age[ds]?\s*:?\s*(?:[0-9]|1[0-7])|(?:[0-9]|1[0-7])\s*years? of age)\b[^.!?]{0,32}\b(?:photo|image|picture|video|media|model|person)\b/u.test(
       text,
     ) ||

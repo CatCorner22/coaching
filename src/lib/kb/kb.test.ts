@@ -729,3 +729,25 @@ test("craft phrasings with 'hang' are not misrouted as emergencies", () => {
     assert.equal(knowledgeDisposition(query).kind, "ordinary", query);
   }
 });
+
+test("equipment age is not misclassified as ambiguous-age media, but a person's age still blocks", () => {
+  for (const query of [
+    "my rope is 5 years old should I retire it",
+    "this hemp is 3 years old",
+    "16 year old jute",
+    "a 10 year old harness",
+    "my kit is 7 years old",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "ordinary", query);
+  }
+  for (const query of [
+    "photo of a 15 year old",
+    "she is 15 years old",
+    "15 years old",
+    "a 12 year old model",
+    "underage",
+    "the person looks young in the photo",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "unsupported_media", query);
+  }
+});
