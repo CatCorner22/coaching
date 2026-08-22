@@ -86,13 +86,31 @@ export function negotiationMergingStorage<State>(name: string): PersistStorage<S
       try {
         const raw = safeBrowserStorage().getItem(key);
         if (raw) {
-          const existing = JSON.parse(raw) as { state?: { items?: unknown } };
+          type Blob = { state?: { items?: unknown; notes?: unknown; notesUpdatedAt?: unknown } };
+          const existing = JSON.parse(raw) as Blob;
+          const incoming = value as Blob;
           const merged = mergeNegotiationItemsByStamp(
-            (value as { state?: { items?: unknown } })?.state?.items,
+            incoming?.state?.items,
             existing?.state?.items,
           );
           if (merged) {
             (value as { state: { items: unknown } }).state.items = merged;
+          }
+          // Notes were whole-blob last-writer-wins, so a stale tab erased what
+          // the couple wrote in the other one. Keep the newer text; a tie keeps
+          // whatever is already stored rather than overwriting it with older
+          // state the writing tab happens to be holding.
+          const incomingNotesAt = Number(incoming?.state?.notesUpdatedAt) || 0;
+          const existingNotesAt = Number(existing?.state?.notesUpdatedAt) || 0;
+          if (
+            typeof existing?.state?.notes === "string" &&
+            existingNotesAt >= incomingNotesAt &&
+            existing.state.notes !== incoming?.state?.notes
+          ) {
+            (value as { state: { notes: unknown; notesUpdatedAt: unknown } }).state.notes =
+              existing.state.notes;
+            (value as { state: { notes: unknown; notesUpdatedAt: unknown } }).state.notesUpdatedAt =
+              existing.state.notesUpdatedAt;
           }
         }
       } catch {
@@ -105,27 +123,103 @@ export function negotiationMergingStorage<State>(name: string): PersistStorage<S
 
 type StampedItem = { id?: unknown; rank?: unknown; updatedAt?: unknown };
 
-/** Per-id newest-stamp-wins. Exported for tests. */
+/** Restrictiveness order. A tie must never resolve toward more permission. */
+const RANK_RESTRICTION: Record<string, number> = { no: 2, maybe: 1, yes: 0 };
+
+function restriction(rank: unknown) {
+  return RANK_RESTRICTION[String(rank)] ?? 2;
+}
+
+function itemStamp(item: StampedItem) {
+  const value = Number(item?.updatedAt);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+/**
+ * Per-id resolution between the writing tab's items and what is already stored.
+ *
+ * Two rules, both chosen so the failure mode is a limit that is too tight
+ * rather than a permission the couple did not give:
+ *
+ *  - An item present on only one side is kept. Mapping over the incoming array
+ *    alone deleted any limit added in another tab the moment a stale tab saved
+ *    anything.
+ *  - When the two sides disagree, the MORE RESTRICTIVE rank wins unless the
+ *    more permissive one is strictly newer. Equal stamps therefore resolve to
+ *    the restriction instead of to whichever tab happened to write last, while
+ *    a genuine later re-approval still takes effect. Stamps are monotonic per
+ *    store (see nextNegotiationStamp), so a backward wall-clock correction
+ *    cannot make a fresh revocation look older than the approval it replaces.
+ *
+ * Exported for tests.
+ */
 export function mergeNegotiationItemsByStamp(
   incoming: unknown,
   existing: unknown,
 ): unknown[] | null {
   if (!Array.isArray(incoming) || !Array.isArray(existing)) return null;
-  const stamp = (item: StampedItem) => {
-    const value = Number(item?.updatedAt);
-    return Number.isFinite(value) && value > 0 ? value : 0;
-  };
+
   const existingById = new Map<string, StampedItem>();
   for (const item of existing as StampedItem[]) {
     if (item && typeof item.id === "string") existingById.set(item.id, item);
   }
-  return (incoming as StampedItem[]).map((item) => {
-    if (!item || typeof item.id !== "string") return item;
+
+  const seen = new Set<string>();
+  const merged: unknown[] = [];
+  for (const item of incoming as StampedItem[]) {
+    if (!item || typeof item.id !== "string") {
+      merged.push(item);
+      continue;
+    }
+    seen.add(item.id);
     const other = existingById.get(item.id);
-    if (!other) return item;
-    // Strictly newer wins; equal stamps keep the writing tab's own value.
-    return stamp(other) > stamp(item) ? { ...item, rank: other.rank, updatedAt: other.updatedAt } : item;
-  });
+    if (!other) {
+      merged.push(item);
+      continue;
+    }
+    const mineIsMorePermissive = restriction(item.rank) < restriction(other.rank);
+    const mineIsStrictlyNewer = itemStamp(item) > itemStamp(other);
+    if (mineIsMorePermissive && !mineIsStrictlyNewer) {
+      merged.push({ ...item, rank: other.rank, updatedAt: other.updatedAt });
+      continue;
+    }
+    if (!mineIsMorePermissive && restriction(item.rank) === restriction(other.rank)) {
+      // Same rank: keep the newer stamp so ordering stays monotonic.
+      merged.push(itemStamp(other) > itemStamp(item) ? { ...item, updatedAt: other.updatedAt } : item);
+      continue;
+    }
+    merged.push(item);
+  }
+
+  // Anything the writing tab has never seen survives rather than being erased.
+  // Bounded: without a cap the stored array grows on every write, because each
+  // merge appends the survivors of the last one. The read path keeps 40, so
+  // twice that is ample headroom for two tabs holding different custom limits
+  // while keeping the blob from growing without limit.
+  for (const [id, item] of existingById) {
+    if (merged.length >= MERGED_ITEM_CAP) break;
+    if (!seen.has(id)) merged.push(item);
+  }
+  return merged;
+}
+
+const MERGED_ITEM_CAP = 80;
+
+/**
+ * A stamp strictly greater than every stamp already recorded, so ordering does
+ * not depend on the wall clock being monotonic. Without this a backward NTP or
+ * manual clock correction made a revocation unsaveable: it was stamped earlier
+ * than the approval it replaced, so the merge above kept the approval and the
+ * store silently disagreed with storage.
+ */
+export function nextNegotiationStamp(stamps: readonly unknown[]): number {
+  let highest = 0;
+  for (const value of stamps) {
+    const stamp = Number(value);
+    if (Number.isFinite(stamp) && stamp > highest) highest = stamp;
+  }
+  const now = Date.now();
+  return now > highest ? now : highest + 1;
 }
 
 /**

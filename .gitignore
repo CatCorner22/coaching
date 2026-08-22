@@ -12,3 +12,6 @@ tmp/
 .env.*
 .DS_Store
 coverage/
+
+# Scratch probes written by analysis agents; never part of the app.
+scripts/_*

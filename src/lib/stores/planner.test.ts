@@ -124,17 +124,69 @@ test("negotiation writes resolve per item by stamp, so a stale tab cannot resurr
   const after = mergeNegotiationItemsByStamp(reapproval, revokedExisting) as Array<{ rank: string }>;
   assert.equal(after[0]!.rank, "yes");
 
-  // Equal stamps keep the writing tab's own value; unknown ids pass through;
-  // malformed input is left alone rather than throwing.
+  // A tie must resolve to the restriction, not to whichever tab wrote last.
+  // This previously asserted "yes", which made the outcome of two simultaneous
+  // edits decide whether consent stood.
   const tie = mergeNegotiationItemsByStamp(
     [{ id: "photos", rank: "yes", updatedAt: 5 }],
     [{ id: "photos", rank: "no", updatedAt: 5 }],
   ) as Array<{ rank: string }>;
-  assert.equal(tie[0]!.rank, "yes");
+  assert.equal(tie[0]!.rank, "no");
+
   assert.deepEqual(
     mergeNegotiationItemsByStamp([{ id: "new", rank: "no" }], []),
     [{ id: "new", rank: "no" }],
   );
   assert.equal(mergeNegotiationItemsByStamp(null, []), null);
   assert.equal(mergeNegotiationItemsByStamp([], "junk"), null);
+});
+
+test("a cross-tab merge loses neither a custom limit nor a revocation under a backward clock", async () => {
+  const { mergeNegotiationItemsByStamp, nextNegotiationStamp } = await import("./persist.ts");
+
+  // A limit added in the other tab is not in this tab's array at all. Mapping
+  // over the incoming items alone deleted it on the next unrelated save.
+  const stale = [{ id: "photos", rank: "yes", updatedAt: 1000 }];
+  const stored = [
+    { id: "photos", rank: "no", updatedAt: 2000 },
+    { id: "custom", label: "No gags in the bedroom", rank: "no", updatedAt: 2000 },
+  ];
+  const merged = mergeNegotiationItemsByStamp(stale, stored) as Array<{ id: string; rank: string }>;
+  assert.equal(merged.find((i) => i.id === "photos")?.rank, "no");
+  assert.ok(
+    merged.some((i) => i.id === "custom"),
+    "a limit that exists only in storage was deleted",
+  );
+
+  // Restrictiveness ordering, at equal stamps: no beats maybe beats yes.
+  for (const [mine, theirs, want] of [
+    ["yes", "maybe", "maybe"],
+    ["maybe", "no", "no"],
+    ["no", "yes", "no"],
+    ["maybe", "yes", "maybe"],
+  ] as const) {
+    const out = mergeNegotiationItemsByStamp(
+      [{ id: "x", rank: mine, updatedAt: 100 }],
+      [{ id: "x", rank: theirs, updatedAt: 100 }],
+    ) as Array<{ rank: string }>;
+    assert.equal(out[0]!.rank, want, `mine=${mine} stored=${theirs}`);
+  }
+
+  // Stamps are monotonic, so a backward wall-clock correction cannot make a
+  // fresh revocation look older than the approval it replaces.
+  assert.ok(nextNegotiationStamp([Date.now() + 60_000]) > Date.now() + 60_000);
+  assert.ok(nextNegotiationStamp([]) > 0);
+  assert.ok(nextNegotiationStamp(["junk", null, undefined, NaN]) > 0);
+
+  // Preserving survivors must not let the stored array grow without bound.
+  let storage: unknown[] = Array.from({ length: 40 }, (_, i) => ({ id: "s" + i, rank: "no", updatedAt: 1 }));
+  for (let round = 0; round < 20; round++) {
+    const incoming = Array.from({ length: 40 }, (_, i) => ({
+      id: `r${round}-${i}`,
+      rank: "no",
+      updatedAt: round + 2,
+    }));
+    storage = mergeNegotiationItemsByStamp(incoming, storage) as unknown[];
+  }
+  assert.ok(storage.length <= 80, `merged array grew to ${storage.length}`);
 });

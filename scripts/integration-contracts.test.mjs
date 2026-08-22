@@ -149,7 +149,13 @@ test("Studio requires yes for negotiated actions and blocks every voice path", (
   const persistModule = read("src/lib/stores/persist.ts");
   assert.match(persistModule, /export function negotiationMergingStorage/);
   assert.match(persistModule, /const base = safeJsonStorage<State>\(\);/);
-  assert.match(persistModule, /stamp\(other\) > stamp\(item\)/);
+  // A tie, or a stale write, must resolve toward the restriction rather than
+  // toward whichever tab wrote last, and an item that exists only in storage
+  // must survive the merge instead of being deleted.
+  assert.match(persistModule, /mineIsMorePermissive && !mineIsStrictlyNewer/);
+  assert.match(persistModule, /if \(!seen\.has\(id\)\) merged\.push\(item\);/);
+  assert.match(persistModule, /export function nextNegotiationStamp/);
+  assert.match(store, /nextNegotiationStamp\(get\(\)\.items\.map\(\(i\) => i\.updatedAt\)\)/);
   assert.match(store, /migrate: \(persisted\) => persisted as State/);
   assert.match(studio, /buildStudioNegotiationPolicy\(items\)/);
   assert.match(studio, /const \[negotiationReady, setNegotiationReady\] = useState\(false\)/);
