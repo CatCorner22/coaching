@@ -18,6 +18,7 @@ const stem = desktopPng.slice(0, -extension.length);
 const mobilePng = checkedOutputPath(`${stem}.mobile${extension}`, ["/workspace"]);
 const verdictPath = checkedOutputPath(`${stem}.json`, ["/workspace"], "verdict JSON");
 const studioUrl = new URL("/studio", baseUrl).href;
+const negotiateUrl = new URL("/negotiate", baseUrl).href;
 const viewports = [
   { name: "desktop", width: 1280, height: 800, screenshot: desktopPng },
   { name: "mobile", width: 390, height: 844, screenshot: mobilePng },
@@ -57,6 +58,39 @@ try {
       for (let index = 0; index < 4; index += 1) await checks.nth(index).check();
       await enter.click();
     }
+
+    const negotiateResponse = await page.goto(negotiateUrl, {
+      waitUntil: "domcontentloaded",
+      timeout: 45_000,
+    });
+    if (negotiateResponse?.status() !== 200) {
+      throw new Error(`${viewport.name}: negotiate HTTP ${negotiateResponse?.status() ?? 0}`);
+    }
+    const photoPermissionRow = page
+      .getByRole("listitem")
+      .filter({ hasText: "Photos / video for coaching" });
+    await photoPermissionRow.getByRole("button", { name: "yes", exact: true }).click();
+    await page.waitForFunction(() => {
+      const stored = localStorage.getItem("knotty-negotiate");
+      if (!stored) return false;
+      try {
+        const parsed = JSON.parse(stored);
+        return parsed?.state?.items?.some((item) => item?.id === "photos" && item?.rank === "yes");
+      } catch {
+        return false;
+      }
+    });
+    const studioResponse = await page.goto(studioUrl, {
+      waitUntil: "domcontentloaded",
+      timeout: 45_000,
+    });
+    if (studioResponse?.status() !== 200) {
+      throw new Error(`${viewport.name}: studio reload HTTP ${studioResponse?.status() ?? 0}`);
+    }
+    await page.getByText("Loading your consent on this device…", { exact: true }).waitFor({
+      state: "hidden",
+      timeout: 10_000,
+    });
 
     const noConcern = page.getByRole("radio", {
       name: /^No urgent symptom, coercion or secret-recording concern/,
