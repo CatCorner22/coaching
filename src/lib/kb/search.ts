@@ -281,6 +281,11 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
     /\b(?:can't|cant|cannot|unable to)\s+(?:get (?:enough )?air|speak)\b/u.test(text) ||
     /\b(?:barely|labou?red|shallow|agonal|irregular)\s+breathing\b/u.test(text) ||
     /\bno\s+breathing\b/u.test(text) ||
+    // Vomiting or aspiration behind a gag is an airway emergency; the gag
+    // article routes it here.
+    /\b(?:aspirat(?:e|ed|ing|ion)|choking on (?:vomit|sick|their tongue))\b/u.test(text) ||
+    /\b(?:vomit(?:ed|ing)?|throwing up|threw up|being sick|puk(?:e|ed|ing))\b[^.!?]{0,32}\bgag(?:ged|ging)?\b/u.test(text) ||
+    /\bgag(?:ged|ging)?\b[^.!?]{0,32}\b(?:vomit(?:ed|ing)?|throwing up|threw up|being sick|puk(?:e|ed|ing)|choking)\b/u.test(text) ||
     /\bwheez(?:e|ed|ing)\b[^.!?]{0,32}\b(?:can't|cant|cannot|unable to)\s+speak\b/u.test(text) ||
     /\b(?:gasping for air|(?:can't|cant|cannot|unable to) catch (?:their |his |her |my )?breath)\b/u.test(text) ||
     includesAny(text, [
@@ -606,9 +611,11 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
       "성인물 영상",
     ]);
   const releaseSymptom =
-    /\b(?:new |sudden |worsening |sharp worsening |increasing )?(?:numb(?:ness)?|tingl(?:e|ing|y)|pins and needles|burning|electric sensation|weakness|loss of (?:movement|function|coordination|sensation)|no sensation|reduced movement|weak grip|foot drop|severe pain|escalating pain|excruciating pain|faintness|lightheaded(?:ness)?|swollen|swelling|edema)\b/u.test(
+    /\b(?:new |sudden |worsening |sharp worsening |increasing )?(?:numb(?:ness)?|tingl(?:e|ing|y)|pins and needles|burning|electric sensation|weakness|loss of (?:movement|function|coordination|sensation)|no sensation|reduced movement|weak grip|foot drop|wrist drop|severe pain|escalating pain|excruciating pain|faintness|lightheaded(?:ness)?|swollen|swelling|edema)\b/u.test(
       text,
     ) ||
+    /\b(?:(?:can't|cant|cannot|unable to)\s+(?:lift|extend|raise)|(?:won't|will not|can't|cannot)\s+(?:lift|extend|raise))\s+(?:my |their |his |her |the )?(?:wrist|hand)\b/u.test(text) ||
+    /\b(?:wrist|hand)\b[^.!?]{0,16}\b(?:won't|will not|can't|cannot|unable to)\s+(?:lift|extend|raise|move|straighten)\b/u.test(text) ||
     /\b(?:feel|feels|feeling)\s+(?:faint|light[- ]?headed|woozy|dizzy)\b/u.test(text) ||
     /\bloss of grip\b(?![^.!?]{0,24}\b(?:rope )?tool\b)/u.test(text) ||
     /\b(?:dropping things|hand (?:feels?|felt) dead)\b/u.test(text) ||
@@ -801,6 +808,7 @@ const ACTION_HIT_ALLOWLIST: Record<
     "article:nerve-atlas",
     "article:nerve-self-checks",
     "article:circulation-vs-nerve",
+    "article:incident-response",
     "article:emergency-stop",
     "gear:shears",
   ]),

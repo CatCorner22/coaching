@@ -79,7 +79,7 @@ const CORE_ARTICLES: Article[] = [
       {
         type: "callout",
         title: "Non-verbal",
-        text: "If a gag is ever in play, agree a drop object or a triple tap before the gag goes in. Knotty's studio can listen for 'red' and 'yellow' when the mic is on. A bound person who cannot speak still needs a channel.",
+        text: "If a gag is ever in play, agree a drop object or a triple tap before the gag goes in. If the studio mic is enabled it may pick up a spoken 'red' or 'yellow', but browser speech detection is unreliable and is never a substitute for a physical stop signal. A bound person who cannot speak still needs a channel that does not depend on being heard.",
       },
       {
         type: "p",

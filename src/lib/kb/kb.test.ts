@@ -689,6 +689,7 @@ test("emergency routing still leads with action-first guidance beside expansion 
         "nerve-atlas",
         "nerve-self-checks",
         "circulation-vs-nerve",
+        "incident-response",
         "emergency-stop",
         "shears",
       ].includes(hit.slug),
@@ -750,4 +751,28 @@ test("equipment age is not misclassified as ambiguous-age media, but a person's 
   ]) {
     assert.equal(knowledgeDisposition(query).kind, "unsupported_media", query);
   }
+});
+
+test("wrist drop, aspiration-behind-gag, and next-day symptoms route with the right family", () => {
+  for (const query of ["wrist drop", "her hand won't lift at the wrist", "can't extend my wrist"]) {
+    assert.equal(knowledgeDisposition(query).kind, "release_now", query);
+  }
+  for (const query of [
+    "she's gagged and vomiting",
+    "vomiting behind the gag",
+    "he's choking on vomit",
+    "aspirating",
+    "gagged and throwing up",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "emergency", query);
+    assert.equal(searchKnowledge(query, 3)[0]?.slug, "emergency-stop", query);
+  }
+  // Craft/after-the-fact phrasings must not trip the emergency families.
+  for (const query of ["gag types overview", "cleaning up after vomiting the next day", "wrist wrap tutorial"]) {
+    assert.equal(knowledgeDisposition(query).kind, "ordinary", query);
+  }
+  // The incident-response article is admitted beside release guidance.
+  assert.ok(
+    searchKnowledge("still numb next day weak hand", 6).some((hit) => hit.slug === "incident-response"),
+  );
 });
