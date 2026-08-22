@@ -473,3 +473,25 @@ test("a cross-tab policy change cannot erase an active stop or a completed repor
   );
   assert.match(studio, /const negotiationPolicy = policyRef\.current;/);
 });
+
+test("check-in answers stay on screen at a narrow layout viewport", () => {
+  const checkin = read("src/routes/checkin.tsx");
+  // Buttons are whitespace-nowrap by default and these answer rows did not
+  // wrap, so the concern answer — always the longer, second one — ran off the
+  // edge: 7% clipped at 320px (a WCAG 1.4.10 reflow failure) and 88% hidden at
+  // 195px, which is a 390px phone at 200% zoom. The all-clear answer was always
+  // the one fully reachable, which is the wrong bias for a safety questionnaire.
+  // The action row in the same file already used flex-wrap, so this was an
+  // inconsistency rather than a decision.
+  assert.equal(
+    (checkin.match(/className="mt-2 flex gap-2"/g) ?? []).length,
+    0,
+    "an answer row is missing flex-wrap",
+  );
+  assert.ok(
+    (checkin.match(/className="mt-2 flex flex-wrap gap-2"/g) ?? []).length >= 2,
+    "both answer rows must wrap",
+  );
+  // Sentence-length labels must be allowed to wrap rather than overflow.
+  assert.match(checkin, /className="h-auto whitespace-normal py-2 text-left"/);
+});
