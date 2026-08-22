@@ -250,6 +250,68 @@ export const EXPANSION_ARTICLES: Article[] = [
     ],
   },
   {
+    slug: "where-the-images-live",
+    title: "Where the Images Actually Live",
+    section: "consent",
+    minutes: 6,
+    summary:
+      "This app's privacy copy covers the hop to the model. It says nothing about the phone, which is where the copies pile up.",
+    related: ["photography-ethics", "photo-for-coaching", "consent-frameworks", "hard-limits"],
+    blocks: [
+      {
+        type: "p",
+        text: "Read this app's disclosures and you learn what happens to a still after you press Analyze: it is compressed, sent once, and covered by whatever retention setting the operator verified. That is a narrow and honest account of one hop. It is also not where the risk is. The risk is that the picture existed on a phone at all.",
+      },
+      {
+        type: "ul",
+        items: [
+          "A photo taken with the camera app lands in the phone's library first. If iCloud Photos or Google Photos backup is on — it is on by default for most people — a copy is on someone else's servers within seconds, before you have decided whether you wanted to keep it.",
+          "Deleting it does not delete it. Both platforms hold deleted photos in a recovery album for around thirty days, and the cloud copy follows the same schedule. Anyone with the unlocked phone in that window has the whole set.",
+          "Copies breed. Share sheets, messaging apps that auto-save to the gallery, screenshots of a preview, a re-encode sent to a partner, a device backup to a laptop. Each one is a separate thing to remember to remove later.",
+          "Photos carry a location and a device identifier in their metadata unless something strips it. That data does not care that the image is anonymous — a cropped, faceless picture can still say where it was taken.",
+          "Cloud providers scan what is uploaded to them. That is a fact about the storage, not a judgement about the content, and it applies to lawful private material between adults exactly as it applies to anything else.",
+        ],
+      },
+      {
+        type: "p",
+        text: "Publishing is a separate decision from capturing, and it is the one that cannot be walked back. A picture that has been posted, sent, or shared has been copied by strangers, caches, and archives that will not honour a later change of mind. Consent to be photographed is not consent to be published, and consent to be published today is not consent that holds next year — which is why the person in the picture should be the one deciding each time, in specific terms, and should be able to withdraw the ongoing part of it even though the already-distributed part is gone.",
+      },
+      {
+        type: "warn",
+        text: "This app cannot see, reach, or delete anything in your photo library, your cloud account, or anywhere a picture has been sent. Its controls end at its own local batch. Treat every copy outside it as permanent unless you have personally removed it.",
+      },
+    ],
+  },
+  {
+    slug: "getting-cold",
+    title: "Getting Cold, Not a Cold Hand",
+    section: "body",
+    minutes: 5,
+    summary:
+      "Everywhere else in this app, cold means a limb and means release. Whole-body cooling is a different thing and it builds quietly.",
+    related: ["circulation", "temperature-and-drop", "aftercare", "fainting-response"],
+    blocks: [
+      {
+        type: "p",
+        text: "This app uses cold as a limb signal: a whole-limb temperature change is an immediate-release sign, and every mention of it points that way. That framing is correct for a limb and unhelpful for a person. Someone undressed, still, and restrained for an hour is losing heat the entire time, from a much larger surface than the one being watched, and nothing about that reads as an emergency until it is well along.",
+      },
+      {
+        type: "ul",
+        items: [
+          "Restraint removes the responses that normally fix this. You cannot curl up, rub your arms, put on a layer, or move around, and effective shivering needs muscles that are free to shiver.",
+          "Being still is the whole difference. A clothed, moving person in the same room is comfortable; that room temperature was never chosen for someone undressed and motionless.",
+          "It arrives as shivering, then as not shivering — clumsiness, slurred or slowed speech, confusion, apathy, or a bottom who has simply gone quiet. Quiet is easy to read as subspace. Check rather than assume, and treat confusion as a reason to stop and warm rather than a state to enjoy.",
+          "Sedatives, alcohol, and cannabis blunt both the shivering and the noticing, in both people.",
+          "Warm the room before, not the person after. Blankets over an already-cold person are slow; layers, a warmer room, and a shorter scene are what actually work.",
+        ],
+      },
+      {
+        type: "p",
+        text: "Warm someone gradually once they are out — a warm room, dry layers, warm sweet drinks if they are fully alert and swallowing normally. Do not use hot water, a hot shower, or direct heat on cold skin, and do not rub cold limbs. Confusion, slurred speech, drowsiness, or shivering that has stopped without the person warming up are reasons to call emergency services, not to try harder at home.",
+      },
+    ],
+  },
+  {
     slug: "medical-disclosure",
     title: "Health Disclosure in Negotiation",
     section: "consent",

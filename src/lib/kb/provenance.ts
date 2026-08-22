@@ -53,6 +53,11 @@ const ARTICLE_SOURCE_IDS: Readonly<Record<string, readonly SafetySourceId[]>> = 
   // FIRSTAID-1 anchors only the unresponsive-person half — airway, position,
   // and calling emergency services. The scoping argument is app-authored.
   "top-incapacitated": ["FIRSTAID-1"],
+  // Anchored for the consent half only. The device and cloud-storage behaviour
+  // it describes is general platform fact this app publishes no citation for,
+  // so the entry stays honest about being app-authored on that.
+  "where-the-images-live": ["CONSENT-2", "XAI-PRIVACY-1"],
+  "getting-cold": ["FIRSTAID-1"],
   "medical-disclosure": ["CONSENT-1", "CONSENT-2", "CONSENT-3"],
   "rope-inspection-retirement": ["MAT-1"],
   "incident-response": ["ROPE-1", "FIRSTAID-1"],
