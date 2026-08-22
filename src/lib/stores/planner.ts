@@ -14,6 +14,22 @@ type PlannerState = {
 
 adoptPersistKey("knotty-plan", "musubi-plan");
 
+/** Coerce a persisted (possibly corrupt or legacy) blob into a valid slug list. */
+export function normalizePersistedSlugs(persisted: unknown, fallback: string[]): string[] {
+  const raw = (persisted as { slugs?: unknown } | null)?.slugs;
+  if (!Array.isArray(raw)) return [...fallback];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of raw) {
+    if (typeof value !== "string") continue;
+    const slug = value.trim();
+    if (!slug || seen.has(slug) || out.length >= 40) continue;
+    seen.add(slug);
+    out.push(slug);
+  }
+  return out;
+}
+
 export const usePlanner = create<PlannerState>()(
   persist(
     (set, get) => ({
@@ -33,6 +49,15 @@ export const usePlanner = create<PlannerState>()(
       },
       clear: () => set({ slugs: [] }),
     }),
-    { name: "knotty-plan", storage: safeJsonStorage<PlannerState>() },
+    {
+      name: "knotty-plan",
+      storage: safeJsonStorage<PlannerState>(),
+      version: 1,
+      migrate: (persisted) => persisted as PlannerState,
+      merge: (persisted, current) => ({
+        ...current,
+        slugs: normalizePersistedSlugs(persisted, current.slugs),
+      }),
+    },
   ),
 );
