@@ -275,12 +275,43 @@ try {
         );
       }
     };
+    const waitForNeutralLocalReport = async (stage) => {
+      const stopAlert = page.getByRole("alert").filter({ hasText: "Stop the activity" });
+      const localReport = page.getByText("local report · model not requested", { exact: true });
+      await Promise.race([
+        localReport.waitFor({ state: "visible", timeout: 10_000 }),
+        stopAlert.first().waitFor({ state: "visible", timeout: 10_000 }),
+      ]);
+      if ((await stopAlert.count()) > 0) {
+        throw new Error(`${viewport.name}: ${stage} incorrectly stopped the studio`);
+      }
+    };
 
     await confirmBatchPermissions();
     await page.getByRole("button", { name: "Open live camera", exact: true }).click();
     await waitForLivePreview();
     await page.getByRole("button", { name: "Capture still", exact: true }).click();
     await waitForCommittedBatch("photo");
+    await waitForNeutralLocalReport("neutral synthetic still");
+
+    const analyzeButton = page.getByRole("button", {
+      name: "Analyze selected stills once",
+      exact: true,
+    });
+    await analyzeButton.click();
+    await page
+      .getByRole("alert")
+      .filter({ hasText: "No media was sent. xAI is not available in this environment" })
+      .waitFor({ state: "visible", timeout: 15_000 });
+    if (!(await analyzeButton.isEnabled())) {
+      throw new Error(`${viewport.name}: verified pre-provider failure did not reopen the batch`);
+    }
+    if (!(await committed.isVisible())) {
+      throw new Error(
+        `${viewport.name}: verified pre-provider failure discarded the committed batch`,
+      );
+    }
+    await waitForNeutralLocalReport("verified pre-provider failure");
 
     await page
       .getByRole("button", { name: "Discard batch and start another", exact: true })
@@ -303,6 +334,7 @@ try {
     await page.getByRole("img", { name: "F01 video still", exact: true }).click();
     await page.getByRole("button", { name: "Use selected stills", exact: true }).click();
     await waitForCommittedBatch("video");
+    await waitForNeutralLocalReport("neutral synthetic video still");
 
     const syntheticCapture = await page.evaluate(() => ({
       calls: globalThis.__syntheticCamera.calls,

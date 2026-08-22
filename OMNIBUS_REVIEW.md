@@ -12,7 +12,7 @@ capture, photo/video import, observation reports, knowledge routing, provider
 contracts, authentication, build behavior, and release automation.
 
 No remaining reproducible source-level release blocker was found after the final
-camera-to-report-to-knowledge re-probe. Local validation passed all 401
+camera-to-report-to-knowledge re-probe. Local validation passed all 408
 source-owned tests, TypeScript, zero-warning ESLint, the production build,
 generated server-module syntax checks, and secret/PGLite artifact scans. The
 exact Node 22.23.2 GitHub pipeline and its production Chromium smoke remain the
@@ -106,6 +106,13 @@ cover 32,832 state combinations without an invalid report or throw.
   trailing junk fail closed.
 - Capture, discard, context change, urgent triage, and consent withdrawal now
   invalidate stale refusal, request, report, saved-revision, and error state.
+- Studio action gates now require an affirmative yes. An unresolved maybe blocks
+  media, mapped ties/equipment, and every Studio speech path; every rank change
+  also invalidates the capture-bound context.
+- Reviewed local observation text is no longer scanned as if it were an
+  untrusted activity proposal. This removes false Stops caused by generic words
+  such as “rope” and “use,” while incoming action prose still passes the
+  negotiated-limit and prohibited-content guards.
 - Selected still labels are preserved, but the report never claims chronology,
   motion understanding, or full-video review.
 
@@ -172,7 +179,9 @@ cover 32,832 state combinations without an invalid report or throw.
   budgets, probes direct route loads, and captures root plus Studio desktop/mobile
   evidence. The Studio browser storm keeps preflight passive, then uses a
   no-audio synthetic equipment feed to exercise live open, photo commit, batch
-  reset, recording, labeled-still selection, video commit, and track shutdown.
+  reset, recording, labeled-still selection, video commit, track shutdown, and
+  the retryable pre-provider failure path without sending media or spending
+  provider quota.
 - A route validator no longer imports the knowledge-base barrel into the global
   registration graph. The root preview bridge now uses a small, tested closed
   message parser instead of eagerly loading Zod. This defers route-specific KB
@@ -180,15 +189,15 @@ cover 32,832 state combinations without an invalid report or throw.
 
 ## Verification evidence
 
-- `npm test`: 401/401 passed, zero failures (groups: 261, 49, 82, and 9).
+- `npm test`: 408/408 passed, zero failures (groups: 262, 49, 85, and 12).
 - Integrated focused corpus: 155/155 passed.
 - Final independent camera/knowledge re-probe: 107/107 passed.
 - `tsc --noEmit`: passed.
 - `eslint . --max-warnings=0`: passed.
-- Production Vite/Nitro/Vercel build: passed; 1,984 client modules, 411 SSR
+- Production Vite/Nitro/Vercel build: passed; 1,985 client modules, 412 SSR
   modules, and 2,475 Nitro modules transformed.
-- Client entry: 370,980 bytes raw / 115,787 bytes gzip, down from 536,396 /
-  165,560. The complete static entry graph is 477,749 bytes raw / 154,206
+- Client entry: 370,980 bytes raw / 115,779 bytes gzip, down from 536,396 /
+  165,560. The complete static entry graph is 477,749 bytes raw / 154,198
   bytes gzip and passes committed regression budgets.
 - Every emitted server `.js`/`.mjs` module passed `node --check`.
 - Production artifact scans found neither a credential-shaped preview OAuth
@@ -202,7 +211,8 @@ Local browser capture was not treated as passing: this managed environment had
 no Chromium executable, and the browser CDN failed certificate validation and
 returned empty archives. GitHub's clean Ubuntu job installs Chromium and is the
 required visual/runtime merge gate for the keyboard, focus, no-camera-call,
-synthetic photo/video lifecycle, track-shutdown, and mobile-overflow checks.
+synthetic photo/video lifecycle, verified provider-unavailable recovery,
+track-shutdown, and mobile-overflow checks.
 
 The prior 536.39 kB client warning is resolved through real route-boundary
 deferral. CI now fails if either the entry alone or its complete static import

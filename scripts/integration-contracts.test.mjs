@@ -105,8 +105,23 @@ test("a late analysis response rechecks the current mic state before speaking", 
   const analyze = between(studio, "async function runAnalyze()", "const acceptCapture");
   assert.match(studio, /const micArmedRef = useRef\(false\)/);
   assert.match(studio, /micArmedRef\.current = true;\s*setMicArmed\(true\)/);
-  assert.match(analyze, /settings\.voice && !micArmedRef\.current/);
-  assert.doesNotMatch(analyze, /settings\.voice && !micArmed\)/);
+  assert.match(analyze, /studioVoice && !micArmedRef\.current/);
+  assert.doesNotMatch(analyze, /studioVoice && !micArmed\)/);
+});
+
+test("Studio requires yes for negotiated actions and blocks every voice path", () => {
+  const studio = read("src/routes/studio.tsx");
+  const policy = read("src/lib/studio/negotiation.ts");
+  assert.match(policy, /items\.filter\(\(item\) => item\.rank !== "yes"\)/);
+  assert.match(policy, /mediaBlocked: operationalLimitIds\.has\("photos"\)/);
+  assert.match(policy, /voiceBlocked: operationalLimitIds\.has\("voice"\)/);
+  assert.match(studio, /buildStudioNegotiationPolicy\(items\)/);
+  assert.match(studio, /const studioVoice = settings\.voice && !voiceBlocked/);
+  assert.match(studio, /if \(!studioVoice\) stopCoachVoice\(\)/);
+  assert.match(studio, /voice=\{studioVoice\}/);
+  assert.match(studio, /voice=\{studioVoice && !micArmed\}/);
+  assert.match(studio, /disabled=\{stopped \|\| !studioVoice\}/);
+  assert.doesNotMatch(studio, /playCoachVoice\([^\n]+, settings\.voice\)/);
 });
 
 test("direct triage invalidates stale visual coaching before rendering or journaling", () => {
@@ -122,7 +137,7 @@ test("direct triage invalidates stale visual coaching before rendering or journa
   );
   assert.match(
     studio,
-    /disabled=\{!contextBoundReport \|\| !contextBoundObservationReport \|\| !reportRevision \|\| currentReportSaved\}/,
+    /disabled=\{\s*!contextBoundReport\s*\|\|\s*!contextBoundObservationReport\s*\|\|\s*!reportRevision\s*\|\|\s*currentReportSaved\s*\}/,
   );
 });
 
@@ -166,6 +181,6 @@ test("instructor-only entries cannot route into Studio", () => {
   assert.match(plan, /Instructor route · Studio unavailable/);
 
   const studio = read("src/routes/studio.tsx");
-  assert.match(studio, /disabled=\{t\.minutes\[1\] === 0 \|\| blockedByIds/);
+  assert.match(studio, /disabled=\{t\.minutes\[1\] === 0 \|\| negotiationPolicy\.isTieBlocked/);
   assert.match(studio, /requestedTie && requestedTie\.minutes\[1\] > 0/);
 });

@@ -16,6 +16,7 @@ import { useJournal } from "@/lib/stores/journal";
 import { useNegotiate } from "@/lib/stores/negotiate";
 import { useSession } from "@/lib/stores/session";
 import { useSettings } from "@/lib/stores/settings";
+import { buildStudioNegotiationPolicy } from "@/lib/studio/negotiation";
 import { listenForWords, playCoachVoice, stopCoachVoice } from "@/lib/voice/play";
 import { DIRECT_CHECK_REMINDER } from "@/lib/voice/reviewed-lines";
 import { buildDeterministic } from "@/lib/ml/predict";
@@ -33,35 +34,6 @@ export const Route = createFileRoute("/studio")({
   }),
   component: StudioPage,
 });
-
-const TIE_LIMIT_IDS: Record<string, string[]> = {
-  "takate-kote": ["gote"],
-  ebi: ["gote", "predicament"],
-  "gyaku-ebi": ["gote", "predicament"],
-  "hogtie-floor": ["predicament"],
-  matanawa: ["crotch"],
-  karada: ["torso"],
-  shinju: ["torso"],
-  tasuki: ["torso"],
-  hishi: ["torso"],
-  kikkou: ["torso"],
-  "partial-suspension": ["suspension"],
-};
-
-const FURNITURE_LIMIT_IDS: Record<string, string[]> = {
-  "massage-table": ["bench"],
-  "sex-bench": ["bench"],
-  "st-andrews-cross": ["cross"],
-  "sex-swing": ["swing"],
-  pole: ["pole"],
-  floggers: ["impact"],
-  hismith: ["machine"],
-  "bad-dragon": ["toys"],
-};
-
-function blockedByIds(slug: string | undefined, table: Record<string, string[]>, noIds: Set<string>) {
-  return !!slug && (table[slug] ?? []).some((id) => noIds.has(id));
-}
 
 function StudioPage() {
   const search = Route.useSearch();
@@ -81,10 +53,9 @@ function StudioPage() {
   const stepIndex = useSession((s) => s.stepIndex);
   const tieSlug = useSession((s) => s.tieSlug);
   const furnitureSlug = useSession((s) => s.furnitureSlug);
-  const hardNos = useMemo(() => items.filter((i) => i.rank === "no"), [items]);
-  const hardNoIds = useMemo(() => new Set(hardNos.map((item) => item.id)), [hardNos]);
-  const hardNoKey = useMemo(() => hardNos.map((item) => `${item.id}:${item.label}`).sort().join("\u0000"), [hardNos]);
-  const captureContextKey = `${tieSlug ?? ""}|${stepIndex}|${furnitureSlug ?? ""}|${hardNoKey}`;
+  const negotiationPolicy = useMemo(() => buildStudioNegotiationPolicy(items), [items]);
+  const { operationalLimits, negotiationKey, mediaBlocked, voiceBlocked } = negotiationPolicy;
+  const captureContextKey = `${tieSlug ?? ""}|${stepIndex}|${furnitureSlug ?? ""}|${negotiationKey}`;
   const [capture, setCapture] = useState<CaptureResult | null>(null);
   const [report, setReport] = useState<CoachReport | null>(null);
   const [observationReport, setObservationReport] = useState<ObservationReport | null>(null);
@@ -98,16 +69,18 @@ function StudioPage() {
   const [savedEntryId, setSavedEntryId] = useState<string | null>(null);
   const [micArmed, setMicArmed] = useState(false);
   const micArmedRef = useRef(false);
-  const [micStatus, setMicStatus] = useState<"idle" | "starting" | "active" | "error" | "unsupported">("idle");
+  const [micStatus, setMicStatus] = useState<
+    "idle" | "starting" | "active" | "error" | "unsupported"
+  >("idle");
   const analysisRequestRef = useRef(0);
   const currentContextRef = useRef(captureContextKey);
   const captureContextAtCommitRef = useRef<string | null>(null);
   currentContextRef.current = captureContextKey;
   const tie = getTie(tieSlug ?? "");
   const instructorOnlyTie = tie?.minutes[1] === 0;
-  const tieBlocked = blockedByIds(tieSlug, TIE_LIMIT_IDS, hardNoIds);
-  const furnitureBlocked = blockedByIds(furnitureSlug, FURNITURE_LIMIT_IDS, hardNoIds);
-  const mediaBlocked = hardNoIds.has("photos");
+  const tieBlocked = negotiationPolicy.isTieBlocked(tieSlug);
+  const furnitureBlocked = negotiationPolicy.isFurnitureBlocked(furnitureSlug);
+  const studioVoice = settings.voice && !voiceBlocked;
 
   useEffect(() => {
     if (tieBlocked || instructorOnlyTie) useSession.getState().setTie(undefined);
@@ -123,6 +96,10 @@ function StudioPage() {
       setPending(false);
     }
   }, [tieBlocked, instructorOnlyTie, furnitureBlocked, mediaBlocked]);
+
+  useEffect(() => {
+    if (!studioVoice) stopCoachVoice();
+  }, [studioVoice]);
 
   useEffect(() => {
     if (search.tie) {
@@ -157,13 +134,7 @@ function StudioPage() {
         }
       },
     );
-  }, [
-    settings.listen,
-    micArmed,
-    settings.safeword,
-    settings.yellowWord,
-    stopSession,
-  ]);
+  }, [settings.listen, micArmed, settings.safeword, settings.yellowWord, stopSession]);
 
   const captureContextRef = useRef(captureContextKey);
 
@@ -193,7 +164,8 @@ function StudioPage() {
     return buildDeterministic(capture.observations, null);
   }, [capture, captureMatchesContext]);
   const contextBoundReport = capture && !captureMatchesContext ? null : report;
-  const contextBoundObservationReport = capture && !captureMatchesContext ? null : observationReport;
+  const contextBoundObservationReport =
+    capture && !captureMatchesContext ? null : observationReport;
   const reportRevision = useMemo(() => {
     if (!contextBoundReport || !contextBoundObservationReport) return null;
     return [
@@ -236,7 +208,7 @@ function StudioPage() {
       stepIndex,
       elapsedSec: useSession.getState().elapsed,
       priorNerveHits: nerveHits,
-      hardNos: hardNos.map((n) => n.label),
+      hardNos: operationalLimits.map((item) => item.label),
     });
     setReport(next);
     setObservationReport(
@@ -251,7 +223,7 @@ function StudioPage() {
     setRefusal(false);
     setModelStatus("not_requested");
     if (next.final.recommend === "stop") stopSession("coach");
-  }, [det, capture, tie, stepIndex, nerveHits, hardNos, stopSession]);
+  }, [det, capture, tie, stepIndex, nerveHits, operationalLimits, stopSession]);
 
   useEffect(() => {
     if (triage === "unanswered" || triage === "none") return;
@@ -268,7 +240,11 @@ function StudioPage() {
     setModelStatus("not_requested");
     setObservationReport(
       buildObservationReport({
-        mediaMode: capture ? (capture.kind === "video" ? "selected_video_stills" : "static_photos") : "no_media",
+        mediaMode: capture
+          ? capture.kind === "video"
+            ? "selected_video_stills"
+            : "static_photos"
+          : "no_media",
         consent: capture?.consent,
         quality: capture?.quality,
         allowedFrameIds: capture?.frameLabels,
@@ -276,7 +252,13 @@ function StudioPage() {
         triage,
       }),
     );
-    stopSession(triage === "emergency" ? "medical-emergency" : triage === "prompt_medical" ? "medical" : "consent");
+    stopSession(
+      triage === "emergency"
+        ? "medical-emergency"
+        : triage === "prompt_medical"
+          ? "medical"
+          : "consent",
+    );
   }, [capture, triage, stopSession]);
 
   async function runAnalyze() {
@@ -303,7 +285,7 @@ function StudioPage() {
           tieSlug,
           stepIndex,
           elapsedSec: sessionSnapshot.elapsed,
-          hardNos: hardNos.map((n) => `${n.id}: ${n.label}`),
+          hardNos: operationalLimits.map((item) => `${item.id}: ${item.label}`),
           triage,
           media: {
             mode: capture.kind === "video" ? "selected_video_stills" : "static_photos",
@@ -321,7 +303,8 @@ function StudioPage() {
         requestContext !== currentContextRef.current ||
         captureContextAtCommitRef.current !== requestContext ||
         useSession.getState().stopped
-      ) return;
+      )
+        return;
       if (res.ok) {
         setRefusal(res.refusal);
         setReport(res.report);
@@ -333,8 +316,8 @@ function StudioPage() {
           res.selfAudit.hardLimit
         ) {
           stopSession("observation");
-        } else if (settings.voice && !micArmedRef.current) {
-          void playCoachVoice(res.report.final.speak, settings.voice);
+        } else if (studioVoice && !micArmedRef.current) {
+          void playCoachVoice(res.report.final.speak, studioVoice);
         }
       } else {
         setAnalysisError(res.error || "The analysis could not be completed.");
@@ -347,7 +330,9 @@ function StudioPage() {
       }
     } catch (cause) {
       if (request === analysisRequestRef.current) {
-        setAnalysisError(cause instanceof Error ? cause.message : "The analysis could not be completed.");
+        setAnalysisError(
+          cause instanceof Error ? cause.message : "The analysis could not be completed.",
+        );
       }
     } finally {
       if (request === analysisRequestRef.current) setPending(false);
@@ -394,8 +379,8 @@ function StudioPage() {
     spoke.current = stepIndex;
     if (stopped) return;
     const line = tie?.steps[stepIndex]?.speak;
-    if (line && settings.voice && !micArmed) void playCoachVoice(line, settings.voice);
-  }, [stepIndex, stopped, tie, settings.voice, micArmed]);
+    if (line && studioVoice && !micArmed) void playCoachVoice(line, studioVoice);
+  }, [stepIndex, stopped, tie, studioVoice, micArmed]);
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
@@ -410,8 +395,8 @@ function StudioPage() {
           <p className="font-display text-3xl text-danger">Stop</p>
           <p className="mt-1 text-sm text-fg">
             Stop the activity. Support the person's position and release without creating a fall.
-            Call emergency services for abnormal breathing, unresponsiveness, seizure, chest pain,
-            a serious fall, stroke-like signs, major weakness, or concerning symptoms after neck
+            Call emergency services for abnormal breathing, unresponsiveness, seizure, chest pain, a
+            serious fall, stroke-like signs, major weakness, or concerning symptoms after neck
             pressure. Seek prompt assessment for persistent or worsening symptoms after release.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -450,9 +435,10 @@ function StudioPage() {
           <SessionClock limitSec={settings.circulationMins * 60} />
         </div>
       </div>
-      {hardNos.length > 0 && (
+      {operationalLimits.length > 0 && (
         <p className="mt-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
-          Negotiated no: {hardNos.map((n) => n.label).join(" · ")}
+          Not approved (no or unresolved maybe):{" "}
+          {operationalLimits.map((item) => `${item.label} (${item.rank})`).join(" · ")}
         </p>
       )}
       {settings.listen && !stopped && (
@@ -472,7 +458,9 @@ function StudioPage() {
               }
             }}
           >
-            {micArmed ? "Turn off optional mic word detection" : "Enable optional mic word detection for this session"}
+            {micArmed
+              ? "Turn off optional mic word detection"
+              : "Enable optional mic word detection for this session"}
           </button>
           <span className="ml-2" role="status" aria-live="polite">
             Status: {micStatus}. It can only surface configured red/yellow words; convenience only,
@@ -482,12 +470,14 @@ function StudioPage() {
       )}
       <CirculationBanner
         minutes={settings.circulationMins}
-        voice={settings.voice}
+        voice={studioVoice}
         micArmed={micArmed}
       />
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <div>
-          <label htmlFor="studio-tie" className="text-xs uppercase tracking-wide text-subtle">Tie</label>
+          <label htmlFor="studio-tie" className="text-xs uppercase tracking-wide text-subtle">
+            Tie
+          </label>
           <select
             id="studio-tie"
             className="mt-1 h-11 w-full rounded-md border border-border bg-elevated px-3 text-sm"
@@ -500,18 +490,23 @@ function StudioPage() {
               <option
                 key={t.slug}
                 value={t.slug}
-                disabled={t.minutes[1] === 0 || blockedByIds(t.slug, TIE_LIMIT_IDS, hardNoIds)}
+                disabled={t.minutes[1] === 0 || negotiationPolicy.isTieBlocked(t.slug)}
               >
                 {t.name}
                 {t.minutes[1] === 0
                   ? " — instructor route"
-                  : blockedByIds(t.slug, TIE_LIMIT_IDS, hardNoIds)
-                    ? " — negotiated no"
+                  : negotiationPolicy.isTieBlocked(t.slug)
+                    ? " — not approved"
                     : ""}
               </option>
             ))}
           </select>
-          <label htmlFor="studio-surface" className="mt-3 block text-xs uppercase tracking-wide text-subtle">On</label>
+          <label
+            htmlFor="studio-surface"
+            className="mt-3 block text-xs uppercase tracking-wide text-subtle"
+          >
+            On
+          </label>
           <select
             id="studio-surface"
             className="mt-1 h-11 w-full rounded-md border border-border bg-elevated px-3 text-sm"
@@ -524,9 +519,10 @@ function StudioPage() {
               <option
                 key={d.slug}
                 value={d.slug}
-                disabled={blockedByIds(d.slug, FURNITURE_LIMIT_IDS, hardNoIds)}
+                disabled={negotiationPolicy.isFurnitureBlocked(d.slug)}
               >
-                {d.name}{blockedByIds(d.slug, FURNITURE_LIMIT_IDS, hardNoIds) ? " — negotiated no" : ""}
+                {d.name}
+                {negotiationPolicy.isFurnitureBlocked(d.slug) ? " — not approved" : ""}
               </option>
             ))}
           </select>
@@ -536,47 +532,45 @@ function StudioPage() {
                 <p className="text-sm text-muted">
                   Step {stepIndex + 1}/{tie.steps.length}: {tie.steps[stepIndex]?.title}
                 </p>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={stopped || pending || stepIndex === 0}
-                onClick={() => {
-                  if (useSession.getState().stopped || pending) return;
-                  setStep(stepIndex - 1);
-                }}
-              >
-                Prev
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={stopped || pending || stepIndex >= tie.steps.length - 1}
-                onClick={() => {
-                  if (useSession.getState().stopped || pending) return;
-                  setStep(stepIndex + 1);
-                }}
-              >
-                Next
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={stopped || !settings.voice}
-                onClick={() => {
-                  if (useSession.getState().stopped) return;
-                  micArmedRef.current = false;
-                  setMicArmed(false);
-                  setMicStatus("idle");
-                  const line = tie.steps[stepIndex]?.speak;
-                  if (line) void playCoachVoice(line, settings.voice);
-                }}
-              >
-                Speak step
-              </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={stopped || pending || stepIndex === 0}
+                  onClick={() => {
+                    if (useSession.getState().stopped || pending) return;
+                    setStep(stepIndex - 1);
+                  }}
+                >
+                  Prev
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={stopped || pending || stepIndex >= tie.steps.length - 1}
+                  onClick={() => {
+                    if (useSession.getState().stopped || pending) return;
+                    setStep(stepIndex + 1);
+                  }}
+                >
+                  Next
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={stopped || !studioVoice}
+                  onClick={() => {
+                    if (useSession.getState().stopped || !studioVoice) return;
+                    micArmedRef.current = false;
+                    setMicArmed(false);
+                    setMicStatus("idle");
+                    const line = tie.steps[stepIndex]?.speak;
+                    if (line) void playCoachVoice(line, studioVoice);
+                  }}
+                >
+                  {voiceBlocked ? "Speak step — not approved" : "Speak step"}
+                </Button>
               </div>
-              <p className="mt-2 text-sm leading-relaxed text-fg">
-                {tie.steps[stepIndex]?.rigger}
-              </p>
+              <p className="mt-2 text-sm leading-relaxed text-fg">{tie.steps[stepIndex]?.rigger}</p>
               <p className="mt-1 text-xs text-muted">Check. {tie.steps[stepIndex]?.check}</p>
               <div className="mx-auto mt-3 h-64 w-36">
                 <RopeFigure
@@ -599,7 +593,8 @@ function StudioPage() {
           <div className="mt-4">
             {mediaBlocked && (
               <p className="mb-3 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
-                Media is a negotiated no. Change that decision together before enabling photo or video capture.
+                Media is not affirmatively approved. Resolve no or maybe together before enabling
+                photo or video capture.
               </p>
             )}
             <fieldset className="mb-3 rounded-lg border border-border bg-surface p-3">
@@ -649,12 +644,16 @@ function StudioPage() {
             report={contextBoundReport}
             observationReport={contextBoundObservationReport}
             modelStatus={modelStatus}
-            voice={settings.voice && !micArmed}
+            voice={studioVoice && !micArmed}
             pending={pending}
             refusal={refusal}
             halted={stopped}
           />
-          {analysisError && <p className="text-sm text-danger" role="alert">{analysisError}</p>}
+          {analysisError && (
+            <p className="text-sm text-danger" role="alert">
+              {analysisError}
+            </p>
+          )}
           <div className="flex flex-wrap gap-2">
             {authEnabled && !currentUser && !authPending ? (
               <Button asChild>
@@ -691,7 +690,12 @@ function StudioPage() {
           <Button
             variant="ghost"
             size="sm"
-            disabled={!contextBoundReport || !contextBoundObservationReport || !reportRevision || currentReportSaved}
+            disabled={
+              !contextBoundReport ||
+              !contextBoundObservationReport ||
+              !reportRevision ||
+              currentReportSaved
+            }
             onClick={() => {
               if (!contextBoundReport || !contextBoundObservationReport || !reportRevision) return;
               const snapshot = useSession.getState();
@@ -709,7 +713,11 @@ function StudioPage() {
               setSavedReportRevision(reportRevision);
             }}
           >
-            {currentReportSaved ? "Saved on this device" : savedEntryId ? "Update journal report" : "Save to journal"}
+            {currentReportSaved
+              ? "Saved on this device"
+              : savedEntryId
+                ? "Update journal report"
+                : "Save to journal"}
           </Button>
           <p className="text-xs leading-relaxed text-subtle">
             Captures stay in page memory until replaced, stopped, or the page closes; the journal
@@ -742,18 +750,12 @@ function CirculationBanner({
   const reminderTick = useSession((state) => state.elapsed);
   const stopped = useSession((state) => state.stopped);
   const nagged = useRef(false);
-  const due =
-    reminderTick >= 0 &&
-    !!lastCheckAt &&
-    Date.now() - lastCheckAt > minutes * 60 * 1000;
+  const due = reminderTick >= 0 && !!lastCheckAt && Date.now() - lastCheckAt > minutes * 60 * 1000;
 
   useEffect(() => {
     if (due && voice && !micArmed && !stopped && !nagged.current) {
       nagged.current = true;
-      void playCoachVoice(
-        DIRECT_CHECK_REMINDER,
-        voice,
-      );
+      void playCoachVoice(DIRECT_CHECK_REMINDER, voice);
     }
     if (!due) nagged.current = false;
   }, [due, voice, micArmed, stopped]);
