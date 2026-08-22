@@ -336,7 +336,7 @@ export const EXPANSION_ARTICLES: Article[] = [
       },
       {
         type: "warn",
-        text: "Disclosure changes the plan; it never transfers responsibility or makes an elevated-risk activity safe. This entry is a conversation guide, not medical advice, and it cannot assess any individual condition.",
+        text: "The conditions above are prompts for the conversation, not sourced clinical findings — this app publishes no citation for what any one of them does to any one person. Disclosure changes the plan; it never transfers responsibility or makes an elevated-risk activity safe. Where a condition raises a question neither partner can answer, that is a question for a clinician who knows the person, not for this entry.",
       },
     ],
   },

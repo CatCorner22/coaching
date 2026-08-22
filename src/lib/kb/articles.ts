@@ -391,6 +391,8 @@ const CORE_ARTICLES: Article[] = [
           "Choose practice material using the maker's documented purpose, care, and retirement guidance; a common label or dimension is not a safety rating.",
           "Do not heat, oil, wash, or otherwise condition rope from generic app instructions. Follow the specific manufacturer's instructions and fire-safety warnings.",
           "Retire cut, melted, contaminated, damaged, or uncertain material from body use; do not rely on appearance alone.",
+          "Skin reacts to the fiber itself, not only to pressure. Natural fibers shed fine dust and carry processing oils; some people itch, redden, or come up in a rash from jute or hemp and are fine with cotton, and a first exposure that went well does not settle the second. Anyone with sensitive skin, eczema, or a known fiber or latex sensitivity should know the material before it is on them.",
+          "Friction is the other half of what rope does to skin. A fast pass or a rope dragged under load abrades regardless of how well the tie is tensioned, and broken skin changes what is safe to do next — it is an open wound, not a mark.",
         ],
       },
     ],
