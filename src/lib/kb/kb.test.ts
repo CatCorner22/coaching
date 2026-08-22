@@ -825,3 +825,55 @@ test("the equipment-age exemption cannot smuggle a person's age past the block",
     assert.equal(knowledgeDisposition(query).kind, "ordinary", query);
   }
 });
+
+
+test("adversarial routing corpus: inflections, progressives, CJK, and craft controls", () => {
+  // Corpus from an adversarial swarm pass over this session's routing changes.
+  // Each string below was a real misroute before the fix.
+  const urgent = new Set(["emergency", "prompt_medical", "release_now"]);
+  for (const query of [
+    // 1 hung
+    "she is hung by the neck","found her hung by the neck","he was hung from the rig by his neck",
+    "found them hanging by the neck","he hanged himself","self-hanging",
+    // CJK hanging
+    "首を吊っています","彼が首を吊った","首吊り","他上吊了","吊死","목을 맸어요",
+    // 3 cyanosis progressive
+    "his face is going blue","her lips are going blue","his lips are going purple",
+    "face is going dusky","lips are looking blue","face is looking dusky","lips were going blue",
+    "lips are turning purple","her lips look dusky",
+    "唇が紫色","嘴唇发紫","입술이 보라색",
+    // 4/7 vomiting incident
+    "she is gagged and vomiting","she throws up with the gag in","she vomits with the gag on",
+    "he is retching with the gag in","she is heaving behind the gag","gagged and throwing up",
+    "aspirating","he's choking on vomit",
+    "猿ぐつわをしたまま嘔吐している","戴着口塞呕吐","재갈 물린 채 구토",
+    // 5 wrist
+    "i can't straighten my wrist","i cant straighten my wrist","my wrist wont lift",
+    "her wrist cant extend","wrist drop","her hand won't lift at the wrist",
+    "手首が上がらない",
+    // 8 pre-syncope
+    "she felt faint","i felt dizzy after the suspension","she got dizzy","i am dizzy",
+    "she is very dizzy","i feel like i'm going to faint","i feel faint","feeling faint",
+    "めまい","头晕","어지러워요",
+  ]) {
+    assert.ok(urgent.has(knowledgeDisposition(query).kind), `should be urgent: ${query}`);
+  }
+  for (const query of [
+    // 2 suspension craft must NOT be emergency
+    "how long can someone stay hanging from the rope in a suspension",
+    "hanging from the rope upside down inversion tips",
+    "she is hanging from the rig comfortably",
+    "how much weight when hanging from the rope",
+    "hang the rope to dry","hang out after the scene","how to hang rope for storage",
+    // 4 gag education must NOT be emergency
+    "does a ball gag increase the risk of vomiting","how to clean a gag after vomit",
+    "gag safety and vomiting risk",
+    // 9 equipment age with possessive
+    "her rope is 5 years old","my rope is 5 years old should I retire it",
+    "16 year old jute","my kit is 7 years old",
+    // controls
+    "rope care","aftercare","wrist wrap tutorial",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "ordinary", query);
+  }
+});

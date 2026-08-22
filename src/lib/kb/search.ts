@@ -284,8 +284,14 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
     // Vomiting or aspiration behind a gag is an airway emergency; the gag
     // article routes it here.
     /\b(?:aspirat(?:e|ed|ing|ion)|choking on (?:vomit|sick|their tongue))\b/u.test(text) ||
-    /\b(?:vomit(?:ed|ing)?|throwing up|threw up|being sick|puk(?:e|ed|ing))\b[^.!?]{0,32}\bgag(?:ged|ging)?\b/u.test(text) ||
-    /\bgag(?:ged|ging)?\b[^.!?]{0,32}\b(?:vomit(?:ed|ing)?|throwing up|threw up|being sick|puk(?:e|ed|ing)|choking)\b/u.test(text) ||
+    // An actual incident, not an educational question about gag risk. Requires a
+    // present/past report ("she is vomiting with the gag in"), so "does a ball
+    // gag increase the risk of vomiting" stays an ordinary search.
+    ((/\b(?:vomit(?:s|ed|ing)?|throw(?:s|ing)? up|threw up|be(?:ing)? sick|puk(?:e|es|ed|ing)|retch(?:es|ed|ing)?|heav(?:es|ed|ing))\b[^.!?]{0,32}\bgag(?:ged|ging)?\b/u.test(text) ||
+      /\bgag(?:ged|ging)?\b[^.!?]{0,32}\b(?:vomit(?:s|ed|ing)?|throw(?:s|ing)? up|threw up|be(?:ing)? sick|puk(?:e|es|ed|ing)|retch(?:es|ed|ing)?|heav(?:es|ed|ing)|choking)\b/u.test(text)) &&
+      !/\b(?:risk|risks|danger|dangers|safety|prevent|avoid|reduce|clean|cleaning|wash|advice|guide|article|why|should i|can a|does a|do gags|is it safe)\b/u.test(text)) ||
+    includesAny(text, ["猿ぐつわ", "口塞", "재갈"]) &&
+      includesAny(text, ["嘔吐", "吐いて", "呕吐", "구토", "토하"]) ||
     /\bwheez(?:e|ed|ing)\b[^.!?]{0,32}\b(?:can't|cant|cannot|unable to)\s+speak\b/u.test(text) ||
     /\b(?:gasping for air|(?:can't|cant|cannot|unable to) catch (?:their |his |her |my )?breath)\b/u.test(text) ||
     includesAny(text, [
@@ -367,9 +373,11 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
   const materialColorChange =
     /\b(?:rope|cord|line|fabric|screen|light)\b[^.!?]{0,32}\bturning blue\b/u.test(text);
   const cyanosisEmergency =
-    /\b(?:cyanotic|cyanosis|(?:blue|gr[ae]y|ashen|purple|dusky) (?:face|lips|skin|tongue)|(?:face|lips|skin|tongue) (?:are |is |look |looks |looking |went |going )?(?:turning )?(?:blue|gr[ae]y|ashen|purple|dusky)|turning (?:blue|gr[ae]y|ashen|purple|dusky) around (?:the )?(?:face|lips))\b/u.test(
+    /\b(?:cyanotic|cyanosis|(?:blue|gr[ae]y|ashen|purple|dusky) (?:face|lips|skin|tongue)|(?:face|lips|skin|tongue) (?:are |is |was |were |look |looks |looked |seem |seems )?(?:looking |going |turning |getting |gone )?(?:blue|gr[ae]y|ashen|purple|dusky)|turning (?:blue|gr[ae]y|ashen|purple|dusky) around (?:the )?(?:face|lips))\b/u.test(
       text,
-    ) || (/\bturning blue\b/u.test(text) && !materialColorChange);
+    ) ||
+    includesAny(text, ["唇が紫", "唇が青", "顔が紫", "嘴唇发紫", "嘴唇发青", "脸色发紫", "입술이 보라", "입술이 파래"]) ||
+    (/\bturning blue\b/u.test(text) && !materialColorChange);
   const neckTerminologyContext =
     /\b(?:chokehold|strangulation|asphyxiation)\s+(?:terminology|definition|meaning|history)\b/u.test(
       text,
@@ -382,13 +390,21 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
       /\b(?:rope|cord|line|ligature|noose|hands?)\b[^.!?]{0,48}\b(?:around|on|across|near|over|touching)\s+(?:the\s+|my\s+|their\s+|his\s+|her\s+)?(?:neck|throat)\b/u.test(
         text,
       ) ||
-      // Hanging is a neck-loading emergency. Constrain to hang + a neck/rope/
-      // self object so craft phrasing ("hang the rope to dry") does not fire.
-      /\bhang(?:s|ed|ing)?\s+(?:by|from)\s+(?:the\s+|their\s+|his\s+|her\s+|a\s+)?(?:neck|throat|rope|cord|noose|ligature|rig)\b/u.test(
+      // Hanging is a neck-loading emergency. The object must be the neck or a
+      // ligature — NOT rope/rig, because "hanging from the rope" is ordinary
+      // suspension vocabulary and must not be emergency-routed. "hung" is an
+      // irregular form the inflection group cannot produce.
+      /\b(?:hang(?:s|ed|ing)?|hung)\s+(?:by|from)\s+(?:the\s+|their\s+|his\s+|her\s+|my\s+|a\s+)?(?:neck|throat|noose|ligature)\b/u.test(
         text,
       ) ||
       /\b(?:hung|hang(?:ed|ing))\s+(?:themsel(?:f|ves)|him ?self|her ?self|my ?self)\b/u.test(text) ||
       /\bself[- ]?hang(?:ed|ing)?\b/u.test(text) ||
+      /\b(?:neck|throat)\b[^.!?]{0,16}\b(?:hung|hanging|hanged)\b/u.test(text) ||
+      // "hung from the rig by his neck": the neck object can trail the verb.
+      /\b(?:hung|hang(?:s|ed|ing)?)\b[^.!?]{0,24}\bby\s+(?:the\s+|his\s+|her\s+|their\s+|my\s+)?(?:neck|throat)\b/u.test(
+        text,
+      ) ||
+      includesAny(text, ["首を吊", "首吊り", "首つり", "上吊", "吊死", "목을 맸", "목맴", "목을 매"]) ||
       /\bbreath\s*play\b[^.!?]{0,32}\b(?:last night|yesterday|earlier|happened|after|during)\b/u.test(
         text,
       ) ||
@@ -550,9 +566,15 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
   // child-safety report, and it must fail closed: an earlier, looser version
   // let "16 year old girlfriend rope photo" and "rope for my 14 year old"
   // bypass the block simply because a rope word sat nearby.
+  // A possessive directly before an equipment noun ("her rope is 5 years old")
+  // describes the equipment, so it must not veto the equipment reading.
+  const ageScanText = text.replace(
+    /\b(?:my|your|his|her|their|our|its)\s+(?=(?:rope|ropes|hemp|jute|jutes|cotton|nylon|mfp|cord|cords|line|lines|webbing|hardware|harness|harnesses|gear|equipment|kit|carabiner|carabiners|ring|rings|shears|bamboo)\b)/gu,
+    "",
+  );
   const personReference =
     /\b(?:he|him|his|she|her|hers|they|them|their|theirs|you|your|partner|girlfriend|boyfriend|wife|husband|spouse|model|person|people|someone|somebody|anyone|friend|sub|bottom|top|rigger|bunny|girl|boy|woman|women|man|men|lady|guy|kid|kids|child|children|son|daughter|niece|nephew|cousin|student|teen|teenager|minor|adult|adults)\b/u.test(
-      text,
+      ageScanText,
     );
   const EQUIPMENT = "rope|ropes|hemp|jute|jutes|cotton|nylon|mfp|cord|cords|line|lines|webbing|hardware|harness|harnesses|gear|equipment|kit|carabiner|carabiners|ring|rings|shears|bamboo";
   const equipmentAgeContext =
@@ -632,9 +654,12 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
     /\b(?:new |sudden |worsening |sharp worsening |increasing )?(?:numb(?:ness)?|tingl(?:e|ing|y)|pins and needles|burning|electric sensation|weakness|loss of (?:movement|function|coordination|sensation)|no sensation|reduced movement|weak grip|foot drop|wrist drop|severe pain|escalating pain|excruciating pain|faintness|lightheaded(?:ness)?|swollen|swelling|edema)\b/u.test(
       text,
     ) ||
-    /\b(?:(?:can't|cant|cannot|unable to)\s+(?:lift|extend|raise)|(?:won't|will not|can't|cannot)\s+(?:lift|extend|raise))\s+(?:my |their |his |her |the )?(?:wrist|hand)\b/u.test(text) ||
-    /\b(?:wrist|hand)\b[^.!?]{0,16}\b(?:won't|will not|can't|cannot|unable to)\s+(?:lift|extend|raise|move|straighten)\b/u.test(text) ||
-    /\b(?:feel|feels|feeling)\s+(?:faint|light[- ]?headed|woozy|dizzy)\b/u.test(text) ||
+    /\b(?:can't|cant|cannot|can not|won't|wont|will not|unable to)\s+(?:lift|extend|raise|straighten|move)\s+(?:my |their |his |her |the )?(?:wrist|hand)\b/u.test(text) ||
+    /\b(?:wrist|hand)\b[^.!?]{0,16}\b(?:won't|wont|will not|can't|cant|cannot|can not|unable to|doesn't|doesnt|does not)\s+(?:lift|extend|raise|move|straighten|go up)\b/u.test(text) ||
+    includesAny(text, ["手首が上がらない", "手首が動かない", "手腕抬不起", "手腕无力", "손목이 올라가지"]) ||
+    /\b(?:feel|feels|feeling|felt|am|is|are|was|were|got|gets|getting|went|seems?)\s+(?:very |really |so |quite |a bit )?(?:faint|light[- ]?headed|woozy|dizzy)\b/u.test(text) ||
+    /\b(?:going to|about to|gonna)\s+(?:faint|pass out|black out)\b/u.test(text) ||
+    includesAny(text, ["めまい", "立ちくらみ", "ふらつく", "头晕", "頭暈", "어지러", "현기증"]) ||
     /\bloss of grip\b(?![^.!?]{0,24}\b(?:rope )?tool\b)/u.test(text) ||
     /\b(?:dropping things|hand (?:feels?|felt) dead)\b/u.test(text) ||
     /\b(?:can't|cant|cannot|unable to)\s+feel\s+(?:my|their|his|her)?\s*(?:finger|fingers|hand|hands|toe|toes|foot|feet)\b/u.test(
