@@ -58,7 +58,7 @@ export const MORE_ARTICLES: Article[] = [
     title: "Privacy-Minimized Camera Input",
     section: "craft",
     minutes: 5,
-    summary: "Prefer equipment-only or clothed, non-identifying media. A still can support broad observation, never physiology, technique validation, or clearance.",
+    summary: "Prefer equipment-only or non-identifying media. A still can support broad observation, never physiology, technique validation, or clearance.",
     related: ["photography-ethics", "circulation"],
     blocks: [
       { type: "h", text: "Use the least sensitive useful view" },
@@ -66,7 +66,7 @@ export const MORE_ARTICLES: Article[] = [
         type: "ul",
         items: [
           "Start with unoccupied equipment or rope laid on a surface.",
-          "If a person must appear, keep the view clothed, non-explicit, and non-identifying.",
+          "If a person must appear, keep the view non-explicit and non-identifying. Clothed or intimate wear is fine; full nudity and sexual activity are outside the supported upload scope.",
           "Include enough ordinary context to avoid treating crop or overlap as contact or load.",
           "Use neutral light; do not ask a camera to judge skin color or circulation.",
           "For video, choose one to three labeled stills yourself; the clip is not uploaded.",

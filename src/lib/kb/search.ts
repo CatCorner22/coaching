@@ -662,7 +662,7 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
     return {
       kind: "unsupported_media",
       action:
-        "Unsupported media: do not capture or upload it. Camera analysis is limited to confirmed legal adults in clothed, non-explicit, consented images or selected video stills. The app does not automatically detect these conditions; ambiguous age, nudity, explicit sexual activity, secret recording, and coerced media are prohibited and must not be selected or uploaded.",
+        "Unsupported media: do not capture or upload it. Camera analysis is limited to confirmed legal adults in non-explicit, consented images or selected video stills; clothed or intimate-wear views are within scope. The app does not automatically detect these conditions; ambiguous age, full nudity, explicit sexual activity, secret recording, and coerced media are prohibited and must not be selected or uploaded.",
     };
   }
 

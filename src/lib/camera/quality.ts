@@ -124,13 +124,13 @@ export function scoreFrame(data: ImageData): FrameQuality {
   const rope = Math.min(1, ropeHint(data) / 0.12);
   const notes: string[] = [];
   if (sharpness < 0.45) {
-    notes.push("Hold the camera steady and retake an equipment-only or clothed, non-identifying view.");
+    notes.push("Hold the camera steady and retake an equipment-only or non-identifying view.");
   }
   if (exposure < 0.45) {
     notes.push("Add neutral light without revealing faces, identifiers, or more of the room.");
   }
   if (rope < 0.2) {
-    notes.push("Keep the relevant equipment visible in an equipment-only or clothed, non-identifying view.");
+    notes.push("Keep the relevant equipment visible in an equipment-only or non-identifying view.");
   }
   const score = sharpness * 0.45 + exposure * 0.25 + rope * 0.3;
   return { sharpness, exposure, ropeHint: rope, score, notes };
@@ -155,13 +155,13 @@ export function worstFrameQuality(qualities: readonly FrameQuality[]): FrameQual
 /** A privacy-minimizing UI hint; quality never justifies a more intimate view. */
 export function privacySafeQualityHint(quality: FrameQuality): string {
   if (quality.sharpness < 0.55) {
-    return "One or more selected frames are soft. Retake an equipment-only or clothed, non-identifying view while holding the camera steady.";
+    return "One or more selected frames are soft. Retake an equipment-only or non-identifying view while holding the camera steady.";
   }
   if (quality.exposure < 0.55) {
     return "One or more selected frames need neutral light. Avoid faces, identifiers, intimate areas, and extra room detail.";
   }
   if (quality.ropeHint < 0.2) {
-    return "Use an equipment-only or clothed, non-identifying view with only the relevant equipment in frame.";
+    return "Use an equipment-only or non-identifying view with only the relevant equipment in frame.";
   }
   return "The selected stills passed a limited image-quality check; this is not safety clearance.";
 }

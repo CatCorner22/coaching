@@ -821,7 +821,8 @@ export const CameraCapture = memo(function CameraCapture({
         </legend>
         <p className="mb-2 text-xs leading-relaxed text-muted">
           Confirm legal-adult status, non-explicit media scope, and all four permissions separately
-          for each batch. Prefer equipment-only, clothed, non-identifying stills. Exclude faces,
+          for each batch. Prefer equipment-only, non-identifying stills. Clothed or intimate-wear
+          views of consenting adults are supported; full nudity and sexual activity are not. Exclude faces,
           nudity, intimate contact, tattoos, screens, mail, and room details. The app does not
           automatically detect or certify that media is non-explicit; do not select explicit media.
         </p>
@@ -834,7 +835,7 @@ export const CameraCapture = memo(function CameraCapture({
           <PermissionCheck
             checked={permissions.nonExplicit}
             onChange={(checked) => updatePermission("nonExplicit", checked)}
-            label="I confirm this batch is clothed and non-explicit."
+            label="I confirm this batch is non-explicit: lingerie or intimate wear is fine; no full nudity or sexual activity."
           />
           <PermissionCheck
             checked={permissions.nonSecret}
@@ -905,7 +906,7 @@ export const CameraCapture = memo(function CameraCapture({
             <div className="absolute inset-0 bg-bg/70" />
             <Camera className="relative size-8 text-muted" />
             <p className="relative px-6 text-center text-sm text-muted">
-              Use a clothed, non-identifying still of equipment or a limited setup whenever
+              Use a non-identifying still of equipment or a limited setup whenever
               possible. Video is converted to labeled stills that you choose yourself.
             </p>
           </div>
