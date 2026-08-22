@@ -585,3 +585,77 @@ test("sparse source clip labels become distinct bounded report frames", () => {
   assert.deepEqual(report.observations.map((observation) => observation.frame_id), ["F01", "F02"]);
   assert.equal(validateObservationReport(report, { allowedFrameIds: ["F01", "F02"] }).success, true);
 });
+
+test("a stop-level report leads with stopping, not with confirming consent", () => {
+  // nonvisualChecksFor keyed only off triage, so a report whose disposition was
+  // stop_now — a possible neck or airway overlap, torso breathing restriction,
+  // fire, electrical, needle, chemical or weapon context — led its red action
+  // list with "Confirm current, specific, revocable consent directly". Consent
+  // is not the first move when the image may show something over an airway.
+  const base = {
+    mediaMode: "static_photos",
+    consent,
+    quality: { sharpness: 0.8, exposure: 0.8, score: 0.8 },
+    allowedFrameIds: ["F01"],
+    modelStatus: "completed",
+  };
+  for (const id of [
+    "neck_or_airway_overlap_possible",
+    "torso_breathing_restriction_possible",
+    "mouth_covering_or_signal_limitation_possible",
+    "fire_or_heat_edge_context_possible",
+    "electrical_edge_context_possible",
+    "needle_cutting_or_blood_context_possible",
+    "weapon_context_possible",
+    "chemical_or_intoxication_context_possible",
+  ]) {
+    const report = buildObservationReport({
+      ...base,
+      matches: [{ canonical_id: id, confidence: "possible", frame_id: "F01", evidence: "x" }],
+    });
+    assert.equal(report.urgent_stop, true, id);
+    assert.match(report.nonvisual_checks[0], /^Stop and release now/, id);
+    assert.match(report.nonvisual_checks[1], /breathing, speech, and responsiveness/, id);
+    // The ordinary checks still follow rather than being replaced.
+    assert.ok(
+      report.nonvisual_checks.some((c) => /revocable consent/.test(c)),
+      `${id} dropped the consent check`,
+    );
+  }
+
+  // A report that is not a stop keeps the ordinary list, unchanged and unpadded.
+  for (const matches of [
+    [],
+    [{ canonical_id: "rope_restraint_unspecified", confidence: "possible", frame_id: "F01", evidence: "x" }],
+  ]) {
+    const report = buildObservationReport({ ...base, matches });
+    assert.equal(report.urgent_stop, false);
+    assert.equal(report.nonvisual_checks.length, 3);
+    assert.match(report.nonvisual_checks[0], /^Confirm current, specific, revocable consent/);
+  }
+});
+
+test("a report the model never ran says so in the line that is actually rendered", () => {
+  // Both surfaces that show limitations render only limitations[0]
+  // (coach-panel.tsx, journal.tsx). The "did not complete" caveat was appended,
+  // so it sat at index 4 and was invisible: a report where xAI refused, errored
+  // or was never reached was displayed and journaled headed by the generic
+  // resize caveat, with nothing saying the classification had not happened.
+  const base = {
+    mediaMode: "static_photos",
+    consent,
+    quality: { sharpness: 0.8, exposure: 0.8, score: 0.8 },
+    allowedFrameIds: ["F01"],
+  };
+  for (const modelStatus of ["refused", "error", "not_requested"]) {
+    const report = buildObservationReport({ ...base, modelStatus });
+    assert.match(
+      report.limitations[0],
+      /Remote visual classification did not complete/,
+      `${modelStatus} hid the caveat behind another limitation`,
+    );
+  }
+  // A completed report must not claim the classification failed.
+  const completed = buildObservationReport({ ...base, modelStatus: "completed" });
+  assert.ok(!completed.limitations.some((l) => /did not complete/.test(l)));
+});

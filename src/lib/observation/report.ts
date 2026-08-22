@@ -422,7 +422,7 @@ export function buildObservationReport(options: {
     media_quality: mediaQuality,
     recognized_categories: categories,
     observations: triage === "none" ? observationsFor(matches, mediaQuality) : [],
-    nonvisual_checks: nonvisualChecksFor(triage),
+    nonvisual_checks: nonvisualChecksFor(triage, urgentStop),
     limitations: limitationsFor(options.modelStatus, mediaMode, options.hardLimit === true),
     escalation,
     next_step_id: nextStep,
@@ -595,7 +595,17 @@ function highestBand(bands: ConsequenceBand[]): ConsequenceBand {
   );
 }
 
-function nonvisualChecksFor(triage: TriageState): string[] {
+/**
+ * The direct checks to run, which an image cannot stand in for.
+ *
+ * This keyed only off `triage`, so a report whose DISPOSITION was stop_now —
+ * a possible neck or airway overlap, torso breathing restriction, mouth
+ * covering, fire, electrical, needle, chemical or weapon context — led its red
+ * action list with "Confirm current, specific, revocable consent directly".
+ * Consent is not the first move when the image may show something over an
+ * airway. The stop steps go first, and the ordinary checks follow them.
+ */
+function nonvisualChecksFor(triage: TriageState, urgentStop: boolean): string[] {
   if (triage === "emergency") {
     return [
       "Release restraint now without creating a fall and call local emergency services.",
@@ -615,10 +625,16 @@ function nonvisualChecksFor(triage: TriageState): string[] {
       "Prioritize immediate personal safety and contact a trusted local resource or emergency service if anyone is in danger.",
     ];
   }
-  return [
+  const ordinary = [
     "Confirm current, specific, revocable consent directly; an image cannot establish it.",
     "Ask directly about sensation, movement, breathing or speech change, pain, distress, and release readiness; release for any concern or uncertainty.",
     "Confirm continuous adult attendance and an immediately accessible, rehearsed release plan outside the image.",
+  ];
+  if (!urgentStop) return ordinary;
+  return [
+    "Stop and release now without creating a fall. The match is unvalidated and may be wrong, which is a reason to release rather than to look again.",
+    "Check the person directly for breathing, speech, and responsiveness before anything else; call local emergency services for any breathing change, unresponsiveness, or symptom following neck pressure.",
+    ...ordinary,
   ];
 }
 
@@ -644,7 +660,13 @@ function limitationsFor(
       "Remote visual classification violated the closed output contract. Only any conservative high-consequence match was retained; do not proceed from the remaining output.",
     );
   } else if (status !== "completed") {
-    limitations.push(
+    // unshift, not push: every surface that shows limitations renders only
+    // limitations[0] (coach-panel.tsx, journal.tsx). Appended, this sat at
+    // index 4 and was invisible, so a report the model never ran was displayed
+    // and journaled headed by the generic resize caveat — with nothing saying
+    // the classification had not happened. The hardLimit branch above already
+    // unshifts for exactly this reason.
+    limitations.unshift(
       "Remote visual classification did not complete; this is an insufficient-view, lower-consequence-only report.",
     );
   }
