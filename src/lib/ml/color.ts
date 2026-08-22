@@ -15,8 +15,16 @@ export function isSkin(r: number, g: number, b: number) {
   const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
   const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
   const ycbcr = cb >= 77 && cb <= 127 && cr >= 133 && cr <= 173 && y > 40;
-  const notHemp = g - b < 48;
-  return kovac && ycbcr && notHemp;
+  // Skin sits at a redder hue than natural fibre: its red-green gap exceeds its
+  // green-blue gap, while jute and hemp are yellower and reverse that ordering.
+  // This replaces a fixed `g - b < 48` gap, which could not work: channel gaps
+  // shrink with brightness, so the absolute threshold never fired for hemp
+  // (g-b = 42) or dark jute (g-b = 38) and admitted both as skin. Because
+  // `isRope` vetoes anything skin-like, that made hemp rope invisible — zero
+  // bands and zero rope share against every skin tone. The ordering test is
+  // brightness-invariant and separates the same colours at any exposure.
+  const notFibre = r - g > g - b;
+  return kovac && ycbcr && notFibre;
 }
 
 /**
