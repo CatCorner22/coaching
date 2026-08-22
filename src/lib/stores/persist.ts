@@ -270,6 +270,95 @@ export function nextNegotiationStamp(stamps: readonly unknown[]): number {
   return now > highest ? now : highest + 1;
 }
 
+/** Entries are append-only records with stable ids. */
+type IdentifiedEntry = { id?: unknown };
+
+const JOURNAL_ENTRY_CAP = 80;
+const JOURNAL_TOMBSTONE_CAP = 200;
+
+/**
+ * Union journal entries across tabs, honouring deletions from either side.
+ *
+ * The journal was the only persisted store with neither a merge nor a cross-tab
+ * listener, so it was whole-blob last-writer-wins: a report saved in one tab was
+ * erased by an unrelated save in a stale one. A plain union fixes that and
+ * introduces the mirror bug — a deleted entry coming back from the other tab's
+ * older copy — so removals leave tombstones and both sides' tombstones apply.
+ *
+ * Exported for tests.
+ */
+export function mergeJournalEntriesById(
+  incoming: unknown,
+  existing: unknown,
+  incomingRemoved: unknown,
+  existingRemoved: unknown,
+): { entries: unknown[]; removedIds: string[] } | null {
+  if (!Array.isArray(incoming) || !Array.isArray(existing)) return null;
+
+  const removed = new Set<string>();
+  for (const list of [incomingRemoved, existingRemoved]) {
+    if (!Array.isArray(list)) continue;
+    for (const id of list) if (typeof id === "string") removed.add(id);
+  }
+
+  const byId = new Map<string, IdentifiedEntry>();
+  const anonymous: unknown[] = [];
+  // Incoming first so the writing tab's version of a shared id wins; entries are
+  // immutable once written, so this only matters for a rewritten row.
+  for (const entry of [...(incoming as IdentifiedEntry[]), ...(existing as IdentifiedEntry[])]) {
+    if (!entry || typeof entry !== "object") continue;
+    const id = (entry as { id?: unknown }).id;
+    if (typeof id !== "string") {
+      anonymous.push(entry);
+      continue;
+    }
+    if (removed.has(id) || byId.has(id)) continue;
+    byId.set(id, entry);
+  }
+
+  const merged = [...byId.values(), ...anonymous];
+  // Newest first, matching how the store writes them.
+  merged.sort((a, b) => Number((b as { at?: unknown }).at ?? 0) - Number((a as { at?: unknown }).at ?? 0));
+  return {
+    entries: merged.slice(0, JOURNAL_ENTRY_CAP),
+    removedIds: [...removed].slice(-JOURNAL_TOMBSTONE_CAP),
+  };
+}
+
+/** Storage for the journal that unions entries on WRITE. */
+export function journalMergingStorage<State>(name: string): PersistStorage<State> {
+  const base = safeJsonStorage<State>();
+  return {
+    ...base,
+    setItem: (key, value) => {
+      if (key !== name) return base.setItem(key, value);
+      try {
+        const raw = safeBrowserStorage().getItem(key);
+        if (raw) {
+          type Blob = { state?: { entries?: unknown; removedIds?: unknown } };
+          const existing = JSON.parse(raw) as Blob;
+          const incoming = value as Blob;
+          const merged = mergeJournalEntriesById(
+            incoming?.state?.entries,
+            existing?.state?.entries,
+            incoming?.state?.removedIds,
+            existing?.state?.removedIds,
+          );
+          if (merged) {
+            (value as { state: { entries: unknown; removedIds: unknown } }).state.entries =
+              merged.entries;
+            (value as { state: { entries: unknown; removedIds: unknown } }).state.removedIds =
+              merged.removedIds;
+          }
+        }
+      } catch {
+        // A corrupt existing blob is simply replaced by the incoming one.
+      }
+      return base.setItem(key, value);
+    },
+  };
+}
+
 /**
  * Whether a `storage` event should trigger a rehydrate for the store at `name`.
  * A null key means the whole store was cleared (storage.clear()); a matching

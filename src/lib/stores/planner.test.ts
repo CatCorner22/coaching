@@ -252,3 +252,38 @@ test("a write that cannot be persisted is reported instead of swallowed", async 
     (globalThis as { window?: unknown }).window = originalWindow;
   }
 });
+
+test("journal entries survive a cross-tab write, and deleted ones stay deleted", async () => {
+  const { mergeJournalEntriesById } = await import("./persist.ts");
+
+  // Tab A saved a report; tab B, stale, saves an unrelated one. Whole-blob
+  // last-writer-wins erased whichever landed first.
+  const a = [{ id: "a1", at: 200 }];
+  const b = [{ id: "b1", at: 100 }];
+  const union = mergeJournalEntriesById(a, b, [], []);
+  assert.deepEqual(
+    union?.entries.map((e) => (e as { id: string }).id),
+    ["a1", "b1"],
+    "both tabs' entries must survive, newest first",
+  );
+
+  // The mirror bug a plain union would introduce: a deleted entry coming back
+  // from the other tab's older copy. Tombstones from either side apply.
+  const afterDelete = mergeJournalEntriesById([{ id: "b1", at: 100 }], [{ id: "a1", at: 200 }], ["a1"], []);
+  assert.deepEqual(afterDelete?.entries.map((e) => (e as { id: string }).id), ["b1"]);
+  assert.deepEqual(afterDelete?.removedIds, ["a1"]);
+
+  const otherSideDeleted = mergeJournalEntriesById([{ id: "a1", at: 200 }], [], [], ["a1"]);
+  assert.deepEqual(otherSideDeleted?.entries, [], "the other tab's deletion must apply too");
+
+  // Bounded: neither entries nor tombstones may grow without limit.
+  const many = Array.from({ length: 120 }, (_, i) => ({ id: `e${i}`, at: i }));
+  const capped = mergeJournalEntriesById(many, many, [], []);
+  assert.equal(capped?.entries.length, 80);
+  const manyRemoved = Array.from({ length: 400 }, (_, i) => `r${i}`);
+  assert.equal(mergeJournalEntriesById([], [], manyRemoved, [])?.removedIds.length, 200);
+
+  // Malformed input is left alone rather than throwing.
+  assert.equal(mergeJournalEntriesById(null, [], [], []), null);
+  assert.equal(mergeJournalEntriesById([], "junk", [], []), null);
+});
