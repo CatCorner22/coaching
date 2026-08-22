@@ -17,6 +17,11 @@ import {
 const ISSUER = "https://gate.app-builder-testing.com";
 const AUDIENCE = "app:proj-123";
 
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}
+
 type TestKey = { privateKey: KeyObject; jwk: JWK; kid: string };
 
 async function makeKey(kid: string): Promise<TestKey> {
@@ -289,17 +294,24 @@ describe("parseGateJwksResponse", () => {
 });
 
 describe("gateIdentityFromHeaders", () => {
-  const originalAuthEnabled = process.env.VITE_AUTH_ENABLED;
+  const originalEnv = {
+    authEnabled: process.env.VITE_AUTH_ENABLED,
+    projectId: process.env.GROK_PROJECT_ID,
+    gateOrigin: process.env.GROK_GATE_ORIGIN,
+  };
 
   before(() => {
     // Gate identity is deliberately an auth-on deployment mode. Declare that
     // precondition instead of depending on the runner's ambient environment.
     process.env.VITE_AUTH_ENABLED = "true";
+    delete process.env.GROK_PROJECT_ID;
+    delete process.env.GROK_GATE_ORIGIN;
   });
 
   after(() => {
-    if (originalAuthEnabled === undefined) delete process.env.VITE_AUTH_ENABLED;
-    else process.env.VITE_AUTH_ENABLED = originalAuthEnabled;
+    restoreEnv("VITE_AUTH_ENABLED", originalEnv.authEnabled);
+    restoreEnv("GROK_PROJECT_ID", originalEnv.projectId);
+    restoreEnv("GROK_GATE_ORIGIN", originalEnv.gateOrigin);
   });
 
   it("verifies the header token end to end and fails closed without it", async () => {
@@ -367,6 +379,27 @@ describe("gateIdentityFromHeaders", () => {
       );
       assert.equal(identity, null);
     } finally {
+      delete process.env.GROK_GATE_ORIGIN;
+    }
+  });
+
+  it("stays disabled when app auth is explicitly off", async () => {
+    const key = await makeKey("k-auth-off");
+    const { fetchImpl, calls } = staticJwks([key.jwk]);
+    process.env.VITE_AUTH_ENABLED = "false";
+    process.env.GROK_PROJECT_ID = "proj-123";
+    process.env.GROK_GATE_ORIGIN = ISSUER;
+    try {
+      const token = await signToken(key, { sub: "user-1" });
+      const identity = await gateIdentityFromHeaders(
+        new Headers({ "x-grok-identity": token }),
+        fetchImpl,
+      );
+      assert.equal(identity, null);
+      assert.equal(calls(), 0);
+    } finally {
+      process.env.VITE_AUTH_ENABLED = "true";
+      delete process.env.GROK_PROJECT_ID;
       delete process.env.GROK_GATE_ORIGIN;
     }
   });
