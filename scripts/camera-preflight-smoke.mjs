@@ -298,11 +298,44 @@ try {
       name: "Analyze selected stills once",
       exact: true,
     });
-    await analyzeButton.click();
-    await page
-      .getByRole("alert")
-      .filter({ hasText: "No media was sent. xAI is not available in this environment" })
-      .waitFor({ state: "visible", timeout: 15_000 });
+    const [analysisResponse] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.request().method() === "POST" && response.url().includes("/_serverFn/"),
+        { timeout: 15_000 },
+      ),
+      analyzeButton.click(),
+    ]);
+    const analysisBody = (await analysisResponse.text().catch(() => "<unreadable>")).slice(
+      0,
+      2_000,
+    );
+    try {
+      await page
+        .getByRole("alert")
+        .filter({ hasText: "No media was sent. xAI is not available in this environment" })
+        .waitFor({ state: "visible", timeout: 5_000 });
+    } catch (cause) {
+      const providerFailurePng = checkedOutputPath(
+        `${stem}.${viewport.name}.provider-failure${extension}`,
+        ["/workspace"],
+      );
+      await page.screenshot({ path: providerFailurePng, type: "png", fullPage: true });
+      const diagnostic = await page.evaluate(() => ({
+        alerts: [...document.querySelectorAll("[role='alert']")]
+          .filter((element) => element.getClientRects().length > 0)
+          .map((element) => element.textContent?.replace(/\s+/g, " ").trim()),
+        statuses: [...document.querySelectorAll("[role='status']")]
+          .filter((element) => element.getClientRects().length > 0)
+          .map((element) => element.textContent?.replace(/\s+/g, " ").trim()),
+        analyzeButtons: [...document.querySelectorAll("button")]
+          .filter((element) => /analy/i.test(element.textContent ?? ""))
+          .map((element) => ({ text: element.textContent, disabled: element.disabled })),
+      }));
+      throw new Error(
+        `${viewport.name}: provider failure did not surface: ${JSON.stringify({ response: { status: analysisResponse.status(), url: analysisResponse.url(), body: analysisBody }, diagnostic, evidence: providerFailurePng })}; ${String(cause?.message ?? cause)}`,
+      );
+    }
     if (!(await analyzeButton.isEnabled())) {
       throw new Error(`${viewport.name}: verified pre-provider failure did not reopen the batch`);
     }
