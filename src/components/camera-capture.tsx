@@ -24,6 +24,7 @@ import {
   processMediaFrame,
   validateMediaFile,
   validateMediaSignature,
+  type ProcessedMediaFrame,
 } from "@/lib/media";
 import { observeFrame } from "@/lib/ml/detect";
 import type { FrameObservation } from "@/lib/ml/types";
@@ -546,7 +547,7 @@ export const CameraCapture = memo(function CameraCapture({
     const operation = beginMediaOperation();
     const { signal } = operation;
     try {
-      const frames: { jpeg: string; imageData: ImageData }[] = [];
+      const frames: ProcessedMediaFrame[] = [];
       for (let i = 0; i < 3; i++) {
         signal.throwIfAborted();
         frames.push(await processMediaFrame(v, 1600, 240, 0.82));
@@ -571,7 +572,7 @@ export const CameraCapture = memo(function CameraCapture({
         "photo",
         [chosen.jpeg],
         [chosen.observation],
-        [scoreFrame(chosen.imageData)],
+        [scoreFrame(chosen.imageData, chosen.detailData)],
       );
     } catch (cause) {
       if (
@@ -684,7 +685,7 @@ export const CameraCapture = memo(function CameraCapture({
         id: `F${String(index + 1).padStart(2, "0")}`,
         jpeg: x.f.jpeg,
         observation: x.obs,
-        quality: scoreFrame(x.f.imageData),
+        quality: scoreFrame(x.f.imageData, x.f.detailData),
       })),
     );
     setSelectedFrames([]);

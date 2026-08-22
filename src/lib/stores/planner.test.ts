@@ -174,7 +174,10 @@ test("a cross-tab merge loses neither a custom limit nor a revocation under a ba
 
   // Stamps are monotonic, so a backward wall-clock correction cannot make a
   // fresh revocation look older than the approval it replaces.
-  assert.ok(nextNegotiationStamp([Date.now() + 60_000]) > Date.now() + 60_000);
+  // Capture the base once: reading the clock on both sides of the comparison
+  // makes the assertion fail whenever a millisecond elapses between them.
+  const ahead = Date.now() + 60_000;
+  assert.ok(nextNegotiationStamp([ahead]) > ahead);
   assert.ok(nextNegotiationStamp([]) > 0);
   assert.ok(nextNegotiationStamp(["junk", null, undefined, NaN]) > 0);
 

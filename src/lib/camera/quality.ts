@@ -141,8 +141,14 @@ export function ropeHint(data: ImageData): number {
   return share;
 }
 
-export function scoreFrame(data: ImageData): FrameQuality {
-  const sharpness = Math.min(1, Math.log1p(laplacianVar(data)) / Math.log1p(900));
+/**
+ * @param data   Downscaled frame, for exposure and the rope colour hint.
+ * @param detail Native-scale crop of the transmitted image, for focus. Falls
+ *   back to `data` when absent, which understates blur — a downscale is a
+ *   low-pass filter, so it removes the very frequencies shake destroys.
+ */
+export function scoreFrame(data: ImageData, detail?: ImageData): FrameQuality {
+  const sharpness = Math.min(1, Math.log1p(laplacianVar(detail ?? data)) / Math.log1p(900));
   const exposure = exposureScore(data);
   const rope = Math.min(1, ropeHint(data) / 0.12);
   const notes: string[] = [];

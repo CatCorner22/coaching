@@ -168,3 +168,49 @@ test("an equipment-only rope close-up outranks a bare-skin frame", () => {
   );
   assert.ok(ropeHint(blackLace) > 0, "black fabric no longer reads as dark fibre");
 });
+
+test("focus is judged on the transmitted detail, not on a downscale of it", () => {
+  // The frame sent to the model is ~1600px, but sharpness used to be measured
+  // on the 240px analysis copy. Shrinking by that much is itself a low-pass
+  // filter, so it removes exactly the frequencies camera shake destroys: on
+  // realistic wrap structure a frame that scores 0.14 at full size scored 1.00
+  // after the downscale, and was reported as perfectly sharp while badly shaken.
+  const W = 640;
+  const gray = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+  const build = (px: (x: number, y: number) => number) => {
+    const buf = new Uint8ClampedArray(W * W * 4);
+    for (let y = 0; y < W; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4;
+        const v = gray(px(x, y));
+        buf[i] = v;
+        buf[i + 1] = v;
+        buf[i + 2] = v;
+        buf[i + 3] = 255;
+      }
+    }
+    return { data: buf, width: W, height: W } as unknown as ImageData;
+  };
+  // Coarse strand structure plus fine fibre — the fibre is what shake removes.
+  const sharp = build(
+    (x, y) =>
+      120 +
+      55 * Math.sin((y / 45) * Math.PI * 2) +
+      18 * Math.sin((x / 30) * Math.PI * 2) +
+      10 * Math.sin((y / 7) * Math.PI * 2),
+  );
+  // The same frame with the fine fibre gone: coarse structure survives intact.
+  const shaken = build(
+    (x, y) => 120 + 55 * Math.sin((y / 45) * Math.PI * 2) + 18 * Math.sin((x / 30) * Math.PI * 2),
+  );
+
+  const coarseOnly = scoreFrame(sharp, shaken).sharpness;
+  const withDetail = scoreFrame(sharp, sharp).sharpness;
+  assert.ok(
+    withDetail > coarseOnly,
+    `losing fine detail must lower sharpness (${withDetail} vs ${coarseOnly})`,
+  );
+  // Without a detail source the reading falls back to the coarse frame, which
+  // is why the argument has to be threaded through from processMediaFrame.
+  assert.equal(scoreFrame(shaken).sharpness, scoreFrame(shaken, shaken).sharpness);
+});
