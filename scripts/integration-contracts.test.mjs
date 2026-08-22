@@ -421,3 +421,22 @@ test("the mobile More sheet is keyboard operable and the sidebar cannot clip its
   // below the viewport, and Settings holds the privacy controls.
   assert.match(shell, /aria-label="Main"[\s\S]{0,120}min-h-0[\s\S]{0,40}overflow-y-auto/);
 });
+
+test("an urgent search disposition reaches the screen without a second tap", () => {
+  const page = read("src/routes/knowledge.tsx");
+  // The action used to render only inside the submitted answer, so typing "she
+  // cant breathe" reordered the result links and showed nothing else until the
+  // user also pressed Find entries. Routing the query and then hiding the
+  // result behind another tap is the failure the routing exists to prevent.
+  // The banner must be gated on the disposition alone, never on `answer`.
+  const banner = page.match(/\{actionFirst && \([\s\S]*?\n {6}\)\}/);
+  assert.ok(banner, "the action banner is not rendered from actionFirst alone");
+  assert.match(banner[0], /role="alert"/);
+  assert.match(banner[0], /aria-live="assertive"/);
+  assert.match(banner[0], /\{disposition\.action\}/);
+  assert.match(banner[0], /disposition\.emergencyHref/);
+  assert.doesNotMatch(banner[0], /\banswer\b/);
+  // knowledgeAnswer prefixes the same action text; the submitted answer must
+  // drop it rather than print it twice.
+  assert.match(page, /answer\.startsWith\(disposition\.action\)/);
+});

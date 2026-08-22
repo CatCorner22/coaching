@@ -19,6 +19,12 @@ function KnowledgePage() {
   const hits = useMemo(() => (usableQuery ? searchKnowledge(q, 8) : []), [q, usableQuery]);
   const disposition = useMemo(() => knowledgeDisposition(q), [q]);
   const actionFirst = disposition.kind !== "ordinary";
+  // knowledgeAnswer prefixes the same action text. The banner below now carries
+  // it, so drop the duplicate when a submitted answer is also on screen.
+  const answerBody =
+    answer && disposition.action && answer.startsWith(disposition.action)
+      ? answer.slice(disposition.action.length).trimStart()
+      : answer;
   const sections = [...new Set(ARTICLES.map((a) => a.section))];
 
   function updateQuery(value: string) {
@@ -59,15 +65,21 @@ function KnowledgePage() {
           Find entries
         </Button>
       </div>
-      {answer && (
+      {/*
+        The action has to stand on its own as soon as the wording is recognised.
+        It used to render only inside the submitted answer, so someone typing
+        "she cant breathe" saw a reordered list of links and nothing else unless
+        they also pressed Find entries — the one thing a person in that moment
+        should not have to do. Routing this query well and then hiding the
+        result behind a second tap defeats the whole point of routing it.
+      */}
+      {actionFirst && (
         <div
-          role={actionFirst ? "alert" : "status"}
-          aria-live={actionFirst ? "assertive" : "polite"}
-          className={`mt-4 whitespace-pre-wrap rounded-lg border p-4 text-sm leading-relaxed ${
-            actionFirst ? "border-danger/50 bg-danger/10" : "border-border bg-surface"
-          }`}
+          role="alert"
+          aria-live="assertive"
+          className="mt-4 whitespace-pre-wrap rounded-lg border border-danger/50 bg-danger/10 p-4 text-sm leading-relaxed"
         >
-          <p>{answer}</p>
+          <p>{disposition.action}</p>
           {disposition.emergencyHref && (
             <Link
               to={disposition.emergencyHref}
@@ -76,6 +88,15 @@ function KnowledgePage() {
               Open emergency card
             </Link>
           )}
+        </div>
+      )}
+      {answerBody && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mt-4 whitespace-pre-wrap rounded-lg border border-border bg-surface p-4 text-sm leading-relaxed"
+        >
+          <p>{answerBody}</p>
         </div>
       )}
       {hits.length > 0 && (
