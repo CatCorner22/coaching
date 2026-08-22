@@ -57,8 +57,13 @@ function StudioPage() {
   const tieSlug = useSession((s) => s.tieSlug);
   const furnitureSlug = useSession((s) => s.furnitureSlug);
   const negotiationPolicy = useMemo(() => buildStudioNegotiationPolicy(items), [items]);
-  const { operationalLimits, negotiationKey, voiceBlocked } = negotiationPolicy;
-  const mediaBlocked = !negotiationReady || negotiationPolicy.mediaBlocked;
+  const {
+    operationalLimits,
+    negotiationKey,
+    voiceBlocked,
+    mediaBlocked: negotiatedMediaBlocked,
+  } = negotiationPolicy;
+  const mediaBlocked = !negotiationReady || negotiatedMediaBlocked;
   const captureContextKey = `${tieSlug ?? ""}|${stepIndex}|${furnitureSlug ?? ""}|${negotiationKey}`;
   const [capture, setCapture] = useState<CaptureResult | null>(null);
   const [report, setReport] = useState<CoachReport | null>(null);
@@ -103,7 +108,7 @@ function StudioPage() {
   useEffect(() => {
     if (tieBlocked || instructorOnlyTie) useSession.getState().setTie(undefined);
     if (furnitureBlocked) useSession.getState().setFurniture(undefined);
-    if (mediaBlocked) {
+    if (negotiationReady && negotiatedMediaBlocked) {
       analysisRequestRef.current += 1;
       captureContextAtCommitRef.current = null;
       setCapture(null);
@@ -113,7 +118,7 @@ function StudioPage() {
       setTriage("unanswered");
       setPending(false);
     }
-  }, [tieBlocked, instructorOnlyTie, furnitureBlocked, mediaBlocked]);
+  }, [tieBlocked, instructorOnlyTie, furnitureBlocked, negotiationReady, negotiatedMediaBlocked]);
 
   useEffect(() => {
     if (!studioVoice) stopCoachVoice();
