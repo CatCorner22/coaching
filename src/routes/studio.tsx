@@ -19,6 +19,7 @@ import { useSettings } from "@/lib/stores/settings";
 import {
   buildStudioNegotiationPolicy,
   mediaAuthorizationWasRevoked,
+  studioPolicySignature,
 } from "@/lib/studio/negotiation";
 import { listenForWords, playCoachVoice, stopCoachVoice } from "@/lib/voice/play";
 import { DIRECT_CHECK_REMINDER } from "@/lib/voice/reviewed-lines";
@@ -118,17 +119,35 @@ function StudioPage() {
   }, []);
 
   useEffect(() => {
+    const signature = () =>
+      studioPolicySignature(useNegotiate.getState().items, useSettings.getState());
+    let lastSignature = signature();
+    let pending: ReturnType<typeof setTimeout> | null = null;
     const invalidateAcrossTabs = (event: StorageEvent) => {
       if (event.key !== null && event.key !== "knotty-negotiate" && event.key !== "knotty-settings")
         return;
-      analysisRequestRef.current += 1;
-      captureContextAtCommitRef.current = null;
-      micArmedRef.current = false;
-      stopCoachVoice();
-      window.location.reload();
+      // The consent-bearing stores rehydrate from their own storage listeners;
+      // that resolves in a microtask, so compare on the next task. Reload only
+      // when the gating policy actually changed — a note or name keystroke in
+      // another tab must not reload-storm this page and discard a live capture.
+      if (pending !== null) clearTimeout(pending);
+      pending = setTimeout(() => {
+        pending = null;
+        const next = signature();
+        if (next === lastSignature) return;
+        lastSignature = next;
+        analysisRequestRef.current += 1;
+        captureContextAtCommitRef.current = null;
+        micArmedRef.current = false;
+        stopCoachVoice();
+        window.location.reload();
+      }, 0);
     };
     window.addEventListener("storage", invalidateAcrossTabs);
-    return () => window.removeEventListener("storage", invalidateAcrossTabs);
+    return () => {
+      if (pending !== null) clearTimeout(pending);
+      window.removeEventListener("storage", invalidateAcrossTabs);
+    };
   }, []);
 
   useEffect(() => {
@@ -497,7 +516,7 @@ function StudioPage() {
           tabIndex={-1}
           className="mb-6 rounded-lg border border-danger/40 bg-danger/10 p-4 outline-none focus:ring-2 focus:ring-danger"
         >
-          <p className="font-display text-3xl text-danger">Stop</p>
+          <p className="font-display text-3xl text-danger-text">Stop</p>
           <p className="mt-1 text-sm text-fg">
             Stop the activity. Support the person's position and release without creating a fall.
             Call emergency services for abnormal breathing, unresponsiveness, seizure, chest pain, a
@@ -522,7 +541,7 @@ function StudioPage() {
               Reset studio
             </Button>
             <Button asChild variant="danger">
-              <Link to="/emergency">Cut-down card</Link>
+              <Link to="/emergency">Emergency card</Link>
             </Button>
             <Button asChild variant="outline">
               <Link to="/aftercare">Aftercare</Link>
@@ -541,7 +560,7 @@ function StudioPage() {
         </div>
       </div>
       {operationalLimits.length > 0 && (
-        <p className="mt-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
+        <p className="mt-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger-text">
           Not approved (no or unresolved maybe):{" "}
           {operationalLimits.map((item) => `${item.label} (${item.rank})`).join(" · ")}
         </p>
@@ -712,7 +731,7 @@ function StudioPage() {
             ) : mediaBlocked ? (
               <p
                 role="status"
-                className="mb-3 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger"
+                className="mb-3 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger-text"
               >
                 Media is not affirmatively approved. Resolve no or maybe together before enabling
                 photo or video capture.
@@ -789,7 +808,7 @@ function StudioPage() {
             halted={stopped}
           />
           {analysisError && (
-            <p className="text-sm text-danger" role="alert">
+            <p className="text-sm text-danger-text" role="alert">
               {analysisError}
             </p>
           )}
@@ -822,7 +841,11 @@ function StudioPage() {
             <Button asChild variant="outline">
               <Link to="/checkin">Open direct check-in</Link>
             </Button>
-            <Button variant="danger" onClick={() => stopSession("manual")}>
+            <Button
+              variant="danger"
+              aria-label={`Stop the session now (safeword: ${settings.safeword})`}
+              onClick={() => stopSession("manual")}
+            >
               {settings.safeword}
             </Button>
           </div>
@@ -845,7 +868,11 @@ function StudioPage() {
                 notes: contextBoundReport.final.coaching.slice(0, 280),
                 flags: contextBoundReport.final.flags.map((flag) => flag.code),
                 disposition: contextBoundObservationReport.disposition,
-                limitations: contextBoundObservationReport.limitations.slice(0, 3),
+                // The store bounds this to 6. Truncating to 3 here dropped the
+                // resize caveat and the "remote classification did not
+                // complete — insufficient view" disclosure, which is exactly
+                // the caveat a saved report must carry.
+                limitations: contextBoundObservationReport.limitations.slice(0, 6),
                 sourceIds: contextBoundObservationReport.source_ids,
               });
               setSavedEntryId(entryId);

@@ -1,3 +1,5 @@
+import { MAX_VIDEO_BYTES } from "@/lib/media";
+
 type Facing = "user" | "environment";
 const FOCUS_SETUP_TIMEOUT_MS = 1_000;
 const CAMERA_OPEN_TIMEOUT_MS = 20_000;
@@ -115,14 +117,14 @@ export async function openRopeCamera(
       audio: false,
       video: {
         facingMode: { ideal: facing },
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
         frameRate: { ideal: 30 },
       },
     },
     {
       audio: false,
-      video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } },
+      video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } },
     },
     { audio: false, video: true },
   ];
@@ -348,7 +350,9 @@ export function startClip(stream: MediaStream): ClipHandle {
   // across Safari/iOS (usually MP4) and Chromium/Firefox (usually WebM).
   const rec = new MediaRecorder(stream);
   const chunks: BlobPart[] = [];
-  const maxBytes = 100 * 1024 * 1024;
+  // One source of truth with the import path's cap, so the recorder budget and
+  // the file-size rejection can never drift apart.
+  const maxBytes = MAX_VIDEO_BYTES;
   let recordedBytes = 0;
   let recordedMime = rec.mimeType;
   let cancelled = false;

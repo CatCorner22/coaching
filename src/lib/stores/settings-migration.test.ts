@@ -66,3 +66,13 @@ test("only complete v4 consent can retain explicit voice and microphone opt-ins"
   assert.equal(incomplete.voice, false);
   assert.equal(incomplete.listen, false);
 });
+
+test("resetConsent drops the consent-bearing voice and mic opt-ins immediately", async () => {
+  const { useSettings } = await import("./settings.ts");
+  useSettings.setState({ consented: true, voice: true, listen: true });
+  useSettings.getState().resetConsent();
+  const s = useSettings.getState();
+  assert.equal(s.consented, false);
+  assert.equal(s.voice, false);
+  assert.equal(s.listen, false);
+});

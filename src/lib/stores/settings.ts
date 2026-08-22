@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { adoptPersistKey, safeJsonStorage } from "./persist";
+import { adoptPersistKey, safeJsonStorage, syncPersistedAcrossTabs } from "./persist";
 
 export type Settings = {
   consentVersion: number;
@@ -50,6 +50,7 @@ function clampWord(v: unknown, fallback: string) {
 type SettingsState = Settings & {
   set: (p: Partial<Settings>) => void;
   enter: () => void;
+  resetConsent: () => void;
 };
 
 /** Normalize an untrusted persisted snapshot without carrying unknown fields forward. */
@@ -100,6 +101,10 @@ export const useSettings = create<SettingsState>()(
               : s.circulationMins,
         })),
       enter: () => set({ consentVersion: 4, consented: true, adults: true, shears: true, photosOk: true }),
+      // Withdrawing consent also drops the consent-bearing cloud-voice and mic
+      // opt-ins, so the live state matches the hydration invariant (voice and
+      // listen require consented) instead of lingering enabled until reload.
+      resetConsent: () => set({ consented: false, voice: false, listen: false }),
     }),
     {
       name: "knotty-settings",
@@ -115,3 +120,8 @@ export const useSettings = create<SettingsState>()(
     },
   ),
 );
+
+// Propagate a consent reset (which also clears voice/mic) from another tab.
+syncPersistedAcrossTabs("knotty-settings", () => {
+  void useSettings.persist.rehydrate();
+});

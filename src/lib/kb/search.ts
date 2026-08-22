@@ -155,6 +155,26 @@ const SEARCH_ALIASES: Readonly<Record<string, string>> = {
   "article:photography-ethics":
     "secret recording coercion privacy deletion revoke permission sharing retention minor underage under 18 teen ambiguous age nude naked explicit image explicit photo unsupported media",
   "article:safewords": "red yellow safeword safe word stop signal nonverbal signal",
+  "article:positional-asphyxia":
+    "prone face down facedown chest compression can't expand chest belly compression folded position hogtie breathing position restricted breathing positional asphyxia",
+  "article:gag-signal-safety":
+    "ball gag gagged mouth covered tape over mouth nose blocked congestion stuffy nose drop signal held object nonverbal safeword",
+  "article:nerve-self-checks":
+    "hand check finger check thumbs up ok sign wiggle fingers grip strength tingling fingers sleepy hand numb patch self check",
+  "article:circulation-vs-nerve":
+    "cold hand whole hand numb part of hand few fingers purple hand swollen hand pins and needles which is it circulation or nerve",
+  "article:fainting-response":
+    "faint fainting fainted lightheaded light-headed dizzy woozy tunnel vision graying vision nausea standing too long vasovagal syncope suspension syndrome",
+  "article:cuff-and-collar-fit":
+    "cuff cuffs handcuff leather cuff two finger fit collar leash spreader bar padlock key quick release too tight",
+  "article:solo-self-tying":
+    "self tie self-tie solo alone by myself self bondage self-bondage practice alone escape release plan",
+  "article:medical-disclosure":
+    "health condition medical history diabetes neuropathy blood thinner anticoagulant ehlers danlos hypermobile asthma seizure epilepsy pregnant pregnancy medication disclosure",
+  "article:rope-inspection-retirement":
+    "inspect inspection fray frayed fuzzy worn core damage retire retirement wash washing store storage mildew",
+  "article:incident-response":
+    "injury injured hurt after injury wrist drop weak hand still numb next day doctor urgent care report debrief what happened",
   "gear:shears":
     "trauma shears emergency release cut rope cut rope now rapid release unresponsive passed out seizure serious fall ロープを切る 緊急 切断 意識がない 失神 痙攣 転倒 绳索 紧急 切断绳索 昏倒 无反应 癫痫发作 摔倒",
   "tie:takate-kote": "tk takatekote takate kote box tie box-tie",
@@ -261,6 +281,17 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
     /\b(?:can't|cant|cannot|unable to)\s+(?:get (?:enough )?air|speak)\b/u.test(text) ||
     /\b(?:barely|labou?red|shallow|agonal|irregular)\s+breathing\b/u.test(text) ||
     /\bno\s+breathing\b/u.test(text) ||
+    // Vomiting or aspiration behind a gag is an airway emergency; the gag
+    // article routes it here.
+    /\b(?:aspirat(?:e|ed|ing|ion)|choking on (?:vomit|sick|their tongue))\b/u.test(text) ||
+    // An actual incident, not an educational question about gag risk. Requires a
+    // present/past report ("she is vomiting with the gag in"), so "does a ball
+    // gag increase the risk of vomiting" stays an ordinary search.
+    ((/\b(?:vomit(?:s|ed|ing)?|throw(?:s|ing)? up|threw up|be(?:ing)? sick|puk(?:e|es|ed|ing)|retch(?:es|ed|ing)?|heav(?:es|ed|ing))\b[^.!?]{0,32}\bgag(?:ged|ging)?\b/u.test(text) ||
+      /\bgag(?:ged|ging)?\b[^.!?]{0,32}\b(?:vomit(?:s|ed|ing)?|throw(?:s|ing)? up|threw up|be(?:ing)? sick|puk(?:e|es|ed|ing)|retch(?:es|ed|ing)?|heav(?:es|ed|ing)|choking)\b/u.test(text)) &&
+      !/\b(?:risk|risks|danger|dangers|safety|prevent|avoid|reduce|clean|cleaning|wash|advice|guide|article|why|should i|can a|does a|do gags|is it safe)\b/u.test(text)) ||
+    includesAny(text, ["猿ぐつわ", "口塞", "재갈"]) &&
+      includesAny(text, ["嘔吐", "吐いて", "呕吐", "구토", "토하"]) ||
     /\bwheez(?:e|ed|ing)\b[^.!?]{0,32}\b(?:can't|cant|cannot|unable to)\s+speak\b/u.test(text) ||
     /\b(?:gasping for air|(?:can't|cant|cannot|unable to) catch (?:their |his |her |my )?breath)\b/u.test(text) ||
     includesAny(text, [
@@ -342,9 +373,11 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
   const materialColorChange =
     /\b(?:rope|cord|line|fabric|screen|light)\b[^.!?]{0,32}\bturning blue\b/u.test(text);
   const cyanosisEmergency =
-    /\b(?:cyanotic|cyanosis|(?:blue|gr[ae]y|ashen) (?:face|lips|skin|tongue)|(?:face|lips|skin|tongue) (?:are |is )?(?:turning )?(?:blue|gr[ae]y|ashen)|turning (?:blue|gr[ae]y|ashen) around (?:the )?(?:face|lips))\b/u.test(
+    /\b(?:cyanotic|cyanosis|(?:blue|gr[ae]y|ashen|purple|dusky) (?:face|lips|skin|tongue)|(?:face|lips|skin|tongue) (?:are |is |was |were |look |looks |looked |seem |seems )?(?:looking |going |turning |getting |gone )?(?:blue|gr[ae]y|ashen|purple|dusky)|turning (?:blue|gr[ae]y|ashen|purple|dusky) around (?:the )?(?:face|lips))\b/u.test(
       text,
-    ) || (/\bturning blue\b/u.test(text) && !materialColorChange);
+    ) ||
+    includesAny(text, ["唇が紫", "唇が青", "顔が紫", "嘴唇发紫", "嘴唇发青", "脸色发紫", "입술이 보라", "입술이 파래"]) ||
+    (/\bturning blue\b/u.test(text) && !materialColorChange);
   const neckTerminologyContext =
     /\b(?:chokehold|strangulation|asphyxiation)\s+(?:terminology|definition|meaning|history)\b/u.test(
       text,
@@ -357,6 +390,21 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
       /\b(?:rope|cord|line|ligature|noose|hands?)\b[^.!?]{0,48}\b(?:around|on|across|near|over|touching)\s+(?:the\s+|my\s+|their\s+|his\s+|her\s+)?(?:neck|throat)\b/u.test(
         text,
       ) ||
+      // Hanging is a neck-loading emergency. The object must be the neck or a
+      // ligature — NOT rope/rig, because "hanging from the rope" is ordinary
+      // suspension vocabulary and must not be emergency-routed. "hung" is an
+      // irregular form the inflection group cannot produce.
+      /\b(?:hang(?:s|ed|ing)?|hung)\s+(?:by|from)\s+(?:the\s+|their\s+|his\s+|her\s+|my\s+|a\s+)?(?:neck|throat|noose|ligature)\b/u.test(
+        text,
+      ) ||
+      /\b(?:hung|hang(?:ed|ing))\s+(?:themsel(?:f|ves)|him ?self|her ?self|my ?self)\b/u.test(text) ||
+      /\bself[- ]?hang(?:ed|ing)?\b/u.test(text) ||
+      /\b(?:neck|throat)\b[^.!?]{0,16}\b(?:hung|hanging|hanged)\b/u.test(text) ||
+      // "hung from the rig by his neck": the neck object can trail the verb.
+      /\b(?:hung|hang(?:s|ed|ing)?)\b[^.!?]{0,24}\bby\s+(?:the\s+|his\s+|her\s+|their\s+|my\s+)?(?:neck|throat)\b/u.test(
+        text,
+      ) ||
+      includesAny(text, ["首を吊", "首吊り", "首つり", "上吊", "吊死", "목을 맸", "목맴", "목을 매"]) ||
       /\bbreath\s*play\b[^.!?]{0,32}\b(?:last night|yesterday|earlier|happened|after|during)\b/u.test(
         text,
       ) ||
@@ -510,6 +558,36 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
     );
   const minorNonAgeContext =
     /\bminor (?:damage|fraying|injur(?:y|ies)|issue|repair|rope|wear)\b/u.test(text);
+  // Equipment age ("my rope is 5 years old", "16 year old jute") is not a
+  // person's age. Gate only the otherwise-unconditional bare years-old pattern
+  // on this; person/media-anchored age patterns below still fail closed.
+  // Any reference to a person forbids the equipment reading outright. This
+  // guard exists only so "my rope is 5 years old" is not treated as a
+  // child-safety report, and it must fail closed: an earlier, looser version
+  // let "16 year old girlfriend rope photo" and "rope for my 14 year old"
+  // bypass the block simply because a rope word sat nearby.
+  // A possessive directly before an equipment noun ("her rope is 5 years old")
+  // describes the equipment, so it must not veto the equipment reading.
+  const ageScanText = text.replace(
+    /\b(?:my|your|his|her|their|our|its)\s+(?=(?:rope|ropes|hemp|jute|jutes|cotton|nylon|mfp|cord|cords|line|lines|webbing|hardware|harness|harnesses|gear|equipment|kit|carabiner|carabiners|ring|rings|shears|bamboo)\b)/gu,
+    "",
+  );
+  const personReference =
+    /\b(?:he|him|his|she|her|hers|they|them|their|theirs|you|your|partner|girlfriend|boyfriend|wife|husband|spouse|model|person|people|someone|somebody|anyone|friend|sub|bottom|top|rigger|bunny|girl|boy|woman|women|man|men|lady|guy|kid|kids|child|children|son|daughter|niece|nephew|cousin|student|teen|teenager|minor|adult|adults)\b/u.test(
+      ageScanText,
+    );
+  const EQUIPMENT = "rope|ropes|hemp|jute|jutes|cotton|nylon|mfp|cord|cords|line|lines|webbing|hardware|harness|harnesses|gear|equipment|kit|carabiner|carabiners|ring|rings|shears|bamboo";
+  const equipmentAgeContext =
+    !personReference &&
+    // The equipment noun must actually govern the age through a copula, with at
+    // most one intervening word ("my rope is 5 years old", "these ropes are 12
+    // years old") — not merely appear within a window of it.
+    (new RegExp(
+      `\\b(?:${EQUIPMENT})\\b(?:\\s+\\w+)?\\s+(?:is|are|was|were)\\s+(?:about\\s+|around\\s+|roughly\\s+)?(?:[0-9]|1[0-7])[- ]years?[- ]old\\b`,
+      "u",
+    ).test(text) ||
+      // Or the age directly qualifies the equipment noun ("16 year old jute").
+      new RegExp(`\\b(?:[0-9]|1[0-7])[- ]years?[- ]old\\s+(?:${EQUIPMENT})\\b`, "u").test(text));
   const ambiguousAgeMedia =
     !minorNonAgeContext &&
     (/^(?:minor|underage|under[- ]?18|under eighteen|ambiguous age|child)$/u.test(text) ||
@@ -522,9 +600,14 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
         )) ||
     (mediaContext &&
       /\b(?:id|age) (?:was |is )?not (?:checked|verified|confirmed)\b/u.test(text)) ||
-    /\b(?:(?:[0-9]|1[0-7])|(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen))[- ]years?[- ]old\b/u.test(
-      text,
-    ) ||
+    // "her age is 16" — a person's stated age without the "years old" wording.
+    // Requires a person reference so an equipment age ("the rope age is 5")
+    // is not swept in.
+    (personReference && /\bage (?:is |was )?(?:[0-9]|1[0-7])\b/u.test(text)) ||
+    (!equipmentAgeContext &&
+      /\b(?:(?:[0-9]|1[0-7])|(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen))[- ]years?[- ]old\b/u.test(
+        text,
+      )) ||
     /\b(?:age[ds]?\s*:?\s*(?:[0-9]|1[0-7])|(?:[0-9]|1[0-7])\s*years? of age)\b[^.!?]{0,32}\b(?:photo|image|picture|video|media|model|person)\b/u.test(
       text,
     ) ||
@@ -568,9 +651,15 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
       "성인물 영상",
     ]);
   const releaseSymptom =
-    /\b(?:new |sudden |worsening |sharp worsening |increasing )?(?:numb(?:ness)?|tingl(?:e|ing|y)|pins and needles|burning|electric sensation|weakness|loss of (?:movement|function|coordination|sensation)|no sensation|reduced movement|weak grip|foot drop|severe pain|escalating pain|excruciating pain|faintness|lightheaded(?:ness)?|swollen|swelling|edema)\b/u.test(
+    /\b(?:new |sudden |worsening |sharp worsening |increasing )?(?:numb(?:ness)?|tingl(?:e|ing|y)|pins and needles|burning|electric sensation|weakness|loss of (?:movement|function|coordination|sensation)|no sensation|reduced movement|weak grip|foot drop|wrist drop|severe pain|escalating pain|excruciating pain|faintness|lightheaded(?:ness)?|swollen|swelling|edema)\b/u.test(
       text,
     ) ||
+    /\b(?:can't|cant|cannot|can not|won't|wont|will not|unable to)\s+(?:lift|extend|raise|straighten|move)\s+(?:my |their |his |her |the )?(?:wrist|hand)\b/u.test(text) ||
+    /\b(?:wrist|hand)\b[^.!?]{0,16}\b(?:won't|wont|will not|can't|cant|cannot|can not|unable to|doesn't|doesnt|does not)\s+(?:lift|extend|raise|move|straighten|go up)\b/u.test(text) ||
+    includesAny(text, ["手首が上がらない", "手首が動かない", "手腕抬不起", "手腕无力", "손목이 올라가지"]) ||
+    /\b(?:feel|feels|feeling|felt|am|is|are|was|were|got|gets|getting|went|seems?)\s+(?:very |really |so |quite |a bit )?(?:faint|light[- ]?headed|woozy|dizzy)\b/u.test(text) ||
+    /\b(?:going to|about to|gonna)\s+(?:faint|pass out|black out)\b/u.test(text) ||
+    includesAny(text, ["めまい", "立ちくらみ", "ふらつく", "头晕", "頭暈", "어지러", "현기증"]) ||
     /\bloss of grip\b(?![^.!?]{0,24}\b(?:rope )?tool\b)/u.test(text) ||
     /\b(?:dropping things|hand (?:feels?|felt) dead)\b/u.test(text) ||
     /\b(?:can't|cant|cannot|unable to)\s+feel\s+(?:my|their|his|her)?\s*(?:finger|fingers|hand|hands|toe|toes|foot|feet)\b/u.test(
@@ -642,7 +731,7 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
     return {
       kind: "unsupported_media",
       action:
-        "Unsupported media: do not capture or upload it. Camera analysis is limited to confirmed legal adults in clothed, non-explicit, consented images or selected video stills. The app does not automatically detect these conditions; ambiguous age, nudity, explicit sexual activity, secret recording, and coerced media are prohibited and must not be selected or uploaded.",
+        "Unsupported media: do not capture or upload it. Camera analysis is limited to confirmed legal adults in non-explicit, consented images or selected video stills; clothed or intimate-wear views are within scope. The app does not automatically detect these conditions; ambiguous age, full nudity, explicit sexual activity, secret recording, and coerced media are prohibited and must not be selected or uploaded.",
     };
   }
 
@@ -743,11 +832,26 @@ const ACTION_HIT_ALLOWLIST: Record<
   Exclude<KnowledgeDispositionKind, "ordinary">,
   ReadonlySet<string>
 > = {
-  emergency: new Set(["article:emergency-stop", "article:hard-limits", "gear:shears"]),
-  prompt_medical: new Set(["article:emergency-stop", "article:hard-limits"]),
+  emergency: new Set([
+    "article:emergency-stop",
+    "article:hard-limits",
+    "article:positional-asphyxia",
+    "article:fainting-response",
+    "gear:shears",
+  ]),
+  prompt_medical: new Set([
+    "article:emergency-stop",
+    "article:hard-limits",
+    "article:positional-asphyxia",
+    "article:fainting-response",
+    "article:incident-response",
+  ]),
   release_now: new Set([
     "article:circulation",
     "article:nerve-atlas",
+    "article:nerve-self-checks",
+    "article:circulation-vs-nerve",
+    "article:incident-response",
     "article:emergency-stop",
     "gear:shears",
   ]),

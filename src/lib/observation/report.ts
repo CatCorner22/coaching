@@ -151,11 +151,11 @@ const META: Record<CanonicalId, CategoryMeta> = {
   negotiation_materials_visible: meta("Negotiation materials", "A checklist, boundary card, or stop-signal aid may be visible.", "Generic notes or props"),
   aftercare_materials_visible: meta("Aftercare materials", "Water, a blanket, a debrief card, or another comfort item may be visible.", "Ordinary household items"),
   roleplay_or_power_exchange_context_possible: meta("Roleplay or power-exchange context", "Role-like symbols or staging may be visible.", "Costume, theater, fashion, or photography"),
-  rope_restraint_unspecified: meta("Unspecified rope restraint", "Rope-like material may encircle or connect visible regions or equipment.", "Clothing trim, cable, hair, or decorative cord"),
+  rope_restraint_unspecified: meta("Unspecified rope restraint", "Rope-like material may encircle or connect visible regions or equipment.", "Clothing trim, lingerie or garment strap, lace or elastic edge, cable, hair, decorative cord, or a skin crease"),
   ground_or_surface_supported_restraint_possible: meta("Surface-supported restraint", "A surface and restraint-like material may appear in the same view.", "Hidden loading, cropped support, or forced perspective"),
   rope_present_no_visible_load_path: meta("Rope with no visible load path", "Rope-like material may be visible without a load path in the supplied crop.", "Unseen attachment, crop, or rear routing"),
-  cuff_strap_or_wrap_restraint: meta("Cuff, strap, or wrap restraint", "A cuff-, strap-, tape-, belt-, or wrap-like item may encircle or connect visible regions.", "Clothing, medical support, or sports equipment"),
-  multiple_restraint_modalities: meta("Multiple restraint modalities", "More than one restraint-medium class may be visible.", "Decorative accessories or one ambiguous class"),
+  cuff_strap_or_wrap_restraint: meta("Cuff, strap, or wrap restraint", "A cuff-, strap-, tape-, belt-, or wrap-like item may encircle or connect visible regions.", "Clothing, lingerie or garter strap, waistband, watch band or jewelry, medical support, or sports equipment"),
+  multiple_restraint_modalities: meta("Multiple restraint modalities", "More than one restraint-medium class may be visible.", "Decorative accessories, lingerie or garment straps, or one ambiguous class"),
   positional_restraint_possible: meta("Positional restraint", "Visible connections may coincide with a maintained body configuration.", "Voluntary pose, exercise, dance, or hidden support"),
   support_or_furniture_connection_possible: meta("Support or furniture connection", "Restraint-like material may connect to a support-like object.", "Exercise, medical, photography, or theatrical equipment"),
   lock_or_key_mechanism_connected_possible: meta("Connected lock or key mechanism", "A lock- or key-like object may connect to restraint-like equipment.", "Jewelry, cosmetic fastener, or prop"),
@@ -171,10 +171,10 @@ const META: Record<CanonicalId, CategoryMeta> = {
   mouth_covering_or_signal_limitation_possible: meta("Possible mouth covering or signal limitation", "An item may visually overlap the mouth region.", "Costume, medical item, or perspective"),
   impact_activity_context_possible: meta("Impact activity context", "An impact-implement-like object may appear in the supplied context.", "Sports, cleaning, costume, or theatrical prop"),
   temperature_source_context_possible: meta("Temperature-source context", "An ice-, wax-, or temperature-device-like object may appear in context.", "Food, spa items, an ordinary candle, or household device"),
-  pressure_device_context_possible: meta("Pressure-device context", "A device-like object may visibly contact a non-intimate region.", "Jewelry, medical clip, or clothing fastener"),
+  pressure_device_context_possible: meta("Pressure-device context", "A device-like object may visibly contact a non-intimate region.", "Jewelry, medical clip, garter or lingerie clasp, or clothing fastener"),
   balance_or_fall_demand_possible: meta("Possible balance or fall demand", "Posture or support may appear position-dependent.", "Yoga, exercise, dance, or staged performance"),
-  neck_or_airway_overlap_possible: meta("Possible neck or airway overlap", "Material or an object may visually overlap a neck, throat, mouth, or nose region.", "Perspective, clothing, jewelry, or medical equipment"),
-  torso_breathing_restriction_possible: meta("Possible torso breathing restriction", "Restraint-like material may cross the chest or abdomen in a concerning pattern.", "Clothing, posture, or two-dimensional overlap"),
+  neck_or_airway_overlap_possible: meta("Possible neck or airway overlap", "Material or an object may visually overlap a neck, throat, mouth, or nose region.", "Perspective, clothing, necklace or choker-style jewelry, or medical equipment"),
+  torso_breathing_restriction_possible: meta("Possible torso breathing restriction", "Restraint-like material may cross the chest or abdomen in a concerning pattern.", "Clothing, bra band or lingerie edge, posture, or two-dimensional overlap"),
   fire_or_heat_edge_context_possible: meta("Fire or active-heat context", "A flame-, heated-tool-, or active-heat-like source may be visible.", "Ordinary candle, cooking, or theatrical prop"),
   electrical_edge_context_possible: meta("Electrical edge context", "Electrode-, lead-, or electrical-device-like equipment may be visible.", "Medical, exercise, audio, or household equipment"),
   needle_cutting_or_blood_context_possible: meta("Needle, cutting, or blood context", "A sharp-tool-, needle-, cutting-, or blood-like feature may be visible.", "Medical care, craft tools, makeup, or prop"),
@@ -501,9 +501,9 @@ function normalizeMatches(matches: ModelCategoryMatch[], allowedFrameIds: readon
   for (const [index, match] of matches.slice(0, 12).entries()) {
     if (!isCanonicalId(match?.canonical_id)) continue;
     // The capture flow assigns frame labels but never receives user-attested
-    // chronology. A transition label therefore cannot satisfy its ontology
-    // discriminator and is replaced by a per-frame abstention below.
-    if (match.canonical_id === "transition_across_frames_possible") continue;
+    // chronology, so a transition match keeps its C3 consequence routing while
+    // abstaining on chronology below. Deleting it here would silently degrade
+    // an instructor-route signal to an ordinary insufficient view.
     const frameId = normalizeFrameId(match?.frame_id, index);
     if (!allowed.has(frameId)) continue;
     const key = `${frameId}:${match.canonical_id}`;
@@ -809,7 +809,9 @@ export function validateObservationReport(
       }
       if (
         category.canonical_id === "transition_across_frames_possible" &&
-        report.media_quality?.chronology !== "user_labeled"
+        report.media_quality?.chronology !== "user_labeled" &&
+        (category.evidence_state === "observed" ||
+          category.abstain_reason !== "chronology_unknown")
       ) {
         issues.push("transition evidence requires user-labeled chronology");
       }

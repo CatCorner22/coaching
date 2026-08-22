@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { TIES } from "@/lib/kb";
+import { TIES, getTie } from "@/lib/kb";
 import { catalogLengths, metersFor } from "@/lib/calc/rope";
 import { useKit } from "@/lib/stores/kit";
 import { usePlanner } from "@/lib/stores/planner";
@@ -62,7 +62,11 @@ function CalcPage() {
           </li>
         ))}
       </ul>
+      <label htmlFor="calc-add-tie" className="sr-only">
+        Add a tie to this estimate
+      </label>
       <select
+        id="calc-add-tie"
         className="mt-6 h-11 w-full rounded-md border border-border bg-elevated px-3 text-sm"
         defaultValue=""
         onChange={(e) => {
@@ -77,6 +81,32 @@ function CalcPage() {
           </option>
         ))}
       </select>
+      {/* Added ties were folded into the total with no list of their own and no
+          way to remove one, so a mis-tapped entry silently inflated the
+          estimate for the rest of the session. */}
+      {extra.length > 0 && (
+        <div className="mt-4">
+          <h2 className="text-xs uppercase tracking-wide text-subtle">Added to this estimate</h2>
+          <ul className="mt-2 space-y-1 text-sm">
+            {extra.map((slug, index) => (
+              <li
+                key={`${slug}-${index}`}
+                className="flex items-center justify-between rounded-md border border-border bg-surface px-3 py-1"
+              >
+                <span>{getTie(slug)?.name ?? slug}</span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${getTie(slug)?.name ?? slug} from this estimate`}
+                  className="min-h-11 cursor-pointer rounded-md px-3 text-xs text-muted hover:text-fg"
+                  onClick={() => setExtra((x) => x.filter((_, i) => i !== index))}
+                >
+                  Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <h2 className="mt-10 font-display text-2xl">Catalog</h2>
       <ul className="mt-3 space-y-1 text-sm">
         {catalog.map((c) => (

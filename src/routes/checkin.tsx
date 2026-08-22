@@ -70,15 +70,20 @@ function CheckInPage() {
         />
       </div>
 
+      <label htmlFor="checkin-note" className="mt-6 block text-xs uppercase tracking-wide text-subtle">
+        Optional session-only note (240 characters; no identifying details)
+      </label>
       <textarea
-        className="mt-6 h-20 w-full rounded-md border border-border bg-elevated p-3 text-sm"
+        id="checkin-note"
+        maxLength={240}
+        className="mt-1 h-20 w-full rounded-md border border-border bg-elevated p-3 text-sm"
         placeholder="Optional session-only note; do not include identifying details"
         value={note}
         onChange={(event) => setNote(event.target.value.slice(0, 240))}
       />
 
       {concern && (
-        <div className="mt-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">
+        <div className="mt-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger-text" role="alert">
           Release now and do not re-tie. {emergency
             ? "Call local emergency services and follow dispatcher instructions."
             : "Seek prompt medical assessment for persistent or worsening symptoms; use emergency services if an emergency sign develops."}
@@ -172,7 +177,19 @@ function CheckField({
 }
 
 function Choice({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <Button type="button" variant={active ? "default" : "outline"} size="sm" onClick={onClick}>{children}</Button>;
+  // aria-pressed: selection was conveyed only by a visual variant swap, so a
+  // screen reader could not tell which answer was chosen.
+  return (
+    <Button
+      type="button"
+      aria-pressed={active}
+      variant={active ? "default" : "outline"}
+      size="sm"
+      onClick={onClick}
+    >
+      {children}
+    </Button>
+  );
 }
 
 function hasConcern(entry: CheckIn): boolean {

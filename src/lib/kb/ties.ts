@@ -140,7 +140,7 @@ const CORE_TIES: Tie[] = [
   unoccupiedPractice({
     slug: "larks-head-cuff",
     name: "Lark's Head: Object-Only",
-    jp: "クイックカフ",
+    jp: "雲雀結び",
     summary:
       "A fast hitch that cinches. Practice it on an object only; this app excludes it from body cuffs, neck contact, and person-bearing use.",
     level: "foundation",

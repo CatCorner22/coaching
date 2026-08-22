@@ -53,7 +53,7 @@ function NervesPage() {
           </div>
           <div>
             <dt className="text-[11px] uppercase tracking-wide text-subtle">Why changes matter</dt>
-            <dd className="mt-1 text-danger">{n.risk}</dd>
+            <dd className="mt-1 text-danger-text">{n.risk}</dd>
           </div>
           <div>
             <dt className="text-[11px] uppercase tracking-wide text-subtle">Check</dt>

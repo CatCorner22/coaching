@@ -82,4 +82,40 @@ export const GEAR: GearItem[] = [
     summary: "Offer warmth only if wanted; a blanket is comfort equipment, not treatment or a way to rule out a medical problem.",
     notes: ["Keep agreed aftercare items nearby so nobody restrained is left alone. Seek urgent help for emergency signs."],
   },
+  {
+    slug: "cuffs",
+    name: "Padded restraint cuffs",
+    kind: "support",
+    summary:
+      "Wide, padded cuffs spread pressure better than a narrow edge, but they carry the same nerve and circulation risks as rope and need the same monitoring.",
+    notes: [
+      "Fit snug without compression; a commonly taught starting reference is two flat fingers under the cuff, which is a fit check, not a safety guarantee",
+      "Place on the meatier forearm above the wrist bones, never in the groove at the base of the hand",
+      "Prefer fast, practiced release; if it locks, the key stays in arm's reach for the whole scene",
+    ],
+  },
+  {
+    slug: "blindfold",
+    name: "Blindfold",
+    kind: "support",
+    summary:
+      "Covering the eyes intensifies other senses and removes visual check-ins; communication has to carry more of the load.",
+    notes: [
+      "Agree on more frequent verbal check-ins before covering the eyes",
+      "Never combine with anything that also limits speech or hearing without a rehearsed nonverbal stop signal",
+      "Remove first at any sign of disorientation, panic, or faintness",
+    ],
+  },
+  {
+    slug: "collar",
+    name: "Collar: symbolic only",
+    kind: "support",
+    summary:
+      "A collar in this app's scope is symbolic equipment. Nothing worn around a neck has a safe loaded configuration.",
+    notes: [
+      "Never attach a load, a downward line, or a pulling force to anything around a neck",
+      "Never leave a collared person attached to a fixed point unattended",
+      "Serious harm from neck pressure can occur without visible injury and can be delayed; seek urgent assessment for any neck-pressure event",
+    ],
+  },
 ];

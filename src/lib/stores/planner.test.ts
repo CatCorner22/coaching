@@ -42,3 +42,99 @@ test("planner add is idempotent and ignores blanks", async () => {
   usePlanner.getState().add("futomomo");
   assert.deepEqual(usePlanner.getState().slugs, ["karada", "futomomo"]);
 });
+
+test("normalizePersistedSlugs coerces corrupt or legacy blobs without throwing", async () => {
+  const { normalizePersistedSlugs } = await import("./planner.ts");
+  const fallback = ["single-column"];
+  // A well-formed blob with a non-array slugs field is the crash case: it
+  // survives JSON.parse and would reach slugs.map/.filter as a string.
+  assert.deepEqual(normalizePersistedSlugs({ slugs: "single-column" }, fallback), fallback);
+  assert.deepEqual(normalizePersistedSlugs({ slugs: null }, fallback), fallback);
+  assert.deepEqual(normalizePersistedSlugs(null, fallback), fallback);
+  assert.deepEqual(normalizePersistedSlugs({}, fallback), fallback);
+  // Arrays are filtered to unique, non-empty strings.
+  assert.deepEqual(
+    normalizePersistedSlugs({ slugs: ["a", "a", "", "  ", 5, null, "b"] }, fallback),
+    ["a", "b"],
+  );
+  // The list is bounded.
+  const many = Array.from({ length: 60 }, (_, i) => `s${i}`);
+  assert.equal(normalizePersistedSlugs({ slugs: many }, fallback).length, 40);
+});
+
+test("clampRopeCount rejects non-finite, negative, and oversized persisted values", async () => {
+  const { clampRopeCount } = await import("./kit.ts");
+  assert.equal(clampRopeCount("junk", 6), 6);
+  // Non-finite falls back to the last good value (Infinity also serializes to
+  // null through JSON, which lands here as the same fallback).
+  assert.equal(clampRopeCount(Infinity, 6), 6);
+  assert.equal(clampRopeCount(-4, 0), 0);
+  assert.equal(clampRopeCount(3.9, 0), 3);
+  assert.equal(clampRopeCount(5000, 2), 999);
+  assert.equal(clampRopeCount(8, 2), 8);
+  assert.equal(clampRopeCount(null, 2), 2);
+});
+
+test("storageEventTargetsKey rehydrates on a matching key or a full clear only", async () => {
+  const { storageEventTargetsKey } = await import("./persist.ts");
+  assert.equal(storageEventTargetsKey("knotty-negotiate", "knotty-negotiate"), true);
+  assert.equal(storageEventTargetsKey(null, "knotty-negotiate"), true); // storage.clear()
+  assert.equal(storageEventTargetsKey("knotty-settings", "knotty-negotiate"), false);
+  assert.equal(storageEventTargetsKey("some-other-app-key", "knotty-negotiate"), false);
+});
+
+test("syncPersistedAcrossTabs rehydrates when another tab rewrites the same key", async () => {
+  const { syncPersistedAcrossTabs } = await import("./persist.ts");
+  const listeners: Array<(e: { key: string | null }) => void> = [];
+  const originalWindow = (globalThis as { window?: unknown }).window;
+  (globalThis as { window?: unknown }).window = {
+    addEventListener: (type: string, cb: (e: { key: string | null }) => void) => {
+      if (type === "storage") listeners.push(cb);
+    },
+  };
+  try {
+    let rehydrated = 0;
+    syncPersistedAcrossTabs("knotty-negotiate", () => {
+      rehydrated += 1;
+    });
+    assert.equal(listeners.length, 1);
+    listeners[0]!({ key: "knotty-negotiate" });
+    listeners[0]!({ key: null });
+    listeners[0]!({ key: "unrelated" });
+    assert.equal(rehydrated, 2);
+  } finally {
+    (globalThis as { window?: unknown }).window = originalWindow;
+  }
+});
+
+test("negotiation writes resolve per item by stamp, so a stale tab cannot resurrect a revoked rank", async () => {
+  const { mergeNegotiationItemsByStamp } = await import("./persist.ts");
+  // Tab A is stale: it still holds the old approval with an older stamp.
+  const staleIncoming = [{ id: "photos", label: "Photos", rank: "yes", updatedAt: 1000 }];
+  const revokedExisting = [{ id: "photos", label: "Photos", rank: "no", updatedAt: 2000 }];
+  const merged = mergeNegotiationItemsByStamp(staleIncoming, revokedExisting) as Array<{
+    rank: string;
+    updatedAt: number;
+  }>;
+  assert.equal(merged[0]!.rank, "no", "a stale write must not resurrect a revoked rank");
+  assert.equal(merged[0]!.updatedAt, 2000);
+
+  // A genuine later re-approval must still win.
+  const reapproval = [{ id: "photos", label: "Photos", rank: "yes", updatedAt: 3000 }];
+  const after = mergeNegotiationItemsByStamp(reapproval, revokedExisting) as Array<{ rank: string }>;
+  assert.equal(after[0]!.rank, "yes");
+
+  // Equal stamps keep the writing tab's own value; unknown ids pass through;
+  // malformed input is left alone rather than throwing.
+  const tie = mergeNegotiationItemsByStamp(
+    [{ id: "photos", rank: "yes", updatedAt: 5 }],
+    [{ id: "photos", rank: "no", updatedAt: 5 }],
+  ) as Array<{ rank: string }>;
+  assert.equal(tie[0]!.rank, "yes");
+  assert.deepEqual(
+    mergeNegotiationItemsByStamp([{ id: "new", rank: "no" }], []),
+    [{ id: "new", rank: "no" }],
+  );
+  assert.equal(mergeNegotiationItemsByStamp(null, []), null);
+  assert.equal(mergeNegotiationItemsByStamp([], "junk"), null);
+});

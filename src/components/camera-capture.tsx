@@ -20,6 +20,7 @@ import {
 } from "@/lib/camera/quality";
 import {
   extractVideoFrames,
+  MAX_VIDEO_BYTES,
   processMediaFrame,
   validateMediaFile,
   validateMediaSignature,
@@ -105,6 +106,7 @@ export const CameraCapture = memo(function CameraCapture({
   const mediaOperationRef = useRef<AbortController | null>(null);
   const mediaOperationIdRef = useRef(0);
   const torchRequestRef = useRef(0);
+  const torchBusyRef = useRef(false);
   const permissionsRef = useRef(EMPTY_PERMISSIONS);
   const permissionConfirmedAtRef = useRef<number | null>(null);
   const permissionExpiryTimerRef = useRef<number | null>(null);
@@ -126,6 +128,7 @@ export const CameraCapture = memo(function CameraCapture({
   const [checkingCapabilities, setCheckingCapabilities] = useState(false);
   const [capabilityError, setCapabilityError] = useState<string | null>(null);
   const [batchCommitted, setBatchCommitted] = useState(false);
+  const [permissionExpiresAt, setPermissionExpiresAt] = useState<number | null>(null);
   const [videoFrames, setVideoFrames] = useState<PendingVideoFrame[]>([]);
   const [selectedFrames, setSelectedFrames] = useState<number[]>([]);
   const permissionsReady = Object.values(permissions).every(Boolean);
@@ -164,10 +167,20 @@ export const CameraCapture = memo(function CameraCapture({
   }, []);
 
   useEffect(() => {
-    const onVisibility = () => {
-      if (document.visibilityState === "hidden") stopLive();
+    const stopForBackground = () => {
+      // A local file decode holds no camera hardware, but it is aborted with
+      // the rest of the teardown. Say so instead of leaving the capture area
+      // blank with no explanation of where the import went.
+      const hadMediaOperation = mediaOperationRef.current !== null;
+      stopLive();
+      if (hadMediaOperation) {
+        setHint("Processing stopped when the app went to the background. Choose the file again.");
+      }
     };
-    const onPageHide = () => stopLive();
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") stopForBackground();
+    };
+    const onPageHide = () => stopForBackground();
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", onPageHide);
     return () => {
@@ -213,6 +226,7 @@ export const CameraCapture = memo(function CameraCapture({
     setBatchCommitted(false);
     permissionsRef.current = EMPTY_PERMISSIONS;
     permissionConfirmedAtRef.current = null;
+    setPermissionExpiresAt(null);
     setPermissions({ ...EMPTY_PERMISSIONS });
     if (permissionExpiryTimerRef.current !== null) {
       window.clearTimeout(permissionExpiryTimerRef.current);
@@ -272,12 +286,14 @@ export const CameraCapture = memo(function CameraCapture({
     if (isReady && !wasReady) {
       const confirmedAt = Date.now();
       permissionConfirmedAtRef.current = confirmedAt;
+      setPermissionExpiresAt(confirmedAt + BATCH_PERMISSION_MAX_AGE_MS);
       if (permissionExpiryTimerRef.current !== null) {
         window.clearTimeout(permissionExpiryTimerRef.current);
       }
       permissionExpiryTimerRef.current = window.setTimeout(() => {
         permissionExpiryTimerRef.current = null;
         permissionConfirmedAtRef.current = null;
+        setPermissionExpiresAt(null);
         permissionsRef.current = EMPTY_PERMISSIONS;
         setPermissions({ ...EMPTY_PERMISSIONS });
         setBatchCommitted(false);
@@ -289,18 +305,28 @@ export const CameraCapture = memo(function CameraCapture({
       }, BATCH_PERMISSION_MAX_AGE_MS);
     } else if (!isReady) {
       permissionConfirmedAtRef.current = null;
+      setPermissionExpiresAt(null);
       if (permissionExpiryTimerRef.current !== null) {
         window.clearTimeout(permissionExpiryTimerRef.current);
         permissionExpiryTimerRef.current = null;
       }
     }
     if (!checked) {
+      // Withdrawal always stops capture, but only claim a discard when there
+      // was something to discard. Unchecking a box while still filling the
+      // form in used to reset Studio triage, wipe every other box, and report
+      // that a pending batch had been discarded when none existed.
+      const hadPendingWork = live || recording || batchCommitted || videoFrames.length > 0;
       stopLive();
       setBatchCommitted(false);
       setVideoFrames([]);
       setSelectedFrames([]);
-      onDiscard();
-      setHint("Permission withdrawn; the pending batch was discarded.");
+      if (hadPendingWork) {
+        onDiscard();
+        setHint("Permission withdrawn; the pending batch was discarded.");
+      } else {
+        setHint("Every item must stay confirmed for this batch before the camera opens.");
+      }
     }
   }
 
@@ -311,6 +337,7 @@ export const CameraCapture = memo(function CameraCapture({
       permissionExpiryTimerRef.current = null;
     }
     permissionConfirmedAtRef.current = null;
+    setPermissionExpiresAt(null);
     permissionsRef.current = EMPTY_PERMISSIONS;
     setPermissions({ ...EMPTY_PERMISSIONS });
     setBatchCommitted(false);
@@ -513,7 +540,7 @@ export const CameraCapture = memo(function CameraCapture({
       const frames: { jpeg: string; imageData: ImageData }[] = [];
       for (let i = 0; i < 3; i++) {
         signal.throwIfAborted();
-        frames.push(await processMediaFrame(v, 768, 240, 0.74));
+        frames.push(await processMediaFrame(v, 1600, 240, 0.82));
         await new Promise((r) => setTimeout(r, 90));
       }
       const observed = frames.map((frame) => ({
@@ -623,8 +650,10 @@ export const CameraCapture = memo(function CameraCapture({
   ) {
     const { signal } = operation;
     if (!file.size) throw new Error("The video is empty.");
-    if (file.size > 100 * 1024 * 1024) {
-      throw new Error("Video is too large. Choose one under 100 MB.");
+    if (file.size > MAX_VIDEO_BYTES) {
+      throw new Error(
+        `Video is too large. Choose one under ${Math.round(MAX_VIDEO_BYTES / 1024 / 1024)} MB.`,
+      );
     }
     const frames = await extractVideoFrames(file, 6, signal, durationHintSeconds);
     let prev: Uint8ClampedArray | undefined;
@@ -673,7 +702,11 @@ export const CameraCapture = memo(function CameraCapture({
   function toggleSelectedFrame(index: number) {
     setSelectedFrames((current) => {
       if (current.includes(index)) return current.filter((value) => value !== index);
-      if (current.length >= 3) return current;
+      if (current.length >= 3) {
+        // Silently ignoring the fourth tap read as an unresponsive control.
+        setHint("Up to three stills per batch. Deselect one before choosing another.");
+        return current;
+      }
       return [...current, index];
     });
   }
@@ -681,21 +714,32 @@ export const CameraCapture = memo(function CameraCapture({
   async function onFile(file: File, kind: "photo" | "video") {
     if (recording || batchCommitted) return;
     if (!hasCurrentBatchPermissions()) return;
-    setVideoFrames([]);
-    setSelectedFrames([]);
     setBusy(true);
     setError(null);
     const operation = beginMediaOperation();
     const { signal } = operation;
     try {
-      const actualKind = file.type.startsWith("video/") ? "video" : kind;
+      // Recover in both directions: a video chosen through the photo control
+      // was already corrected, while a photo chosen through the video control
+      // used to fail with "Choose a supported video file."
+      const actualKind = file.type.startsWith("video/")
+        ? "video"
+        : file.type.startsWith("image/")
+          ? "photo"
+          : kind;
       validateMediaFile(file, actualKind);
       const dimensions = await validateMediaSignature(file, actualKind);
       signal.throwIfAborted();
+      // Only now discard any pending clip-still selection. Clearing before
+      // validation meant a rejected pick destroyed extracted stills that only
+      // a fresh recording could restore.
+      if (!ownsMediaOperation(operation.id) || disabledRef.current) return;
+      setVideoFrames([]);
+      setSelectedFrames([]);
       if (actualKind === "video") {
         await ingestVideo(file, operation);
       } else {
-        const { jpeg, imageData } = await processMediaFrame(file, 768, 240, 0.74, dimensions);
+        const { jpeg, imageData } = await processMediaFrame(file, 1600, 240, 0.82, dimensions);
         signal.throwIfAborted();
         if (!ownsMediaOperation(operation.id) || disabledRef.current) return;
         const observation = observeFrame(imageData);
@@ -719,10 +763,20 @@ export const CameraCapture = memo(function CameraCapture({
   async function toggleTorch() {
     const stream = streamRef.current;
     if (!stream) return;
+    // setTorch tears the stream down itself when a constraint fails or times
+    // out, so a second concurrent call from a double-tap could kill a stream
+    // the first call had already applied successfully. One at a time.
+    if (torchBusyRef.current) return;
+    torchBusyRef.current = true;
     const request = cameraRequestRef.current;
     const torchRequest = ++torchRequestRef.current;
     const next = !torch;
-    const ok = await setTorch(stream, next);
+    let ok: boolean;
+    try {
+      ok = await setTorch(stream, next);
+    } finally {
+      torchBusyRef.current = false;
+    }
     if (
       !mountedRef.current ||
       disabledRef.current ||
@@ -805,7 +859,7 @@ export const CameraCapture = memo(function CameraCapture({
           </div>
         )}
         {capabilityError && (
-          <p className="mt-2 text-xs text-danger" role="alert">
+          <p className="mt-2 text-xs text-danger-text" role="alert">
             {capabilityError}
           </p>
         )}
@@ -821,7 +875,8 @@ export const CameraCapture = memo(function CameraCapture({
         </legend>
         <p className="mb-2 text-xs leading-relaxed text-muted">
           Confirm legal-adult status, non-explicit media scope, and all four permissions separately
-          for each batch. Prefer equipment-only, clothed, non-identifying stills. Exclude faces,
+          for each batch. Prefer equipment-only, non-identifying stills. Clothed or intimate-wear
+          views of consenting adults are supported; full nudity and sexual activity are not. Exclude faces,
           nudity, intimate contact, tattoos, screens, mail, and room details. The app does not
           automatically detect or certify that media is non-explicit; do not select explicit media.
         </p>
@@ -834,7 +889,7 @@ export const CameraCapture = memo(function CameraCapture({
           <PermissionCheck
             checked={permissions.nonExplicit}
             onChange={(checked) => updatePermission("nonExplicit", checked)}
-            label="I confirm this batch is clothed and non-explicit."
+            label="I confirm this batch is non-explicit: lingerie or intimate wear is fine; no full nudity or sexual activity."
           />
           <PermissionCheck
             checked={permissions.nonSecret}
@@ -905,7 +960,7 @@ export const CameraCapture = memo(function CameraCapture({
             <div className="absolute inset-0 bg-bg/70" />
             <Camera className="relative size-8 text-muted" />
             <p className="relative px-6 text-center text-sm text-muted">
-              Use a clothed, non-identifying still of equipment or a limited setup whenever
+              Use a non-identifying still of equipment or a limited setup whenever
               possible. Video is converted to labeled stills that you choose yourself.
             </p>
           </div>
@@ -937,13 +992,25 @@ export const CameraCapture = memo(function CameraCapture({
           </button>
         ))}
       </div>
+      {/* The one-hour batch window was invisible until it expired and silently
+          discarded the batch. Show when it runs out. */}
+      {permissionsReady && permissionExpiresAt !== null && (
+        <p className="text-xs text-muted">
+          Batch permissions confirmed for this hour; they expire at{" "}
+          {new Date(permissionExpiresAt).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+          , after which every item must be confirmed again.
+        </p>
+      )}
       {hint && (
         <p className="text-xs text-muted" aria-live="polite">
           {hint}
         </p>
       )}
       {error && (
-        <p className="text-sm text-danger" role="alert">
+        <p className="text-sm text-danger-text" role="alert">
           {error}
         </p>
       )}

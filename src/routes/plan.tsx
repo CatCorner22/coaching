@@ -47,7 +47,12 @@ function PlanPage() {
               <Link to="/tie/$slug" params={{ slug }} className="font-display text-xl">
                 {t?.name ?? slug}
               </Link>
-              <button className="text-xs text-muted" onClick={() => remove(i)}>
+              <button
+                type="button"
+                aria-label={`Remove ${t?.name ?? slug} from the plan`}
+                className="min-h-11 cursor-pointer rounded-md px-3 text-xs text-muted hover:text-fg"
+                onClick={() => remove(i)}
+              >
                 Remove
               </button>
             </li>

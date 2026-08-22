@@ -8,7 +8,7 @@ export type ArticleEvidence = {
   status: "source_anchored" | "editorial_only";
   sourceIds: readonly SafetySourceId[];
   ledgerRevision: typeof SOURCE_LEDGER_REVISION;
-  auditedAt: "2026-08-21";
+  auditedAt: "2026-08-22";
   note: string;
 };
 
@@ -43,6 +43,16 @@ const ARTICLE_SOURCE_IDS: Readonly<Record<string, readonly SafetySourceId[]>> = 
     "XAI-PRIVACY-1",
     "XAI-TERMS-1",
   ],
+  "positional-asphyxia": ["ASPHYX-1", "FATAL-1", "FIRSTAID-1"],
+  "gag-signal-safety": ["CONSENT-2", "FATAL-1"],
+  "nerve-self-checks": ["ROPE-1", "ROPE-2"],
+  "circulation-vs-nerve": ["ROPE-2", "FIRSTAID-1"],
+  "fainting-response": ["SYNCOPE-1", "SYNCOPE-2", "FIRSTAID-1"],
+  "cuff-and-collar-fit": ["NFS-1"],
+  "solo-self-tying": ["FATAL-1", "FIRSTAID-1"],
+  "medical-disclosure": ["CONSENT-1", "CONSENT-2", "CONSENT-3"],
+  "rope-inspection-retirement": ["MAT-1"],
+  "incident-response": ["ROPE-1", "FIRSTAID-1"],
 };
 
 export function getArticleEvidence(slug: string): ArticleEvidence {
@@ -52,7 +62,7 @@ export function getArticleEvidence(slug: string): ArticleEvidence {
     status,
     sourceIds,
     ledgerRevision: SOURCE_LEDGER_REVISION,
-    auditedAt: "2026-08-21",
+    auditedAt: "2026-08-22",
     note:
       status === "source_anchored"
         ? "The linked sources anchor only the relevant consent, injury-pattern, emergency, provider-capability, privacy, or limitation claims. They do not validate every sentence, an individual setup, or a safe technique."

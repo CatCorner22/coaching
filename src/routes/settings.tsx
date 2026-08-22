@@ -54,23 +54,27 @@ function SettingsPage() {
             <option value="peer">Peer — two adults, no protocol</option>
           </select>
         </label>
-        <Field label="Red" value={s.safeword} onChange={(v) => s.set({ safeword: v })} />
+        <Field
+          label="Red"
+          value={s.safeword}
+          onChange={(v) => s.set({ safeword: v })}
+          hint="At least two characters. Command words (next, analyze, hands, stop, pause, release) are rejected and the previous word is kept."
+        />
         <Field label="Yellow" value={s.yellowWord} onChange={(v) => s.set({ yellowWord: v })} />
         <Field label="Green" value={s.greenWord} onChange={(v) => s.set({ greenWord: v })} />
         <label className="block text-sm">
           <span className="text-xs uppercase tracking-wide text-subtle">Direct-check reminder (minutes; not a safety interval)</span>
-          <input
-            type="number"
+          <NumberField
             min={2}
-            max={8}
-            className="mt-1 h-11 w-full rounded-md border border-border bg-elevated px-3"
+            max={12}
             value={s.circulationMins}
-            onChange={(e) => s.set({ circulationMins: Number(e.target.value) || 4 })}
+            onCommit={(n) => s.set({ circulationMins: n })}
           />
         </label>
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
+            className="size-4 accent-accent"
             checked={s.voice}
             onChange={(event) => {
               if (!event.target.checked) clearCoachVoiceCache();
@@ -80,7 +84,12 @@ function SettingsPage() {
           Enable cloud voice; send each reviewed spoken line to xAI TTS after a privacy preflight
         </label>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={s.listen} onChange={(e) => s.set({ listen: e.target.checked })} />
+          <input
+            type="checkbox"
+            className="size-4 accent-accent"
+            checked={s.listen}
+            onChange={(e) => s.set({ listen: e.target.checked })}
+          />
           Optional microphone word detection
         </label>
         <p className="text-xs leading-relaxed text-subtle">
@@ -89,7 +98,7 @@ function SettingsPage() {
           While armed, Knotty listens only for the configured red/yellow words and suppresses its
           own speech to reduce feedback.
         </p>
-        <Button variant="outline" onClick={() => s.set({ consented: false })}>
+        <Button variant="outline" onClick={() => s.resetConsent()}>
           Reset consent gate
         </Button>
         <section className="rounded-lg border border-border bg-surface p-4">
@@ -167,23 +176,81 @@ function SettingsPage() {
   );
 }
 
+/**
+ * Same commit-on-blur reason as Field: the store clamps to 2..12, so typing the
+ * first digit of "10" was clamped to 2 and the rest of the entry was lost. The
+ * declared min/max now match the store's own bounds.
+ */
+function NumberField({
+  value,
+  min,
+  max,
+  onCommit,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  onCommit: (n: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  const [editing, setEditing] = useState(false);
+  return (
+    <input
+      type="number"
+      min={min}
+      max={max}
+      className="mt-1 h-11 w-full rounded-md border border-border bg-elevated px-3"
+      value={editing ? draft : String(value)}
+      onFocus={() => {
+        setDraft(String(value));
+        setEditing(true);
+      }}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        setEditing(false);
+        const parsed = Number(draft);
+        onCommit(Number.isFinite(parsed) && draft.trim() !== "" ? parsed : value);
+      }}
+    />
+  );
+}
+
+/**
+ * Commit on blur rather than per keystroke. The settings store clamps words to
+ * at least two characters and rejects command words, so writing every keystroke
+ * straight through made a field impossible to retype: the first character of a
+ * replacement was rejected and the old value snapped back mid-edit.
+ */
 function Field({
   label,
   value,
   onChange,
+  hint,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  hint?: string;
 }) {
+  const [draft, setDraft] = useState(value);
+  const [editing, setEditing] = useState(false);
   return (
     <label className="block text-sm">
       <span className="text-xs uppercase tracking-wide text-subtle">{label}</span>
       <input
         className="mt-1 h-11 w-full rounded-md border border-border bg-elevated px-3"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={editing ? draft : value}
+        onFocus={() => {
+          setDraft(value);
+          setEditing(true);
+        }}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          setEditing(false);
+          onChange(draft);
+        }}
       />
+      {hint && <span className="mt-1 block text-[11px] leading-relaxed text-muted">{hint}</span>}
     </label>
   );
 }

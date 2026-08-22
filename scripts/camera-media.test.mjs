@@ -127,6 +127,15 @@ test("validateMediaSignature accepts a common 24 MP phone still", async () => {
   await assert.doesNotReject(validateMediaSignature(new Blob([bytes]), "photo"));
 });
 
+test("validateMediaSignature accepts a modern 48 MP phone still", async () => {
+  const bytes = new Uint8Array(24);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  bytes.set([0x49, 0x48, 0x44, 0x52], 12);
+  new DataView(bytes.buffer).setUint32(16, 8064);
+  new DataView(bytes.buffer).setUint32(20, 6048);
+  await assert.doesNotReject(validateMediaSignature(new Blob([bytes]), "photo"));
+});
+
 test("validateMediaSignature rejects pathological single-edge image dimensions", async () => {
   const bytes = new Uint8Array(24);
   bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -378,8 +387,8 @@ test("openRopeCamera retries constraint failures but not permission denials", as
 
   assert.equal(await openRopeCamera("environment"), stream);
   assert.equal(calls, 2);
-  assert.deepEqual(constraints[0].video.width, { ideal: 1280 });
-  assert.deepEqual(constraints[0].video.height, { ideal: 720 });
+  assert.deepEqual(constraints[0].video.width, { ideal: 1920 });
+  assert.deepEqual(constraints[0].video.height, { ideal: 1080 });
 
   calls = 0;
   globalThis.navigator.mediaDevices.getUserMedia = async () => {

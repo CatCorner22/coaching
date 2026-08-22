@@ -71,7 +71,7 @@ function KnowledgePage() {
           {disposition.emergencyHref && (
             <Link
               to={disposition.emergencyHref}
-              className="mt-3 inline-flex rounded-md border border-danger px-3 py-2 font-medium text-danger hover:bg-danger/10"
+              className="mt-3 inline-flex rounded-md border border-danger px-3 py-2 font-medium text-danger-text hover:bg-danger/10"
             >
               Open emergency card
             </Link>

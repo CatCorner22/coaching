@@ -77,7 +77,7 @@ function TiePage() {
         </div>
 
         <h3 className="mt-10 font-display text-2xl">Stop if</h3>
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-danger">
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-danger-text">
           {tie.stop.map((x) => (
             <li key={x}>{x}</li>
           ))}

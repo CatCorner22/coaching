@@ -1,10 +1,16 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { adoptPersistKey, safeJsonStorage } from "./persist";
+import { adoptPersistKey, negotiationMergingStorage, syncPersistedAcrossTabs } from "./persist";
 
 export type Rank = "yes" | "maybe" | "no";
 
-export type NegItem = { id: string; label: string; rank: Rank };
+/**
+ * `updatedAt` versions each decision. zustand persists the WHOLE state blob on
+ * every set(), so without it a tab holding stale state resurrects a rank that
+ * another tab just revoked, simply by saving something unrelated. Reads and
+ * writes both resolve per item by this stamp instead of by write order.
+ */
+export type NegItem = { id: string; label: string; rank: Rank; updatedAt?: number };
 
 export const LOCKED_NO = new Set(["neck", "breath", "suspension", "alone"]);
 
@@ -46,7 +52,13 @@ function parseCandidate(value: unknown): NegItem | null {
   // Keep a canonical ID even when its untrusted label is malformed so that a
   // duplicate cannot disappear during sanitization and preserve a prior yes.
   if (!id) return null;
-  return { id, label, rank: clampRank(candidate.rank) };
+  const updatedAt = Number(candidate.updatedAt);
+  return {
+    id,
+    label,
+    rank: clampRank(candidate.rank),
+    ...(Number.isFinite(updatedAt) && updatedAt > 0 ? { updatedAt } : {}),
+  };
 }
 
 /**
@@ -72,7 +84,8 @@ export function normalizeNegotiationItems(value: unknown): NegItem[] {
       matches.length === 1 && matches[0].label && !LOCKED_NO.has(seed.id)
         ? matches[0].rank
         : ("no" as Rank);
-    return { ...seed, rank };
+    const stamp = matches.length === 1 ? matches[0].updatedAt : undefined;
+    return { ...seed, rank, ...(stamp ? { updatedAt: stamp } : {}) };
   });
 
   const customIds = new Set<string>();
@@ -109,7 +122,13 @@ export const useNegotiate = create<State>()(
       setRank: (id, rank) =>
         set({
           items: get().items.map((i) =>
-            i.id === id ? { ...i, rank: LOCKED_NO.has(i.id) ? "no" : clampRank(rank) } : i,
+            i.id === id
+              ? {
+                  ...i,
+                  rank: LOCKED_NO.has(i.id) ? "no" : clampRank(rank),
+                  updatedAt: Date.now(),
+                }
+              : i,
           ),
         }),
       setNotes: (notes) => set({ notes: notes.slice(0, 600) }),
@@ -120,14 +139,14 @@ export const useNegotiate = create<State>()(
         set({
           items: normalizeNegotiationItems([
             ...get().items,
-            { id: crypto.randomUUID(), label: clean, rank: "no" as Rank },
+            { id: crypto.randomUUID(), label: clean, rank: "no" as Rank, updatedAt: Date.now() },
           ]),
         });
       },
     }),
     {
       name: "knotty-negotiate",
-      storage: safeJsonStorage<State>(),
+      storage: negotiationMergingStorage<State>("knotty-negotiate"),
       version: 1,
       migrate: (persisted) => persisted as State,
       merge: (persisted, current) => {
@@ -147,3 +166,9 @@ export const useNegotiate = create<State>()(
     },
   ),
 );
+
+// Propagate a limit revocation (including the media-gating "photos" yes) from
+// another tab instead of letting a stale tab's later write resurrect it.
+syncPersistedAcrossTabs("knotty-negotiate", () => {
+  void useNegotiate.persist.rehydrate();
+});

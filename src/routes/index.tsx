@@ -34,7 +34,7 @@ function Home() {
             Check directly.
           </h1>
           <p className="mt-5 max-w-lg text-base leading-relaxed text-muted">
-            Capture equipment-only or clothed, non-identifying stills. Knotty returns a bounded,
+            Capture equipment-only or non-identifying stills. Knotty returns a bounded,
             evidence-labeled observation report with explicit uncertainty and consequence floors—
             never physiology, exact-tie validation, monitoring, clearance, or next-wrap coaching.
           </p>

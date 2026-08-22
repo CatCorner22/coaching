@@ -51,7 +51,9 @@ export const useSession = create<SessionState>((set, get) => ({
   tick: (now) => {
     const { startedAt, stopped, elapsed } = get();
     if (!startedAt || stopped) return;
-    const next = Math.floor((now - startedAt) / 1000);
+    // Clock skew or a backward wall clock must not store a negative elapsed,
+    // which would render in the session clock and ship as elapsedSec.
+    const next = Math.max(0, Math.floor((now - startedAt) / 1000));
     if (next === elapsed) return;
     set({ elapsed: next });
   },

@@ -207,7 +207,7 @@ function AccountBoundaryFailure({
     <main className="grid min-h-dvh place-items-center bg-canvas px-5 text-foreground">
       <section className="max-w-md rounded-xl border border-danger/40 bg-surface p-6">
         <h1 className="font-display text-2xl">Local data is blocked</h1>
-        <p className="mt-3 text-sm leading-relaxed text-danger" role="alert">
+        <p className="mt-3 text-sm leading-relaxed text-danger-text" role="alert">
           {message}
         </p>
         <button

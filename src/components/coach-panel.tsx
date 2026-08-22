@@ -101,7 +101,7 @@ export const CoachPanel = memo(function CoachPanel({
               key={i}
               className={cn(
                 "text-xs",
-                f.severity === "stop" ? "text-danger" : "text-warn",
+                f.severity === "stop" ? "text-danger-text" : "text-warn",
               )}
             >
               {f.note}

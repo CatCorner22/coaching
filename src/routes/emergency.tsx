@@ -1,12 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/emergency")({ component: EmergencyPage });
 
 function EmergencyPage() {
   return (
     <div className="mx-auto max-w-xl px-5 py-10">
-      <p className="text-xs uppercase tracking-[0.22em] text-danger">Stop</p>
-      <h1 className="mt-2 font-display text-5xl text-danger">Release now</h1>
+      <p className="text-xs uppercase tracking-[0.22em] text-danger-text">Stop</p>
+      <h1 className="mt-2 font-display text-5xl text-danger-text">Release now</h1>
       <ol className="mt-8 space-y-4 text-base leading-relaxed">
         <li>
           <span className="text-xs uppercase tracking-wide text-subtle">1 · Stop and release</span>
@@ -30,11 +30,22 @@ function EmergencyPage() {
         </li>
       </ol>
       <div className="mt-8 rounded-md border border-danger bg-danger/10 p-4 text-sm" role="alert">
-        <p className="font-medium text-danger">Call your local emergency-services number now.</p>
+        <p className="font-medium text-danger-text">Call your local emergency-services number now.</p>
         <p className="mt-1 text-muted">
           Use the device's phone dialer. This emergency card deliberately reads no saved account
           data and will not guess a number from browser language or location.
         </p>
+      </div>
+      {/* This page renders outside the app shell (deliberately, so it bypasses
+          the consent gate), which also left it with no header, no nav, and no
+          way back except the browser's own control. */}
+      <div className="mt-8 flex flex-wrap gap-3 text-sm">
+        <Link to="/checkin" className="text-fg underline underline-offset-4">
+          Log a direct check-in
+        </Link>
+        <Link to="/" className="text-muted underline underline-offset-4">
+          Back to Knotty
+        </Link>
       </div>
     </div>
   );

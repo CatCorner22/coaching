@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { normalizeNegotiationItems, type NegItem, type Rank } from "@/lib/stores/negotiate";
-import { buildStudioNegotiationPolicy, mediaAuthorizationWasRevoked } from "./negotiation.ts";
+import {
+  buildStudioNegotiationPolicy,
+  mediaAuthorizationWasRevoked,
+  studioPolicySignature,
+} from "./negotiation.ts";
 
 function item(id: string, rank: Rank): NegItem {
   return { id, label: id, rank };
@@ -117,4 +121,31 @@ test("persisted negotiation normalization restores and locks the canonical polic
       rank: "no",
     },
   );
+});
+
+test("studioPolicySignature changes only for gating policy, not unrelated writes", () => {
+  const base: NegItem[] = normalizeNegotiationItems([
+    { id: "photos", label: "Photos / video for coaching", rank: "yes" },
+  ]);
+  const consent = { consented: true, voice: false, listen: false };
+
+  // Same policy, same signature — an unrelated note/name keystroke in another
+  // tab must not look like a policy change.
+  assert.equal(studioPolicySignature(base, consent), studioPolicySignature([...base], consent));
+
+  // A revoked media approval changes the signature.
+  const revoked = base.map((item) => (item.id === "photos" ? { ...item, rank: "no" as Rank } : item));
+  assert.notEqual(studioPolicySignature(base, consent), studioPolicySignature(revoked, consent));
+
+  // Consent-bearing settings changes are part of the signature.
+  assert.notEqual(
+    studioPolicySignature(base, consent),
+    studioPolicySignature(base, { ...consent, consented: false }),
+  );
+  assert.notEqual(
+    studioPolicySignature(base, consent),
+    studioPolicySignature(base, { ...consent, voice: true }),
+  );
+  // Missing/unknown flags are treated as off rather than throwing.
+  assert.equal(typeof studioPolicySignature(base, {}), "string");
 });

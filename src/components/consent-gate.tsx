@@ -46,7 +46,7 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
         <p className="mt-4 text-sm leading-relaxed text-muted">
           This adult-only app provides general education and limited image observations, never
           consent verification, medical assessment, live monitoring, or safety clearance. Prefer
-          equipment-only or clothed, non-identifying media.
+          equipment-only or non-identifying media.
         </p>
         <ul className="mt-6 space-y-3 text-sm text-fg">
           <Check checked={adults} onChange={setAdults} label="Everyone involved is 18 or older." />

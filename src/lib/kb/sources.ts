@@ -1,4 +1,4 @@
-export const SOURCE_LEDGER_REVISION = "2026-08-21.2" as const;
+export const SOURCE_LEDGER_REVISION = "2026-08-22.1" as const;
 
 export const SAFETY_SOURCES = [
   {
@@ -114,6 +114,42 @@ export const SAFETY_SOURCES = [
     title: "xAI · Enterprise Terms",
     href: "https://x.ai/legal/terms-of-service-enterprise",
     note: "Provider terms warn that outputs may be incomplete or inaccurate and describe conditional retention and deletion. The operator must verify the terms and settings that actually apply.",
+  },
+  {
+    id: "ROPE-2",
+    title: "Helsinki Shibari · Nerve safety for rope bondage",
+    href: "https://www.helsinkishibari.com/articles/nerve-safety-for-rope-bondage",
+    note: "Community education describing commonly cited nerve-risk regions and warning signs; it is not clinical validation, a placement rule set, or individual clearance.",
+  },
+  {
+    id: "ASPHYX-1",
+    title: "U.S. National Institute of Justice · Positional Asphyxia—Sudden Death",
+    href: "https://www.ojp.gov/pdffiles/posasph.pdf",
+    note: "Law-enforcement restraint bulletin describing position-related breathing failure patterns; it addresses a different context and cannot define a safe position, duration, or individual risk.",
+  },
+  {
+    id: "SYNCOPE-1",
+    title: "Cleveland Clinic · Suspension Syndrome",
+    href: "https://my.clevelandclinic.org/health/diseases/suspension-syndrome",
+    note: "Clinical overview of fainting and circulatory collapse while upright or suspended in a harness or line; it does not establish a safe suspension method or individual tolerance.",
+  },
+  {
+    id: "SYNCOPE-2",
+    title: "Mayo Clinic · When does fainting require medical attention",
+    href: "https://newsnetwork.mayoclinic.org/discussion/mayo-clinic-q-and-a-when-does-fainting-require-medical-attention/",
+    note: "General clinical guidance on evaluating fainting episodes and when emergency assessment is needed; it is not scene-specific and does not replace local emergency services.",
+  },
+  {
+    id: "CONSENT-3",
+    title: "Planned Parenthood · The FRIES model of consent",
+    href: "https://www.plannedparenthood.org/planned-parenthood-greater-ohio/media/blog-copy-2/would-you-like-fries-with-that-the-5-pillars-of-consent-everyone-should-know",
+    note: "Public-health education describing freely given, reversible, informed, enthusiastic, and specific consent; it is educational framing, not legal advice or scene clearance.",
+  },
+  {
+    id: "MAT-1",
+    title: "Rope Study · A Brief Overview of Types of Rope",
+    href: "https://ropestudy.com/topic/a-brief-overview-of-types-of-rope/",
+    note: "Community education comparing rope fibers and handling traits; material descriptions do not establish strength ratings, load safety, or suitability for any specific use.",
   },
 ] as const;
 

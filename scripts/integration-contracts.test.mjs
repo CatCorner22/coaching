@@ -141,7 +141,15 @@ test("Studio requires yes for negotiated actions and blocks every voice path", (
   const merge = between(store, "merge: (persisted, current) =>", "      },\n    },");
   assert.match(merge, /\.\.\.current/);
   assert.doesNotMatch(merge, /\.\.\.p[,}]/);
-  assert.match(store, /storage: safeJsonStorage<State>\(\)/);
+  // The negotiation store uses the stamp-merging storage, which wraps
+  // safeJsonStorage: it must still never throw on a corrupt blob, and it must
+  // additionally resolve per item on write so a stale tab cannot resurrect a
+  // revoked rank.
+  assert.match(store, /storage: negotiationMergingStorage<State>\("knotty-negotiate"\)/);
+  const persistModule = read("src/lib/stores/persist.ts");
+  assert.match(persistModule, /export function negotiationMergingStorage/);
+  assert.match(persistModule, /const base = safeJsonStorage<State>\(\);/);
+  assert.match(persistModule, /stamp\(other\) > stamp\(item\)/);
   assert.match(store, /migrate: \(persisted\) => persisted as State/);
   assert.match(studio, /buildStudioNegotiationPolicy\(items\)/);
   assert.match(studio, /const \[negotiationReady, setNegotiationReady\] = useState\(false\)/);
@@ -278,5 +286,88 @@ test("instructor-only entries cannot route into Studio", () => {
   assert.match(
     studio,
     /requestedTie &&[\s\S]*?requestedTie\.minutes\[1\] > 0 &&[\s\S]*?!negotiationPolicy\.isTieBlocked\(search\.tie\)/,
+  );
+});
+
+test("a rejected file import cannot destroy the pending clip-still selection", () => {
+  const camera = read("src/components/camera-capture.tsx");
+  const onFile = between(camera, "async function onFile(file: File", "async function toggleTorch");
+  // Validation must complete before the pending selection is cleared, else an
+  // unsupported or oversized pick discards stills only a re-recording restores.
+  assert.match(
+    onFile,
+    /validateMediaFile\(file, actualKind\);[\s\S]*?await validateMediaSignature\([\s\S]*?setVideoFrames\(\[\]\)/,
+  );
+  assert.doesNotMatch(
+    between(onFile, "async function onFile", "validateMediaFile("),
+    /setVideoFrames\(\[\]\)/,
+  );
+});
+
+test("file-kind recovery works in both directions", () => {
+  const camera = read("src/components/camera-capture.tsx");
+  assert.match(
+    camera,
+    /file\.type\.startsWith\("video\/"\)[\s\S]{0,120}file\.type\.startsWith\("image\/"\)/,
+  );
+});
+
+test("torch toggling is single-flight because setTorch tears down the stream itself", () => {
+  const camera = read("src/components/camera-capture.tsx");
+  const toggle = between(camera, "async function toggleTorch()", "return (");
+  assert.match(toggle, /if \(torchBusyRef\.current\) return;/);
+  assert.match(toggle, /torchBusyRef\.current = true;/);
+  assert.match(toggle, /finally \{[\s\S]*?torchBusyRef\.current = false;/);
+});
+
+test("the recorder budget and the import cap share one constant", () => {
+  const stream = read("src/lib/camera/stream.ts");
+  const camera = read("src/components/camera-capture.tsx");
+  assert.match(stream, /const maxBytes = MAX_VIDEO_BYTES;/);
+  assert.doesNotMatch(stream, /100 \* 1024 \* 1024/);
+  assert.doesNotMatch(camera, /100 \* 1024 \* 1024/);
+  assert.match(camera, /file\.size > MAX_VIDEO_BYTES/);
+});
+
+test("withdrawing an attestation only claims a discard when work existed", () => {
+  const camera = read("src/components/camera-capture.tsx");
+  const withdraw = between(camera, "if (!checked) {", "function startNewBatch");
+  assert.match(withdraw, /const hadPendingWork =/);
+  assert.match(withdraw, /if \(hadPendingWork\) \{[\s\S]*?onDiscard\(\);/);
+});
+
+test("every test file on disk is registered in an npm test script", async () => {
+  const { readdirSync, statSync } = await import("node:fs");
+  const pkg = JSON.parse(read("package.json"));
+  // Platform-owned chrome that this app must not modify. Its injector resolves
+  // src/lib/og/site.json from process.cwd(), so 8 of its 47 cases assert
+  // template defaults and fail from the repo root. Excluded deliberately, not
+  // by omission; every app-owned test file must still be registered.
+  const PLATFORM_OWNED = ["scripts/grok-pwa-plugin.test.mjs"];
+  const registered = [
+    pkg.scripts["test:scripts"],
+    pkg.scripts["test:typed-core"],
+    pkg.scripts["test:stores"],
+  ].join(" ");
+
+  const found = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir)) {
+      if (entry === "node_modules" || entry.startsWith(".")) continue;
+      const full = `${dir}/${entry}`;
+      if (statSync(full).isDirectory()) walk(full);
+      else if (/\.test\.(mjs|ts)$/.test(entry)) found.push(full.replace(/^\.\//, ""));
+    }
+  };
+  walk("scripts");
+  walk("src");
+
+  const missing = found
+    .filter((file) => !PLATFORM_OWNED.includes(file))
+    .filter((file) => !registered.includes(file));
+  assert.deepEqual(
+    missing,
+    [],
+    `these test files exist but no npm script runs them: ${missing.join(", ")}`,
   );
 });

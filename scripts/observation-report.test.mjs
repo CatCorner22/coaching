@@ -484,7 +484,7 @@ test("validator binds sources, evidence multiplicity, and observations to the su
   );
 });
 
-test("transitions are suppressed without user-labeled chronology and validator enforces the boundary", () => {
+test("transitions keep C3 instructor routing while abstaining on chronology", () => {
   const transition = buildObservationReport({
     mediaMode: "selected_video_stills",
     consent,
@@ -496,16 +496,22 @@ test("transitions are suppressed without user-labeled chronology and validator e
     ],
     modelStatus: "completed",
   });
-  assert.equal(
-    transition.recognized_categories.some(
-      (category) => category.canonical_id === "transition_across_frames_possible",
-    ),
-    false,
+  const category = transition.recognized_categories.find(
+    (entry) => entry.canonical_id === "transition_across_frames_possible",
   );
-  assert.ok(transition.observations.every((observation) => observation.confidence === "abstain"));
+  assert.ok(category, "the C3 transition signal must not be silently dropped");
+  assert.equal(category.consequence_band, "C3_high_consequence_instructor_only");
+  assert.equal(category.abstain_reason, "chronology_unknown");
+  assert.notEqual(category.evidence_state, "observed");
+  assert.equal(transition.disposition, "do_not_proceed");
+  assert.equal(transition.next_step_id, "qualified_instructor");
+  assert.equal(validateObservationReport(transition).success, true);
 
   const forgedTransition = clone(transition);
-  forgedTransition.recognized_categories[0].canonical_id = "transition_across_frames_possible";
+  const forged = forgedTransition.recognized_categories.find(
+    (entry) => entry.canonical_id === "transition_across_frames_possible",
+  );
+  forged.abstain_reason = "not_applicable";
   assert.match(
     validateObservationReport(forgedTransition).issues.join(" "),
     /user-labeled chronology/i,

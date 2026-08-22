@@ -610,3 +610,270 @@ test("curated answers are deterministic and available without a server or AI", (
   assert.equal(answer, knowledgeAnswer("coercion"));
   assert.match(knowledgeAnswer("zzzzqvvvv"), /No curated local entry matched/);
 });
+
+test("expansion safety articles are discoverable through natural wording", () => {
+  assert.ok(
+    searchKnowledge("positional asphyxia", 8).some((hit) => hit.slug === "positional-asphyxia"),
+  );
+  assert.ok(
+    searchKnowledge("prone position restricted breathing", 8).some(
+      (hit) => hit.slug === "positional-asphyxia",
+    ),
+  );
+  assert.ok(
+    searchKnowledge("ball gag stuffy nose", 8).some((hit) => hit.slug === "gag-signal-safety"),
+  );
+  assert.ok(
+    searchKnowledge("self bondage alone", 8).some((hit) => hit.slug === "solo-self-tying"),
+  );
+  assert.ok(
+    searchKnowledge("blood thinner disclosure", 8).some((hit) => hit.slug === "medical-disclosure"),
+  );
+  assert.ok(
+    searchKnowledge("frayed rope retire", 8).some(
+      (hit) => hit.slug === "rope-inspection-retirement",
+    ),
+  );
+  assert.ok(
+    searchKnowledge("debrief what happened injury", 8).some(
+      (hit) => hit.slug === "incident-response",
+    ),
+  );
+  assert.ok(searchKnowledge("padded cuffs", 8).some((hit) => hit.slug === "cuffs"));
+  assert.ok(searchKnowledge("collar leash", 8).some((hit) => hit.slug === "collar"));
+});
+
+test("expansion safety articles carry source anchors and honest notes", () => {
+  for (const slug of [
+    "positional-asphyxia",
+    "gag-signal-safety",
+    "nerve-self-checks",
+    "circulation-vs-nerve",
+    "fainting-response",
+    "cuff-and-collar-fit",
+    "solo-self-tying",
+    "medical-disclosure",
+    "rope-inspection-retirement",
+    "incident-response",
+  ]) {
+    const evidence = getArticleEvidence(slug);
+    assert.equal(evidence.status, "source_anchored", slug);
+    assert.ok(evidence.sourceIds.length > 0, slug);
+  }
+  assert.ok(getArticleEvidence("positional-asphyxia").sourceIds.includes("ASPHYX-1"));
+  assert.ok(getArticleEvidence("fainting-response").sourceIds.includes("SYNCOPE-1"));
+  assert.ok(getArticleEvidence("medical-disclosure").sourceIds.includes("CONSENT-3"));
+});
+
+test("emergency routing still leads with action-first guidance beside expansion entries", () => {
+  const hits = searchKnowledge("not breathing", 6);
+  assert.equal(hits[0]?.slug, "emergency-stop");
+  assert.ok(hits.slice(0, 3).some((hit) => hit.slug === "shears"));
+  for (const hit of hits) {
+    assert.ok(
+      [
+        "emergency-stop",
+        "hard-limits",
+        "positional-asphyxia",
+        "fainting-response",
+        "shears",
+      ].includes(hit.slug),
+      `unexpected emergency result ${hit.slug}`,
+    );
+  }
+  const release = searchKnowledge("fingers are numb", 8);
+  for (const hit of release) {
+    assert.ok(
+      [
+        "circulation",
+        "nerve-atlas",
+        "nerve-self-checks",
+        "circulation-vs-nerve",
+        "incident-response",
+        "emergency-stop",
+        "shears",
+      ].includes(hit.slug),
+      `unexpected release result ${hit.slug}`,
+    );
+  }
+});
+
+test("hanging, cyanosis, and pre-syncope phrasings route action-first, not to tie material", () => {
+  for (const query of [
+    "found them hanging by the neck",
+    "he hanged himself",
+    "self-hanging",
+    "hung herself from the rig",
+  ]) {
+    const kind = knowledgeDisposition(query).kind;
+    assert.notEqual(kind, "ordinary", query);
+    const hits = searchKnowledge(query, 4);
+    assert.equal(hits[0]?.slug, "emergency-stop", query);
+    assert.ok(
+      !hits.some((hit) => ["single-column", "takate-kote", "karada"].includes(hit.slug)),
+      `${query} surfaced tie material`,
+    );
+  }
+
+  for (const query of ["lips are turning purple", "her lips look dusky", "his face is purple"]) {
+    assert.equal(knowledgeDisposition(query).kind, "emergency", query);
+    assert.equal(searchKnowledge(query, 3)[0]?.slug, "emergency-stop", query);
+  }
+
+  for (const query of ["I feel faint", "feeling faint", "feels woozy", "feel lightheaded"]) {
+    assert.equal(knowledgeDisposition(query).kind, "release_now", query);
+  }
+});
+
+test("craft phrasings with 'hang' are not misrouted as emergencies", () => {
+  for (const query of ["hang the rope to dry", "hang out after the scene", "how to hang rope for storage"]) {
+    assert.equal(knowledgeDisposition(query).kind, "ordinary", query);
+  }
+});
+
+test("equipment age is not misclassified as ambiguous-age media, but a person's age still blocks", () => {
+  for (const query of [
+    "my rope is 5 years old should I retire it",
+    "this hemp is 3 years old",
+    "16 year old jute",
+    "a 10 year old harness",
+    "my kit is 7 years old",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "ordinary", query);
+  }
+  for (const query of [
+    "photo of a 15 year old",
+    "she is 15 years old",
+    "15 years old",
+    "a 12 year old model",
+    "underage",
+    "the person looks young in the photo",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "unsupported_media", query);
+  }
+});
+
+test("wrist drop, aspiration-behind-gag, and next-day symptoms route with the right family", () => {
+  for (const query of ["wrist drop", "her hand won't lift at the wrist", "can't extend my wrist"]) {
+    assert.equal(knowledgeDisposition(query).kind, "release_now", query);
+  }
+  for (const query of [
+    "she's gagged and vomiting",
+    "vomiting behind the gag",
+    "he's choking on vomit",
+    "aspirating",
+    "gagged and throwing up",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "emergency", query);
+    assert.equal(searchKnowledge(query, 3)[0]?.slug, "emergency-stop", query);
+  }
+  // Craft/after-the-fact phrasings must not trip the emergency families.
+  for (const query of ["gag types overview", "cleaning up after vomiting the next day", "wrist wrap tutorial"]) {
+    assert.equal(knowledgeDisposition(query).kind, "ordinary", query);
+  }
+  // The incident-response article is admitted beside release guidance.
+  assert.ok(
+    searchKnowledge("still numb next day weak hand", 6).some((hit) => hit.slug === "incident-response"),
+  );
+});
+
+test("the equipment-age exemption cannot smuggle a person's age past the block", () => {
+  // Regression corpus. An earlier, looser guard treated any query with a rope
+  // word near an age as an equipment question, which let real child-safety
+  // reports route as ordinary. The exemption now requires that the equipment
+  // noun governs the age AND that no person is referenced at all.
+  for (const query of [
+    "photo of a 15 year old",
+    "she is 16 years old",
+    "he is 17 years old",
+    "15 years old",
+    "a 12 year old model",
+    "underage",
+    "the person looks young in the photo",
+    "she is 16 years old and we used rope",
+    "my rope partner is 16 years old",
+    "16 year old girlfriend rope photo",
+    "rope for my 14 year old",
+    "my kit and a 15 year old",
+    "the model is 16 years old rope harness",
+    "tying a 15 year old",
+    "my 16 year old cousin",
+    "can I tie a 17 year old with jute",
+    "17 year old sub",
+    "rope harness on a 16 year old girl",
+    "my daughter is 15 years old",
+    "bought rope for a 15 year old",
+    "her age is 16 and we have rope",
+    "the bottom is 17 years old",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "unsupported_media", query);
+  }
+
+  for (const query of [
+    "my rope is 5 years old should I retire it",
+    "this hemp is 3 years old",
+    "16 year old jute",
+    "a 10 year old harness",
+    "my kit is 7 years old",
+    "these ropes are 12 years old",
+    "my jute is about 4 years old",
+    "the webbing is 9 years old",
+    "carabiner is 6 years old",
+    "5 year old cotton rope",
+    "my shears are 8 years old",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "ordinary", query);
+  }
+});
+
+
+test("adversarial routing corpus: inflections, progressives, CJK, and craft controls", () => {
+  // Corpus from an adversarial swarm pass over this session's routing changes.
+  // Each string below was a real misroute before the fix.
+  const urgent = new Set(["emergency", "prompt_medical", "release_now"]);
+  for (const query of [
+    // 1 hung
+    "she is hung by the neck","found her hung by the neck","he was hung from the rig by his neck",
+    "found them hanging by the neck","he hanged himself","self-hanging",
+    // CJK hanging
+    "首を吊っています","彼が首を吊った","首吊り","他上吊了","吊死","목을 맸어요",
+    // 3 cyanosis progressive
+    "his face is going blue","her lips are going blue","his lips are going purple",
+    "face is going dusky","lips are looking blue","face is looking dusky","lips were going blue",
+    "lips are turning purple","her lips look dusky",
+    "唇が紫色","嘴唇发紫","입술이 보라색",
+    // 4/7 vomiting incident
+    "she is gagged and vomiting","she throws up with the gag in","she vomits with the gag on",
+    "he is retching with the gag in","she is heaving behind the gag","gagged and throwing up",
+    "aspirating","he's choking on vomit",
+    "猿ぐつわをしたまま嘔吐している","戴着口塞呕吐","재갈 물린 채 구토",
+    // 5 wrist
+    "i can't straighten my wrist","i cant straighten my wrist","my wrist wont lift",
+    "her wrist cant extend","wrist drop","her hand won't lift at the wrist",
+    "手首が上がらない",
+    // 8 pre-syncope
+    "she felt faint","i felt dizzy after the suspension","she got dizzy","i am dizzy",
+    "she is very dizzy","i feel like i'm going to faint","i feel faint","feeling faint",
+    "めまい","头晕","어지러워요",
+  ]) {
+    assert.ok(urgent.has(knowledgeDisposition(query).kind), `should be urgent: ${query}`);
+  }
+  for (const query of [
+    // 2 suspension craft must NOT be emergency
+    "how long can someone stay hanging from the rope in a suspension",
+    "hanging from the rope upside down inversion tips",
+    "she is hanging from the rig comfortably",
+    "how much weight when hanging from the rope",
+    "hang the rope to dry","hang out after the scene","how to hang rope for storage",
+    // 4 gag education must NOT be emergency
+    "does a ball gag increase the risk of vomiting","how to clean a gag after vomit",
+    "gag safety and vomiting risk",
+    // 9 equipment age with possessive
+    "her rope is 5 years old","my rope is 5 years old should I retire it",
+    "16 year old jute","my kit is 7 years old",
+    // controls
+    "rope care","aftercare","wrist wrap tutorial",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "ordinary", query);
+  }
+});
