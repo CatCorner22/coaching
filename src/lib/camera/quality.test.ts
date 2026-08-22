@@ -89,3 +89,82 @@ test("quality hints never request a more intimate or identifying view", () => {
   assert.match(hint, /non-identifying/i);
   assert.doesNotMatch(hint, /nudity|intimate view|whole room/i);
 });
+
+test("an equipment-only rope close-up outranks a bare-skin frame", () => {
+  // The flatness guard used to reject a frame whose pixels were overwhelmingly
+  // rope-coloured — which is exactly what the equipment-only framing this app
+  // asks people to prefer produces. A pure rope close-up scored 0 on the rope
+  // axis while bare skin scored higher, inverting the ranking the hint exists
+  // to drive.
+  let seed = 4242;
+  const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const jitter = (c: readonly [number, number, number], amount: number) =>
+    c.map((v) => Math.max(0, Math.min(255, Math.round(v + (rnd() - 0.5) * amount))));
+  const frame = (
+    w: number,
+    h: number,
+    px: (x: number, y: number) => readonly [number, number, number],
+  ) => {
+    const buf = new Uint8ClampedArray(w * h * 4);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const [r, g, b] = jitter(px(x, y), 12);
+        buf[i] = r!;
+        buf[i + 1] = g!;
+        buf[i + 2] = b!;
+        buf[i + 3] = 255;
+      }
+    }
+    return { data: buf, width: w, height: h } as unknown as ImageData;
+  };
+  const shade = (c: readonly [number, number, number], k: number) =>
+    [c[0] * k, c[1] * k, c[2] * k] as const;
+
+  // Rope must register at every exposure, dark fibre included: the guard was an
+  // absolute luminance spread, and dark material's whole tonal range is
+  // compressed near zero.
+  for (const rope of [
+    [186, 152, 96],
+    [172, 146, 104],
+    [122, 96, 58],
+    [30, 30, 32],
+  ] as const) {
+    for (const dim of [1, 0.55]) {
+      const closeUp = frame(240, 240, (_x, y) =>
+        shade(rope, (0.62 + 0.5 * Math.sin(Math.PI * ((y % 12) / 12))) * dim),
+      );
+      assert.ok(
+        ropeHint(closeUp) > 0.05,
+        `equipment-only close-up of ${rope.join(",")} at exposure ${dim} scored ${ropeHint(closeUp)}`,
+      );
+    }
+  }
+
+  // Bare skin across the tone range, and a rope-coloured wall, must stay at
+  // zero — otherwise the hint steers the app to transmit a body frame.
+  for (const subject of [
+    [231, 195, 168],
+    [209, 167, 133],
+    [180, 138, 100],
+    [141, 95, 63],
+    [88, 56, 36],
+    [150, 118, 82],
+  ] as const) {
+    const bare = frame(240, 240, (x) =>
+      shade(subject, 0.86 + 0.14 * Math.sin((x / 240) * Math.PI)),
+    );
+    assert.equal(ropeHint(bare), 0, `bare ${subject.join(",")} produced a rope hint`);
+  }
+
+  // Black fabric is the acknowledged exception and is asserted as such rather
+  // than wished away: isDarkFiber exists so black rope is not discarded as
+  // background, and black lace occupies the same near-zero, low-saturation
+  // corner. No per-pixel colour test separates them. The cost is bounded — this
+  // only nudges which frame is ranked highest, and the observation report draws
+  // no conclusion from it.
+  const blackLace = frame(240, 240, (x) =>
+    shade([26, 24, 26], 0.86 + 0.14 * Math.sin((x / 240) * Math.PI)),
+  );
+  assert.ok(ropeHint(blackLace) > 0, "black fabric no longer reads as dark fibre");
+});

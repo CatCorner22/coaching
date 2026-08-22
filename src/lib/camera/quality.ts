@@ -83,7 +83,6 @@ function isDarkJute(r: number, g: number, b: number): boolean {
 export function ropeHint(data: ImageData): number {
   const buf = data.data;
   let rope = 0;
-  let ropeColour = 0;
   let n = 0;
   let lumaSum = 0;
   let lumaSquaredSum = 0;
@@ -104,23 +103,41 @@ export function ropeHint(data: ImageData): number {
       Math.abs(
         luma - (0.299 * buf[i - 4]! + 0.587 * buf[i - 3]! + 0.114 * buf[i - 2]!),
       ) >= 5;
-    const ropeColoured = isRope(r, g, b) || isDarkFiber(r, g, b) || isDarkJute(r, g, b);
-    if (ropeColoured) ropeColour++;
-    if (contrast && ropeColoured) rope++;
+    if (contrast && (isRope(r, g, b) || isDarkFiber(r, g, b) || isDarkJute(r, g, b))) rope++;
     n++;
   }
   if (n < 4) return 0;
 
   const meanLuma = lumaSum / n;
   const lumaVariance = Math.max(0, lumaSquaredSum / n - meanLuma * meanLuma);
+  const lumaSd = Math.sqrt(lumaVariance);
   const share = rope / n;
 
-  // A flat dark/brown/skin-colored surface is not evidence of rope. Require scene
-  // texture and some non-rope context before using color as a ranking hint.
-  // The saturation guard must read the UNGATED colour share: the texture gate
-  // removes pixels from the numerator, so testing the gated share let a
-  // full-frame body pass the very guard that exists to reject it.
-  if (Math.sqrt(lumaVariance) < 6 || ropeColour / n > 0.85) return 0;
+  // A flat dark/brown/skin-coloured surface is not evidence of rope, but
+  // flatness has to be judged relative to how bright the frame is. Luminance
+  // spread scales with exposure, so an absolute threshold fails in both
+  // directions at once: it rejected black rope close-ups, whose whole tonal
+  // range is compressed near zero, while admitting evenly lit bare skin whose
+  // spread is larger in absolute terms and yet featureless.
+  //
+  // A share of rope-COLOURED pixels cannot stand in for this either. It reads
+  // 1.00 for bare deep skin, a brown wall and an unlit room, and 0.99 for a
+  // pure rope close-up, so the guard that used it returned zero for exactly the
+  // equipment-only framing this app asks people to prefer — while bare skin
+  // scored higher. Measured across jute, hemp, dark jute and black rope at two
+  // exposures against five skin tones, relative spread separates them with
+  // margin on both sides: rope frames sit at 0.089 and above, bare skin and
+  // flat surfaces at 0.079 and below.
+  //
+  // One pair resists this and is left resisting it: hemp on olive skin at full
+  // exposure lands at 0.079, indistinguishable from heavily noised bare skin at
+  // 0.079, because the two colours differ by almost no luminance. Loosening the
+  // threshold to admit it also admits bare skin at a rope share of 0.38, which
+  // would steer the app to transmit a body frame as the rope frame — a worse
+  // trade than losing a ranking bonus. Band detection in observeFrame is
+  // unaffected and still reports that tie; only this frame-ranking hint abstains.
+  const relativeSpread = lumaSd / Math.max(1, meanLuma);
+  if (lumaSd < 2 || relativeSpread < 0.08) return 0;
   return share;
 }
 
