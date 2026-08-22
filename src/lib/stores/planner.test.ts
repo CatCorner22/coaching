@@ -193,3 +193,62 @@ test("a cross-tab merge loses neither a custom limit nor a revocation under a ba
   }
   assert.ok(storage.length <= 80, `merged array grew to ${storage.length}`);
 });
+
+test("a write that cannot be persisted is reported instead of swallowed", async () => {
+  const { safeBrowserStorage, onPersistFailure, getPersistFailure, resetPersistFailure } =
+    await import("./persist.ts");
+  const originalWindow = (globalThis as { window?: unknown }).window;
+  const originalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  try {
+    resetPersistFailure();
+    const seen: Array<{ key: string; reason: string }> = [];
+    const off = onPersistFailure((failure) => seen.push(failure));
+
+    // A storage that is full, exactly as a browser reports it.
+    const quotaError = new Error("exceeded");
+    quotaError.name = "QuotaExceededError";
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: () => null,
+        setItem: () => {
+          throw quotaError;
+        },
+        removeItem: () => undefined,
+      },
+    });
+
+    const storage = safeBrowserStorage();
+    // It must not throw — the live store keeps working from memory.
+    storage.setItem("knotty-negotiate", "{}");
+    assert.deepEqual(seen, [{ key: "knotty-negotiate", reason: "quota" }]);
+    assert.deepEqual(getPersistFailure(), { key: "knotty-negotiate", reason: "quota" });
+
+    // A blocked storage is a different cause and is reported as one, because
+    // the two need different things from the user.
+    const securityError = new Error("blocked");
+    securityError.name = "SecurityError";
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: () => null,
+        setItem: () => {
+          throw securityError;
+        },
+        removeItem: () => undefined,
+      },
+    });
+    safeBrowserStorage().setItem("knotty-settings", "{}");
+    assert.deepEqual(getPersistFailure(), { key: "knotty-settings", reason: "blocked" });
+
+    off();
+    safeBrowserStorage().setItem("knotty-journal", "{}");
+    assert.equal(seen.length, 2, "unsubscribing must stop delivery");
+    resetPersistFailure();
+    assert.equal(getPersistFailure(), null);
+  } finally {
+    if (originalStorage) Object.defineProperty(globalThis, "localStorage", originalStorage);
+    else delete (globalThis as { localStorage?: unknown }).localStorage;
+    (globalThis as { window?: unknown }).window = originalWindow;
+  }
+});

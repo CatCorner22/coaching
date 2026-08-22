@@ -3,6 +3,7 @@ import { Menu } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ConsentGate } from "@/components/consent-gate";
 import { subscribeToLocalDataErase } from "@/lib/privacy/local-data";
+import { getPersistFailure, onPersistFailure, type PersistFailure } from "@/lib/stores/persist";
 import { authEnabled } from "@/lib/auth/client";
 import { SignedIn, SignedOut, UserButton } from "@/lib/auth/gates";
 import { isActive, MORE, NAV, routeTitle } from "@/lib/nav";
@@ -17,6 +18,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
   // Never leave the sheet covering the screen after a navigation.
   useEffect(() => setMoreOpen(false), [pathname]);
+  // A failed write used to be silent: the tab looked correct and the change was
+  // gone on reload. Consent lives in these stores, so the failure has to be
+  // visible on every screen rather than discovered later.
+  const [persistFailure, setPersistFailure] = useState<PersistFailure | null>(() =>
+    getPersistFailure(),
+  );
+  useEffect(() => onPersistFailure(setPersistFailure), []);
   // The sheet's markup precedes its trigger, so forward Tab walked straight
   // past it and out of the page. Move focus in on open, close on Escape, and
   // hand focus back to the trigger — it is the only route to 13 destinations
@@ -151,6 +159,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-label={routeTitle(pathname)}
             className="pb-24 outline-none md:pb-10"
           >
+            {persistFailure && (
+              <div
+                role="alert"
+                className="mx-auto mb-4 max-w-5xl rounded-lg border border-danger/50 bg-danger/10 px-4 py-3 text-sm leading-relaxed text-fg"
+              >
+                <strong className="text-danger-text">Changes are not being saved.</strong>{" "}
+                {persistFailure.reason === "quota"
+                  ? "This device is out of storage for this app, so the last change stayed in this tab only."
+                  : "This browser is blocking storage for this app, so the last change stayed in this tab only."}{" "}
+                Anything you set — including limits and consent — will revert when the page reloads.
+                Treat what is on screen as unsaved until this clears.
+              </div>
+            )}
             {children}
           </main>
         </div>

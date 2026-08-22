@@ -6,6 +6,52 @@ type SyncStateStorage = {
   removeItem: (name: string) => void;
 };
 
+/**
+ * A write that could not be persisted.
+ *
+ * setItem swallowed these and returned normally, so zustand — and every screen
+ * reading from it — treated a failed write as a successful save. The live tab
+ * looked right and the change was gone on reload. For the negotiation store
+ * that means a limit the couple revoked comes back as they left it, which is
+ * the one class of silence this app cannot afford.
+ */
+export type PersistFailure = { key: string; reason: "quota" | "blocked" };
+
+let lastPersistFailure: PersistFailure | null = null;
+const persistFailureListeners = new Set<(failure: PersistFailure) => void>();
+
+function reportPersistFailure(key: string, error: unknown) {
+  const name = (error as { name?: string })?.name ?? "";
+  const failure: PersistFailure = {
+    key,
+    reason: /quota|QuotaExceeded|NS_ERROR_DOM_QUOTA/i.test(name) ? "quota" : "blocked",
+  };
+  lastPersistFailure = failure;
+  for (const listener of persistFailureListeners) {
+    try {
+      listener(failure);
+    } catch {
+      // A broken listener must not stop the others from hearing about it.
+    }
+  }
+}
+
+/** Most recent failed write, or null if every write so far has landed. */
+export function getPersistFailure(): PersistFailure | null {
+  return lastPersistFailure;
+}
+
+/** Subscribe to failed writes. Returns an unsubscribe function. */
+export function onPersistFailure(listener: (failure: PersistFailure) => void): () => void {
+  persistFailureListeners.add(listener);
+  return () => persistFailureListeners.delete(listener);
+}
+
+/** Test seam. */
+export function resetPersistFailure() {
+  lastPersistFailure = null;
+}
+
 const UNAVAILABLE_STORAGE: SyncStateStorage = {
   getItem: () => null,
   setItem: () => undefined,
@@ -28,8 +74,10 @@ export function safeBrowserStorage(): SyncStateStorage {
       setItem: (name, value) => {
         try {
           storage.setItem(name, value);
-        } catch {
-          // The live store still works with conservative in-memory state.
+        } catch (error) {
+          // The live store keeps working from memory, but the change is NOT
+          // saved. Say so rather than letting the tab look correct until reload.
+          reportPersistFailure(name, error);
         }
       },
       removeItem: (name) => {
