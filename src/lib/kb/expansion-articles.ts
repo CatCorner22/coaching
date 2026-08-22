@@ -213,6 +213,43 @@ export const EXPANSION_ARTICLES: Article[] = [
     ],
   },
   {
+    slug: "top-incapacitated",
+    title: "If the Top Goes Down",
+    section: "risk",
+    minutes: 6,
+    summary:
+      "Every emergency instruction in this app is addressed to the person who can act. This is the one where that person is the emergency.",
+    related: ["solo-self-tying", "emergency-stop", "hard-limits", "fainting-response"],
+    blocks: [
+      {
+        type: "p",
+        text: "Read the rest of this app and you will notice something: every emergency response assumes someone present and able. Stop and release. Support the position. Call for help. All of it is addressed to the person with free hands. A two-person household practising alone has exactly one of those people, and tops are not exempt from fainting, seizures, cardiac events, strokes, low blood sugar, or simply falling and hitting their head. None of that has anything to do with rope, and none of it announces itself in advance.",
+      },
+      {
+        type: "p",
+        text: "What makes this different from every other risk here is that it has no in-the-moment answer. The restrained person cannot be talked through a response they have no hands for. So the whole of the mitigation happens earlier, when you are deciding what to tie — which means it is a negotiation decision, not a safety technique.",
+      },
+      {
+        type: "ul",
+        items: [
+          "The question to settle before a tie, every time: if the top stopped responding right now, could the bottom get out or get help without them? If the answer is no, that is the tie being chosen, not an unlucky outcome.",
+          "Rehearse the bottom's unaided exit while calm, unhurried, and not in the middle of a scene. An escape nobody has actually performed is a plan, not a capability — and hands that are cold, numb, or shaking do not perform it the way rested hands do.",
+          "Keep a phone within the bottom's reach, unlocked or with voice activation and emergency SOS already enabled and tested. Test it: many phones will not answer a voice assistant from a locked screen, and a phone across the room is decoration.",
+          "Anything the bottom cannot exit alone — fixed attachment, load, suspension, anything on the neck, anything blocking the mouth, hands secured beyond reach of a release — has no version of this that works. Those are already stop or instructor-route categories in this app; alone with one partner, they are also unrecoverable.",
+          "Someone outside should notice. A scheduled message, a friend expecting a check-in at a set time, anything that turns silence into a knock. It does not have to explain what you are doing.",
+        ],
+      },
+      {
+        type: "p",
+        text: "If it happens and you are the restrained one: your own position and breathing come first, because an unresponsive partner cannot be helped by someone who has passed out beside them. Get your airway clear of pressure, get out by the route you rehearsed, and call emergency services — an unresponsive person needs them whether or not you are free yet. Say plainly that someone is unresponsive and give the address; dispatchers do not need the rest of the context, and no part of what you were doing changes the medical response.",
+      },
+      {
+        type: "warn",
+        text: "This entry cannot make the scenario survivable after the fact. It can only move the decision to the point where it is still a decision. If you would not accept the outcome of the top going down mid-tie, do not build the tie that makes it unrecoverable.",
+      },
+    ],
+  },
+  {
     slug: "medical-disclosure",
     title: "Health Disclosure in Negotiation",
     section: "consent",

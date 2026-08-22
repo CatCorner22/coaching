@@ -50,6 +50,9 @@ const ARTICLE_SOURCE_IDS: Readonly<Record<string, readonly SafetySourceId[]>> = 
   "fainting-response": ["SYNCOPE-1", "SYNCOPE-2", "FIRSTAID-1"],
   "cuff-and-collar-fit": ["CUFF-1", "NFS-1"],
   "solo-self-tying": ["FIRSTAID-1"],
+  // FIRSTAID-1 anchors only the unresponsive-person half — airway, position,
+  // and calling emergency services. The scoping argument is app-authored.
+  "top-incapacitated": ["FIRSTAID-1"],
   "medical-disclosure": ["CONSENT-1", "CONSENT-2", "CONSENT-3"],
   "rope-inspection-retirement": ["MAT-1"],
   "incident-response": ["ROPE-1", "FIRSTAID-1"],

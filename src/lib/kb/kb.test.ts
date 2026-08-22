@@ -965,3 +965,36 @@ test("a live report still routes even when phrased as a question", () => {
     assert.notEqual(knowledgeDisposition(query).kind, "ordinary", query);
   }
 });
+
+test("the knowledge base covers the top being incapacitated mid-scene", () => {
+  // Every emergency instruction in this app is addressed to the person who can
+  // act, and solo-self-tying names that assumption out loud — "someone present
+  // and able". Nothing covered the partnered case where that person IS the
+  // emergency, which for a two-person household practising alone is the one
+  // scenario with no in-the-moment answer.
+  const article = ARTICLES.find((entry) => entry.slug === "top-incapacitated");
+  assert.ok(article, "no article covers the top going down mid-scene");
+  const text = JSON.stringify(article);
+  // The mitigation is a scoping decision made before the tie, not a technique.
+  assert.match(text, /rehears/i);
+  assert.match(text, /emergency services/i);
+  // It must not promise the scenario can be made safe after the fact.
+  assert.match(text, /cannot make the scenario survivable/i);
+
+  // A live report of it is an emergency; planning for it is ordinary reading.
+  for (const query of [
+    "top passed out while i am tied",
+    "rigger collapsed",
+    "my partner is unresponsive and im still tied",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "emergency", query);
+  }
+  for (const query of ["what if the top faints", "stuck tied nobody to release me"]) {
+    assert.equal(knowledgeDisposition(query).kind, "ordinary", query);
+    assert.equal(
+      searchKnowledge(query, 3)[0]?.slug,
+      "top-incapacitated",
+      `${query} did not surface the article`,
+    );
+  }
+});

@@ -169,6 +169,8 @@ const SEARCH_ALIASES: Readonly<Record<string, string>> = {
     "cuff cuffs handcuff leather cuff two finger fit collar leash spreader bar padlock key quick release too tight",
   "article:solo-self-tying":
     "self tie self-tie solo alone by myself self bondage self-bondage practice alone escape release plan",
+  "article:top-incapacitated":
+    "top passed out rigger fainted rigger collapsed top unconscious top had a seizure partner unresponsive while tied stuck tied nobody to release me cant get out alone couple two people no third person top emergency dominant collapsed",
   "article:medical-disclosure":
     "health condition medical history diabetes neuropathy blood thinner anticoagulant ehlers danlos hypermobile asthma seizure epilepsy pregnant pregnancy medication disclosure",
   "article:rope-inspection-retirement":
