@@ -280,3 +280,50 @@ test("instructor-only entries cannot route into Studio", () => {
     /requestedTie &&[\s\S]*?requestedTie\.minutes\[1\] > 0 &&[\s\S]*?!negotiationPolicy\.isTieBlocked\(search\.tie\)/,
   );
 });
+
+test("a rejected file import cannot destroy the pending clip-still selection", () => {
+  const camera = read("src/components/camera-capture.tsx");
+  const onFile = between(camera, "async function onFile(file: File", "async function toggleTorch");
+  // Validation must complete before the pending selection is cleared, else an
+  // unsupported or oversized pick discards stills only a re-recording restores.
+  assert.match(
+    onFile,
+    /validateMediaFile\(file, actualKind\);[\s\S]*?await validateMediaSignature\([\s\S]*?setVideoFrames\(\[\]\)/,
+  );
+  assert.doesNotMatch(
+    between(onFile, "async function onFile", "validateMediaFile("),
+    /setVideoFrames\(\[\]\)/,
+  );
+});
+
+test("file-kind recovery works in both directions", () => {
+  const camera = read("src/components/camera-capture.tsx");
+  assert.match(
+    camera,
+    /file\.type\.startsWith\("video\/"\)[\s\S]{0,120}file\.type\.startsWith\("image\/"\)/,
+  );
+});
+
+test("torch toggling is single-flight because setTorch tears down the stream itself", () => {
+  const camera = read("src/components/camera-capture.tsx");
+  const toggle = between(camera, "async function toggleTorch()", "return (");
+  assert.match(toggle, /if \(torchBusyRef\.current\) return;/);
+  assert.match(toggle, /torchBusyRef\.current = true;/);
+  assert.match(toggle, /finally \{[\s\S]*?torchBusyRef\.current = false;/);
+});
+
+test("the recorder budget and the import cap share one constant", () => {
+  const stream = read("src/lib/camera/stream.ts");
+  const camera = read("src/components/camera-capture.tsx");
+  assert.match(stream, /const maxBytes = MAX_VIDEO_BYTES;/);
+  assert.doesNotMatch(stream, /100 \* 1024 \* 1024/);
+  assert.doesNotMatch(camera, /100 \* 1024 \* 1024/);
+  assert.match(camera, /file\.size > MAX_VIDEO_BYTES/);
+});
+
+test("withdrawing an attestation only claims a discard when work existed", () => {
+  const camera = read("src/components/camera-capture.tsx");
+  const withdraw = between(camera, "if (!checked) {", "function startNewBatch");
+  assert.match(withdraw, /const hadPendingWork =/);
+  assert.match(withdraw, /if \(hadPendingWork\) \{[\s\S]*?onDiscard\(\);/);
+});
