@@ -59,6 +59,8 @@ function StudioPage() {
   const startSession = useSession((s) => s.start);
   const resetSession = useSession((s) => s.reset);
   const stopped = useSession((s) => s.stopped);
+  const stopReason = useSession((s) => s.stopReason);
+  const yellowAt = useSession((s) => s.yellowAt);
   const stepIndex = useSession((s) => s.stepIndex);
   const tieSlug = useSession((s) => s.tieSlug);
   const furnitureSlug = useSession((s) => s.furnitureSlug);
@@ -223,9 +225,10 @@ function StudioPage() {
       (w) => {
         const t = w.toLowerCase();
         if (t === settings.safeword.toLowerCase() || t === "red") stopSession("safeword");
-        else if (t === settings.yellowWord.toLowerCase()) {
-          if (useSession.getState().stopped) return;
-          stopSession("yellow");
+        // Yellow is information, not a stop: it raises a check-in banner and
+        // leaves the session running, which is what the knowledge base teaches.
+        else if (t === settings.yellowWord.toLowerCase() || t === "yellow") {
+          useSession.getState().flagYellow();
         }
       },
       (status) => {
@@ -237,6 +240,11 @@ function StudioPage() {
       },
     );
   }, [settings.listen, micArmed, settings.safeword, settings.yellowWord, stopSession]);
+
+  const yellowAlertRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (yellowAt !== null) yellowAlertRef.current?.focus({ preventScroll: true });
+  }, [yellowAt]);
 
   const captureContextRef = useRef(captureContextKey);
 
@@ -530,6 +538,30 @@ function StudioPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
+      {!stopped && yellowAt !== null && (
+        <div
+          ref={yellowAlertRef}
+          role="alert"
+          aria-live="assertive"
+          tabIndex={-1}
+          className="mb-6 rounded-lg border border-warn/40 bg-warn/10 p-4 outline-none focus:ring-2 focus:ring-warn"
+        >
+          <p className="font-display text-3xl text-warn">Yellow</p>
+          <p className="mt-1 text-sm text-fg">
+            Stop adding and check directly. Ask what changed and what they need — do not bargain,
+            finish a wrap first, or wait for another signal. The session is still running; clear
+            this once you have actually checked in.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => useSession.getState().clearYellow()}>
+              Checked in
+            </Button>
+            <Button variant="danger" onClick={() => stopSession("safeword")}>
+              Stop the scene
+            </Button>
+          </div>
+        </div>
+      )}
       {stopped && (
         <div
           ref={stopAlertRef}
@@ -539,6 +571,15 @@ function StudioPage() {
           className="mb-6 rounded-lg border border-danger/40 bg-danger/10 p-4 outline-none focus:ring-2 focus:ring-danger"
         >
           <p className="font-display text-3xl text-danger-text">Stop</p>
+          {stopReason && (
+            <p className="mt-1 text-xs uppercase tracking-wide text-muted">
+              {stopReason === "safeword"
+                ? "Safeword heard"
+                : stopReason === "coach"
+                  ? "Stopped by an observation flag"
+                  : "Stopped manually"}
+            </p>
+          )}
           <p className="mt-1 text-sm text-fg">
             Stop the activity. Support the person's position and release without creating a fall.
             Call emergency services for abnormal breathing, unresponsiveness, seizure, chest pain, a

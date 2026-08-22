@@ -10,6 +10,14 @@ type SessionState = {
   listening: boolean;
   stopped: boolean;
   stopReason?: string;
+  /**
+   * A yellow signal is not a stop. The knowledge base is explicit that red ends
+   * the night and yellow changes it, so yellow raises this flag and the session
+   * keeps running; the studio renders its own banner and the top clears it after
+   * checking in. Routing yellow through stop() showed the full red alert,
+   * emergency-services text and all, which teaches people not to say yellow.
+   */
+  yellowAt: number | null;
   setTie: (slug?: string) => void;
   setFurniture: (slug?: string) => void;
   setStep: (n: number) => void;
@@ -17,6 +25,8 @@ type SessionState = {
   tick: (now: number) => void;
   checked: () => void;
   stop: (reason: string) => void;
+  flagYellow: () => void;
+  clearYellow: () => void;
   reset: () => void;
   setListening: (v: boolean) => void;
 };
@@ -28,6 +38,7 @@ export const useSession = create<SessionState>((set, get) => ({
   elapsed: 0,
   listening: false,
   stopped: false,
+  yellowAt: null,
   setTie: (slug) => {
     if (get().stopped) return;
     set({
@@ -58,7 +69,15 @@ export const useSession = create<SessionState>((set, get) => ({
     set({ elapsed: next });
   },
   checked: () => set({ lastCheckAt: Date.now() }),
-  stop: (reason) => set({ stopped: true, stopReason: reason }),
+  stop: (reason) => set({ stopped: true, stopReason: reason, yellowAt: null }),
+  flagYellow: () => {
+    // A stop already supersedes it, and re-flagging while one stands must not
+    // restart the clock on a check-in that has not happened yet.
+    const { stopped, yellowAt } = get();
+    if (stopped || yellowAt !== null) return;
+    set({ yellowAt: Date.now() });
+  },
+  clearYellow: () => set({ yellowAt: null }),
   reset: () => {
     const now = Date.now();
     set({
@@ -68,6 +87,7 @@ export const useSession = create<SessionState>((set, get) => ({
       elapsed: 0,
       stopped: false,
       stopReason: undefined,
+      yellowAt: null,
     });
   },
   setListening: (v) => set({ listening: v }),
