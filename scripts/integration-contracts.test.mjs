@@ -495,3 +495,31 @@ test("check-in answers stay on screen at a narrow layout viewport", () => {
   // Sentence-length labels must be allowed to wrap rather than overflow.
   assert.match(checkin, /className="h-auto whitespace-normal py-2 text-left"/);
 });
+
+test("the emergency card stays offered when the account boundary blocks the app", () => {
+  const provider = read("src/lib/auth/provider.tsx");
+  // /emergency already bypasses this gate, but neither the failure screen nor
+  // the waiting screen said so: a transient session or network failure replaced
+  // the whole app and left "Retry secure erase" as the only way forward, and a
+  // hung check left a status line and nothing else.
+  assert.match(provider, /state\.location\.pathname === "\/emergency"/);
+  const failure = between(provider, "function AccountBoundaryFailure", "\n}\n");
+  assert.match(failure, /href="\/emergency"/);
+  const status = between(provider, "function AccountBoundaryStatus", "\n}\n");
+  assert.match(status, /href="\/emergency"/);
+  // Plain anchors, not router Links: the router is not necessarily usable here.
+  assert.doesNotMatch(failure, /<Link/);
+  assert.doesNotMatch(status, /<Link/);
+});
+
+test("the elapsed direct-check reminder is announced, not just drawn", () => {
+  const studio = read("src/routes/studio.tsx");
+  // It was a bare <p>, so it appeared with no announcement — and on a long page,
+  // off-screen and silent for a sighted user too. The container is always
+  // mounted so the live region exists before its content changes.
+  const banner = between(studio, "function CirculationBanner", "function TriageOption");
+  assert.match(banner, /<div role="status" aria-live="polite">/);
+  assert.match(banner, /\{!due \? null : \(/);
+  // Polite, not assertive: the copy says this is not a safety deadline.
+  assert.doesNotMatch(banner, /aria-live="assertive"/);
+});

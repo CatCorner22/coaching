@@ -991,14 +991,22 @@ function CirculationBanner({
     if (!due) nagged.current = false;
   }, [due, voice, micArmed, stopped]);
 
-  if (!due) return null;
+  // The container is always mounted so the live region exists before its content
+  // changes; announcing from a region inserted at the same moment is unreliable.
+  // This used to be a bare <p>, so the reminder appeared with no announcement at
+  // all — and on a long page, off-screen and silent for a sighted user too.
+  // Polite, not assertive: the copy itself says this is not a safety deadline.
   return (
-    <p className="mt-4 rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-warn">
-      The optional direct-check reminder elapsed. It is not a safety deadline or clearance.{" "}
-      <Link to="/checkin" className="underline">
-        Log it
-      </Link>
-    </p>
+    <div role="status" aria-live="polite">
+      {!due ? null : (
+        <p className="mt-4 rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-warn">
+          The optional direct-check reminder elapsed. It is not a safety deadline or clearance.{" "}
+          <Link to="/checkin" className="underline">
+            Log it
+          </Link>
+        </p>
+      )}
+    </div>
   );
 }
 
