@@ -17,6 +17,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
   // Never leave the sheet covering the screen after a navigation.
   useEffect(() => setMoreOpen(false), [pathname]);
+  // The sheet's markup precedes its trigger, so forward Tab walked straight
+  // past it and out of the page. Move focus in on open, close on Escape, and
+  // hand focus back to the trigger — it is the only route to 13 destinations
+  // on a phone, including Emergency and Settings.
+  useEffect(() => {
+    if (!moreOpen) return;
+    moreSheetRef.current?.querySelector("a")?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setMoreOpen(false);
+      moreButtonRef.current?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [moreOpen]);
+  const moreSheetRef = useRef<HTMLDivElement>(null);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const firstRenderRef = useRef(true);
   useEffect(() => {
@@ -50,7 +67,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="text-[11px] uppercase tracking-[0.28em] text-muted">Rope studio</p>
             <p className="font-display text-3xl leading-none">Knotty</p>
           </Link>
-          <nav aria-label="Main" className="mt-8 flex flex-1 flex-col gap-1">
+          <nav aria-label="Main" className="mt-8 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
             {NAV.map((item) => {
               const active = isActive(pathname, item.to);
               return (
@@ -149,6 +166,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
         <div
           id="more-sheet"
+          ref={moreSheetRef}
           hidden={!moreOpen}
           className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-40 max-h-[60vh] overflow-y-auto border-t border-border bg-surface px-3 py-3 md:hidden"
         >
@@ -194,6 +212,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
           <button
             type="button"
+            ref={moreButtonRef}
             onClick={() => setMoreOpen((open) => !open)}
             aria-expanded={moreOpen}
             aria-controls="more-sheet"

@@ -400,3 +400,24 @@ test("the clip-still commit cannot fire while a file import is validating", () =
     /!selectedFrames\.length \|\| busy \|\| recording \|\| disabled \|\| !permissionsReady/,
   );
 });
+
+test("destructive confirmation cannot be satisfied by a double-tap", () => {
+  const confirm = read("src/components/confirm-button.tsx");
+  // A double-click/double-tap otherwise satisfies both presses at once, which
+  // is the exact accidental input the guard exists to stop.
+  assert.match(confirm, /export const MIN_CONFIRM_DWELL_MS = \d+;/);
+  assert.match(confirm, /armedAt\.current = Date\.now\(\);/);
+  assert.match(confirm, /Date\.now\(\) - armedAt\.current < MIN_CONFIRM_DWELL_MS/);
+});
+
+test("the mobile More sheet is keyboard operable and the sidebar cannot clip its tail", () => {
+  const shell = read("src/components/app-shell.tsx");
+  // The sheet's markup precedes its trigger, so without this focus walks past
+  // it and out of the page; it is the only route to 13 destinations on a phone.
+  assert.match(shell, /moreSheetRef\.current\?\.querySelector\("a"\)\?\.focus\(\)/);
+  assert.match(shell, /event\.key !== "Escape"/);
+  assert.match(shell, /moreButtonRef\.current\?\.focus\(\)/);
+  // At 1280x800 the fixed sidebar clipped Rope calc, Emergency and Settings
+  // below the viewport, and Settings holds the privacy controls.
+  assert.match(shell, /aria-label="Main"[\s\S]{0,120}min-h-0[\s\S]{0,40}overflow-y-auto/);
+});
