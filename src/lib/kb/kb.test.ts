@@ -696,3 +696,36 @@ test("emergency routing still leads with action-first guidance beside expansion 
     );
   }
 });
+
+test("hanging, cyanosis, and pre-syncope phrasings route action-first, not to tie material", () => {
+  for (const query of [
+    "found them hanging by the neck",
+    "he hanged himself",
+    "self-hanging",
+    "hung herself from the rig",
+  ]) {
+    const kind = knowledgeDisposition(query).kind;
+    assert.notEqual(kind, "ordinary", query);
+    const hits = searchKnowledge(query, 4);
+    assert.equal(hits[0]?.slug, "emergency-stop", query);
+    assert.ok(
+      !hits.some((hit) => ["single-column", "takate-kote", "karada"].includes(hit.slug)),
+      `${query} surfaced tie material`,
+    );
+  }
+
+  for (const query of ["lips are turning purple", "her lips look dusky", "his face is purple"]) {
+    assert.equal(knowledgeDisposition(query).kind, "emergency", query);
+    assert.equal(searchKnowledge(query, 3)[0]?.slug, "emergency-stop", query);
+  }
+
+  for (const query of ["I feel faint", "feeling faint", "feels woozy", "feel lightheaded"]) {
+    assert.equal(knowledgeDisposition(query).kind, "release_now", query);
+  }
+});
+
+test("craft phrasings with 'hang' are not misrouted as emergencies", () => {
+  for (const query of ["hang the rope to dry", "hang out after the scene", "how to hang rope for storage"]) {
+    assert.equal(knowledgeDisposition(query).kind, "ordinary", query);
+  }
+});

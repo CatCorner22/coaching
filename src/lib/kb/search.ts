@@ -362,7 +362,7 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
   const materialColorChange =
     /\b(?:rope|cord|line|fabric|screen|light)\b[^.!?]{0,32}\bturning blue\b/u.test(text);
   const cyanosisEmergency =
-    /\b(?:cyanotic|cyanosis|(?:blue|gr[ae]y|ashen) (?:face|lips|skin|tongue)|(?:face|lips|skin|tongue) (?:are |is )?(?:turning )?(?:blue|gr[ae]y|ashen)|turning (?:blue|gr[ae]y|ashen) around (?:the )?(?:face|lips))\b/u.test(
+    /\b(?:cyanotic|cyanosis|(?:blue|gr[ae]y|ashen|purple|dusky) (?:face|lips|skin|tongue)|(?:face|lips|skin|tongue) (?:are |is |look |looks |looking |went |going )?(?:turning )?(?:blue|gr[ae]y|ashen|purple|dusky)|turning (?:blue|gr[ae]y|ashen|purple|dusky) around (?:the )?(?:face|lips))\b/u.test(
       text,
     ) || (/\bturning blue\b/u.test(text) && !materialColorChange);
   const neckTerminologyContext =
@@ -377,6 +377,13 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
       /\b(?:rope|cord|line|ligature|noose|hands?)\b[^.!?]{0,48}\b(?:around|on|across|near|over|touching)\s+(?:the\s+|my\s+|their\s+|his\s+|her\s+)?(?:neck|throat)\b/u.test(
         text,
       ) ||
+      // Hanging is a neck-loading emergency. Constrain to hang + a neck/rope/
+      // self object so craft phrasing ("hang the rope to dry") does not fire.
+      /\bhang(?:s|ed|ing)?\s+(?:by|from)\s+(?:the\s+|their\s+|his\s+|her\s+|a\s+)?(?:neck|throat|rope|cord|noose|ligature|rig)\b/u.test(
+        text,
+      ) ||
+      /\b(?:hung|hang(?:ed|ing))\s+(?:themsel(?:f|ves)|him ?self|her ?self|my ?self)\b/u.test(text) ||
+      /\bself[- ]?hang(?:ed|ing)?\b/u.test(text) ||
       /\bbreath\s*play\b[^.!?]{0,32}\b(?:last night|yesterday|earlier|happened|after|during)\b/u.test(
         text,
       ) ||
@@ -591,6 +598,7 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
     /\b(?:new |sudden |worsening |sharp worsening |increasing )?(?:numb(?:ness)?|tingl(?:e|ing|y)|pins and needles|burning|electric sensation|weakness|loss of (?:movement|function|coordination|sensation)|no sensation|reduced movement|weak grip|foot drop|severe pain|escalating pain|excruciating pain|faintness|lightheaded(?:ness)?|swollen|swelling|edema)\b/u.test(
       text,
     ) ||
+    /\b(?:feel|feels|feeling)\s+(?:faint|light[- ]?headed|woozy|dizzy)\b/u.test(text) ||
     /\bloss of grip\b(?![^.!?]{0,24}\b(?:rope )?tool\b)/u.test(text) ||
     /\b(?:dropping things|hand (?:feels?|felt) dead)\b/u.test(text) ||
     /\b(?:can't|cant|cannot|unable to)\s+feel\s+(?:my|their|his|her)?\s*(?:finger|fingers|hand|hands|toe|toes|foot|feet)\b/u.test(
