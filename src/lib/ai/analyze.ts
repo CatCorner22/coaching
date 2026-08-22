@@ -116,7 +116,7 @@ const MODEL_RESPONSE_FORMAT = {
 
 const analyzeInputSchema = z
   .object({
-    images: z.array(z.string().min(32).max(450_000)).min(1).max(3),
+    images: z.array(z.string().min(32).max(900_000)).min(1).max(3),
     frameLabels: z
       .array(z.string().regex(/^[FSV][0-9]{2}$/))
       .max(3)

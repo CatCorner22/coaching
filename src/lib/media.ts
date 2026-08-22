@@ -1,10 +1,14 @@
 export const MAX_PHOTO_BYTES = 25 * 1024 * 1024;
 export const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
-export const MAX_ANALYZE_IMAGE_BYTES = 300_000;
+// Encoded-still budget for analysis. Must stay under the client data-URL
+// validator (900,000 chars in sanitize.ts) and the server schema cap after
+// base64 expansion: 640,000 bytes ≈ 853,000 base64 chars.
+export const MAX_ANALYZE_IMAGE_BYTES = 640_000;
 export const MAX_VIDEO_DURATION_SECONDS = 60;
-// Current phones commonly produce 24 MP stills. Accept those uploads, then
-// downsample them before analysis, while retaining an absolute decode budget.
-export const MAX_IMAGE_PIXELS = 26_000_000;
+// Current phones produce up to 48-50 MP stills (e.g. 8064x6048). Accept those
+// uploads - header-read dimensions let the decoder resize during decode - then
+// downsample before analysis, while retaining an absolute decode budget.
+export const MAX_IMAGE_PIXELS = 50_000_000;
 export const MAX_IMAGE_EDGE = 8_192;
 export const MAX_VIDEO_FRAME_PIXELS = 16_000_000;
 export const MAX_VIDEO_FRAME_EDGE = 5_120;
@@ -361,7 +365,9 @@ function withTimeout<T>(
 function assertPixelBudget(width: number, height: number): void {
   if (!width || !height) throw new Error("The image has no readable pixels.");
   if (width > MAX_IMAGE_EDGE || height > MAX_IMAGE_EDGE || width * height > MAX_IMAGE_PIXELS) {
-    throw new Error("Image is too large to score safely.");
+    throw new Error(
+      "Image is too large to score safely. Export or retake it at a smaller size (50 megapixels / 8192 px per side or less).",
+    );
   }
 }
 
@@ -606,7 +612,9 @@ export async function extractVideoFrames(
         const t = n === 1 ? end / 2 : Math.min(end, (duration * (i + 0.5)) / n);
         await seekVideo(video, t, signal);
       }
-      frames.push(await processMediaFrame(video, 720, 240, 0.7));
+      // drawContain never upscales, so the still keeps the clip's native
+      // resolution up to this edge - fine texture survives to the model.
+      frames.push(await processMediaFrame(video, 1600, 240, 0.8));
       signal?.throwIfAborted();
     }
     return frames;

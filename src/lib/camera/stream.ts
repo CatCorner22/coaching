@@ -115,14 +115,14 @@ export async function openRopeCamera(
       audio: false,
       video: {
         facingMode: { ideal: facing },
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
         frameRate: { ideal: 30 },
       },
     },
     {
       audio: false,
-      video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } },
+      video: { facingMode: facing, width: { ideal: 1920 }, height: { ideal: 1080 } },
     },
     { audio: false, video: true },
   ];

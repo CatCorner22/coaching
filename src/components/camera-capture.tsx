@@ -513,7 +513,7 @@ export const CameraCapture = memo(function CameraCapture({
       const frames: { jpeg: string; imageData: ImageData }[] = [];
       for (let i = 0; i < 3; i++) {
         signal.throwIfAborted();
-        frames.push(await processMediaFrame(v, 768, 240, 0.74));
+        frames.push(await processMediaFrame(v, 1600, 240, 0.82));
         await new Promise((r) => setTimeout(r, 90));
       }
       const observed = frames.map((frame) => ({
@@ -695,7 +695,7 @@ export const CameraCapture = memo(function CameraCapture({
       if (actualKind === "video") {
         await ingestVideo(file, operation);
       } else {
-        const { jpeg, imageData } = await processMediaFrame(file, 768, 240, 0.74, dimensions);
+        const { jpeg, imageData } = await processMediaFrame(file, 1600, 240, 0.82, dimensions);
         signal.throwIfAborted();
         if (!ownsMediaOperation(operation.id) || disabledRef.current) return;
         const observation = observeFrame(imageData);
