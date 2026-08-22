@@ -446,3 +446,30 @@ test("an urgent search disposition reaches the screen without a second tap", () 
   // drop it rather than print it twice.
   assert.match(page, /answer\.startsWith\(disposition\.action\)/);
 });
+
+test("a cross-tab policy change cannot erase an active stop or a completed report", () => {
+  const studio = read("src/routes/studio.tsx");
+  // The session store is memory-only, so window.location.reload() clears
+  // `stopped` along with the red alert, the report and the triage answer, and
+  // Studio comes back looking like a fresh running session. Verified in a
+  // browser both ways: without this guard the alert is gone after another tab
+  // changes a limit. A stopped session already blocks every action, which is
+  // stricter than anything a new policy could impose.
+  const invalidate = between(studio, "const invalidateAcrossTabs", "window.addEventListener");
+  assert.match(invalidate, /if \(useSession\.getState\(\)\.stopped\) return;/);
+  assert.ok(
+    invalidate.indexOf("stopped) return;") < invalidate.indexOf("window.location.reload()"),
+    "the stop guard must precede the reload",
+  );
+
+  // A rehydrate replaces `items` with a new array even when every rank is
+  // identical. Everything derived from it changed identity with it, which
+  // re-ran the report effect and replaced a completed model report with the
+  // local "not requested" one after the batch was already consumed.
+  assert.match(studio, /const policyRef = useRef\(derivedPolicy\);/);
+  assert.match(
+    studio,
+    /policyRef\.current\.negotiationKey !== derivedPolicy\.negotiationKey/,
+  );
+  assert.match(studio, /const negotiationPolicy = policyRef\.current;/);
+});

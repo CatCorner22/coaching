@@ -61,7 +61,20 @@ function StudioPage() {
   const stepIndex = useSession((s) => s.stepIndex);
   const tieSlug = useSession((s) => s.tieSlug);
   const furnitureSlug = useSession((s) => s.furnitureSlug);
-  const negotiationPolicy = useMemo(() => buildStudioNegotiationPolicy(items), [items]);
+  const derivedPolicy = useMemo(() => buildStudioNegotiationPolicy(items), [items]);
+  // Keep the previous policy object when the policy itself has not changed.
+  // A cross-tab rehydrate replaces `items` with a new array even when every
+  // rank is identical, and everything derived from it — operationalLimits, the
+  // policy object, the capture context — changed identity with it. That re-ran
+  // the report effect below and replaced a completed model report with the
+  // local "not requested" one, after the batch had already been consumed and
+  // could not be re-requested. negotiationKey is the content of the policy, so
+  // comparing on it is the same test the rest of this route already uses.
+  const policyRef = useRef(derivedPolicy);
+  if (policyRef.current.negotiationKey !== derivedPolicy.negotiationKey) {
+    policyRef.current = derivedPolicy;
+  }
+  const negotiationPolicy = policyRef.current;
   const {
     operationalLimits,
     negotiationKey,
@@ -136,6 +149,14 @@ function StudioPage() {
         const next = signature();
         if (next === lastSignature) return;
         lastSignature = next;
+        // Never reload out of a stop. The session store is memory-only, so a
+        // reload clears `stopped` along with the red alert, the report and the
+        // triage answer, and the page comes back looking like a fresh, running
+        // session. A limit revoked in another tab must never do that: a stopped
+        // session already blocks every action, which is stricter than anything
+        // the new policy could impose, and the gating re-derives from the store
+        // on the next render once the session is reset.
+        if (useSession.getState().stopped) return;
         analysisRequestRef.current += 1;
         captureContextAtCommitRef.current = null;
         micArmedRef.current = false;
