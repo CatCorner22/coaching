@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { DeleteButton } from "@/components/confirm-button";
 import { SourceEvidence } from "@/components/source-evidence";
 import { getTie } from "@/lib/kb";
 import { purgeLegacyStills, useJournal } from "@/lib/stores/journal";
@@ -61,9 +62,10 @@ function JournalPage() {
             <li key={e.id} className="rounded-lg border border-border bg-surface p-4">
               <div className="flex items-center justify-between gap-2">
                 <p className="font-display text-2xl">{getTie(e.tieSlug ?? "")?.name ?? "Freeform"}</p>
-                <button className="text-xs text-muted" onClick={() => remove(e.id)}>
-                  Delete
-                </button>
+                <DeleteButton
+                  label={`Delete journal entry from ${new Date(e.at).toLocaleString()}`}
+                  onConfirm={() => remove(e.id)}
+                />
               </div>
               <p className="text-xs text-subtle">
                 {new Date(e.at).toLocaleString()} · {e.minutes} min

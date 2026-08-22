@@ -58,7 +58,7 @@ function LoginPage() {
         ) : capabilities === null ? (
           capabilityError ? (
             <div className="mt-6 rounded-lg border border-danger/40 p-4">
-              <p className="text-sm text-danger" role="alert">
+              <p className="text-sm text-danger-text" role="alert">
                 {capabilityError} Cloud analysis remains unavailable until this check succeeds.
               </p>
               <Button
@@ -105,7 +105,7 @@ function LoginPage() {
           </p>
         )}
         {error && (
-          <p className="mt-4 text-sm text-danger" role="alert">
+          <p className="mt-4 text-sm text-danger-text" role="alert">
             {error}
           </p>
         )}

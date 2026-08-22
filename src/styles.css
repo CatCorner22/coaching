@@ -6,14 +6,23 @@
   --color-elevated: #1c1916;
   --color-fg: #f1ebe3;
   --color-muted: #9a9188;
-  --color-subtle: #6e675f;
+  /* Used for real content (report limitations, schema/ledger provenance, form
+     hints) at 10-12px, so it must clear WCAG AA 4.5:1 on bg/surface/elevated.
+     The former #6e675f measured 3.1-3.6:1. */
+  --color-subtle: #8f877e;
   --color-border: #2a2622;
   --color-border-strong: #3d3832;
   --color-accent: #ded8cf;
   --color-accent-fg: #0b0a09;
   --color-rope: #b9a898;
+  /* Fill colour for solid danger surfaces, paired with --color-danger-fg. */
   --color-danger: #b4453a;
   --color-danger-fg: #f8ece9;
+  /* Danger as TEXT on the dark backgrounds (and on danger/10 tinted panels).
+     The fill colour measures only 3.2-3.6:1 there, which fails AA on the
+     safety-critical small text that uses it, so text sites use this instead.
+     Kept separate so the solid button keeps its light-on-red pairing. */
+  --color-danger-text: #d4675a;
   --color-warn: #c4a56a;
   --color-ok: #7a9a7e;
   --color-ring: #ded8cf;
@@ -43,6 +52,10 @@
 
 @layer base {
   html {
+    /* The app is always dark. Declaring it makes UA-rendered widgets — native
+       select dropdown panels, date and number spinners, scrollbars, form
+       autofill — render dark instead of a white flash on light-mode systems. */
+    color-scheme: dark;
     background: var(--color-bg);
     color: var(--color-fg);
     font-family: var(--font-sans);

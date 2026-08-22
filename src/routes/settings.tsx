@@ -74,6 +74,7 @@ function SettingsPage() {
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
+            className="size-4 accent-accent"
             checked={s.voice}
             onChange={(event) => {
               if (!event.target.checked) clearCoachVoiceCache();
@@ -83,7 +84,12 @@ function SettingsPage() {
           Enable cloud voice; send each reviewed spoken line to xAI TTS after a privacy preflight
         </label>
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={s.listen} onChange={(e) => s.set({ listen: e.target.checked })} />
+          <input
+            type="checkbox"
+            className="size-4 accent-accent"
+            checked={s.listen}
+            onChange={(e) => s.set({ listen: e.target.checked })}
+          />
           Optional microphone word detection
         </label>
         <p className="text-xs leading-relaxed text-subtle">

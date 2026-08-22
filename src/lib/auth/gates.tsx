@@ -164,7 +164,7 @@ export function UserButton({ compact = false }: { compact?: boolean }) {
         </p>
       )}
       {signOutError && (
-        <p className="max-w-xs text-xs leading-relaxed text-danger" role="alert">
+        <p className="max-w-xs text-xs leading-relaxed text-danger-text" role="alert">
           {signOutError}
         </p>
       )}

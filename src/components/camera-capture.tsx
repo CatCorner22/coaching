@@ -805,7 +805,7 @@ export const CameraCapture = memo(function CameraCapture({
           </div>
         )}
         {capabilityError && (
-          <p className="mt-2 text-xs text-danger" role="alert">
+          <p className="mt-2 text-xs text-danger-text" role="alert">
             {capabilityError}
           </p>
         )}
@@ -944,7 +944,7 @@ export const CameraCapture = memo(function CameraCapture({
         </p>
       )}
       {error && (
-        <p className="text-sm text-danger" role="alert">
+        <p className="text-sm text-danger-text" role="alert">
           {error}
         </p>
       )}
