@@ -16,6 +16,27 @@ const value = (source: AuthEnvironment, key: string): string | undefined => {
   return candidate || undefined;
 };
 
+export function normalizeHttpsOrigin(candidate: string): string | null {
+  const value = candidate.trim().replace(/\/+$/u, "");
+  try {
+    const parsed = new URL(value);
+    if (
+      parsed.protocol !== "https:" ||
+      parsed.username ||
+      parsed.password ||
+      parsed.origin !== value ||
+      parsed.pathname !== "/" ||
+      parsed.search ||
+      parsed.hash
+    ) {
+      return null;
+    }
+    return parsed.origin;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Validate only the production, auth-enabled contract. Development keeps the
  * bounded preview credentials and process-stable ephemeral signing secret.
@@ -33,6 +54,8 @@ export function productionAuthProblems(
   const projectId = value(source, "GROK_PROJECT_ID");
   const clientId = value(source, "GROK_AUTH_CLIENT_ID");
   const clientSecret = value(source, "GROK_AUTH_CLIENT_SECRET");
+  const authIssuer = value(source, "GROK_AUTH_ISSUER");
+  const gateOrigin = value(source, "GROK_GATE_ORIGIN");
 
   if (!databaseUrl) problems.push("DATABASE_URL is required");
   if (!baseUrl) {
@@ -49,6 +72,12 @@ export function productionAuthProblems(
   }
   if (!signingSecret || signingSecret.length < 32) {
     problems.push("BETTER_AUTH_SECRET must contain at least 32 characters");
+  }
+  if (authIssuer && !normalizeHttpsOrigin(authIssuer)) {
+    problems.push("GROK_AUTH_ISSUER must be an HTTPS origin without credentials or a path");
+  }
+  if (gateOrigin && !normalizeHttpsOrigin(gateOrigin)) {
+    problems.push("GROK_GATE_ORIGIN must be an HTTPS origin without credentials or a path");
   }
 
   if (Boolean(clientId) !== Boolean(clientSecret)) {

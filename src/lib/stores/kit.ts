@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { safeJsonStorage } from "./persist";
 
 type Kit = {
   eights: number;
@@ -20,6 +21,6 @@ export const useKit = create<Kit>()(
       setFours: (n) => set({ fours: Math.max(0, n) }),
       setShears: (v) => set({ shears: v }),
     }),
-    { name: "knotty-kit" },
+    { name: "knotty-kit", storage: safeJsonStorage<Kit>() },
   ),
 );

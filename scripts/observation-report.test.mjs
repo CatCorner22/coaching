@@ -125,6 +125,7 @@ test("prohibited remote inference keeps high-consequence categories and halts", 
     { nonvisual_inference: false, exact_identification: false, procedural_content: true },
   );
   assert.equal(admitted.hardLimit, true);
+  assert.equal(admitted.modelStatus, "failed");
   assert.deepEqual(admitted.matches, [
     { frame_id: "F01", canonical_id: "neck_or_airway_overlap_possible" },
   ]);
@@ -140,6 +141,7 @@ test("prohibited remote inference keeps high-consequence categories and halts", 
   assert.equal(report.urgent_stop, true);
   assert.equal(report.disposition, "stop_now");
   assert.equal(report.next_step_id, "stop_now");
+  assert.match(report.limitations[0], /violated the closed output contract/i);
 });
 
 test("prohibited remote inference without C3/C4 still refuses continuation", () => {
@@ -511,7 +513,6 @@ test("transitions are suppressed without user-labeled chronology and validator e
 });
 
 test("no-media non-triage reports build without visual rows", () => {
-
   const noMedia = buildObservationReport({
     mediaMode: "no_media",
     modelStatus: "not_requested",
@@ -519,7 +520,21 @@ test("no-media non-triage reports build without visual rows", () => {
   });
   assert.deepEqual(noMedia.recognized_categories, []);
   assert.deepEqual(noMedia.observations, []);
+  assert.deepEqual(noMedia.source_ids, ["CONSENT-2"]);
+  assert.doesNotMatch(noMedia.limitations.join(" "), /remote visual classification did not complete/i);
   assert.equal(validateObservationReport(noMedia).success, true);
+
+  for (const triage of ["emergency", "prompt_medical", "coercion_or_secret_recording"]) {
+    const actionFirst = buildObservationReport({
+      mediaMode: "no_media",
+      modelStatus: "not_requested",
+      triage,
+    });
+    assert.equal(actionFirst.media_mode, "no_media", triage);
+    assert.ok(actionFirst.source_ids.every((source) => !source.startsWith("XAI-")), triage);
+    assert.doesNotMatch(actionFirst.limitations.join(" "), /insufficient-view|lower-consequence-only/i, triage);
+    assert.equal(validateObservationReport(actionFirst).success, true, triage);
+  }
 
   const staleMediaDuringTriage = buildObservationReport({
     mediaMode: "static_photos",

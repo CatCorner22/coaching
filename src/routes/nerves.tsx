@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { RopeFigure } from "@/components/rope-figure";
-import { NERVES, TIES } from "@/lib/kb";
+import { NERVES } from "@/lib/kb/nerves";
+import { TIES } from "@/lib/kb/ties";
 
 export const Route = createFileRoute("/nerves")({
   validateSearch: (search: Record<string, unknown>): { nerve?: string } => ({

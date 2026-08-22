@@ -33,11 +33,65 @@ test("accepting a capture preserves the committed permission ledger", () => {
   const accept = between(studio, "const acceptCapture", "const discardCapture");
   assert.doesNotMatch(accept, /setTriage\("unanswered"\)/);
   assert.match(accept, /setCapture\(next\)/);
+  assert.match(accept, /stopCoachVoice\(\)/);
+  const discard = between(studio, "const discardCapture", "const spoke");
+  assert.match(discard, /analysisRequestRef\.current \+= 1;\s*stopCoachVoice\(\)/);
 
   const camera = read("src/components/camera-capture.tsx");
   assert.match(camera, /setBatchCommitted\(true\)/);
   assert.match(camera, /permissionExpiryTimerRef\.current = window\.setTimeout/);
-  assert.match(studio, /disabled=\{stopped \|\| mediaBlocked \|\| triage !== "none"\}/);
+  assert.match(studio, /disabled=\{cameraGateReason !== "enabled"\}/);
+});
+
+test("camera capability preflight stays passive and cannot certify a device or scene", () => {
+  const camera = read("src/components/camera-capture.tsx");
+  const preflight = between(
+    camera,
+    "async function checkBrowserCapabilities()",
+    "function clearRecordTimer()",
+  );
+  assert.match(preflight, /inspectCameraCapabilities\(/);
+  assert.doesNotMatch(preflight, /getUserMedia|enumerateDevices|openRopeCamera|startLive/);
+  assert.match(camera, /Check browser capabilities — camera stays off/);
+  assert.match(camera, /not\s+device certification or safety\s+clearance/i);
+  assert.match(camera, /file decoding is tested only after you select a file/i);
+  assert.match(camera, /recording\s+is\s+tested only when recording starts/i);
+  assert.match(camera, /role="status"/);
+  assert.match(camera, /aria-live="polite"/);
+  assert.match(camera, /aria-atomic="true"/);
+  assert.match(
+    camera,
+    /onClick=\{\(\) => void checkBrowserCapabilities\(\)\}[\s\S]{0,160}disabled=\{disabled\}[\s\S]{0,160}aria-disabled=\{disabled \|\| checkingCapabilities\}/,
+  );
+  assert.match(camera, /capabilityRequestRef\.current \+= 1/);
+  assert.match(camera, /request === capabilityRequestRef\.current/);
+  assert.match(camera, /aria-label="Live camera preview;/);
+  assert.match(camera, /aria-label="Recording in progress"/);
+  assert.match(camera, /aria-pressed=\{torch\}/);
+});
+
+test("route registration and the preview bridge keep heavy knowledge and schema graphs lazy", () => {
+  const nerves = read("src/routes/nerves.tsx");
+  assert.doesNotMatch(nerves, /from "@\/lib\/kb"/);
+  assert.match(nerves, /from "@\/lib\/kb\/nerves"/);
+  assert.match(nerves, /from "@\/lib\/kb\/ties"/);
+
+  const bridge = read("src/lib/preview-host-bridge.ts");
+  assert.doesNotMatch(bridge, /from "zod"/);
+  assert.match(bridge, /parsePreviewHostMessage\(event\.data\)/);
+});
+
+test("a cancelled photo import cannot commit after its decoder resolves", () => {
+  const camera = read("src/components/camera-capture.tsx");
+  const photoImport = between(
+    camera,
+    "const { jpeg, imageData } = await processMediaFrame(file",
+    "} catch (e) {",
+  );
+  assert.match(
+    photoImport,
+    /signal\.throwIfAborted\(\);[\s\S]*?!ownsMediaOperation\(operation\.id\)[\s\S]*?signal\.throwIfAborted\(\);[\s\S]*?!ownsMediaOperation\(operation\.id\)[\s\S]*?await emitFromMedia\("photo"/,
+  );
 });
 
 test("capture analysis is synchronously bound to the current Studio context", () => {
@@ -47,11 +101,153 @@ test("capture analysis is synchronously bound to the current Studio context", ()
   assert.match(studio, /requestContext !== currentContextRef\.current/);
   assert.match(studio, /captureContextAtCommitRef\.current !== requestContext/);
   assert.match(studio, /disabled=\{stopped \|\| pending \|\| stepIndex === 0\}/);
+  assert.equal((studio.match(/disabled=\{stopped \|\| pending\}/g) ?? []).length, 2);
 });
 
-test("only a verified pre-provider quota denial reopens a batch", () => {
+test("late analysis responses cannot survive unmount or withdrawn voice approval", () => {
+  const studio = read("src/routes/studio.tsx");
+  const analyze = between(studio, "async function runAnalyze()", "const acceptCapture");
+  assert.match(studio, /const micArmedRef = useRef\(false\)/);
+  assert.match(studio, /const mountedRef = useRef\(true\)/);
+  assert.match(studio, /micArmedRef\.current = true;\s*setMicArmed\(true\)/);
+  assert.match(
+    studio,
+    /mountedRef\.current = false;[\s\S]*?analysisRequestRef\.current \+= 1;[\s\S]*?captureContextAtCommitRef\.current = null;[\s\S]*?stopCoachVoice\(\)/,
+  );
+  assert.match(analyze, /!mountedRef\.current \|\|[\s\S]*?liveNegotiationPolicy\.mediaBlocked/);
+  assert.match(
+    analyze,
+    /useSettings\.getState\(\)\.voice &&[\s\S]*?!liveNegotiationPolicy\.voiceBlocked &&[\s\S]*?!micArmedRef\.current/,
+  );
+  assert.doesNotMatch(analyze, /studioVoice && !micArmed\)/);
+  assert.match(analyze, /mountedRef\.current && request === analysisRequestRef\.current/);
+});
+
+test("Studio requires yes for negotiated actions and blocks every voice path", () => {
+  const studio = read("src/routes/studio.tsx");
+  const policy = read("src/lib/studio/negotiation.ts");
+  const store = read("src/lib/stores/negotiate.ts");
+  const consentGate = read("src/components/consent-gate.tsx");
+  assert.match(policy, /normalizeNegotiationItems\(items\)/);
+  assert.match(policy, /normalizedItems\.filter\(\(item\) => item\.rank !== "yes"\)/);
+  assert.match(policy, /mediaBlocked: !approvedIds\.has\("photos"\)/);
+  assert.match(policy, /voiceBlocked: !approvedIds\.has\("voice"\)/);
+  assert.match(policy, /negotiationKey: JSON\.stringify\(negotiationEntries\)/);
+  assert.match(store, /export function normalizeNegotiationItems\(value: unknown\)/);
+  assert.match(
+    store,
+    /matches\.length === 1 && matches\[0\]\.label && !LOCKED_NO\.has\(seed\.id\)/,
+  );
+  const merge = between(store, "merge: (persisted, current) =>", "      },\n    },");
+  assert.match(merge, /\.\.\.current/);
+  assert.doesNotMatch(merge, /\.\.\.p[,}]/);
+  assert.match(store, /storage: safeJsonStorage<State>\(\)/);
+  assert.match(store, /migrate: \(persisted\) => persisted as State/);
+  assert.match(studio, /buildStudioNegotiationPolicy\(items\)/);
+  assert.match(studio, /const \[negotiationReady, setNegotiationReady\] = useState\(false\)/);
+  assert.doesNotMatch(studio, /useState\(\(\) =>\s*useNegotiate\.persist\.hasHydrated\(\)\s*\)/);
+  assert.match(studio, /useNegotiate\.persist[\s\S]*?onFinishHydration\(finish\)/);
+  const hydration = between(studio, "const api = useNegotiate.persist", "useEffect(() => {");
+  assert.match(hydration, /api\.hasHydrated\(\)/);
+  assert.doesNotMatch(hydration, /setTimeout/);
+  const consentHydration = between(consentGate, "const api = useSettings.persist", "  }, []);");
+  assert.match(consentHydration, /api\.onFinishHydration\(finish\)/);
+  assert.match(consentHydration, /api\.hasHydrated\(\)/);
+  assert.doesNotMatch(consentHydration, /setTimeout/);
+  assert.match(
+    studio,
+    /mediaBlocked: negotiatedMediaBlocked,[\s\S]*?const mediaBlocked = !negotiationReady \|\| negotiatedMediaBlocked/,
+  );
+  assert.match(studio, /const mediaAllowed = negotiationReady && !negotiatedMediaBlocked/);
+  assert.match(studio, /const previousMediaAllowedRef = useRef\(mediaAllowed\)/);
+  assert.match(studio, /mediaAuthorizationWasRevoked\(previouslyAllowed, mediaAllowed\)/);
+  assert.doesNotMatch(studio, /if \(negotiationReady && negotiatedMediaBlocked\)/);
+  assert.match(studio, /disabled=\{!negotiationReady\}/);
+  assert.match(studio, /const studioVoice = settings\.voice && !voiceBlocked/);
+  assert.match(studio, /if \(!studioVoice\) stopCoachVoice\(\)/);
+  assert.match(studio, /voice=\{studioVoice\}/);
+  assert.match(studio, /voice=\{studioVoice && !micArmed\}/);
+  assert.match(studio, /disabled=\{stopped \|\| !studioVoice\}/);
+  assert.match(studio, /data-negotiation-ready=\{negotiationReady \? "true" : "false"\}/);
+  assert.match(studio, /data-media-blocked=\{negotiatedMediaBlocked \? "true" : "false"\}/);
+  assert.match(studio, /data-camera-ready=/);
+  assert.match(studio, /data-camera-gate-reason=\{cameraGateReason\}/);
+  assert.match(
+    studio,
+    /event\.key !== null &&[\s\S]*?event\.key !== "knotty-negotiate" &&[\s\S]*?event\.key !== "knotty-settings"[\s\S]*?analysisRequestRef\.current \+= 1;[\s\S]*?stopCoachVoice\(\);[\s\S]*?window\.location\.reload\(\)/,
+  );
+  const negotiatedRevocation = between(
+    studio,
+    "if (!mediaAuthorizationWasRevoked(previouslyAllowed, mediaAllowed)) return;",
+    "  }, [mediaAllowed]",
+  );
+  assert.match(negotiatedRevocation, /analysisRequestRef\.current \+= 1;\s*stopCoachVoice\(\)/);
+  const contextInvalidation = between(studio, "if (contextChanged && capture)", "  }, [capture");
+  assert.match(
+    contextInvalidation,
+    /stopCoachVoice\(\);\s*captureContextAtCommitRef\.current = null/,
+  );
+  assert.doesNotMatch(studio, /playCoachVoice\([^\n]+, settings\.voice\)/);
+});
+
+test("direct triage invalidates stale visual coaching before rendering or journaling", () => {
+  const studio = read("src/routes/studio.tsx");
+  const triageEffect = between(
+    studio,
+    'if (triage === "unanswered" || triage === "none") return;',
+    "async function runAnalyze()",
+  );
+  assert.match(
+    triageEffect,
+    /analysisRequestRef\.current \+= 1[\s\S]*?setPending\(false\)[\s\S]*?setReport\(null\)[\s\S]*?setSavedReportRevision\(null\)[\s\S]*?setObservationReport\(/,
+  );
+  const chooseTriage = between(studio, "function chooseTriage", "async function runAnalyze()");
+  assert.match(
+    chooseTriage,
+    /analysisRequestRef\.current \+= 1;[\s\S]*?stopCoachVoice\(\);[\s\S]*?setPending\(false\);/,
+  );
+  assert.match(chooseTriage, /if \(next !== "none"\) \{[\s\S]*?stopSession\(/);
+  assert.equal((studio.match(/onChange=\{\(\) => chooseTriage\(/g) ?? []).length, 4);
+  assert.match(
+    studio,
+    /disabled=\{\s*!contextBoundReport\s*\|\|\s*!contextBoundObservationReport\s*\|\|\s*!reportRevision\s*\|\|\s*currentReportSaved\s*\}/,
+  );
+});
+
+test("only verified pre-reservation admission denials reopen a batch", () => {
   const analyze = read("src/lib/ai/analyze.ts");
-  const rateLimit = between(analyze, "if (error instanceof RateLimitError)", "if (error instanceof MediaBatchReplayError)");
+  const preflight = analyze.indexOf('if (data.triage === "none" && !grokProviderConfigured())');
+  const authorization = analyze.indexOf("await authorizeAiRequest(context.userId)");
+  const reservation = analyze.indexOf("await consumeMediaBatch(");
+  const quota = analyze.indexOf('consumeAiBudget("vision"');
+  const provider = analyze.indexOf("const grok = await grokChat(");
+  assert.ok(
+    preflight >= 0 &&
+      preflight < authorization &&
+      authorization < reservation &&
+      authorization < quota &&
+      reservation < provider &&
+      quota < provider &&
+      authorization < provider,
+  );
+  assert.match(
+    analyze.slice(preflight, reservation),
+    /providerAttempted: false[\s\S]*?code: "AI_PROVIDER_UNAVAILABLE"[\s\S]*?retryableBeforeProvider: true/,
+  );
+  const privacy = analyze.slice(provider, analyze.indexOf("if (!grok.ok) {", provider));
+  assert.match(
+    privacy,
+    /privacyFailure === "preflight"[\s\S]*?providerAttempted: false[\s\S]*?retryableBeforeProvider: false/,
+  );
+  assert.match(
+    privacy,
+    /privacyFailure === "response"[\s\S]*?providerAttempted: true[\s\S]*?AI_PRIVACY_RESPONSE_UNVERIFIED[\s\S]*?retryableBeforeProvider: false/,
+  );
+  const rateLimit = between(
+    analyze,
+    "if (error instanceof RateLimitError)",
+    "if (error instanceof MediaBatchReplayError)",
+  );
   assert.match(rateLimit, /providerAttempted: false/);
   assert.match(rateLimit, /retryableBeforeProvider: true/);
 
@@ -78,6 +274,9 @@ test("instructor-only entries cannot route into Studio", () => {
   assert.match(plan, /Instructor route · Studio unavailable/);
 
   const studio = read("src/routes/studio.tsx");
-  assert.match(studio, /disabled=\{t\.minutes\[1\] === 0 \|\| blockedByIds/);
-  assert.match(studio, /requestedTie && requestedTie\.minutes\[1\] > 0/);
+  assert.match(studio, /disabled=\{t\.minutes\[1\] === 0 \|\| negotiationPolicy\.isTieBlocked/);
+  assert.match(
+    studio,
+    /requestedTie &&[\s\S]*?requestedTie\.minutes\[1\] > 0 &&[\s\S]*?!negotiationPolicy\.isTieBlocked\(search\.tie\)/,
+  );
 });

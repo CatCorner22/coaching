@@ -47,10 +47,32 @@ const CJK_SEARCH_TERMS = [
   "癫痫发作",
   "抽搐",
   "胸痛",
+  "大量出血",
+  "激しい出血",
+  "出血がひどい",
+  "脳卒中",
+  "片側の脱力",
+  "首を圧迫",
+  "喉が締まっている",
+  "声の変化",
+  "飲み込みにくい",
   "跌倒",
   "摔倒",
   "撞到头",
   "头部受伤",
+  "大量出血",
+  "严重出血",
+  "中风症状",
+  "中风",
+  "单侧无力",
+  "颈部受压",
+  "声音改变",
+  "吞咽困难",
+  "호흡곤란",
+  "의식이 없다",
+  "반응이 없다",
+  "심한 출혈",
+  "뇌졸중 증상",
   "ロープを切る",
   "緊急時",
   "緊急",
@@ -123,7 +145,7 @@ const SEARCH_ALIASES: Readonly<Record<string, string>> = {
   "article:consent-frameworks":
     "coercion coerced forced pressure retaliation freely given revoke withdrawn consent 合意 同意 撤回 取り消し 拒否 中止 取消 撤销 收回",
   "article:emergency-stop":
-    "911 emergency services ambulance unconscious unresponsive not responding passed out fainted seizure chest pain serious fall hit head stroke rapid release cut shears not breathing cannot breathe can't breathe 呼吸できない 息ができない 呼吸困難 意識がない 反応がない 失神 けいれん 痙攣 胸痛 転倒 頭を打った 緊急 緊急時 ロープを切る 切断 不能呼吸 无法呼吸 呼吸困难 昏倒 失去意识 无反应 没有反应 癫痫发作 抽搐 胸痛 跌倒 摔倒 撞到头 头部受伤 紧急 切断绳索",
+    "911 emergency services ambulance cardiac arrest no pulse collapse collapsed blackout unconscious unresponsive won't wake up not responding passed out fainted seizure chest pain severe bleeding uncontrolled bleeding bleeding heavily bleeding profusely serious fall hit head stroke facial droop speech difficulty major weakness rapid release cut shears stopped breathing gasping for air can't catch breath not breathing cannot breathe can't breathe 呼吸できない 息ができない 呼吸困難 意識がない 反応がない 失神 けいれん 痙攣 胸痛 大量出血 激しい出血 脳卒中 片側の脱力 転倒 頭を打った 緊急 緊急時 ロープを切る 切断 不能呼吸 无法呼吸 呼吸困难 昏倒 失去意识 无反应 没有反应 癫痫发作 抽搐 胸痛 大量出血 严重出血 中风症状 单侧无力 跌倒 摔倒 撞到头 头部受伤 紧急 切断绳索 호흡곤란 의식이 없다 반응이 없다 심한 출혈 뇌졸중 증상",
   "article:hard-limits":
     "strangulation choking choke neck compression airway breath restriction intoxication unconscious solo bondage",
   "article:negotiation":
@@ -131,7 +153,7 @@ const SEARCH_ALIASES: Readonly<Record<string, string>> = {
   "article:nerve-atlas":
     "radial ulnar median peroneal fibular femoral tibial saphenous brachial pudendal numbness tingling weakness 神経 末梢神経 しびれ 痺れ 麻痺 神经 麻木 刺痛 无力",
   "article:photography-ethics":
-    "secret recording coercion privacy deletion revoke permission sharing retention",
+    "secret recording coercion privacy deletion revoke permission sharing retention minor underage under 18 teen ambiguous age nude naked explicit image explicit photo unsupported media",
   "article:safewords": "red yellow safeword safe word stop signal nonverbal signal",
   "gear:shears":
     "trauma shears emergency release cut rope cut rope now rapid release unresponsive passed out seizure serious fall ロープを切る 緊急 切断 意識がない 失神 痙攣 転倒 绳索 紧急 切断绳索 昏倒 无反应 癫痫发作 摔倒",
@@ -193,74 +215,471 @@ function tokens(q: unknown) {
   return [...unique];
 }
 
-function intentBoosts(query: unknown) {
-  const text = normalized(query, true).replace(/[’‘]/gu, "'").replace(/\s+/gu, " ").trim();
-  const boosts = new Map<string, number>();
-  const add = (key: string, amount: number) => boosts.set(key, (boosts.get(key) ?? 0) + amount);
+export type KnowledgeDispositionKind =
+  | "ordinary"
+  | "emergency"
+  | "prompt_medical"
+  | "release_now"
+  | "consent_withdrawn"
+  | "unsupported_media";
+
+export type KnowledgeDisposition = {
+  kind: KnowledgeDispositionKind;
+  action: string;
+  emergencyHref?: "/emergency";
+};
+
+const ORDINARY_DISPOSITION: KnowledgeDisposition = {
+  kind: "ordinary",
+  action: "",
+};
+
+function intentText(query: unknown) {
+  return normalized(query, true).replace(/[’‘]/gu, "'").replace(/\s+/gu, " ").trim();
+}
+
+function includesAny(text: string, phrases: readonly string[]) {
+  return phrases.some((phrase) => text.includes(phrase));
+}
+
+/**
+ * Conservative, local routing for time-critical or unsupported requests.
+ * This is deliberately separate from relevance scoring: a high score must never
+ * be the only thing standing between an urgent query and an action-first answer.
+ */
+export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
+  const text = intentText(query);
+  if (!text) return ORDINARY_DISPOSITION;
 
   const breathingEmergency =
-    /\b(?:not|cannot|can't|cant|unable to)\s+breath(?:e|ing)\b/u.test(text) ||
-    /\b(?:difficulty|trouble)\s+breath(?:ing|e)\b/u.test(text) ||
-    ["呼吸できない", "息ができない", "呼吸困難", "不能呼吸", "无法呼吸", "呼吸困难"].some((phrase) =>
-      text.includes(phrase),
-    );
-  const responsivenessEmergency =
-    /\b(?:passed out|pass(?:es|ed|ing)? out|fainted|fainting|unconscious|unresponsive|not responding|not responsive)\b/u.test(
+    /\b(?:not|cannot|can't|cant|isn't|isnt|wasn't|wasnt|unable to|stopped|stops|has stopped|no longer)\s+breath(?:e|ing)\b/u.test(
       text,
     ) ||
-    [
+    /\b(?:abnormal|difficult|difficulty|trouble)\s+breath(?:ing|e)\b/u.test(text) ||
+    /\b(?:struggling to|hard to)\s+breath(?:e|ing)\b/u.test(text) ||
+    /\b(?:breathless|short of breath|shortness of breath|struggling for breath|gasping|suffocat(?:e|ed|ing))\b/u.test(text) ||
+    /\b(?:can't|cant|cannot|unable to)\s+(?:get (?:enough )?air|speak)\b/u.test(text) ||
+    /\b(?:barely|labou?red|shallow|agonal|irregular)\s+breathing\b/u.test(text) ||
+    /\bno\s+breathing\b/u.test(text) ||
+    /\bwheez(?:e|ed|ing)\b[^.!?]{0,32}\b(?:can't|cant|cannot|unable to)\s+speak\b/u.test(text) ||
+    /\b(?:gasping for air|(?:can't|cant|cannot|unable to) catch (?:their |his |her |my )?breath)\b/u.test(text) ||
+    includesAny(text, [
+      "呼吸できない",
+      "息ができない",
+      "呼吸困難",
+      "息が苦しい",
+      "不能呼吸",
+      "无法呼吸",
+      "呼吸困难",
+      "喘不上气",
+      "호흡곤란",
+      "숨을 못 쉬",
+      "숨을 쉴 수 없어요",
+      "喉が締まっている",
+    ]);
+  const chokingEmergency = /\bchok(?:e|ed|ing)\b/u.test(text);
+  const responsivenessEmergency =
+    /\b(?:passed out|pass(?:es|ed|ing)? out|fainted|fainting|unconscious|unresponsive|out cold|knocked out|not conscious|not awake|not responding|not responsive|stopped responding|lost consciousness|loss of consciousness|blackout|blacked out|collapsed?|won't wake(?: up)?|will not wake(?: up)?|does not wake(?: up)?|(?:can't|cant|cannot|unable to) (?:wake|awaken)(?: (?:them|him|her|me))?(?: up)?|(?:can't|cant|cannot|unable to) stay (?:awake|conscious)|not waking(?: up)?)\b/u.test(
+      text,
+    ) ||
+    includesAny(text, [
       "意識がない",
       "反応がない",
       "失神",
+      "意識不明",
       "昏倒",
       "失去意识",
       "无反应",
       "没有反应",
-    ].some((phrase) => text.includes(phrase));
+      "怎么叫也叫不醒",
+      "의식이 없다",
+      "반응이 없다",
+      "깨워도 안 일어나요",
+    ]);
   const seizureEmergency =
-    /\b(?:seizure|seizing|convulsion|convulsions)\b/u.test(text) ||
-    ["けいれん", "痙攣", "癫痫发作", "抽搐"].some((phrase) => text.includes(phrase));
-  const chestPainEmergency = /\bchest pain\b/u.test(text) || text.includes("胸痛");
+    /\b(?:seizure|seizing|convulsion|convulsions|convulsing)\b/u.test(text) ||
+    includesAny(text, ["けいれん", "痙攣", "癫痫发作", "抽搐", "발작"]);
+  const chestPainEmergency = /\bchest pain\b/u.test(text) || includesAny(text, ["胸痛", "흉통"]);
+  const cardiacEmergency =
+    /\b(?:cardiac arrest|heart attack|heart (?:has )?stopped|no (?:pulse|heart ?beat)|pulseless)\b/u.test(
+      text,
+    );
+  const bleedingEmergency =
+    /\b(?:severe|serious|heavy|major|uncontrolled|won't stop|will not stop)\s+bleed(?:ing)?\b/u.test(text) ||
+    /\bbleed(?:ing)?\s+(?:profusely|heavily|severely|uncontrollably)\b/u.test(text) ||
+    /\bbleed(?:ing)?\b[^.!?]{0,24}\b(?:won't|will not|does not)\s+stop\b/u.test(text) ||
+    /\bblood\b[^.!?]{0,24}\b(?:won't|will not|does not)\s+stop\b/u.test(text) ||
+    /\b(?:blood (?:is )?(?:spurting|gushing)|(?:spurting|gushing) blood|bleeding out|massive blood loss|h[ae]morrhag(?:e|ed|ing))\b/u.test(
+      text,
+    ) ||
+    includesAny(text, [
+      "大量出血",
+      "激しい出血",
+      "出血がひどい",
+      "血が止まらない",
+      "严重出血",
+      "血流不止",
+      "심한 출혈",
+      "피가 멈추지 않아요",
+    ]);
+  const strokeEmergency =
+    /\b(?:stroke(?:-like)?(?: signs?| symptoms?)?|facial droop|drooping face|face (?:is )?drooping|one[- ]sided weakness|one side (?:is )?weak|weak on (?:the )?(?:left|right) side|major weakness|sudden weakness|(?:left|right) (?:arm|leg) (?:is |became |suddenly )?(?:suddenly )?weak|slurred speech|(?:speech|words?) (?:are |is |became )?slurred|slurring (?:speech|words?))\b/u.test(
+      text,
+    ) ||
+    includesAny(text, ["脳卒中", "片側の脱力", "中风症状", "中风", "单侧无力", "뇌졸중 증상"]);
   const fallOrHeadEmergency =
-    /\b(?:serious fall|fell|fallen|falling)\b[^.!?]{0,48}\b(?:hit|struck|hurt|injured)\s+(?:their|his|her|my|the)?\s*head\b/u.test(
+    /\b(?:serious|major|bad) fall\b/u.test(text) ||
+    /\b(?:head injury|fell from (?:suspension|a height|height|the ceiling|a rig|the rig)|dropped from (?:a rig|the rig|suspension))\b/u.test(text) ||
+    /\b(?:fell|fallen|falling)\b[^.!?]{0,48}\b(?:hit|struck|hurt|injured|banged)\s+(?:their|his|her|my|the)?\s*head\b/u.test(
       text,
     ) ||
     /\b(?:hit|struck|hurt|injured)\s+(?:their|his|her|my|the)?\s*head\b/u.test(text) ||
-    ["転倒", "頭を打った", "跌倒", "摔倒", "撞到头", "头部受伤"].some((phrase) => text.includes(phrase));
-  const emergencyCut =
-    /\bcut\s+(?:the\s+)?rope(?:\s+(?:now|immediately))?\b/u.test(text) ||
+    includesAny(text, ["転倒", "頭を打った", "跌倒", "摔倒", "撞到头", "头部受伤"]);
+  const severeConfusionEmergency =
+    /\b(?:severe|sudden) confusion\b/u.test(text) ||
+    /\b(?:suddenly|very) confused\b/u.test(text) ||
+    /\baltered mental status\b/u.test(text);
+  const materialColorChange =
+    /\b(?:rope|cord|line|fabric|screen|light)\b[^.!?]{0,32}\bturning blue\b/u.test(text);
+  const cyanosisEmergency =
+    /\b(?:cyanotic|cyanosis|(?:blue|gr[ae]y|ashen) (?:face|lips|skin|tongue)|(?:face|lips|skin|tongue) (?:are |is )?(?:turning )?(?:blue|gr[ae]y|ashen)|turning (?:blue|gr[ae]y|ashen) around (?:the )?(?:face|lips))\b/u.test(
+      text,
+    ) || (/\bturning blue\b/u.test(text) && !materialColorChange);
+  const neckTerminologyContext =
+    /\b(?:chokehold|strangulation|asphyxiation)\s+(?:terminology|definition|meaning|history)\b/u.test(
+      text,
+    );
+  const neckContext =
+    !neckTerminologyContext &&
+    (/\b(?:neck (?:pressure|compression|constriction|was squeezed)|pressure (?:on|to) (?:the |my |their |his |her )?(?:neck|throat)|(?:squeezed|grabbed|compressed) (?:the |my |their |his |her )?(?:neck|throat)|strang(?:le|led|ling|ulation|ulated)|chok(?:e|ed|ing|ehold)|throttl(?:e|ed|ing)|garrot(?:e|ed|ing)|manual strangulation|(?:erotic )?asphyxi(?:a|ation|ated))\b/u.test(
+      text,
+    ) ||
+      /\b(?:rope|cord|line|ligature|noose|hands?)\b[^.!?]{0,48}\b(?:around|on|across|near|over|touching)\s+(?:the\s+|my\s+|their\s+|his\s+|her\s+)?(?:neck|throat)\b/u.test(
+        text,
+      ) ||
+      /\bbreath\s*play\b[^.!?]{0,32}\b(?:last night|yesterday|earlier|happened|after|during)\b/u.test(
+        text,
+      ) ||
+      /\b(?:after|during)\b[^.!?]{0,32}\bbreath\s*play\b/u.test(text) ||
+      includesAny(text, [
+        "首を圧迫",
+        "首が締",
+        "喉が締まっている",
+        "颈部受压",
+        "勒颈",
+        "목 압박",
+      ]));
+  const concerningNeckSymptom =
+    /\b(?:concerning symptoms?|breath(?:ing)? (?:change|changed|difficulty|problem)|swallow(?:ing)?|voice chang(?:e|ed|ing)|hoarse|raspy voice|(?:can't|cant|cannot|unable to) speak|confusion|confused|faint(?:ed|ing|ness)?|headache|dizz(?:y|iness)|weakness|vision change)\b/u.test(
+      text,
+    ) ||
+    includesAny(text, [
+      "声の変化",
+      "飲み込みにくい",
+      "めまい",
+      "混乱",
+      "声音改变",
+      "吞咽困难",
+      "头晕",
+      "혼란",
+      "어지러",
+      "삼키기",
+      "목소리 변화",
+    ]);
+  const emergencyReleaseRequest =
+    /\bcut\s+(?:the\s+)?ropes?(?:\s+(?:now|immediately))?\b/u.test(text) ||
+    /\bcut\s+(?:them|him|her|me)\s+free(?:\s+(?:now|immediately))?\b/u.test(text) ||
+    /\bemergency release(?:\s+(?:now|immediately))?\b/u.test(text) ||
     ((text.includes("緊急") || text.includes("緊急時")) && text.includes("ロープ") &&
       (text.includes("切る") || text.includes("切断"))) ||
+    includesAny(text, ["今すぐ縄を切って", "马上把绳子剪断", "지금 당장 밧줄을 잘라"]) ||
     (text.includes("紧急") && (text.includes("绳") || text.includes("绳索")) &&
       (text.includes("切") || text.includes("切断")));
+
   if (
     breathingEmergency ||
+    chokingEmergency ||
     responsivenessEmergency ||
     seizureEmergency ||
     chestPainEmergency ||
+    cardiacEmergency ||
+    bleedingEmergency ||
+    strokeEmergency ||
     fallOrHeadEmergency ||
-    emergencyCut
+    severeConfusionEmergency ||
+    cyanosisEmergency ||
+    emergencyReleaseRequest ||
+    (neckContext && concerningNeckSymptom)
   ) {
-    add("article:emergency-stop", 2_000);
-    add("gear:shears", 1_800);
-    add("article:hard-limits", 900);
+    return {
+      kind: "emergency",
+      action:
+        "Emergency: stop the activity. Support the person's position and release restraint without creating a fall. Call local emergency services now and follow dispatcher instructions. Do not delay for this app.",
+      emergencyHref: "/emergency",
+    };
+  }
+
+  if (neckContext) {
+    return {
+      kind: "prompt_medical",
+      action:
+        "Possible neck-pressure exposure: stop and release. Do not resume. Seek urgent medical assessment because serious or delayed harm can occur without visible injury; call emergency services now for breathing or swallowing change, voice change, confusion, fainting, severe headache, dizziness, weakness, or any worsening symptom.",
+      emergencyHref: "/emergency",
+    };
   }
 
   const consentWithdrawal =
     /\b(?:revoke|withdraw|cancel)\s+(?:my\s+)?consent\b/u.test(text) ||
     /\bconsent\s+(?:is\s+)?(?:revoked|withdrawn|cancelled|canceled)\b/u.test(text) ||
+    /\b(?:(?:i|we|they|he|she)\s+)?(?:do not|don't|does not|doesn't)\s+consent\b/u.test(text) ||
+    /\b(?:there is |there's )?no consent\b/u.test(text) ||
+    /\b(?:stop|quit)\s+(?:recording|filming|photographing)\s+me\b/u.test(text) ||
+    /\b(?:i |they |he |she |the person |my partner )?(?:said|says?)\s+stop\s+(?:recording|filming|photographing|taking (?:photos|pictures))\b/u.test(
+      text,
+    ) ||
+    /\bstop\s+taking\s+(?:photos|pictures)\s+of\s+(?:me|them|him|her)\b/u.test(text) ||
+    /\bdelete\s+(?:my|their|his|her)\s+(?:photo|image|picture|video|recording|upload)\b/u.test(text) ||
+    /\b(?:revoke|withdraw|cancel)\s+(?:my |their |his |her )?(?:upload|recording|camera|photo|video)\s+permission\b/u.test(
+      text,
+    ) ||
+    /\bpermission\s+to\s+(?:upload|record|film|photograph|share)\s+(?:was |is |has been )?(?:withdrawn|revoked|cancelled|canceled)\b/u.test(
+      text,
+    ) ||
+    /\bchanged\s+(?:my|their|his|her)\s+mind\b/u.test(text) ||
+    /\b(?:they|he|she|the person|my partner)\s+(?:told|asked)\s+me\s+to\s+stop\b/u.test(text) ||
+    includesAny(text, ["やめてと言われた", "对方说停下", "상대가 그만하라고 했어요"]) ||
     (text.includes("同意") && ["撤回", "取り消し", "取消", "撤销", "收回"].some((term) => text.includes(term)));
-  if (consentWithdrawal) {
+  const secretRecordingPrevention =
+    /\bhow to (?:prevent|avoid|detect|protect against)\b[^.!?]{0,48}\bsecret recording\b/u.test(
+      text,
+    );
+  const secretOrCoercedRecording =
+    !secretRecordingPrevention &&
+    (/\b(?:secret(?:ly)?|hidden|without (?:their|his|her|my)?\s*permission|coerced?|forced)\s+(?:camera|recording|photo|image|upload)\b/u.test(
+      text,
+    ) ||
+      /\b(?:recorded|filmed|photographed|uploaded|shared)\b[^.!?]{0,32}\bwithout\s+(?:their|his|her|my)?\s*permission\b/u.test(
+        text,
+      ) ||
+      /\b(?:recorded|filmed|photographed|uploaded|shared)\b[^.!?]{0,32}\bwithout\s+(?:their|his|her|my)?\s*consent\b/u.test(
+        text,
+      ) ||
+      /\b(?:didn't|did not|never)\s+agree\s+to\s+(?:the\s+)?(?:camera|recording|filming|photo|video|upload|sharing)\b/u.test(
+        text,
+      ) ||
+      /\b(?:recording|photo|image|upload)\s+(?:is|was)\s+(?:secret|hidden|coerced|forced)\b/u.test(
+        text,
+      ) ||
+      /\b(?:camera|recorder)\s+(?:is|was)\s+(?:secret|hidden)\b/u.test(text) ||
+      /\b(?:forced|coerced)\b[^.!?]{0,48}\b(?:pose|posing)\b[^.!?]{0,32}\b(?:photo|image|picture)\b/u.test(
+        text,
+      ) ||
+      /\b(?:surreptitious|nonconsensual|unconsented)\s+(?:camera|recording|video|photo|image|upload)\b/u.test(
+        text,
+      ) ||
+      /\b(?:took|captured|recorded|filmed)\b[^.!?]{0,48}\b(?:photo|picture|image|video)?\b[^.!?]{0,24}\bwhile (?:asleep|sleeping|unconscious)\b/u.test(
+        text,
+      ) ||
+      /\b(?:spy\s*cam|spy camera)\b[^.!?]{0,32}\b(?:video|photo|image|recording|footage)\b/u.test(
+        text,
+      ) ||
+      /\b(?:shared|uploaded|posted)\b[^.!?]{0,32}\bagainst\s+(?:their|his|her|my)\s+wishes\b/u.test(
+        text,
+      ) ||
+      /\b(?:revenge porn|stolen (?:intimate|nude|explicit) (?:photo|image|video|recording))\b/u.test(
+        text,
+      ) ||
+      /\b(?:didn't|did not|never) ask\b[^.!?]{0,48}\bbefore (?:filming|recording|photographing|uploading)\b/u.test(
+        text,
+      ) ||
+      /\bno permission to (?:record|film|photograph|upload|share)\b/u.test(text) ||
+      /\b(?:they|he|she|the person|my partner) (?:said|told me) no to (?:the )?(?:camera|recording|photo|video|upload)\b/u.test(
+        text,
+      ) ||
+      includesAny(text, [
+        "隠し撮り",
+        "盗撮",
+        "未经同意拍摄",
+        "未经同意录像",
+        "몰래 촬영",
+        "몰래 찍",
+      ]));
+  const mediaContext =
+    /\b(?:camera|capture|clip|filming|image|media|model|photo|photograph|picture|recording|still|upload|video)\b/u.test(
+      text,
+    );
+  const minorNonAgeContext =
+    /\bminor (?:damage|fraying|injur(?:y|ies)|issue|repair|rope|wear)\b/u.test(text);
+  const ambiguousAgeMedia =
+    !minorNonAgeContext &&
+    (/^(?:minor|underage|under[- ]?18|under eighteen|ambiguous age|child)$/u.test(text) ||
+      /\b(?:underage|under[- ]?18|under eighteen|below 18|ambiguous age|age (?:is )?(?:unknown|unclear|unconfirmed|not verified)|unknown age|unknown[- ]aged|young[- ]looking (?:person|participant|model)|childlike (?:person|participant|model)|looks? young (?:in (?:the )?)?(?:photo|image|picture|video)|not sure (?:if )?(?:(?:they are|he is|she is|the person is) )?(?:an )?adult|(?:can't|cant|cannot|unable to) (?:confirm|verify) (?:an )?adult|(?:don't|do not) know (?:their|his|her|the person's) age|not eighteen|not of age|below (?:the )?legal age|under (?:the )?legal age)\b/u.test(
+        text,
+      ) ||
+      (mediaContext &&
+        /\b(?:minor|teen(?:ager)?|child|kid|preteen|adolescent|schoolchild|high school student|middle school student|schoolgirl|schoolboy|juvenile)\b/u.test(
+          text,
+        )) ||
+    (mediaContext &&
+      /\b(?:id|age) (?:was |is )?not (?:checked|verified|confirmed)\b/u.test(text)) ||
+    /\b(?:(?:[0-9]|1[0-7])|(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen))[- ]years?[- ]old\b/u.test(
+      text,
+    ) ||
+    /\b(?:age[ds]?\s*:?\s*(?:[0-9]|1[0-7])|(?:[0-9]|1[0-7])\s*years? of age)\b[^.!?]{0,32}\b(?:photo|image|picture|video|media|model|person)\b/u.test(
+      text,
+    ) ||
+    /\b(?:[0-9]|1[0-7])\s*(?:yo\b|y\/o\b|y\.?\s*o\.?|yrs? old\b)[^!?]{0,32}\b(?:photo|image|picture|video|media|model|person)\b/u.test(
+      text,
+    ) ||
+    /\baged\s+(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen)\b[^.!?]{0,32}\b(?:photo|image|video|media|model|person)\b/u.test(
+      text,
+    ) ||
+    /\b(?:kid|schoolgirl|schoolboy|juvenile|childlike (?:person|participant|model))\b[^.!?]{0,32}\b(?:photo|image|video|media|model|person)\b/u.test(
+      text,
+    ));
+  const explicitScanText = text.replace(/\bnon[- ]explicit\b/gu, "");
+  const nudeColorContext =
+    /\bnude(?:[- ](?:pink|beige|tan|tone|toned|colou?r(?:ed)?))?\s+(?:rope|cord|line|shade|paint)\b/u.test(
+      text,
+    );
+  const explicitMedia =
+    (!nudeColorContext && /\b(?:nude|nudes|nudity|naked|nakedness|nsfw)\b/u.test(explicitScanText)) ||
+    /^(?:porn|pornographic|xxx|explicit (?:image|photo|video|media))$/u.test(explicitScanText) ||
+    (mediaContext &&
+      /\b(?:nude|nudes|nudity|naked|nakedness|topless|nsfw|undressed|unclothed|no clothes|full frontal|bare (?:breasts?|chest)|(?:breasts?|nipples?|private parts?|genitals?)(?: are| is| look)? visible|genital|vulva|penis|sex(?:ual)? acts?|sexual activity|sexual intercourse|sex scene|graphic sex|xxx|intimate|explicit|porn(?:ographic)?|hardcore|adult content|lewd)\b/u.test(
+        explicitScanText,
+      ));
+  const unsupportedMedia =
+    ambiguousAgeMedia ||
+    explicitMedia ||
+    /(?:[0-9]|1[0-7])歳(?:の)?写真/u.test(text) ||
+    /(?:[0-9]|1[0-7])岁照片/u.test(text) ||
+    /(?:[0-9]|1[0-7])살 사진/u.test(text) ||
+    includesAny(text, [
+      "未成年の写真",
+      "露出写真",
+      "裸の写真",
+      "ヌード写真",
+      "未成年照片",
+      "裸体照片",
+      "成人视频",
+      "미성년자 사진",
+      "나체 사진",
+      "성인물 영상",
+    ]);
+  const releaseSymptom =
+    /\b(?:new |sudden |worsening |sharp worsening |increasing )?(?:numb(?:ness)?|tingl(?:e|ing|y)|pins and needles|burning|electric sensation|weakness|loss of (?:movement|function|coordination|sensation)|no sensation|reduced movement|weak grip|foot drop|severe pain|escalating pain|excruciating pain|faintness|lightheaded(?:ness)?|swollen|swelling|edema)\b/u.test(
+      text,
+    ) ||
+    /\bloss of grip\b(?![^.!?]{0,24}\b(?:rope )?tool\b)/u.test(text) ||
+    /\b(?:dropping things|hand (?:feels?|felt) dead)\b/u.test(text) ||
+    /\b(?:can't|cant|cannot|unable to)\s+feel\s+(?:my|their|his|her)?\s*(?:finger|fingers|hand|hands|toe|toes|foot|feet)\b/u.test(
+      text,
+    ) ||
+    /\b(?:finger|fingers|hand|hands|toe|toes|foot|feet)\b[^.!?]{0,24}\b(?:won't|will not|cannot|can't)\s+move\b/u.test(
+      text,
+    ) ||
+    /\b(?:can't|cant|cannot|unable to)\s+(?:grip|wiggle (?:my |their |his |her )?(?:fingers?|toes?))\b/u.test(
+      text,
+    ) ||
+    /\b(?:can't|cant|cannot|unable to)\s+move\s+(?:my |their |his |her )?(?:fingers?|hands?|toes?|feet)\b/u.test(
+      text,
+    ) ||
+    /\b(?:arm|arms|hand|hands|leg|legs|limb|limbs|foot|feet|finger|fingers|fingertip|fingertips|toe|toes)\s+(?:is |are )?(?:purple|blue|black|white|grey|gray|cold|cool|pale|asleep|puffy)\b/u.test(
+      text,
+    ) ||
+    /\b(?:purple|blue|black|white|grey|gray|cold|cool|pale|puffy)\s+(?:arm|arms|hand|hands|leg|legs|limb|limbs|foot|feet|finger|fingers|fingertip|fingertips|toe|toes)\b/u.test(
+      text,
+    ) ||
+    /\b(?:arm|arms|hand|hands|leg|legs|limb|limbs|foot|feet|finger|fingers|fingertip|fingertips|toe|toes)\b[^.!?]{0,16}\b(?:went|feels?|became|looks?)\s+(?:purple|blue|black|white|grey|gray|cold|cool|pale|puffy)\b/u.test(
+      text,
+    ) ||
+    /\b(?:discolou?red)\s+(?:arm|hand|leg|limb|foot|finger|fingertip|toe)s?\b/u.test(text) ||
+    /\b(?:sharp worsening|increasing)\s+pain\b/u.test(text) ||
+    /\bpain\s+(?:has |is\s+)?(?:increased|worsened|getting|becoming|growing)\s*(?:worse)?\b/u.test(
+      text,
+    ) ||
+    /\b(?:rope|cord|line)\b[^.!?]{0,48}\bcut\s+off\s+(?:the\s+)?circulation\b/u.test(text) ||
+    includesAny(text, [
+      "しびれ",
+      "痺れ",
+      "指の感覚がない",
+      "麻木",
+      "刺痛",
+      "无力",
+      "手没有知觉",
+      "붓기",
+      "저림",
+      "손에 감각이 없어요",
+    ]);
+  if (releaseSymptom) {
+    const consentAction =
+      consentWithdrawal || secretOrCoercedRecording
+        ? " Consent is absent or withdrawn: keep the camera off, delete any unsent local batch, and do not substitute another activity or upload."
+        : "";
+    const unsupportedMediaAction = unsupportedMedia
+      ? " Do not capture or upload unsupported media; ambiguous age, nudity, and explicit sexual activity are outside this app's camera scope."
+      : "";
+    return {
+      kind: "release_now",
+      action:
+        "Stop and release now without creating a fall. Check the person directly; a photo or normal appearance cannot clear sensation, movement, circulation, pain, or injury. Seek prompt medical assessment for persistent or worsening symptoms, and call emergency services for any emergency sign." +
+        consentAction +
+        unsupportedMediaAction,
+      emergencyHref: "/emergency",
+    };
+  }
+
+  if (consentWithdrawal || secretOrCoercedRecording) {
+    return {
+      kind: "consent_withdrawn",
+      action:
+        "Consent is absent or withdrawn: stop the activity, release any restraint, keep the camera off, and delete any unsent local batch. Do not substitute another activity or upload. A request already transmitted cannot be recalled by this app.",
+    };
+  }
+
+  if (unsupportedMedia) {
+    return {
+      kind: "unsupported_media",
+      action:
+        "Unsupported media: do not capture or upload it. Camera analysis is limited to confirmed legal adults in clothed, non-explicit, consented images or selected video stills. The app does not automatically detect these conditions; ambiguous age, nudity, explicit sexual activity, secret recording, and coerced media are prohibited and must not be selected or uploaded.",
+    };
+  }
+
+  return ORDINARY_DISPOSITION;
+}
+
+function intentBoosts(query: unknown) {
+  const text = intentText(query);
+  const boosts = new Map<string, number>();
+  const add = (key: string, amount: number) => boosts.set(key, (boosts.get(key) ?? 0) + amount);
+  const disposition = knowledgeDisposition(text);
+  if (disposition.kind === "emergency" || disposition.kind === "prompt_medical") {
+    add("article:emergency-stop", 2_000);
+    add("gear:shears", 1_800);
+    add("article:hard-limits", 900);
+  }
+
+  if (disposition.kind === "consent_withdrawn") {
     add("article:consent-frameworks", 1_600);
     add("article:safewords", 1_000);
     add("article:emergency-stop", 600);
+  }
+  if (disposition.kind === "unsupported_media") {
+    add("article:photography-ethics", 2_000);
+    add("article:consent-frameworks", 1_100);
+    add("article:hard-limits", 800);
+  }
+  if (disposition.kind === "release_now") {
+    add("article:circulation", 1_900);
+    add("article:nerve-atlas", 1_700);
+    add("article:emergency-stop", 900);
   }
 
   const safeStart =
     ((/\b(?:safe|safely)\b/u.test(text) && /\b(?:start|begin|starting|beginning)\b/u.test(text)) ||
       (text.includes("安全") && ["始め", "始める", "开始"].some((term) => text.includes(term)))) &&
-    !breathingEmergency &&
-    !emergencyCut;
+    disposition.kind === "ordinary";
   if (safeStart) {
     add("article:negotiation", 1_400);
     add("article:consent-frameworks", 1_200);
@@ -319,6 +738,31 @@ function boundedLimit(limit: number | undefined) {
   if (!Number.isFinite(numeric)) return 12;
   return Math.max(0, Math.min(MAX_RESULTS, Math.trunc(numeric)));
 }
+
+const ACTION_HIT_ALLOWLIST: Record<
+  Exclude<KnowledgeDispositionKind, "ordinary">,
+  ReadonlySet<string>
+> = {
+  emergency: new Set(["article:emergency-stop", "article:hard-limits", "gear:shears"]),
+  prompt_medical: new Set(["article:emergency-stop", "article:hard-limits"]),
+  release_now: new Set([
+    "article:circulation",
+    "article:nerve-atlas",
+    "article:emergency-stop",
+    "gear:shears",
+  ]),
+  consent_withdrawn: new Set([
+    "article:consent-frameworks",
+    "article:safewords",
+    "article:photography-ethics",
+    "article:emergency-stop",
+  ]),
+  unsupported_media: new Set([
+    "article:photography-ethics",
+    "article:consent-frameworks",
+    "article:hard-limits",
+  ]),
+};
 
 export function searchKnowledge(query: string, limit = 12): SearchHit[] {
   const terms = tokens(query);
@@ -472,24 +916,32 @@ export function searchKnowledge(query: string, limit = 12): SearchHit[] {
     gear: 4,
     dungeon: 5,
   };
-  return hits
-    .sort((a, b) => {
+  const ranked = hits.sort((a, b) => {
       if (a.score !== b.score) return b.score - a.score;
       if (kindOrder[a.kind] !== kindOrder[b.kind]) return kindOrder[a.kind] - kindOrder[b.kind];
       if (a.slug === b.slug) return 0;
       return a.slug < b.slug ? -1 : 1;
-    })
+    });
+  const disposition = knowledgeDisposition(query);
+  if (disposition.kind === "ordinary") return ranked.slice(0, safeLimit);
+  const allowlist = ACTION_HIT_ALLOWLIST[disposition.kind];
+  return ranked
+    .filter((hit) => allowlist.has(`${hit.kind}:${hit.slug}`))
     .slice(0, safeLimit);
 }
 
-/** Format a deterministic, reviewed-only answer locally; this never needs AI or a network. */
+/** Format a deterministic local answer; this never needs AI or a network. */
 export function knowledgeAnswer(query: string, limit = 6): string {
+  const disposition = knowledgeDisposition(query);
   const hits = searchKnowledge(query, limit);
   if (!hits.length) {
-    return "No reviewed entry matched that wording. Try a broad topic such as consent, privacy, aftercare, nerves, equipment, or emergency release. This search does not generate individualized rope instructions.";
+    const noMatch =
+      "No curated local entry matched that wording. Try a broad topic such as consent, privacy, aftercare, nerves, equipment, or emergency release. This search does not generate individualized rope instructions.";
+    return disposition.action ? `${disposition.action}\n\n${noMatch}` : noMatch;
   }
   const reading = hits.map((hit) => `• ${hit.title} (${hit.kind})`).join("\n");
-  return `Relevant reviewed entries:\n${reading}\n\nOpen the matching entries below. This search is educational only and does not validate a setup, infer consent or physiology, or provide individualized high-consequence instructions.`;
+  const catalog = `Relevant curated entries:\n${reading}\n\nOpen the matching entries below. Entries may be source-anchored or app-authored; check each article's evidence panel. Search is educational only and does not validate a setup, infer consent or physiology, or provide individualized high-consequence instructions.`;
+  return disposition.action ? `${disposition.action}\n\n${catalog}` : catalog;
 }
 
 export function articleExcerpts(slugs: string[], maxChars = 900) {

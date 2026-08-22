@@ -5,18 +5,22 @@ export const MORE_KNOTS: Knot[] = [
     slug: "overhand-on-bight",
     name: "Overhand on a Bight",
     jp: "止め結び",
-    summary: "The simplest loop. Bulky, jams under load, fine as a stopper, not a cuff.",
+    summary:
+      "A stopper-loop category demonstrated only on loose, unoccupied material. This app does not teach it as a cuff, loaded connection, or person-bearing component.",
     cinches: true,
     loadBearing: false,
     usedIn: ["karada", "hishi"],
     steps: [
       {
         title: "Fold, wrap, pull",
-        body: "Midpoint bight, wrap the standing pair, pull the bight through. Dress. This will jam. Do not use it where you need a fast untie.",
-        speak: "Overhand on a bight. Stopper, not a cuff.",
+        body: "On loose, unoccupied practice material, fold a bight, pass it through the sample loop, and dress it only for recognition. Untie before any loading.",
+        speak: "Recognition on loose, unoccupied material only.",
       },
     ],
-    watch: ["Jams. Cut it if it took load. Never as a loaded wrist cuff."],
+    watch: [
+      "This structure can jam and is not a rapid-release method.",
+      "Do not load it, put it on a body, or infer a cutting procedure from this entry.",
+    ],
   },
   {
     slug: "prusik",

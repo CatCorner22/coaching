@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { adoptPersistKey } from "./persist";
+import { adoptPersistKey, safeJsonStorage } from "./persist";
 
 export type Settings = {
   consentVersion: number;
@@ -103,6 +103,9 @@ export const useSettings = create<SettingsState>()(
     }),
     {
       name: "knotty-settings",
+      storage: safeJsonStorage<SettingsState>(),
+      version: 1,
+      migrate: (persisted) => persisted as SettingsState,
       merge: (persisted, current) => {
         return {
           ...current,

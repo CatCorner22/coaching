@@ -23,7 +23,16 @@ test("pre-v4 legacy consent is adopted but normalized to consent, voice, and mic
   localStorage.setItem("musubi-settings", JSON.stringify({ state: legacy, version: 0 }));
 
   const { normalizePersistedSettings, useSettings } = await import("./settings.ts");
-  assert.equal(localStorage.getItem("knotty-settings"), localStorage.getItem("musubi-settings"));
+  const adopted = JSON.parse(String(localStorage.getItem("knotty-settings")));
+  assert.equal(adopted.version, 1);
+  assert.equal(adopted.state.consentVersion, 0);
+  assert.equal(adopted.state.consented, false);
+  assert.equal(adopted.state.voice, false);
+  assert.equal(adopted.state.listen, false);
+  assert.deepEqual(JSON.parse(String(localStorage.getItem("musubi-settings"))), {
+    state: legacy,
+    version: 0,
+  });
   const normalized = normalizePersistedSettings(legacy, useSettings.getState());
   assert.equal(normalized.consentVersion, 0);
   assert.equal(normalized.consented, false);

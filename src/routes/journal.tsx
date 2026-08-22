@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { SourceEvidence } from "@/components/source-evidence";
 import { getTie } from "@/lib/kb";
 import { purgeLegacyStills, useJournal } from "@/lib/stores/journal";
 
@@ -77,6 +78,9 @@ function JournalPage() {
               {Array.isArray(e.limitations) && e.limitations.length > 0 && (
                 <p className="mt-1 text-xs text-subtle">{e.limitations[0]}</p>
               )}
+              <div className="mt-2">
+                <SourceEvidence sourceIds={e.sourceIds} />
+              </div>
               {e.tieSlug && (
                 <Button asChild variant="ghost" size="sm" className="mt-2 px-0">
                   <Link to="/tie/$slug" params={{ slug: e.tieSlug }}>

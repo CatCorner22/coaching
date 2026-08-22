@@ -4,6 +4,7 @@ import {
   type JWK,
   type JWTVerifyGetKey,
 } from "jose";
+import { normalizeHttpsOrigin } from "./config.ts";
 
 export const GATE_IDENTITY_HEADER = "x-grok-identity";
 export const GATE_JWKS_PATH = "/__gate/identity-key";
@@ -269,7 +270,8 @@ type GateEndpoints = { issuer: string; jwksUrl: string };
 export function resolveGateEndpoints(headers: Headers): GateEndpoints | null {
   const explicit = env("GROK_GATE_ORIGIN");
   if (explicit) {
-    const origin = explicit.replace(/\/+$/, "");
+    const origin = normalizeHttpsOrigin(explicit);
+    if (!origin) return null;
     return { issuer: origin, jwksUrl: `${origin}${GATE_JWKS_PATH}` };
   }
 

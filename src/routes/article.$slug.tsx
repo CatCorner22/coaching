@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { getArticle, getKnot, getTie } from "@/lib/kb";
+import { articleEvidenceSources, getArticle, getArticleEvidence, getKnot, getTie } from "@/lib/kb";
 
 export const Route = createFileRoute("/article/$slug")({ component: ArticlePage });
 
@@ -13,6 +13,8 @@ function ArticlePage() {
       </div>
     );
   }
+  const evidence = getArticleEvidence(article.slug);
+  const evidenceSources = articleEvidenceSources(article.slug);
   return (
     <article className="mx-auto max-w-2xl px-5 py-10">
       <p className="text-xs uppercase tracking-[0.22em] text-muted">{article.section}</p>
@@ -54,6 +56,33 @@ function ArticlePage() {
           );
         })}
       </div>
+      <section className="mt-10 rounded-lg border border-border bg-surface p-4" aria-labelledby="evidence-status">
+        <p className="text-xs uppercase tracking-wide text-subtle">Evidence status</p>
+        <h2 id="evidence-status" className="mt-1 font-display text-2xl">
+          {evidence.status === "source_anchored" ? "Source-anchored editorial" : "Editorial only"}
+        </h2>
+        <p className="mt-2 text-sm leading-relaxed text-muted">{evidence.note}</p>
+        <p className="mt-2 text-[11px] text-subtle">
+          Ledger {evidence.ledgerRevision} · audited {evidence.auditedAt}
+        </p>
+        {evidenceSources.length > 0 && (
+          <ul className="mt-3 space-y-2">
+            {evidenceSources.map((source) => (
+              <li key={source.id}>
+                <a
+                  href={source.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-fg underline"
+                >
+                  {source.id} · {source.title}
+                </a>
+                <p className="mt-0.5 text-xs leading-relaxed text-muted">{source.note}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
       {article.related.length > 0 && (
         <div className="mt-10">
           <p className="text-xs uppercase tracking-wide text-subtle">Related</p>

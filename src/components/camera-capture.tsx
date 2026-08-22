@@ -2,10 +2,13 @@ import { Camera, Flashlight, ImagePlus, SwitchCamera, Video } from "lucide-react
 import { memo, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
+  inspectCameraCapabilities,
   openRopeCamera,
+  playCameraPreview,
   setTorch,
   startClip,
   torchAvailable,
+  type CameraCapabilityReport,
   type ClipHandle,
 } from "@/lib/camera/stream";
 import {
@@ -97,6 +100,8 @@ export const CameraCapture = memo(function CameraCapture({
   const recordTimerRef = useRef<number | null>(null);
   const recordStartedAtRef = useRef<number | null>(null);
   const cameraRequestRef = useRef(0);
+  const cameraOpenRef = useRef<AbortController | null>(null);
+  const capabilityRequestRef = useRef(0);
   const mediaOperationRef = useRef<AbortController | null>(null);
   const mediaOperationIdRef = useRef(0);
   const torchRequestRef = useRef(0);
@@ -117,6 +122,9 @@ export const CameraCapture = memo(function CameraCapture({
   const [hint, setHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [permissions, setPermissions] = useState(EMPTY_PERMISSIONS);
+  const [capabilityReport, setCapabilityReport] = useState<CameraCapabilityReport | null>(null);
+  const [checkingCapabilities, setCheckingCapabilities] = useState(false);
+  const [capabilityError, setCapabilityError] = useState<string | null>(null);
   const [batchCommitted, setBatchCommitted] = useState(false);
   const [videoFrames, setVideoFrames] = useState<PendingVideoFrame[]>([]);
   const [selectedFrames, setSelectedFrames] = useState<number[]>([]);
@@ -129,6 +137,9 @@ export const CameraCapture = memo(function CameraCapture({
     return () => {
       mountedRef.current = false;
       mediaOperationRef.current?.abort();
+      cameraOpenRef.current?.abort();
+      cameraOpenRef.current = null;
+      capabilityRequestRef.current += 1;
       mediaOperationIdRef.current += 1;
       torchRequestRef.current += 1;
       cameraRequestRef.current += 1;
@@ -169,7 +180,13 @@ export const CameraCapture = memo(function CameraCapture({
 
   useEffect(() => {
     if (!disabled) return;
+    capabilityRequestRef.current += 1;
+    setCheckingCapabilities(false);
+    setCapabilityReport(null);
+    setCapabilityError(null);
     mediaOperationRef.current?.abort();
+    cameraOpenRef.current?.abort();
+    cameraOpenRef.current = null;
     mediaOperationIdRef.current += 1;
     torchRequestRef.current += 1;
     cameraRequestRef.current += 1;
@@ -202,6 +219,30 @@ export const CameraCapture = memo(function CameraCapture({
       permissionExpiryTimerRef.current = null;
     }
   }, [disabled]);
+
+  async function checkBrowserCapabilities() {
+    if (disabledRef.current || checkingCapabilities) return;
+    const request = ++capabilityRequestRef.current;
+    setCheckingCapabilities(true);
+    setCapabilityError(null);
+    try {
+      const report = await inspectCameraCapabilities();
+      if (mountedRef.current && !disabledRef.current && request === capabilityRequestRef.current) {
+        setCapabilityReport(report);
+      }
+    } catch {
+      if (mountedRef.current && !disabledRef.current && request === capabilityRequestRef.current) {
+        setCapabilityReport(null);
+        setCapabilityError(
+          "The browser capability check could not finish. You can still try file selection.",
+        );
+      }
+    } finally {
+      if (mountedRef.current && request === capabilityRequestRef.current) {
+        setCheckingCapabilities(false);
+      }
+    }
+  }
 
   function clearRecordTimer() {
     if (recordTimerRef.current !== null) {
@@ -296,7 +337,9 @@ export const CameraCapture = memo(function CameraCapture({
       confirmedAtForBatch();
       return true;
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Reconfirm every permission for this batch.");
+      setError(
+        cause instanceof Error ? cause.message : "Reconfirm every permission for this batch.",
+      );
       return false;
     }
   }
@@ -304,7 +347,9 @@ export const CameraCapture = memo(function CameraCapture({
   async function startLive(next: "user" | "environment" = facing) {
     if (disabledRef.current || batchCommitted) return;
     if (!Object.values(permissionsRef.current).every(Boolean)) {
-      setError("Confirm adult status, every media-scope item, and all four permissions before opening the camera.");
+      setError(
+        "Confirm adult status, every media-scope item, and all four permissions before opening the camera.",
+      );
       return;
     }
     if (!hasCurrentBatchPermissions()) return;
@@ -313,10 +358,12 @@ export const CameraCapture = memo(function CameraCapture({
     setVideoFrames([]);
     setSelectedFrames([]);
     const request = ++cameraRequestRef.current;
+    const cameraController = new AbortController();
+    cameraOpenRef.current = cameraController;
     let openedStream: MediaStream | null = null;
     setBusy(true);
     try {
-      const stream = await openRopeCamera(next);
+      const stream = await openRopeCamera(next, { signal: cameraController.signal });
       openedStream = stream;
       if (!mountedRef.current || request !== cameraRequestRef.current) {
         stream.getTracks().forEach((track) => track.stop());
@@ -326,7 +373,7 @@ export const CameraCapture = memo(function CameraCapture({
       setHasTorch(torchAvailable(stream));
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+        await playCameraPreview(videoRef.current, cameraController.signal);
       } else {
         throw new Error("Camera view is unavailable.");
       }
@@ -372,12 +419,15 @@ export const CameraCapture = memo(function CameraCapture({
         setError(cameraErrorMessage(cause));
       }
     } finally {
+      if (cameraOpenRef.current === cameraController) cameraOpenRef.current = null;
       if (mountedRef.current && request === cameraRequestRef.current) setBusy(false);
     }
   }
 
   function stopLive() {
     cameraRequestRef.current += 1;
+    cameraOpenRef.current?.abort();
+    cameraOpenRef.current = null;
     mediaOperationRef.current?.abort();
     mediaOperationIdRef.current += 1;
     torchRequestRef.current += 1;
@@ -409,7 +459,9 @@ export const CameraCapture = memo(function CameraCapture({
   ) {
     if (!mountedRef.current || disabledRef.current) return;
     if (!Object.values(permissionsRef.current).every(Boolean)) {
-      throw new Error("Reconfirm adult status, every media-scope item, and all four permissions for this batch.");
+      throw new Error(
+        "Reconfirm adult status, every media-scope item, and all four permissions for this batch.",
+      );
     }
     const confirmedAt = confirmedAtForBatch();
     if (!jpegs.length || !observations.length) throw new Error("No readable frame was captured.");
@@ -464,7 +516,10 @@ export const CameraCapture = memo(function CameraCapture({
         frames.push(await processMediaFrame(v, 768, 240, 0.74));
         await new Promise((r) => setTimeout(r, 90));
       }
-      const observed = frames.map((frame) => ({ frame, observation: observeFrame(frame.imageData) }));
+      const observed = frames.map((frame) => ({
+        frame,
+        observation: observeFrame(frame.imageData),
+      }));
       const best = pickBest(
         observed.map(({ frame, observation }) => ({
           data: frame.imageData,
@@ -483,7 +538,10 @@ export const CameraCapture = memo(function CameraCapture({
         [scoreFrame(chosen.imageData)],
       );
     } catch (cause) {
-      if (ownsMediaOperation(operation.id) && !(cause instanceof DOMException && cause.name === "AbortError")) {
+      if (
+        ownsMediaOperation(operation.id) &&
+        !(cause instanceof DOMException && cause.name === "AbortError")
+      ) {
         setError(cause instanceof Error ? cause.message : "Could not capture a photo.");
       }
     } finally {
@@ -542,10 +600,14 @@ export const CameraCapture = memo(function CameraCapture({
       const stoppedAt = Date.now();
       const blob = await handle.stop();
       signal.throwIfAborted();
-      const durationHint = startedAt === null ? undefined : Math.max(0.05, (stoppedAt - startedAt) / 1000);
+      const durationHint =
+        startedAt === null ? undefined : Math.max(0.05, (stoppedAt - startedAt) / 1000);
       await ingestVideo(blob, operation, durationHint);
     } catch (e) {
-      if (ownsMediaOperation(operation.id) && !(e instanceof DOMException && e.name === "AbortError")) {
+      if (
+        ownsMediaOperation(operation.id) &&
+        !(e instanceof DOMException && e.name === "AbortError")
+      ) {
         setError(e instanceof Error ? e.message : "Could not record");
       }
     } finally {
@@ -582,13 +644,17 @@ export const CameraCapture = memo(function CameraCapture({
       })),
     );
     setSelectedFrames([]);
-    setHint("Choose one to three labeled stills from the clip. Nothing is analyzed remotely until you confirm.");
+    setHint(
+      "Choose one to three labeled stills from the clip. Nothing is analyzed remotely until you confirm.",
+    );
   }
 
   async function commitSelectedVideoFrames() {
     if (!hasCurrentBatchPermissions()) return;
     const indices = [...selectedFrames].sort((a, b) => a - b).slice(0, 3);
-    const chosen = indices.map((index) => videoFrames[index]).filter(Boolean) as PendingVideoFrame[];
+    const chosen = indices
+      .map((index) => videoFrames[index])
+      .filter(Boolean) as PendingVideoFrame[];
     if (!chosen.length) {
       setError("Select at least one still from the clip.");
       return;
@@ -630,10 +696,19 @@ export const CameraCapture = memo(function CameraCapture({
         await ingestVideo(file, operation);
       } else {
         const { jpeg, imageData } = await processMediaFrame(file, 768, 240, 0.74, dimensions);
-        await emitFromMedia("photo", [jpeg], [observeFrame(imageData)], [scoreFrame(imageData)]);
+        signal.throwIfAborted();
+        if (!ownsMediaOperation(operation.id) || disabledRef.current) return;
+        const observation = observeFrame(imageData);
+        const quality = scoreFrame(imageData);
+        signal.throwIfAborted();
+        if (!ownsMediaOperation(operation.id) || disabledRef.current) return;
+        await emitFromMedia("photo", [jpeg], [observation], [quality]);
       }
     } catch (e) {
-      if (ownsMediaOperation(operation.id) && !(e instanceof DOMException && e.name === "AbortError")) {
+      if (
+        ownsMediaOperation(operation.id) &&
+        !(e instanceof DOMException && e.name === "AbortError")
+      ) {
         setError(e instanceof Error ? e.message : "Could not read media");
       }
     } finally {
@@ -654,10 +729,13 @@ export const CameraCapture = memo(function CameraCapture({
       request !== cameraRequestRef.current ||
       torchRequest !== torchRequestRef.current ||
       streamRef.current !== stream
-    ) return;
+    )
+      return;
     if (!ok) {
       stopLive();
-      setError("Torch could not be applied safely, so the camera was closed. Reopen it to continue without torch.");
+      setError(
+        "Torch could not be applied safely, so the camera was closed. Reopen it to continue without torch.",
+      );
       return;
     }
     setTorchOn(next);
@@ -665,8 +743,82 @@ export const CameraCapture = memo(function CameraCapture({
 
   return (
     <div className="space-y-3">
-      <fieldset disabled={disabled} className="rounded-lg border border-border bg-surface p-3 disabled:opacity-60">
-        <legend className="px-1 text-xs uppercase tracking-wide text-subtle">Permission for this batch</legend>
+      <section
+        className="rounded-lg border border-border bg-surface p-3"
+        aria-labelledby="camera-capability-heading"
+        aria-busy={checkingCapabilities}
+      >
+        <h3 id="camera-capability-heading" className="text-sm font-medium text-fg">
+          Browser camera preflight
+        </h3>
+        <p className="mt-1 text-xs leading-relaxed text-muted">
+          Check browser capabilities without opening the camera, prompting for access, or listing
+          devices. This snapshot can identify some browser-layer blockers only.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-3 h-auto min-h-11 whitespace-normal py-2 text-left"
+          onClick={() => void checkBrowserCapabilities()}
+          disabled={disabled}
+          aria-disabled={disabled || checkingCapabilities}
+        >
+          {checkingCapabilities
+            ? "Checking browser capabilities…"
+            : "Check browser capabilities — camera stays off"}
+        </Button>
+        {capabilityReport && (
+          <div
+            className="mt-3 rounded-md border border-border bg-elevated p-3"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <dl className="space-y-2 text-xs text-muted">
+              <CapabilityRow
+                label="Secure context"
+                value={secureContextCopy(capabilityReport.secureContext)}
+              />
+              <CapabilityRow
+                label="Camera policy"
+                value={cameraPolicyCopy(capabilityReport.cameraPolicy)}
+              />
+              <CapabilityRow
+                label="Live camera API"
+                value={apiCopy(capabilityReport.liveCameraApi)}
+              />
+              <CapabilityRow
+                label="In-app clip API"
+                value={apiCopy(capabilityReport.clipRecordingApi)}
+              />
+              <CapabilityRow
+                label="Camera permission"
+                value={permissionCopy(capabilityReport.permission)}
+              />
+            </dl>
+            <p className="mt-3 text-xs leading-relaxed text-subtle">
+              Photo/video file decoding is tested only after you select a file. In-app recording is
+              tested only when recording starts. This does not test the physical camera, image
+              quality, consent, privacy, or safety. It is not device certification or safety
+              clearance.
+            </p>
+          </div>
+        )}
+        {capabilityError && (
+          <p className="mt-2 text-xs text-danger" role="alert">
+            {capabilityError}
+          </p>
+        )}
+      </section>
+      <fieldset
+        disabled={disabled}
+        data-camera-permissions="true"
+        data-capture-disabled={disabled ? "true" : "false"}
+        className="rounded-lg border border-border bg-surface p-3 disabled:opacity-60"
+      >
+        <legend className="px-1 text-xs uppercase tracking-wide text-subtle">
+          Permission for this batch
+        </legend>
         <p className="mb-2 text-xs leading-relaxed text-muted">
           Confirm legal-adult status, non-explicit media scope, and all four permissions separately
           for each batch. Prefer equipment-only, clothed, non-identifying stills. Exclude faces,
@@ -728,11 +880,11 @@ export const CameraCapture = memo(function CameraCapture({
       {batchCommitted && (
         <div className="rounded-md border border-accent/30 bg-accent/10 p-3 text-xs text-muted">
           <p>
-            This page locks the batch to the attestations above and submits it at most once from this
-            view. Shared database storage rejects the same verified-user batch across replicas for two
-            hours—longer than the one-hour permission window—but this is not a permanent global
-            exactly-once guarantee. Uncheck any item to withdraw permission and discard it, or discard
-            it before starting another batch.
+            This page locks the batch to the attestations above and submits it at most once from
+            this view. Shared database storage rejects the same verified-user batch across replicas
+            for two hours—longer than the one-hour permission window—but this is not a permanent
+            global exactly-once guarantee. Uncheck any item to withdraw permission and discard it,
+            or discard it before starting another batch.
           </p>
           <Button className="mt-2" variant="outline" size="sm" onClick={startNewBatch}>
             Discard batch and start another
@@ -743,6 +895,7 @@ export const CameraCapture = memo(function CameraCapture({
         <video
           ref={videoRef}
           className={cn("aspect-[3/4] w-full object-contain", !live && "hidden")}
+          aria-label="Live camera preview; no media is sent until capture and confirmation"
           playsInline
           muted
         />
@@ -752,13 +905,18 @@ export const CameraCapture = memo(function CameraCapture({
             <div className="absolute inset-0 bg-bg/70" />
             <Camera className="relative size-8 text-muted" />
             <p className="relative px-6 text-center text-sm text-muted">
-              Use a clothed, non-identifying still of equipment or a limited setup whenever possible.
-              Video is converted to labeled stills that you choose yourself.
+              Use a clothed, non-identifying still of equipment or a limited setup whenever
+              possible. Video is converted to labeled stills that you choose yourself.
             </p>
           </div>
         )}
         {recording && (
-          <span className="absolute right-3 top-3 rounded-full bg-danger px-2 py-0.5 text-[11px] uppercase tracking-wide text-danger-fg">
+          <span
+            className="absolute right-3 top-3 rounded-full bg-danger px-2 py-0.5 text-[11px] uppercase tracking-wide text-danger-fg"
+            role="status"
+            aria-live="polite"
+            aria-label="Recording in progress"
+          >
             Rec
           </span>
         )}
@@ -792,7 +950,8 @@ export const CameraCapture = memo(function CameraCapture({
       {videoFrames.length > 0 && (
         <div className="rounded-lg border border-border bg-surface p-3">
           <p className="text-xs leading-relaxed text-muted">
-            Select one to three stills. Labels preserve clip order; selection is not safety ranking or clearance.
+            Select one to three stills. Labels preserve clip order; selection is not safety ranking
+            or clearance.
           </p>
           <div className="mt-3 grid grid-cols-3 gap-2">
             {videoFrames.map((frame, index) => {
@@ -808,7 +967,11 @@ export const CameraCapture = memo(function CameraCapture({
                   aria-pressed={selected}
                   onClick={() => toggleSelectedFrame(index)}
                 >
-                  <img src={frame.jpeg} alt={`${frame.id} video still`} className="aspect-[4/3] w-full object-contain" />
+                  <img
+                    src={frame.jpeg}
+                    alt={`${frame.id} video still`}
+                    className="aspect-[4/3] w-full object-contain"
+                  />
                   <span className="absolute bottom-1 left-1 rounded bg-bg/85 px-1.5 py-0.5 text-[10px] text-fg">
                     {frame.id}
                   </span>
@@ -906,6 +1069,7 @@ export const CameraCapture = memo(function CameraCapture({
                 size="icon"
                 onClick={() => void toggleTorch()}
                 aria-label="Torch"
+                aria-pressed={torch}
                 disabled={busy || recording || disabled}
               >
                 <Flashlight />
@@ -924,6 +1088,10 @@ export const CameraCapture = memo(function CameraCapture({
               Close
             </Button>
           </>
+        ) : busy ? (
+          <Button variant="ghost" className="flex-1" onClick={stopLive} disabled={disabled}>
+            Cancel current operation
+          </Button>
         ) : (
           <Button
             variant="outline"
@@ -937,12 +1105,52 @@ export const CameraCapture = memo(function CameraCapture({
       </div>
       {busy && (
         <p className="text-xs text-muted" role="status">
-          Processing camera frames…
+          Opening or processing camera media…
         </p>
       )}
     </div>
   );
 });
+
+function CapabilityRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="font-medium text-fg">{label}</dt>
+      <dd>{value}</dd>
+    </div>
+  );
+}
+
+function secureContextCopy(state: CameraCapabilityReport["secureContext"]): string {
+  if (state === "secure") return "Secure context detected; live access may be attempted later.";
+  if (state === "insecure") return "Blocked: live camera requires HTTPS or localhost.";
+  return "Unknown: this browser did not expose secure-context status.";
+}
+
+function cameraPolicyCopy(state: CameraCapabilityReport["cameraPolicy"]): string {
+  if (state === "allowed") return "Camera use is allowed at the document-policy layer only.";
+  if (state === "blocked") return "Blocked by this document's camera policy.";
+  return "Unknown: this browser did not expose the effective camera policy.";
+}
+
+function apiCopy(state: CameraCapabilityReport["liveCameraApi"]): string {
+  return state === "detected"
+    ? "API detected; no hardware, stream, or successful operation was tested."
+    : "API unavailable in this browser; file selection may still work.";
+}
+
+function permissionCopy(state: CameraCapabilityReport["permission"]): string {
+  if (state === "granted") {
+    return "Browser reports granted; no hardware or stream was tested.";
+  }
+  if (state === "prompt") {
+    return "Browser may ask only after you choose Open live camera.";
+  }
+  if (state === "denied") {
+    return "Browser reports denied; live capture appears blocked, but file selection may still work.";
+  }
+  return "Unknown: this browser did not report camera-permission state.";
+}
 
 function cameraErrorMessage(cause: unknown): string {
   if (typeof DOMException !== "undefined" && cause instanceof DOMException) {

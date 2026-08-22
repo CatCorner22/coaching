@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { generateKeyPairSync, type KeyObject } from "node:crypto";
 import { SignJWT, exportJWK, type JWK } from "jose";
@@ -8,6 +8,7 @@ import {
   gateIdentityFromHeaders,
   gateKeyResolver,
   parseGateJwksResponse,
+  resolveGateEndpoints,
   sessionBoundToGateIdentity,
   verifyGateIdentityToken,
   type GateJwks,
@@ -15,6 +16,11 @@ import {
 
 const ISSUER = "https://gate.app-builder-testing.com";
 const AUDIENCE = "app:proj-123";
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) delete process.env[name];
+  else process.env[name] = value;
+}
 
 type TestKey = { privateKey: KeyObject; jwk: JWK; kid: string };
 
@@ -114,11 +120,7 @@ describe("verifyGateIdentityToken", () => {
 
   it("rejects a wrong audience", async () => {
     const key = await makeKey("k1");
-    const token = await signToken(
-      key,
-      { sub: "user-1" },
-      { audience: "app:other-project" },
-    );
+    const token = await signToken(key, { sub: "user-1" }, { audience: "app:other-project" });
     const identity = await verifyGateIdentityToken(token, {
       issuer: ISSUER,
       audience: AUDIENCE,
@@ -129,11 +131,7 @@ describe("verifyGateIdentityToken", () => {
 
   it("rejects a wrong issuer", async () => {
     const key = await makeKey("k1");
-    const token = await signToken(
-      key,
-      { sub: "user-1" },
-      { issuer: "https://evil.example.com" },
-    );
+    const token = await signToken(key, { sub: "user-1" }, { issuer: "https://evil.example.com" });
     const identity = await verifyGateIdentityToken(token, {
       issuer: ISSUER,
       audience: AUDIENCE,
@@ -145,11 +143,7 @@ describe("verifyGateIdentityToken", () => {
   it("rejects an expired token", async () => {
     const key = await makeKey("k1");
     const past = Math.floor(Date.now() / 1000) - 3600;
-    const token = await signToken(
-      key,
-      { sub: "user-1" },
-      { issuedAt: past, expiresIn: 300 },
-    );
+    const token = await signToken(key, { sub: "user-1" }, { issuedAt: past, expiresIn: 300 });
     const identity = await verifyGateIdentityToken(token, {
       issuer: ISSUER,
       audience: AUDIENCE,
@@ -193,18 +187,20 @@ describe("verifyGateIdentityToken", () => {
     };
     const getKey = gateKeyResolver(url, fetchImpl);
 
-    const first = await verifyGateIdentityToken(
-      await signToken(oldKey, { sub: "user-1" }),
-      { issuer: ISSUER, audience: AUDIENCE, getKey },
-    );
+    const first = await verifyGateIdentityToken(await signToken(oldKey, { sub: "user-1" }), {
+      issuer: ISSUER,
+      audience: AUDIENCE,
+      getKey,
+    });
     assert.equal(first?.sub, "user-1");
     assert.equal(calls, 1);
 
     published = [newKey.jwk];
-    const second = await verifyGateIdentityToken(
-      await signToken(newKey, { sub: "user-1" }),
-      { issuer: ISSUER, audience: AUDIENCE, getKey },
-    );
+    const second = await verifyGateIdentityToken(await signToken(newKey, { sub: "user-1" }), {
+      issuer: ISSUER,
+      audience: AUDIENCE,
+      getKey,
+    });
     assert.equal(second?.sub, "user-1");
     assert.equal(calls, 2);
   });
@@ -261,8 +257,7 @@ describe("verifyGateIdentityToken", () => {
       audience: AUDIENCE,
       getKey: gateKeyResolver(
         uniqueUrl(),
-        staticJwks(Array.from({ length: GATE_JWKS_MAX_KEYS + 1 }, () => key.jwk))
-          .fetchImpl,
+        staticJwks(Array.from({ length: GATE_JWKS_MAX_KEYS + 1 }, () => key.jwk)).fetchImpl,
       ),
     });
     assert.equal(identity, null);
@@ -299,6 +294,26 @@ describe("parseGateJwksResponse", () => {
 });
 
 describe("gateIdentityFromHeaders", () => {
+  const originalEnv = {
+    authEnabled: process.env.VITE_AUTH_ENABLED,
+    projectId: process.env.GROK_PROJECT_ID,
+    gateOrigin: process.env.GROK_GATE_ORIGIN,
+  };
+
+  before(() => {
+    // Gate identity is deliberately an auth-on deployment mode. Declare that
+    // precondition instead of depending on the runner's ambient environment.
+    process.env.VITE_AUTH_ENABLED = "true";
+    delete process.env.GROK_PROJECT_ID;
+    delete process.env.GROK_GATE_ORIGIN;
+  });
+
+  after(() => {
+    restoreEnv("VITE_AUTH_ENABLED", originalEnv.authEnabled);
+    restoreEnv("GROK_PROJECT_ID", originalEnv.projectId);
+    restoreEnv("GROK_GATE_ORIGIN", originalEnv.gateOrigin);
+  });
+
   it("verifies the header token end to end and fails closed without it", async () => {
     const key = await makeKey("k1");
     const { fetchImpl } = staticJwks([key.jwk]);
@@ -315,10 +330,7 @@ describe("gateIdentityFromHeaders", () => {
       );
       assert.equal(withToken?.sub, "user-1");
 
-      const withoutToken = await gateIdentityFromHeaders(
-        new Headers(),
-        fetchImpl,
-      );
+      const withoutToken = await gateIdentityFromHeaders(new Headers(), fetchImpl);
       assert.equal(withoutToken, null);
     } finally {
       delete process.env.GROK_PROJECT_ID;
@@ -348,10 +360,7 @@ describe("gateIdentityFromHeaders", () => {
         fetchImpl,
       );
       assert.equal(identity?.sub, "user-1");
-      assert.equal(
-        fetchedFrom[0],
-        "https://gate.app-builder-testing.com/__gate/identity-key",
-      );
+      assert.equal(fetchedFrom[0], "https://gate.app-builder-testing.com/__gate/identity-key");
     } finally {
       delete process.env.GROK_PROJECT_ID;
     }
@@ -369,6 +378,38 @@ describe("gateIdentityFromHeaders", () => {
         fetchImpl,
       );
       assert.equal(identity, null);
+    } finally {
+      delete process.env.GROK_GATE_ORIGIN;
+    }
+  });
+
+  it("stays disabled when app auth is explicitly off", async () => {
+    const key = await makeKey("k-auth-off");
+    const { fetchImpl, calls } = staticJwks([key.jwk]);
+    process.env.VITE_AUTH_ENABLED = "false";
+    process.env.GROK_PROJECT_ID = "proj-123";
+    process.env.GROK_GATE_ORIGIN = ISSUER;
+    try {
+      const token = await signToken(key, { sub: "user-1" });
+      const identity = await gateIdentityFromHeaders(
+        new Headers({ "x-grok-identity": token }),
+        fetchImpl,
+      );
+      assert.equal(identity, null);
+      assert.equal(calls(), 0);
+    } finally {
+      process.env.VITE_AUTH_ENABLED = "true";
+      delete process.env.GROK_PROJECT_ID;
+      delete process.env.GROK_GATE_ORIGIN;
+    }
+  });
+});
+
+describe("resolveGateEndpoints", () => {
+  it("rejects an unsafe explicit trust root", () => {
+    process.env.GROK_GATE_ORIGIN = "http://attacker.invalid/path";
+    try {
+      assert.equal(resolveGateEndpoints(new Headers({ host: "app.grok.me" })), null);
     } finally {
       delete process.env.GROK_GATE_ORIGIN;
     }

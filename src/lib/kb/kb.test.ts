@@ -12,11 +12,13 @@ import {
   articleExcerpts,
   getKnot,
   getTie,
+  getArticleEvidence,
   isKnowledgeQueryUsable,
   knowledgeAnswer,
+  knowledgeDisposition,
   searchKnowledge,
 } from "./index.ts";
-import { SAFETY_SOURCES } from "./sources.ts";
+import { SAFETY_SOURCE_IDS, SAFETY_SOURCES, SOURCE_LEDGER_REVISION } from "./sources.ts";
 
 test("tie slugs are unique and getTie round-trips", () => {
   const slugs = TIES.map((t) => t.slug);
@@ -90,6 +92,25 @@ test("safety source identifiers and links are unique, stable, and HTTPS", () => 
     assert.ok(url.hostname.includes("."), source.id);
     assert.ok(source.note.length > 40, `${source.id} is missing an evidence-limit note`);
   }
+  assert.deepEqual(SAFETY_SOURCE_IDS, ids);
+  assert.equal(SAFETY_SOURCES.find((source) => source.id === "PRIVACY-1")?.title.startsWith("OpenAI"), true);
+  assert.equal(SAFETY_SOURCES.find((source) => source.id === "XAI-PRIVACY-1")?.title.startsWith("xAI"), true);
+});
+
+test("every article exposes honest evidence status and only canonical source anchors", () => {
+  const canonical = new Set(SAFETY_SOURCE_IDS);
+  for (const article of ARTICLES) {
+    const evidence = getArticleEvidence(article.slug);
+    assert.equal(evidence.ledgerRevision, SOURCE_LEDGER_REVISION, article.slug);
+    assert.match(evidence.auditedAt, /^\d{4}-\d{2}-\d{2}$/u, article.slug);
+    assert.ok(evidence.note.length > 80, article.slug);
+    assert.equal(evidence.status === "source_anchored", evidence.sourceIds.length > 0, article.slug);
+    for (const sourceId of evidence.sourceIds) {
+      assert.ok(canonical.has(sourceId), `${article.slug} has unknown source ${sourceId}`);
+    }
+  }
+  assert.ok(getArticleEvidence("photography-ethics").sourceIds.includes("XAI-PRIVACY-1"));
+  assert.ok(getArticleEvidence("emergency-stop").sourceIds.includes("FIRSTAID-1"));
 });
 
 test("every sequence step is a real tie", () => {
@@ -166,6 +187,28 @@ test("safety-oriented aliases route common wording to reviewed entries", () => {
 test("urgent natural-language intent prioritizes emergency release guidance and shears", () => {
   for (const query of [
     "not breathing",
+    "stopped breathing",
+    "isn't breathing",
+    "gasping for air",
+    "can't catch their breath",
+    "struggling to breathe",
+    "barely breathing",
+    "labored breathing",
+    "shallow breathing",
+    "short of breath",
+    "breathless",
+    "struggling for breath",
+    "cannot get air",
+    "suffocating",
+    "gasping",
+    "wheezing and cannot speak",
+    "cyanotic",
+    "her lips are turning blue",
+    "turning blue",
+    "no pulse",
+    "cardiac arrest",
+    "heart attack",
+    "his heart stopped",
     "can't breathe",
     "cut rope now",
     "passed out",
@@ -176,10 +219,359 @@ test("urgent natural-language intent prioritizes emergency release guidance and 
     "他昏倒了",
     "癫痫发作",
     "胸痛",
+    "severe bleeding",
+    "major weakness",
+    "loss of consciousness",
+    "collapsed and won't wake up",
+    "can't wake them",
+    "cannot awaken them",
+    "she does not wake up",
+    "not waking up",
+    "not conscious",
+    "out cold",
+    "cannot stay awake",
+    "bleeding profusely",
+    "bleeding heavily",
+    "bleeding won't stop",
+    "blood is spurting",
+    "hemorrhaging",
+    "massive blood loss",
+    "he is convulsing",
+    "his speech is slurred",
+    "drooping face",
+    "head injury",
+    "she fell and banged her head",
+    "fell from suspension",
+    "fell from the ceiling",
+    "dropped from the rig",
+    "they are suddenly confused",
+    "very confused",
+    "altered mental status",
+    "rope around neck and voice changed",
+    "rope across throat and raspy voice",
+    "ligature around neck and dizzy",
+    "neck pressure and cannot speak",
+    "serious fall",
+    "severe confusion",
+    "neck pressure followed by concerning symptoms",
+    "she is choking",
+    "cut the ropes now",
+    "cut them free now",
+    "emergency release immediately",
+    "息が苦しい",
+    "意識不明です",
+    "血が止まらない",
+    "今すぐ縄を切って",
+    "喘不上气",
+    "怎么叫也叫不醒",
+    "血流不止",
+    "马上把绳子剪断",
+    "숨을 쉴 수 없어요",
+    "깨워도 안 일어나요",
+    "피가 멈추지 않아요",
+    "지금 당장 밧줄을 잘라",
+    "出血がひどい",
+    "中风",
+    "喉が締まっている",
+    "호흡곤란",
+    "blue face",
+    "knocked out",
+    "blood won't stop",
+    "slurring words",
+    "one side weak",
+    "no heartbeat",
+    "gray lips",
+    "skin is turning grey",
+    "ashen lips",
+    "spurting blood",
+    "blood is gushing",
+    "bleeding out",
+    "left arm suddenly weak",
+    "weak on the left side",
+    "words are slurred",
+    "can't stay conscious",
+    "not awake",
+    "stopped responding",
+    "no breathing",
+    "no heart beat",
   ]) {
     const hits = searchKnowledge(query, 4);
     assert.equal(hits[0]?.slug, "emergency-stop", query);
     assert.ok(hits.slice(0, 3).some((hit) => hit.slug === "shears"), query);
+    assert.equal(knowledgeDisposition(query).kind, "emergency", query);
+    assert.match(knowledgeAnswer(query), /^Emergency: stop the activity\./u, query);
+    assert.match(knowledgeAnswer(query), /Call local emergency services now/u, query);
+  }
+});
+
+test("action-first routing covers release, delayed neck symptoms, consent, and media scope", () => {
+  for (const query of [
+    "numb fingers",
+    "faintness",
+    "cannot feel my fingers",
+    "fingers will not move",
+    "arm is purple",
+    "pain is getting worse",
+    "rope cut off circulation",
+    "指の感覚がない",
+    "手没有知觉",
+    "손에 감각이 없어요",
+    "pins and needles",
+    "loss of sensation in hand",
+    "no sensation in hand",
+    "hand asleep",
+    "can't grip",
+    "limb is cool",
+    "hand is white",
+    "toes black",
+    "excruciating pain",
+    "pain increased",
+    "edema",
+    "puffy hand",
+    "reduced movement",
+    "can't wiggle toes",
+    "purple fingertip",
+    "tingly fingers",
+    "can't move my fingers",
+    "cannot move their hand",
+    "loss of grip",
+    "weak grip",
+    "hand went cold",
+    "hand feels cold",
+    "hand became pale",
+    "fingers look purple",
+    "discolored hand",
+    "discoloured hand",
+    "sharp worsening pain",
+    "increasing pain",
+    "dropping things",
+    "foot drop",
+    "hand feels dead",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "release_now", query);
+    assert.match(knowledgeAnswer(query), /^Stop and release now/u, query);
+  }
+  for (const query of [
+    "strangled yesterday",
+    "was throttled",
+    "neck was squeezed",
+    "hand around throat",
+    "pressure on throat",
+    "rope around my throat",
+    "breath play last night",
+    "manual strangulation",
+    "garroted yesterday",
+    "strangulation no visible marks",
+    "chokehold yesterday",
+    "squeezed my neck",
+    "grabbed my throat",
+    "compressed my neck",
+    "neck constriction",
+    "pressure to my neck",
+    "noose around neck",
+    "rope touching throat",
+    "line over my neck",
+    "breathplay last night",
+    "erotic asphyxiation yesterday",
+    "asphyxiated yesterday",
+    "strangulated yesterday",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "prompt_medical", query);
+    assert.match(knowledgeAnswer(query), /^Possible neck-pressure exposure/u, query);
+  }
+  assert.equal(
+    knowledgeDisposition("trouble swallowing after breath play").kind,
+    "emergency",
+  );
+  for (const query of [
+    "withdraw consent",
+    "I don't consent",
+    "I do not consent",
+    "there is no consent",
+    "stop recording me",
+    "recorded without permission",
+    "uploaded without permission",
+    "the recording was secret",
+    "the camera is hidden",
+    "delete my photo",
+    "I was forced to pose for a photo",
+    "stop, I changed my mind",
+    "they told me to stop",
+    "やめてと言われた",
+    "对方说停下",
+    "상대가 그만하라고 했어요",
+    "隠し撮り",
+    "盗撮",
+    "未经同意拍摄",
+    "몰래 촬영",
+    "surreptitious video",
+    "nonconsensual photo",
+    "unconsented recording",
+    "took a picture while asleep",
+    "didn't ask before filming",
+    "no permission to upload",
+    "they said no to the camera",
+    "filmed without consent",
+    "shared without consent",
+    "uploaded without consent",
+    "didn't agree to recording",
+    "said stop filming",
+    "stop taking pictures of me",
+    "spycam video",
+    "shared against their wishes",
+    "revoke upload permission",
+    "permission to upload was withdrawn",
+    "recorded while sleeping",
+    "revenge porn upload",
+    "stolen intimate photo",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "consent_withdrawn", query);
+    assert.match(knowledgeAnswer(query), /^Consent is absent or withdrawn/u, query);
+  }
+  for (const query of [
+    "minor",
+    "underage",
+    "under 18",
+    "ambiguous age",
+    "nude",
+    "explicit image",
+    "topless photo",
+    "NSFW video",
+    "genitals visible in photo",
+    "bare breasts image",
+    "sex act video",
+    "intimate image",
+    "undressed model",
+    "age unknown photo",
+    "young-looking person photo",
+    "not sure if adult",
+    "17 year old photo",
+    "sixteen year old image",
+    "high school student photo",
+    "15yo photo",
+    "15 y/o image",
+    "not eighteen photo",
+    "below legal age image",
+    "kid in photo",
+    "schoolgirl photo",
+    "juvenile video",
+    "17 yrs old photo",
+    "17yo image",
+    "aged seventeen photo",
+    "age is unclear photo",
+    "can't confirm adult",
+    "middle school student photo",
+    "unknown-aged model",
+    "childlike model image",
+    "bare chest photo",
+    "genital photo",
+    "vulva image",
+    "penis image",
+    "sexual intercourse video",
+    "sex scene recording",
+    "hardcore clip",
+    "adult content photo",
+    "lewd photo",
+    "17 y.o. image",
+    "17 y o video",
+    "age: 17 photo",
+    "below 18 image",
+    "under legal age photo",
+    "preteen photo",
+    "adolescent image",
+    "schoolchild photo",
+    "not of age video",
+    "looks young in the picture",
+    "age not verified photo",
+    "age unconfirmed photo",
+    "cannot verify adult in photo",
+    "don't know their age in the image",
+    "ID not checked for photo",
+    "no clothes photo",
+    "unclothed photo",
+    "full frontal picture",
+    "breasts visible in photo",
+    "nipples visible in image",
+    "private parts visible in picture",
+    "graphic sex photo",
+    "XXX clip",
+    "nudes upload",
+    "nakedness in recording",
+    "未成年の写真",
+    "17歳の写真",
+    "露出写真",
+    "裸の写真",
+    "ヌード写真",
+    "未成年照片",
+    "17岁照片",
+    "裸体照片",
+    "成人视频",
+    "미성년자 사진",
+    "17살 사진",
+    "나체 사진",
+    "성인물 영상",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "unsupported_media", query);
+    assert.equal(searchKnowledge(query, 1)[0]?.slug, "photography-ethics", query);
+    assert.match(knowledgeAnswer(query), /^Unsupported media:/u, query);
+    assert.match(knowledgeAnswer(query), /does not automatically detect/u, query);
+  }
+  for (const [query, secondaryAction] of [
+    ["nude photo and my fingers are numb", /Do not capture or upload unsupported media/u],
+    ["explicit image arm is blue", /Do not capture or upload unsupported media/u],
+    ["underage person has severe pain", /Do not capture or upload unsupported media/u],
+    ["stop recording me, my hand is cold and pale", /Consent is absent or withdrawn/u],
+  ] as const) {
+    assert.equal(knowledgeDisposition(query).kind, "release_now", query);
+    assert.match(knowledgeAnswer(query), /^Stop and release now/u, query);
+    assert.match(knowledgeAnswer(query), secondaryAction, query);
+  }
+});
+
+test("action-first queries suppress procedural catalog navigation", () => {
+  for (const query of [
+    "seizure hogtie",
+    "choking single column",
+    "withdraw consent takate kote",
+    "nude somerville bowline",
+  ]) {
+    const hits = searchKnowledge(query, 12);
+    assert.ok(hits.length > 0, query);
+    assert.ok(hits.every((hit) => hit.kind === "article" || hit.kind === "gear"), query);
+    assert.doesNotMatch(knowledgeAnswer(query), /Takate|Hogtie|Single Column|Somerville/iu, query);
+  }
+});
+
+test("action routing avoids adjacent non-emergency wording", () => {
+  for (const query of [
+    "breathing exercise",
+    "blue rope care",
+    "purple rope comparison",
+    "the rope is turning blue",
+    "speech practice",
+    "fall prevention",
+    "recording permission settings",
+    "stop recording timer",
+    "consent frameworks",
+    "clothed non-explicit adult photo",
+    "18 year old adult photo",
+    "adult age confirmed photo",
+    "camera permission settings",
+    "17mm rope",
+    "how to prevent secret recording",
+    "chokehold terminology",
+    "loss of grip on rope tool",
+    "nude-pink cord",
+    "nude tone rope",
+    "成人の写真",
+    "服を着た写真",
+    "カメラの許可設定",
+    "成年人的穿衣照片",
+    "摄像头权限设置",
+    "성인의 옷 입은 사진",
+    "카메라 권한 설정",
+  ]) {
+    assert.equal(knowledgeDisposition(query).kind, "ordinary", query);
   }
 });
 
@@ -211,10 +603,10 @@ test("generic catalog search hits deep-link to the selected item", () => {
   assert.equal(searchKnowledge("pudendal", 8).find((hit) => hit.slug === "pudendal")?.href, "/nerves?nerve=pudendal");
 });
 
-test("reviewed answers are deterministic and available without a server or AI", () => {
+test("curated answers are deterministic and available without a server or AI", () => {
   const answer = knowledgeAnswer("coercion");
   assert.match(answer, /Consent Frameworks/);
   assert.match(answer, /does not validate a setup/);
   assert.equal(answer, knowledgeAnswer("coercion"));
-  assert.match(knowledgeAnswer("zzzzqvvvv"), /No reviewed entry matched/);
+  assert.match(knowledgeAnswer("zzzzqvvvv"), /No curated local entry matched/);
 });

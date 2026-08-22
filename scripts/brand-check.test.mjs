@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -161,4 +161,16 @@ test("siteDeclaresOgTypeGame reads the site contract", () => {
   assert.equal(siteDeclaresOgTypeGame({ type: "x:game" }), true);
   assert.equal(siteDeclaresOgTypeGame({ type: "website" }), false);
   assert.equal(siteDeclaresOgTypeGame({}), false);
+});
+
+test("the shipped education app keeps its custom card without game-only metadata", () => {
+  const site = JSON.parse(readFileSync(new URL("../src/lib/og/site.json", import.meta.url), "utf8"));
+  assert.equal(site.card, "custom");
+  assert.equal(siteDeclaresOgTypeGame(site), false);
+});
+
+test("browser smoke resolves brand assets from the repository instead of a fixed checkout path", () => {
+  const smoke = readFileSync(new URL("./browser-smoke.mjs", import.meta.url), "utf8");
+  assert.match(smoke, /realpathSync\(new URL\("\.\."/);
+  assert.match(smoke, /computeBrandWarnings\(\{[\s\S]*workspaceRoot/);
 });

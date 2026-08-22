@@ -67,10 +67,13 @@ export const GEAR: GearItem[] = [
   },
   {
     slug: "oil",
-    name: "Camellia / jojoba",
+    name: "Manufacturer-approved rope care",
     kind: "care",
-    summary: "A few drops in jute, then friction and time. You are feeding fiber, not frying it.",
-    notes: ["Wax makes pretty rope that slips and then dirties skin."],
+    summary:
+      "Material-specific care product, method, quantity, and fire precautions must come from the rope maker; this app does not prescribe oil, wax, heat, or washing.",
+    notes: [
+      "Care cannot restore a damaged or uncertain rope to a known strength or establish suitability for body or person-bearing use.",
+    ],
   },
   {
     slug: "blanket",

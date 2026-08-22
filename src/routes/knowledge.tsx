@@ -5,6 +5,7 @@ import {
   ARTICLES,
   isKnowledgeQueryUsable,
   knowledgeAnswer,
+  knowledgeDisposition,
   searchKnowledge,
   type SearchHit,
 } from "@/lib/kb";
@@ -16,6 +17,8 @@ function KnowledgePage() {
   const [answer, setAnswer] = useState<string | null>(null);
   const usableQuery = isKnowledgeQueryUsable(q);
   const hits = useMemo(() => (usableQuery ? searchKnowledge(q, 8) : []), [q, usableQuery]);
+  const disposition = useMemo(() => knowledgeDisposition(q), [q]);
+  const actionFirst = disposition.kind !== "ordinary";
   const sections = [...new Set(ARTICLES.map((a) => a.section))];
 
   function updateQuery(value: string) {
@@ -35,7 +38,8 @@ function KnowledgePage() {
       <h1 className="mt-2 font-display text-4xl">Knowledge</h1>
       <p className="mt-3 text-sm text-muted">
         Consent, risk recognition, privacy, and aftercare. Search in your words; results point to
-        reviewed entries without generating individualized rope instructions.
+        curated local entries without generating individualized rope instructions. Evidence status
+        and source anchors appear on each article.
       </p>
       <div className="mt-6 flex gap-2">
         <input
@@ -56,8 +60,22 @@ function KnowledgePage() {
         </Button>
       </div>
       {answer && (
-        <div role="status" aria-live="polite" className="mt-4 whitespace-pre-wrap rounded-lg border border-border bg-surface p-4 text-sm leading-relaxed">
-          {answer}
+        <div
+          role={actionFirst ? "alert" : "status"}
+          aria-live={actionFirst ? "assertive" : "polite"}
+          className={`mt-4 whitespace-pre-wrap rounded-lg border p-4 text-sm leading-relaxed ${
+            actionFirst ? "border-danger/50 bg-danger/10" : "border-border bg-surface"
+          }`}
+        >
+          <p>{answer}</p>
+          {disposition.emergencyHref && (
+            <Link
+              to={disposition.emergencyHref}
+              className="mt-3 inline-flex rounded-md border border-danger px-3 py-2 font-medium text-danger hover:bg-danger/10"
+            >
+              Open emergency card
+            </Link>
+          )}
         </div>
       )}
       {hits.length > 0 && (
@@ -71,11 +89,11 @@ function KnowledgePage() {
       )}
       {usableQuery && hits.length === 0 && (
         <p className="mt-4 text-sm text-muted">
-          No reviewed entry matched that wording. Try consent, privacy, aftercare, nerves,
+          No curated local entry matched that wording. Try consent, privacy, aftercare, nerves,
           equipment, or emergency release.
         </p>
       )}
-      {sections.map((sec) => (
+      {!actionFirst && sections.map((sec) => (
         <section key={sec} className="mt-10">
           <h2 className="font-display text-2xl capitalize">{sec}</h2>
           <ul className="mt-3 space-y-2">

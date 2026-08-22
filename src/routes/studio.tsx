@@ -16,6 +16,10 @@ import { useJournal } from "@/lib/stores/journal";
 import { useNegotiate } from "@/lib/stores/negotiate";
 import { useSession } from "@/lib/stores/session";
 import { useSettings } from "@/lib/stores/settings";
+import {
+  buildStudioNegotiationPolicy,
+  mediaAuthorizationWasRevoked,
+} from "@/lib/studio/negotiation";
 import { listenForWords, playCoachVoice, stopCoachVoice } from "@/lib/voice/play";
 import { DIRECT_CHECK_REMINDER } from "@/lib/voice/reviewed-lines";
 import { buildDeterministic } from "@/lib/ml/predict";
@@ -34,42 +38,18 @@ export const Route = createFileRoute("/studio")({
   component: StudioPage,
 });
 
-const TIE_LIMIT_IDS: Record<string, string[]> = {
-  "takate-kote": ["gote"],
-  ebi: ["gote", "predicament"],
-  "gyaku-ebi": ["gote", "predicament"],
-  "hogtie-floor": ["predicament"],
-  matanawa: ["crotch"],
-  karada: ["torso"],
-  shinju: ["torso"],
-  tasuki: ["torso"],
-  hishi: ["torso"],
-  kikkou: ["torso"],
-  "partial-suspension": ["suspension"],
-};
-
-const FURNITURE_LIMIT_IDS: Record<string, string[]> = {
-  "massage-table": ["bench"],
-  "sex-bench": ["bench"],
-  "st-andrews-cross": ["cross"],
-  "sex-swing": ["swing"],
-  pole: ["pole"],
-  floggers: ["impact"],
-  hismith: ["machine"],
-  "bad-dragon": ["toys"],
-};
-
-function blockedByIds(slug: string | undefined, table: Record<string, string[]>, noIds: Set<string>) {
-  return !!slug && (table[slug] ?? []).some((id) => noIds.has(id));
-}
-
 function StudioPage() {
   const search = Route.useSearch();
   const settings = useSettings();
   const { user: currentUser, isPending: authPending } = useCurrentUserState();
   const nerveHits = useJournal((j) => j.nerveHits);
   const addEntry = useJournal((j) => j.add);
+  const removeEntry = useJournal((j) => j.remove);
   const items = useNegotiate((s) => s.items);
+  // Persist middleware can finish before React switches from its initial
+  // hydration snapshot to the live store. Keep actions fail-closed until the
+  // mounted effect synchronizes both layers.
+  const [negotiationReady, setNegotiationReady] = useState(false);
   const stopSession = useSession((s) => s.stop);
   const setStep = useSession((s) => s.setStep);
   const setTie = useSession((s) => s.setTie);
@@ -80,10 +60,17 @@ function StudioPage() {
   const stepIndex = useSession((s) => s.stepIndex);
   const tieSlug = useSession((s) => s.tieSlug);
   const furnitureSlug = useSession((s) => s.furnitureSlug);
-  const hardNos = useMemo(() => items.filter((i) => i.rank === "no"), [items]);
-  const hardNoIds = useMemo(() => new Set(hardNos.map((item) => item.id)), [hardNos]);
-  const hardNoKey = useMemo(() => hardNos.map((item) => `${item.id}:${item.label}`).sort().join("\u0000"), [hardNos]);
-  const captureContextKey = `${tieSlug ?? ""}|${stepIndex}|${furnitureSlug ?? ""}|${hardNoKey}`;
+  const negotiationPolicy = useMemo(() => buildStudioNegotiationPolicy(items), [items]);
+  const {
+    operationalLimits,
+    negotiationKey,
+    voiceBlocked,
+    mediaBlocked: negotiatedMediaBlocked,
+  } = negotiationPolicy;
+  const mediaBlocked = !negotiationReady || negotiatedMediaBlocked;
+  const mediaAllowed = negotiationReady && !negotiatedMediaBlocked;
+  const previousMediaAllowedRef = useRef(mediaAllowed);
+  const captureContextKey = `${tieSlug ?? ""}|${stepIndex}|${furnitureSlug ?? ""}|${negotiationKey}`;
   const [capture, setCapture] = useState<CaptureResult | null>(null);
   const [report, setReport] = useState<CoachReport | null>(null);
   const [observationReport, setObservationReport] = useState<ObservationReport | null>(null);
@@ -93,44 +80,98 @@ function StudioPage() {
   const [triage, setTriage] = useState<TriageState | "unanswered">("unanswered");
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [refusal, setRefusal] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [savedReportRevision, setSavedReportRevision] = useState<string | null>(null);
+  const [savedEntryId, setSavedEntryId] = useState<string | null>(null);
   const [micArmed, setMicArmed] = useState(false);
-  const [micStatus, setMicStatus] = useState<"idle" | "starting" | "active" | "error" | "unsupported">("idle");
+  const micArmedRef = useRef(false);
+  const [micStatus, setMicStatus] = useState<
+    "idle" | "starting" | "active" | "error" | "unsupported"
+  >("idle");
   const analysisRequestRef = useRef(0);
+  const mountedRef = useRef(true);
   const currentContextRef = useRef(captureContextKey);
   const captureContextAtCommitRef = useRef<string | null>(null);
   currentContextRef.current = captureContextKey;
   const tie = getTie(tieSlug ?? "");
   const instructorOnlyTie = tie?.minutes[1] === 0;
-  const tieBlocked = blockedByIds(tieSlug, TIE_LIMIT_IDS, hardNoIds);
-  const furnitureBlocked = blockedByIds(furnitureSlug, FURNITURE_LIMIT_IDS, hardNoIds);
-  const mediaBlocked = hardNoIds.has("photos");
+  const tieBlocked = negotiationPolicy.isTieBlocked(tieSlug);
+  const furnitureBlocked = negotiationPolicy.isFurnitureBlocked(furnitureSlug);
+  const studioVoice = settings.voice && !voiceBlocked;
+  const cameraGateReason = stopped
+    ? "session-stopped"
+    : !negotiationReady
+      ? "negotiation-hydrating"
+      : negotiatedMediaBlocked
+        ? "media-not-approved"
+        : triage === "unanswered"
+          ? "triage-unanswered"
+          : triage !== "none"
+            ? "triage-concern"
+            : "enabled";
+
+  useEffect(() => {
+    const api = useNegotiate.persist;
+    const finish = () => setNegotiationReady(true);
+    const unsubscribe = api.onFinishHydration(finish);
+    if (api.hasHydrated()) finish();
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const invalidateAcrossTabs = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== "knotty-negotiate" && event.key !== "knotty-settings")
+        return;
+      analysisRequestRef.current += 1;
+      captureContextAtCommitRef.current = null;
+      micArmedRef.current = false;
+      stopCoachVoice();
+      window.location.reload();
+    };
+    window.addEventListener("storage", invalidateAcrossTabs);
+    return () => window.removeEventListener("storage", invalidateAcrossTabs);
+  }, []);
 
   useEffect(() => {
     if (tieBlocked || instructorOnlyTie) useSession.getState().setTie(undefined);
     if (furnitureBlocked) useSession.getState().setFurniture(undefined);
-    if (mediaBlocked) {
-      analysisRequestRef.current += 1;
-      captureContextAtCommitRef.current = null;
-      setCapture(null);
-      setReport(null);
-      setObservationReport(null);
-      setAnalysisConsumed(false);
-      setTriage("unanswered");
-      setPending(false);
-    }
-  }, [tieBlocked, instructorOnlyTie, furnitureBlocked, mediaBlocked]);
+  }, [tieBlocked, instructorOnlyTie, furnitureBlocked]);
+
+  useEffect(() => {
+    const previouslyAllowed = previousMediaAllowedRef.current;
+    previousMediaAllowedRef.current = mediaAllowed;
+    if (!mediaAuthorizationWasRevoked(previouslyAllowed, mediaAllowed)) return;
+    analysisRequestRef.current += 1;
+    stopCoachVoice();
+    captureContextAtCommitRef.current = null;
+    setCapture(null);
+    setReport(null);
+    setObservationReport(null);
+    setAnalysisConsumed(false);
+    setTriage("unanswered");
+    setPending(false);
+  }, [mediaAllowed]);
+
+  useEffect(() => {
+    if (!studioVoice) stopCoachVoice();
+  }, [studioVoice]);
 
   useEffect(() => {
     if (search.tie) {
       const requestedTie = getTie(search.tie);
-      setTie(requestedTie && requestedTie.minutes[1] > 0 ? search.tie : undefined);
+      setTie(
+        negotiationReady &&
+          requestedTie &&
+          requestedTie.minutes[1] > 0 &&
+          !negotiationPolicy.isTieBlocked(search.tie)
+          ? search.tie
+          : undefined,
+      );
     }
     if (!useSession.getState().startedAt) startSession();
     useSession.getState().tick(Date.now());
     const id = window.setInterval(() => useSession.getState().tick(Date.now()), 1000);
     return () => window.clearInterval(id);
-  }, [search.tie, setTie, startSession]);
+  }, [negotiationPolicy, negotiationReady, search.tie, setTie, startSession]);
 
   const stopAlertRef = useRef<HTMLDivElement>(null);
 
@@ -149,28 +190,26 @@ function StudioPage() {
       (status) => {
         setMicStatus(status);
         if (status === "error" || status === "unsupported" || status === "idle") {
+          micArmedRef.current = false;
           setMicArmed(false);
         }
       },
     );
-  }, [
-    settings.listen,
-    micArmed,
-    settings.safeword,
-    settings.yellowWord,
-    stopSession,
-  ]);
+  }, [settings.listen, micArmed, settings.safeword, settings.yellowWord, stopSession]);
 
   const captureContextRef = useRef(captureContextKey);
 
   useEffect(() => {
     const contextChanged = captureContextRef.current !== captureContextKey;
     captureContextRef.current = captureContextKey;
-    setSaved(false);
+    setSavedReportRevision(null);
+    setSavedEntryId(null);
+    setRefusal(false);
     analysisRequestRef.current += 1;
     setPending(false);
     setAnalysisError(null);
     if (contextChanged && capture) {
+      stopCoachVoice();
       captureContextAtCommitRef.current = null;
       setCapture(null);
       setReport(null);
@@ -187,12 +226,29 @@ function StudioPage() {
     return buildDeterministic(capture.observations, null);
   }, [capture, captureMatchesContext]);
   const contextBoundReport = capture && !captureMatchesContext ? null : report;
-  const contextBoundObservationReport = capture && !captureMatchesContext ? null : observationReport;
+  const contextBoundObservationReport =
+    capture && !captureMatchesContext ? null : observationReport;
+  const reportRevision = useMemo(() => {
+    if (!contextBoundReport || !contextBoundObservationReport) return null;
+    return [
+      capture?.consent.batchId ?? "no-media",
+      modelStatus,
+      contextBoundObservationReport.schema_version,
+      contextBoundObservationReport.source_ledger_revision,
+      contextBoundObservationReport.report_type,
+      contextBoundObservationReport.disposition,
+      contextBoundObservationReport.next_step_id,
+      contextBoundReport.final.coaching,
+      contextBoundReport.final.flags.map((flag) => `${flag.code}:${flag.severity}`).join(","),
+    ].join("|");
+  }, [capture?.consent.batchId, contextBoundObservationReport, contextBoundReport, modelStatus]);
+  const currentReportSaved = reportRevision !== null && savedReportRevision === reportRevision;
 
   useEffect(() => {
     if (!stopped) return;
     analysisRequestRef.current += 1;
     stopCoachVoice();
+    micArmedRef.current = false;
     setMicArmed(false);
     setPending(false);
     captureContextAtCommitRef.current = null;
@@ -200,7 +256,17 @@ function StudioPage() {
     stopAlertRef.current?.focus();
   }, [stopped]);
 
-  useEffect(() => () => stopCoachVoice(), []);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      analysisRequestRef.current += 1;
+      currentContextRef.current = "";
+      captureContextAtCommitRef.current = null;
+      micArmedRef.current = false;
+      stopCoachVoice();
+    };
+  }, []);
 
   useEffect(() => {
     if (!det || !capture) return;
@@ -214,7 +280,7 @@ function StudioPage() {
       stepIndex,
       elapsedSec: useSession.getState().elapsed,
       priorNerveHits: nerveHits,
-      hardNos: hardNos.map((n) => n.label),
+      hardNos: operationalLimits.map((item) => item.label),
     });
     setReport(next);
     setObservationReport(
@@ -226,17 +292,31 @@ function StudioPage() {
         modelStatus: "not_requested",
       }),
     );
+    setRefusal(false);
     setModelStatus("not_requested");
     if (next.final.recommend === "stop") stopSession("coach");
-  }, [det, capture, tie, stepIndex, nerveHits, hardNos, stopSession]);
+  }, [det, capture, tie, stepIndex, nerveHits, operationalLimits, stopSession]);
 
   useEffect(() => {
     if (triage === "unanswered" || triage === "none") return;
+    // A direct symptom/consent report supersedes every prior visual result.
+    // Invalidate the request and capture-derived coach text so an urgent action
+    // cannot be displayed or journaled beside stale visual coaching.
+    analysisRequestRef.current += 1;
+    setPending(false);
+    setReport(null);
+    setSavedReportRevision(null);
+    setAnalysisError(null);
     setAnalysisConsumed(true);
+    setRefusal(false);
     setModelStatus("not_requested");
     setObservationReport(
       buildObservationReport({
-        mediaMode: capture ? (capture.kind === "video" ? "selected_video_stills" : "static_photos") : "no_media",
+        mediaMode: capture
+          ? capture.kind === "video"
+            ? "selected_video_stills"
+            : "static_photos"
+          : "no_media",
         consent: capture?.consent,
         quality: capture?.quality,
         allowedFrameIds: capture?.frameLabels,
@@ -244,10 +324,40 @@ function StudioPage() {
         triage,
       }),
     );
-    stopSession(triage === "emergency" ? "medical-emergency" : triage === "prompt_medical" ? "medical" : "consent");
+    stopSession(
+      triage === "emergency"
+        ? "medical-emergency"
+        : triage === "prompt_medical"
+          ? "medical"
+          : "consent",
+    );
   }, [capture, triage, stopSession]);
 
+  function chooseTriage(next: TriageState) {
+    analysisRequestRef.current += 1;
+    stopCoachVoice();
+    setPending(false);
+    setAnalysisError(null);
+    if (next !== "none") {
+      micArmedRef.current = false;
+      setMicArmed(false);
+      setMicStatus("idle");
+      setReport(null);
+      setSavedReportRevision(null);
+      setAnalysisConsumed(true);
+      stopSession(
+        next === "emergency"
+          ? "medical-emergency"
+          : next === "prompt_medical"
+            ? "medical"
+            : "consent",
+      );
+    }
+    setTriage(next);
+  }
+
   async function runAnalyze() {
+    if (!mountedRef.current) return;
     if (!capture || !det) return;
     if (authEnabled && !currentUser) {
       setAnalysisError("Sign in before sending selected stills to xAI.");
@@ -271,7 +381,7 @@ function StudioPage() {
           tieSlug,
           stepIndex,
           elapsedSec: sessionSnapshot.elapsed,
-          hardNos: hardNos.map((n) => `${n.id}: ${n.label}`),
+          hardNos: operationalLimits.map((item) => `${item.id}: ${item.label}`),
           triage,
           media: {
             mode: capture.kind === "video" ? "selected_video_stills" : "static_photos",
@@ -284,12 +394,16 @@ function StudioPage() {
           consent: capture.consent,
         },
       });
+      const liveNegotiationPolicy = buildStudioNegotiationPolicy(useNegotiate.getState().items);
       if (
+        !mountedRef.current ||
         request !== analysisRequestRef.current ||
         requestContext !== currentContextRef.current ||
         captureContextAtCommitRef.current !== requestContext ||
+        liveNegotiationPolicy.mediaBlocked ||
         useSession.getState().stopped
-      ) return;
+      )
+        return;
       if (res.ok) {
         setRefusal(res.refusal);
         setReport(res.report);
@@ -301,32 +415,40 @@ function StudioPage() {
           res.selfAudit.hardLimit
         ) {
           stopSession("observation");
-        } else if (settings.voice && !micArmed) {
-          void playCoachVoice(res.report.final.speak, settings.voice);
+        } else if (
+          useSettings.getState().voice &&
+          !liveNegotiationPolicy.voiceBlocked &&
+          !micArmedRef.current
+        ) {
+          void playCoachVoice(res.report.final.speak, true);
         }
       } else {
         setAnalysisError(res.error || "The analysis could not be completed.");
-        // The server sets this flag only when admission failed before any
-        // provider request and the replay reservation was rolled back. Never
-        // reopen a batch after an ambiguous network/provider outcome or replay.
+        // Only a server-declared retryable admission denial before durable
+        // reservation can reopen this batch. Never reopen after reservation,
+        // selected-media dispatch, an ambiguous outcome, or replay.
         if (res.retryableBeforeProvider && res.providerAttempted === false) {
           setAnalysisConsumed(false);
         }
       }
     } catch (cause) {
-      if (request === analysisRequestRef.current) {
-        setAnalysisError(cause instanceof Error ? cause.message : "The analysis could not be completed.");
+      if (mountedRef.current && request === analysisRequestRef.current) {
+        setAnalysisError(
+          cause instanceof Error ? cause.message : "The analysis could not be completed.",
+        );
       }
     } finally {
-      if (request === analysisRequestRef.current) setPending(false);
+      if (mountedRef.current && request === analysisRequestRef.current) setPending(false);
     }
   }
 
   const acceptCapture = useCallback((next: CaptureResult) => {
     analysisRequestRef.current += 1;
+    stopCoachVoice();
     captureContextAtCommitRef.current = currentContextRef.current;
     setPending(false);
     setAnalysisError(null);
+    setRefusal(false);
     setReport(null);
     setObservationReport(null);
     setModelStatus("not_requested");
@@ -339,9 +461,11 @@ function StudioPage() {
 
   const discardCapture = useCallback(() => {
     analysisRequestRef.current += 1;
+    stopCoachVoice();
     captureContextAtCommitRef.current = null;
     setPending(false);
     setAnalysisError(null);
+    setRefusal(false);
     setReport(null);
     setObservationReport(null);
     setModelStatus("not_requested");
@@ -360,8 +484,8 @@ function StudioPage() {
     spoke.current = stepIndex;
     if (stopped) return;
     const line = tie?.steps[stepIndex]?.speak;
-    if (line && settings.voice && !micArmed) void playCoachVoice(line, settings.voice);
-  }, [stepIndex, stopped, tie, settings.voice, micArmed]);
+    if (line && studioVoice && !micArmed) void playCoachVoice(line, studioVoice);
+  }, [stepIndex, stopped, tie, studioVoice, micArmed]);
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
@@ -376,8 +500,8 @@ function StudioPage() {
           <p className="font-display text-3xl text-danger">Stop</p>
           <p className="mt-1 text-sm text-fg">
             Stop the activity. Support the person's position and release without creating a fall.
-            Call emergency services for abnormal breathing, unresponsiveness, seizure, chest pain,
-            a serious fall, stroke-like signs, major weakness, or concerning symptoms after neck
+            Call emergency services for abnormal breathing, unresponsiveness, seizure, chest pain, a
+            serious fall, stroke-like signs, major weakness, or concerning symptoms after neck
             pressure. Seek prompt assessment for persistent or worsening symptoms after release.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -416,9 +540,10 @@ function StudioPage() {
           <SessionClock limitSec={settings.circulationMins * 60} />
         </div>
       </div>
-      {hardNos.length > 0 && (
+      {operationalLimits.length > 0 && (
         <p className="mt-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
-          Negotiated no: {hardNos.map((n) => n.label).join(" · ")}
+          Not approved (no or unresolved maybe):{" "}
+          {operationalLimits.map((item) => `${item.label} (${item.rank})`).join(" · ")}
         </p>
       )}
       {settings.listen && !stopped && (
@@ -428,15 +553,19 @@ function StudioPage() {
             className="font-medium text-fg underline-offset-2 hover:underline"
             onClick={() => {
               if (micArmed) {
+                micArmedRef.current = false;
                 setMicArmed(false);
                 setMicStatus("idle");
               } else {
                 setMicStatus("starting");
+                micArmedRef.current = true;
                 setMicArmed(true);
               }
             }}
           >
-            {micArmed ? "Turn off optional mic word detection" : "Enable optional mic word detection for this session"}
+            {micArmed
+              ? "Turn off optional mic word detection"
+              : "Enable optional mic word detection for this session"}
           </button>
           <span className="ml-2" role="status" aria-live="polite">
             Status: {micStatus}. It can only surface configured red/yellow words; convenience only,
@@ -446,51 +575,65 @@ function StudioPage() {
       )}
       <CirculationBanner
         minutes={settings.circulationMins}
-        voice={settings.voice}
+        voice={studioVoice}
         micArmed={micArmed}
       />
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <div>
-          <label htmlFor="studio-tie" className="text-xs uppercase tracking-wide text-subtle">Tie</label>
+          <label htmlFor="studio-tie" className="text-xs uppercase tracking-wide text-subtle">
+            Tie
+          </label>
           <select
             id="studio-tie"
             className="mt-1 h-11 w-full rounded-md border border-border bg-elevated px-3 text-sm"
             value={tieSlug ?? ""}
-            disabled={stopped}
-            onChange={(e) => setTie(e.target.value || undefined)}
+            disabled={stopped || pending}
+            onChange={(e) => {
+              if (useSession.getState().stopped || pending) return;
+              setTie(e.target.value || undefined);
+            }}
           >
             <option value="">Freeform</option>
             {TIES.map((t) => (
               <option
                 key={t.slug}
                 value={t.slug}
-                disabled={t.minutes[1] === 0 || blockedByIds(t.slug, TIE_LIMIT_IDS, hardNoIds)}
+                disabled={t.minutes[1] === 0 || negotiationPolicy.isTieBlocked(t.slug)}
               >
                 {t.name}
                 {t.minutes[1] === 0
                   ? " — instructor route"
-                  : blockedByIds(t.slug, TIE_LIMIT_IDS, hardNoIds)
-                    ? " — negotiated no"
+                  : negotiationPolicy.isTieBlocked(t.slug)
+                    ? " — not approved"
                     : ""}
               </option>
             ))}
           </select>
-          <label htmlFor="studio-surface" className="mt-3 block text-xs uppercase tracking-wide text-subtle">On</label>
+          <label
+            htmlFor="studio-surface"
+            className="mt-3 block text-xs uppercase tracking-wide text-subtle"
+          >
+            On
+          </label>
           <select
             id="studio-surface"
             className="mt-1 h-11 w-full rounded-md border border-border bg-elevated px-3 text-sm"
             value={furnitureSlug ?? ""}
-            disabled={stopped}
-            onChange={(e) => setFurniture(e.target.value || undefined)}
+            disabled={stopped || pending}
+            onChange={(e) => {
+              if (useSession.getState().stopped || pending) return;
+              setFurniture(e.target.value || undefined);
+            }}
           >
             <option value="">Floor / bed</option>
             {DUNGEON.map((d) => (
               <option
                 key={d.slug}
                 value={d.slug}
-                disabled={blockedByIds(d.slug, FURNITURE_LIMIT_IDS, hardNoIds)}
+                disabled={negotiationPolicy.isFurnitureBlocked(d.slug)}
               >
-                {d.name}{blockedByIds(d.slug, FURNITURE_LIMIT_IDS, hardNoIds) ? " — negotiated no" : ""}
+                {d.name}
+                {negotiationPolicy.isFurnitureBlocked(d.slug) ? " — not approved" : ""}
               </option>
             ))}
           </select>
@@ -500,46 +643,45 @@ function StudioPage() {
                 <p className="text-sm text-muted">
                   Step {stepIndex + 1}/{tie.steps.length}: {tie.steps[stepIndex]?.title}
                 </p>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={stopped || pending || stepIndex === 0}
-                onClick={() => {
-                  if (useSession.getState().stopped || pending) return;
-                  setStep(stepIndex - 1);
-                }}
-              >
-                Prev
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={stopped || pending || stepIndex >= tie.steps.length - 1}
-                onClick={() => {
-                  if (useSession.getState().stopped || pending) return;
-                  setStep(stepIndex + 1);
-                }}
-              >
-                Next
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={stopped || !settings.voice}
-                onClick={() => {
-                  if (useSession.getState().stopped) return;
-                  setMicArmed(false);
-                  setMicStatus("idle");
-                  const line = tie.steps[stepIndex]?.speak;
-                  if (line) void playCoachVoice(line, settings.voice);
-                }}
-              >
-                Speak step
-              </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={stopped || pending || stepIndex === 0}
+                  onClick={() => {
+                    if (useSession.getState().stopped || pending) return;
+                    setStep(stepIndex - 1);
+                  }}
+                >
+                  Prev
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={stopped || pending || stepIndex >= tie.steps.length - 1}
+                  onClick={() => {
+                    if (useSession.getState().stopped || pending) return;
+                    setStep(stepIndex + 1);
+                  }}
+                >
+                  Next
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={stopped || !studioVoice}
+                  onClick={() => {
+                    if (useSession.getState().stopped || !studioVoice) return;
+                    micArmedRef.current = false;
+                    setMicArmed(false);
+                    setMicStatus("idle");
+                    const line = tie.steps[stepIndex]?.speak;
+                    if (line) void playCoachVoice(line, studioVoice);
+                  }}
+                >
+                  {voiceBlocked ? "Speak step — not approved" : "Speak step"}
+                </Button>
               </div>
-              <p className="mt-2 text-sm leading-relaxed text-fg">
-                {tie.steps[stepIndex]?.rigger}
-              </p>
+              <p className="mt-2 text-sm leading-relaxed text-fg">{tie.steps[stepIndex]?.rigger}</p>
               <p className="mt-1 text-xs text-muted">Check. {tie.steps[stepIndex]?.check}</p>
               <div className="mx-auto mt-3 h-64 w-36">
                 <RopeFigure
@@ -560,12 +702,33 @@ function StudioPage() {
             </div>
           )}
           <div className="mt-4">
-            {mediaBlocked && (
-              <p className="mb-3 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
-                Media is a negotiated no. Change that decision together before enabling photo or video capture.
+            {!negotiationReady ? (
+              <p
+                role="status"
+                className="mb-3 rounded-md border border-border px-3 py-2 text-xs text-muted"
+              >
+                Loading negotiation choices…
               </p>
-            )}
-            <fieldset className="mb-3 rounded-lg border border-border bg-surface p-3">
+            ) : mediaBlocked ? (
+              <p
+                role="status"
+                className="mb-3 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger"
+              >
+                Media is not affirmatively approved. Resolve no or maybe together before enabling
+                photo or video capture.
+              </p>
+            ) : null}
+            <fieldset
+              disabled={!negotiationReady}
+              data-camera-gate="action-first"
+              data-negotiation-ready={negotiationReady ? "true" : "false"}
+              data-media-blocked={negotiatedMediaBlocked ? "true" : "false"}
+              data-triage={triage}
+              data-session-stopped={stopped ? "true" : "false"}
+              data-camera-gate-reason={cameraGateReason}
+              data-camera-ready={cameraGateReason === "enabled" ? "true" : "false"}
+              className="mb-3 rounded-lg border border-border bg-surface p-3 disabled:opacity-60"
+            >
               <legend className="px-1 text-xs uppercase tracking-wide text-subtle">
                 Action-first screen · required before media
               </legend>
@@ -576,31 +739,39 @@ function StudioPage() {
               <div className="space-y-2 text-xs text-fg">
                 <TriageOption
                   checked={triage === "none"}
-                  onChange={() => setTriage("none")}
+                  onChange={() => chooseTriage("none")}
                   label="No urgent symptom, coercion or secret-recording concern, unconsented bystander, or unresolved media-permission issue is being reported. This is not safety clearance."
                 />
                 <TriageOption
                   checked={triage === "prompt_medical"}
-                  onChange={() => setTriage("prompt_medical")}
+                  onChange={() => chooseTriage("prompt_medical")}
                   label="After release, a symptom such as numbness, weakness, pain, swelling, discoloration, temperature change, dizziness, or loss of function is persistent or worsening."
                 />
                 <TriageOption
                   checked={triage === "emergency"}
-                  onChange={() => setTriage("emergency")}
+                  onChange={() => chooseTriage("emergency")}
                   label="There is abnormal breathing, unresponsiveness, seizure, chest pain, a serious fall, stroke-like signs, major weakness, severe confusion, or concerning symptoms after neck pressure."
                 />
                 <TriageOption
                   checked={triage === "coercion_or_secret_recording"}
-                  onChange={() => setTriage("coercion_or_secret_recording")}
+                  onChange={() => chooseTriage("coercion_or_secret_recording")}
                   label="There is coercion, secret recording, unclear adult status, absent or revoked permission, or an unconsented bystander."
                 />
               </div>
             </fieldset>
+            {cameraGateReason === "triage-unanswered" && (
+              <p
+                role="status"
+                className="mb-3 rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted"
+              >
+                Answer the action-first screen for this batch before confirming media permissions.
+              </p>
+            )}
             <CameraCapture
               key={captureContextKey}
               onCapture={acceptCapture}
               onDiscard={discardCapture}
-              disabled={stopped || mediaBlocked || triage !== "none"}
+              disabled={cameraGateReason !== "enabled"}
             />
           </div>
           {capture && captureMatchesContext && (
@@ -612,12 +783,16 @@ function StudioPage() {
             report={contextBoundReport}
             observationReport={contextBoundObservationReport}
             modelStatus={modelStatus}
-            voice={settings.voice && !micArmed}
+            voice={studioVoice && !micArmed}
             pending={pending}
             refusal={refusal}
             halted={stopped}
           />
-          {analysisError && <p className="text-sm text-danger" role="alert">{analysisError}</p>}
+          {analysisError && (
+            <p className="text-sm text-danger" role="alert">
+              {analysisError}
+            </p>
+          )}
           <div className="flex flex-wrap gap-2">
             {authEnabled && !currentUser && !authPending ? (
               <Button asChild>
@@ -654,11 +829,17 @@ function StudioPage() {
           <Button
             variant="ghost"
             size="sm"
-            disabled={!contextBoundReport || !contextBoundObservationReport}
+            disabled={
+              !contextBoundReport ||
+              !contextBoundObservationReport ||
+              !reportRevision ||
+              currentReportSaved
+            }
             onClick={() => {
-              if (!contextBoundReport || !contextBoundObservationReport) return;
+              if (!contextBoundReport || !contextBoundObservationReport || !reportRevision) return;
               const snapshot = useSession.getState();
-              addEntry({
+              if (savedEntryId) removeEntry(savedEntryId);
+              const entryId = addEntry({
                 tieSlug: snapshot.tieSlug,
                 minutes: Math.round(snapshot.elapsed / 60),
                 notes: contextBoundReport.final.coaching.slice(0, 280),
@@ -667,17 +848,24 @@ function StudioPage() {
                 limitations: contextBoundObservationReport.limitations.slice(0, 3),
                 sourceIds: contextBoundObservationReport.source_ids,
               });
-              setSaved(true);
+              setSavedEntryId(entryId);
+              setSavedReportRevision(reportRevision);
             }}
           >
-            {saved ? "Saved on this device" : "Save to journal"}
+            {currentReportSaved
+              ? "Saved on this device"
+              : savedEntryId
+                ? "Update journal report"
+                : "Save to journal"}
           </Button>
           <p className="text-xs leading-relaxed text-subtle">
             Captures stay in page memory until replaced, stopped, or the page closes; the journal
             never saves them. One Analyze request sends only selected compressed stills and generic
-            frame labels to xAI. Already-transmitted data cannot be recalled and may be retained
-            under workspace settings. Closed consequence floors can force a stop or instructor
-            route, but model misses remain possible and no report is clearance.
+            frame labels to xAI. A fixed, non-sensitive request must first confirm zero data
+            retention, and the selected-media response must confirm it again before the app reads
+            the body. A missing confirmation is discarded, but an already-initiated request cannot
+            be recalled. Closed consequence floors can force a stop or instructor route, but model
+            misses remain possible and no report is clearance.
           </p>
         </div>
       </div>
@@ -703,18 +891,12 @@ function CirculationBanner({
   const reminderTick = useSession((state) => state.elapsed);
   const stopped = useSession((state) => state.stopped);
   const nagged = useRef(false);
-  const due =
-    reminderTick >= 0 &&
-    !!lastCheckAt &&
-    Date.now() - lastCheckAt > minutes * 60 * 1000;
+  const due = reminderTick >= 0 && !!lastCheckAt && Date.now() - lastCheckAt > minutes * 60 * 1000;
 
   useEffect(() => {
     if (due && voice && !micArmed && !stopped && !nagged.current) {
       nagged.current = true;
-      void playCoachVoice(
-        DIRECT_CHECK_REMINDER,
-        voice,
-      );
+      void playCoachVoice(DIRECT_CHECK_REMINDER, voice);
     }
     if (!due) nagged.current = false;
   }, [due, voice, micArmed, stopped]);

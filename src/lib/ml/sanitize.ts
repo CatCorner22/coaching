@@ -1,7 +1,7 @@
 import { clamp01 } from "./signal";
 import type { DeterministicReport, LlmDraft, SafetyFlag, WrapBand } from "./types";
 
-const IMAGE = /^data:image\/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=\s]+$/i;
+const JPEG = /^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/;
 const MAX_DATA_URL = 900000;
 const QUALITY = new Set(["sound", "adjust", "unsafe"]);
 const FLAG_CODES = new Set<SafetyFlag["code"]>([
@@ -50,36 +50,24 @@ export function isCameraDataUrl(s: string) {
   if (typeof s !== "string") return false;
   if (s.length < 32 || s.length > MAX_DATA_URL) return false;
   if (/svg|script|https?:|ftp:|file:|charset/i.test(s.slice(0, 48))) return false;
-  if (!IMAGE.test(s)) return false;
+  if (!JPEG.test(s)) return false;
   const comma = s.indexOf(",");
   if (comma < 0) return false;
-  const b64 = s.slice(comma + 1).replace(/\s+/g, "");
+  const b64 = s.slice(comma + 1);
   if (b64.length < 24 || b64.length % 4 !== 0) return false;
   try {
-    const bytes = Uint8Array.from(atob(b64.slice(0, 32)), (c) => c.charCodeAt(0));
-    return looksLikeImage(bytes);
+    const bytes = atob(b64);
+    if (bytes.length < 8) return false;
+    return (
+      bytes.charCodeAt(0) === 0xff &&
+      bytes.charCodeAt(1) === 0xd8 &&
+      bytes.charCodeAt(2) === 0xff &&
+      bytes.charCodeAt(bytes.length - 2) === 0xff &&
+      bytes.charCodeAt(bytes.length - 1) === 0xd9
+    );
   } catch {
     return false;
   }
-}
-
-function looksLikeImage(b: Uint8Array) {
-  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return true;
-  if (b.length >= 4 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return true;
-  if (
-    b.length >= 12 &&
-    b[0] === 0x52 &&
-    b[1] === 0x49 &&
-    b[2] === 0x46 &&
-    b[3] === 0x46 &&
-    b[8] === 0x57 &&
-    b[9] === 0x45 &&
-    b[10] === 0x42 &&
-    b[11] === 0x50
-  ) {
-    return true;
-  }
-  return false;
 }
 
 export function sanitizeQuestion(q: unknown, max = 400) {

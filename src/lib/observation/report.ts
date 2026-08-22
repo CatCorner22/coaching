@@ -1,3 +1,9 @@
+import {
+  SAFETY_SOURCE_IDS,
+  SOURCE_LEDGER_REVISION,
+  type SafetySourceId,
+} from "@/lib/kb/sources";
+
 export const CANONICAL_IDS = [
   "negotiation_materials_visible",
   "aftercare_materials_visible",
@@ -78,24 +84,13 @@ export type Disposition =
   | "insufficient_view"
   | "lower_consequence_learning_only"
   | "no_visible_concern_not_clearance";
-export type SourceId =
-  | "CONSENT-1"
-  | "CONSENT-2"
-  | "ROPE-1"
-  | "FATAL-1"
-  | "NFS-1"
-  | "FIRSTAID-1"
-  | "VISION-1"
-  | "VISION-2"
-  | "VISION-3"
-  | "PRIVACY-1"
-  | "STRUCTURE-1"
-  | "AI-SAFETY-1";
+export type SourceId = SafetySourceId;
 export type ModelStatus = "not_requested" | "completed" | "refused" | "unavailable" | "failed";
 export type TriageState = "none" | "prompt_medical" | "emergency" | "coercion_or_secret_recording";
 
 export type ObservationReport = {
-  schema_version: "1.1";
+  schema_version: "1.2";
+  source_ledger_revision: typeof SOURCE_LEDGER_REVISION;
   report_type: "readiness" | "activity_recognition" | "urgent_alert" | "post_scene" | "instructor_handoff";
   media_mode: "static_photos" | "selected_video_stills" | "no_media";
   adult_status_confirmed: boolean;
@@ -285,7 +280,7 @@ export function admitRemoteCategories(
   return {
     matches: critical,
     hardLimit: true,
-    modelStatus: critical.length > 0 ? "completed" : "failed",
+    modelStatus: "failed",
   };
 }
 
@@ -407,9 +402,10 @@ export function buildObservationReport(options: {
     nextStep = "lower_consequence_only";
   }
 
-  const sourceIds = sourcesFor(categories, triage);
+  const sourceIds = sourcesFor(categories, triage, mediaMode);
   const report: ObservationReport = {
-    schema_version: "1.1",
+    schema_version: "1.2",
+    source_ledger_revision: SOURCE_LEDGER_REVISION,
     report_type: urgentStop ? "urgent_alert" : triage === "prompt_medical" ? "post_scene" : "activity_recognition",
     media_mode: mediaMode,
     // This combined stop route includes unclear legal-adult status as well as
@@ -631,19 +627,25 @@ function limitationsFor(
   mode: ObservationReport["media_mode"],
   hardLimit: boolean,
 ): string[] {
+  if (mode === "no_media") {
+    return [
+      "No media was analyzed; this report reflects only the selected action-first triage path and cannot determine cause, severity, consent, physiology, injury, or future condition.",
+      "Use direct assessment and the stated emergency or consent response. Do not delay care or treat this no-media report as a visual finding or clearance.",
+    ];
+  }
   const limitations = [
     "Images cannot establish legal age, consent, capacity, comfort, pain, sensation, nerve function, circulation, breathing adequacy, pressure, force, load, duration, injury, or future condition.",
     "The report cannot validate an exact knot, tie, harness, placement, construction, material, anchor, rating, technique, instructor qualification, or safety.",
     "Broad category matches are unvalidated and may contain false positives or false negatives; no visible concern is never an all-clear.",
   ];
-  if (mode !== "no_media") {
-    limitations.push("The app resized and re-encoded the selected stills; crop, lighting, perspective, occlusion, and unknown prior edits can change appearance.");
-  }
-  if (status !== "completed") {
+  limitations.push("The app resized and re-encoded the selected stills; crop, lighting, perspective, occlusion, and unknown prior edits can change appearance.");
+  if (hardLimit) {
+    limitations.unshift(
+      "Remote visual classification violated the closed output contract. Only any conservative high-consequence match was retained; do not proceed from the remaining output.",
+    );
+  } else if (status !== "completed") {
     limitations.push(
-      hardLimit
-        ? "Remote visual classification failed or violated the closed output contract; do not proceed from its output."
-        : "Remote visual classification did not complete; this is an insufficient-view, lower-consequence-only report.",
+      "Remote visual classification did not complete; this is an insufficient-view, lower-consequence-only report.",
     );
   }
   return limitations;
@@ -652,8 +654,18 @@ function limitationsFor(
 function sourcesFor(
   categories: ObservationReport["recognized_categories"],
   triage: TriageState,
+  mediaMode: ObservationReport["media_mode"],
 ): SourceId[] {
-  const sources = new Set<SourceId>(["CONSENT-2", "VISION-2", "PRIVACY-1", "STRUCTURE-1", "AI-SAFETY-1"]);
+  const sources = new Set<SourceId>(["CONSENT-2"]);
+  if (mediaMode !== "no_media") {
+    sources.add("XAI-VISION-1");
+    sources.add("XAI-VISION-2");
+    sources.add("XAI-MODEL-1");
+    sources.add("XAI-STRUCTURE-1");
+    sources.add("XAI-PRIVACY-1");
+    sources.add("XAI-TERMS-1");
+  }
+  if (mediaMode === "selected_video_stills") sources.add("XAI-VIDEO-1");
   if (categories.some((category) => category.canonical_id.includes("rope") || category.canonical_id.includes("load"))) {
     sources.add("ROPE-1");
   }
@@ -674,6 +686,7 @@ function sourcesFor(
 
 const REQUIRED_KEYS = [
   "schema_version",
+  "source_ledger_revision",
   "report_type",
   "media_mode",
   "adult_status_confirmed",
@@ -706,9 +719,12 @@ export function validateObservationReport(
   const keys = Object.keys(report).sort();
   const expected = [...REQUIRED_KEYS].sort();
   if (keys.length !== expected.length || keys.some((key, index) => key !== expected[index])) {
-    issues.push("top-level keys do not match schema 1.1");
+    issues.push("top-level keys do not match schema 1.2");
   }
-  if (report.schema_version !== "1.1") issues.push("schema_version must be 1.1");
+  if (report.schema_version !== "1.2") issues.push("schema_version must be 1.2");
+  if (report.source_ledger_revision !== SOURCE_LEDGER_REVISION) {
+    issues.push("source_ledger_revision must match the current ledger");
+  }
   if (!REPORT_TYPES.has(report.report_type as ObservationReport["report_type"])) issues.push("invalid report_type");
   if (!MEDIA_MODES.has(report.media_mode as ObservationReport["media_mode"])) issues.push("invalid media_mode");
   for (const key of CONSENT_BOOLEAN_KEYS) {
@@ -1035,7 +1051,7 @@ const EVIDENCE_SOURCES = new Set<EvidenceSource>(["single_frame_visual", "multi_
 const EVIDENCE_STATES = new Set<EvidenceState>(["observed", "possible", "unknown", "not_assessed"]);
 const CONSEQUENCE_BANDS = new Set<ConsequenceBand>(["C1_lower_consequence_learning", "C2_elevated", "C3_high_consequence_instructor_only", "C4_stop_or_decline"]);
 const ABSTAIN_REASONS = new Set<AbstainReason>(["not_applicable", "insufficient_coverage", "perspective_distortion", "two_dimensional_overlap", "chronology_unknown", "ambiguous_object", "nonvisual_fact", "sensitive_view_required", "out_of_scope"]);
-const SOURCE_IDS = new Set<SourceId>(["CONSENT-1", "CONSENT-2", "ROPE-1", "FATAL-1", "NFS-1", "FIRSTAID-1", "VISION-1", "VISION-2", "VISION-3", "PRIVACY-1", "STRUCTURE-1", "AI-SAFETY-1"]);
+const SOURCE_IDS = new Set<SourceId>(SAFETY_SOURCE_IDS);
 const VISIBILITIES = new Set(["clear", "partial", "obscured", "not_shown"]);
 const CONFIDENCES = new Set(["high", "moderate", "low", "abstain"]);
 const CONSENT_BOOLEAN_KEYS = ["adult_status_confirmed", "activity_consent_confirmed", "recording_consent_confirmed", "upload_consent_confirmed", "output_consent_confirmed"] as const;
@@ -1082,13 +1098,15 @@ function validateEscalation(value: unknown, issues: string[]): void {
 }
 
 function requiredSourcesForReport(report: Partial<ObservationReport>): Set<SourceId> {
-  const required = new Set<SourceId>([
-    "CONSENT-2",
-    "VISION-2",
-    "PRIVACY-1",
-    "STRUCTURE-1",
-    "AI-SAFETY-1",
-  ]);
+  const required = new Set<SourceId>(["CONSENT-2"]);
+  if (report.media_mode !== "no_media") {
+    required.add("XAI-VISION-1");
+    required.add("XAI-VISION-2");
+    required.add("XAI-MODEL-1");
+    required.add("XAI-STRUCTURE-1");
+    required.add("XAI-PRIVACY-1");
+    required.add("XAI-TERMS-1");
+  }
   const categories = Array.isArray(report.recognized_categories) ? report.recognized_categories : [];
   if (
     categories.some(
@@ -1110,5 +1128,6 @@ function requiredSourcesForReport(report: Partial<ObservationReport>): Set<Sourc
     report.escalation?.level === "emergency_services" ||
     report.escalation?.level === "prompt_medical_assessment"
   ) required.add("FIRSTAID-1");
+  if (report.media_mode === "selected_video_stills") required.add("XAI-VIDEO-1");
   return required;
 }
