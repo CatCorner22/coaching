@@ -92,12 +92,20 @@ function NegotiatePage() {
             const next = label.trim();
             setAddError(null);
             if (!next) return;
-            const before = useNegotiate.getState().items.length;
+            const beforeItems = useNegotiate.getState().items;
+            // A duplicate is rejected by the store too, so distinguish the two
+            // causes: telling someone the list is full when the limit is
+            // already recorded sends them to delete a negotiated line.
+            const duplicate = beforeItems.some(
+              (item) => item.label.toLowerCase() === next.toLowerCase(),
+            );
+            if (duplicate) {
+              setAddError("That limit is already on the list.");
+              return;
+            }
             add(next);
             const after = useNegotiate.getState().items;
-            // The list is capped; without this the input cleared as if the
-            // limit had been recorded while it was silently dropped.
-            if (after.length === before && !after.some((item) => item.label === next)) {
+            if (after.length === beforeItems.length && !after.some((item) => item.label === next)) {
               setAddError(
                 "This list is full, so that limit was not added. Remove or reword an existing line, and say it out loud regardless.",
               );

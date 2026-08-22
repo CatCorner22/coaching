@@ -106,3 +106,35 @@ test("syncPersistedAcrossTabs rehydrates when another tab rewrites the same key"
     (globalThis as { window?: unknown }).window = originalWindow;
   }
 });
+
+test("negotiation writes resolve per item by stamp, so a stale tab cannot resurrect a revoked rank", async () => {
+  const { mergeNegotiationItemsByStamp } = await import("./persist.ts");
+  // Tab A is stale: it still holds the old approval with an older stamp.
+  const staleIncoming = [{ id: "photos", label: "Photos", rank: "yes", updatedAt: 1000 }];
+  const revokedExisting = [{ id: "photos", label: "Photos", rank: "no", updatedAt: 2000 }];
+  const merged = mergeNegotiationItemsByStamp(staleIncoming, revokedExisting) as Array<{
+    rank: string;
+    updatedAt: number;
+  }>;
+  assert.equal(merged[0]!.rank, "no", "a stale write must not resurrect a revoked rank");
+  assert.equal(merged[0]!.updatedAt, 2000);
+
+  // A genuine later re-approval must still win.
+  const reapproval = [{ id: "photos", label: "Photos", rank: "yes", updatedAt: 3000 }];
+  const after = mergeNegotiationItemsByStamp(reapproval, revokedExisting) as Array<{ rank: string }>;
+  assert.equal(after[0]!.rank, "yes");
+
+  // Equal stamps keep the writing tab's own value; unknown ids pass through;
+  // malformed input is left alone rather than throwing.
+  const tie = mergeNegotiationItemsByStamp(
+    [{ id: "photos", rank: "yes", updatedAt: 5 }],
+    [{ id: "photos", rank: "no", updatedAt: 5 }],
+  ) as Array<{ rank: string }>;
+  assert.equal(tie[0]!.rank, "yes");
+  assert.deepEqual(
+    mergeNegotiationItemsByStamp([{ id: "new", rank: "no" }], []),
+    [{ id: "new", rank: "no" }],
+  );
+  assert.equal(mergeNegotiationItemsByStamp(null, []), null);
+  assert.equal(mergeNegotiationItemsByStamp([], "junk"), null);
+});
