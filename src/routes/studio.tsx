@@ -21,7 +21,8 @@ import {
   mediaAuthorizationWasRevoked,
   studioPolicySignature,
 } from "@/lib/studio/negotiation";
-import { listenForWords, playCoachVoice, stopCoachVoice } from "@/lib/voice/play";
+import { listenForWords } from "@/lib/voice/listen";
+import { playCoachVoice, stopCoachVoice } from "@/lib/voice/play";
 import { DIRECT_CHECK_REMINDER } from "@/lib/voice/reviewed-lines";
 import { buildDeterministic } from "@/lib/ml/predict";
 import {

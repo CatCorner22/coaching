@@ -1,0 +1,132 @@
+/**
+ * Browser speech listener for spoken safewords.
+ *
+ * Split out of play.ts, which imports the server-side voice function: that made
+ * this safety-critical listener impossible to load — and therefore to test —
+ * outside a browser. It has no dependencies of its own.
+ */
+type Rec = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((ev: unknown) => void) | null;
+  onerror: ((ev: unknown) => void) | null;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+export function listenForWords(
+  words: string[],
+  onHit: (word: string) => void,
+  onStatus?: (status: "starting" | "active" | "idle" | "error" | "unsupported") => void,
+): () => void {
+  const SR =
+    (window as unknown as { SpeechRecognition?: new () => Rec; webkitSpeechRecognition?: new () => Rec })
+      .SpeechRecognition ??
+    (window as unknown as { webkitSpeechRecognition?: new () => Rec }).webkitSpeechRecognition;
+  if (!SR) {
+    onStatus?.("unsupported");
+    return () => undefined;
+  }
+  const rec = new SR();
+  let disposed = false;
+  let fatal = false;
+  let restartAttempts = 0;
+  let restartTimer: number | null = null;
+  let sessionStartedAt = 0;
+  // A recognizer that ran for a meaningful stretch before ending was working.
+  // Below this, repeated end-immediately cycles are a real fault and should
+  // consume the retry budget.
+  const HEALTHY_SESSION_MS = 1_000;
+  const report = (status: "starting" | "active" | "idle" | "error" | "unsupported") => {
+    if (!disposed) onStatus?.(status);
+  };
+  rec.continuous = true;
+  rec.interimResults = false;
+  rec.lang = "en-US";
+  const last = new Map<string, number>();
+  rec.onresult = (ev: unknown) => {
+    restartAttempts = 0;
+    const e = ev as {
+      resultIndex: number;
+      results: ArrayLike<{ 0: { transcript: string }; isFinal?: boolean }>;
+    };
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = ` ${e.results[i]![0]!.transcript.toLowerCase()} `;
+      const now = Date.now();
+      for (const w of words) {
+        const needle = w.toLowerCase().trim();
+        if (!needle) continue;
+        const re = new RegExp(`(?:^|[^a-z0-9])${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:[^a-z0-9]|$)`);
+        if (!re.test(t)) continue;
+        if ((last.get(w) ?? 0) + 2500 > now) continue;
+        last.set(w, now);
+        onHit(w);
+      }
+    }
+  };
+  rec.onstart = () => {
+    sessionStartedAt = Date.now();
+    report("active");
+  };
+  const scheduleRestart = () => {
+    if (disposed || fatal || restartTimer !== null) return;
+    if (restartAttempts >= 5) {
+      report("idle");
+      return;
+    }
+    report("starting");
+    const delay = Math.min(4_000, 250 * 2 ** restartAttempts);
+    restartTimer = window.setTimeout(() => {
+      restartTimer = null;
+      if (disposed || fatal) return;
+      restartAttempts += 1;
+      try {
+        rec.start();
+      } catch {
+        scheduleRestart();
+      }
+    }, delay);
+  };
+  rec.onerror = (event: unknown) => {
+    const code = (event as { error?: string }).error;
+    if (code === "not-allowed" || code === "service-not-allowed") {
+      fatal = true;
+      report("error");
+    }
+  };
+  rec.onend = () => {
+    // Browsers end recognition on their own after a stretch of silence, which
+    // is normal — and it is exactly what a quiet or gagged bottom produces.
+    // The budget used to reset only on a speech result, so silence was
+    // indistinguishable from a broken recognizer: five quiet cycles exhausted
+    // it and the listener stopped for the rest of the scene, having reported
+    // nothing louder than "idle". Session duration is what actually separates
+    // the two cases.
+    if (sessionStartedAt > 0 && Date.now() - sessionStartedAt >= HEALTHY_SESSION_MS) {
+      restartAttempts = 0;
+    }
+    sessionStartedAt = 0;
+    scheduleRestart();
+  };
+  report("starting");
+  try {
+    rec.start();
+  } catch {
+    report("error");
+  }
+  return () => {
+    disposed = true;
+    if (restartTimer !== null) {
+      window.clearTimeout(restartTimer);
+      restartTimer = null;
+    }
+    try {
+      rec.stop();
+    } catch {
+      /* ignore */
+    }
+  };
+}
