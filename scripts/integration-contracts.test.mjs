@@ -116,6 +116,13 @@ test("Studio requires yes for negotiated actions and blocks every voice path", (
   assert.match(policy, /mediaBlocked: operationalLimitIds\.has\("photos"\)/);
   assert.match(policy, /voiceBlocked: operationalLimitIds\.has\("voice"\)/);
   assert.match(studio, /buildStudioNegotiationPolicy\(items\)/);
+  assert.match(studio, /useNegotiate\.persist\.hasHydrated\(\)/);
+  assert.match(studio, /useNegotiate\.persist[\s\S]*?onFinishHydration\(finish\)/);
+  assert.match(
+    studio,
+    /const mediaBlocked = !negotiationReady \|\| negotiationPolicy\.mediaBlocked/,
+  );
+  assert.match(studio, /disabled=\{!negotiationReady\}/);
   assert.match(studio, /const studioVoice = settings\.voice && !voiceBlocked/);
   assert.match(studio, /if \(!studioVoice\) stopCoachVoice\(\)/);
   assert.match(studio, /voice=\{studioVoice\}/);

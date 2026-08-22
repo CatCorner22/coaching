@@ -43,6 +43,9 @@ function StudioPage() {
   const addEntry = useJournal((j) => j.add);
   const removeEntry = useJournal((j) => j.remove);
   const items = useNegotiate((s) => s.items);
+  const [negotiationReady, setNegotiationReady] = useState(() =>
+    useNegotiate.persist.hasHydrated(),
+  );
   const stopSession = useSession((s) => s.stop);
   const setStep = useSession((s) => s.setStep);
   const setTie = useSession((s) => s.setTie);
@@ -54,7 +57,8 @@ function StudioPage() {
   const tieSlug = useSession((s) => s.tieSlug);
   const furnitureSlug = useSession((s) => s.furnitureSlug);
   const negotiationPolicy = useMemo(() => buildStudioNegotiationPolicy(items), [items]);
-  const { operationalLimits, negotiationKey, mediaBlocked, voiceBlocked } = negotiationPolicy;
+  const { operationalLimits, negotiationKey, voiceBlocked } = negotiationPolicy;
+  const mediaBlocked = !negotiationReady || negotiationPolicy.mediaBlocked;
   const captureContextKey = `${tieSlug ?? ""}|${stepIndex}|${furnitureSlug ?? ""}|${negotiationKey}`;
   const [capture, setCapture] = useState<CaptureResult | null>(null);
   const [report, setReport] = useState<CoachReport | null>(null);
@@ -81,6 +85,20 @@ function StudioPage() {
   const tieBlocked = negotiationPolicy.isTieBlocked(tieSlug);
   const furnitureBlocked = negotiationPolicy.isFurnitureBlocked(furnitureSlug);
   const studioVoice = settings.voice && !voiceBlocked;
+
+  useEffect(() => {
+    const api = useNegotiate.persist;
+    const finish = () => setNegotiationReady(true);
+    const unsubscribe = api.onFinishHydration(finish);
+    if (api.hasHydrated()) finish();
+    // Block on the fail-closed defaults rather than wedging the Studio if
+    // browser storage is unavailable and hydration never reports completion.
+    const timeout = window.setTimeout(finish, 250);
+    return () => {
+      unsubscribe();
+      window.clearTimeout(timeout);
+    };
+  }, []);
 
   useEffect(() => {
     if (tieBlocked || instructorOnlyTie) useSession.getState().setTie(undefined);
@@ -591,13 +609,23 @@ function StudioPage() {
             </div>
           )}
           <div className="mt-4">
-            {mediaBlocked && (
+            {!negotiationReady ? (
+              <p
+                role="status"
+                className="mb-3 rounded-md border border-border px-3 py-2 text-xs text-muted"
+              >
+                Loading negotiation choices…
+              </p>
+            ) : mediaBlocked ? (
               <p className="mb-3 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
                 Media is not affirmatively approved. Resolve no or maybe together before enabling
                 photo or video capture.
               </p>
-            )}
-            <fieldset className="mb-3 rounded-lg border border-border bg-surface p-3">
+            ) : null}
+            <fieldset
+              disabled={!negotiationReady}
+              className="mb-3 rounded-lg border border-border bg-surface p-3 disabled:opacity-60"
+            >
               <legend className="px-1 text-xs uppercase tracking-wide text-subtle">
                 Action-first screen · required before media
               </legend>

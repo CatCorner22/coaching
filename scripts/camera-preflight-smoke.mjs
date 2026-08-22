@@ -91,6 +91,13 @@ try {
       state: "hidden",
       timeout: 10_000,
     });
+    await page.getByText("Loading negotiation choices…", { exact: true }).waitFor({
+      state: "hidden",
+      timeout: 10_000,
+    });
+    await page
+      .getByText("Media is not affirmatively approved.", { exact: false })
+      .waitFor({ state: "hidden", timeout: 10_000 });
 
     const noConcern = page.getByRole("radio", {
       name: /^No urgent symptom, coercion or secret-recording concern/,
@@ -202,6 +209,40 @@ try {
       const count = await checks.count();
       if (count !== 9) {
         throw new Error(`${viewport.name}: expected 9 batch permissions, found ${count}`);
+      }
+      const first = await checks.first().elementHandle();
+      if (!first) throw new Error(`${viewport.name}: batch permission controls are missing`);
+      try {
+        await page.waitForFunction(
+          (element) => element instanceof HTMLInputElement && !element.matches(":disabled"),
+          first,
+          { timeout: 10_000 },
+        );
+      } catch (cause) {
+        const diagnostic = await page.evaluate(() => {
+          const stored = localStorage.getItem("knotty-negotiate");
+          let photos = "unreadable";
+          try {
+            const state = stored ? JSON.parse(stored)?.state : null;
+            photos = state?.items?.find((item) => item?.id === "photos")?.rank ?? "missing";
+          } catch {
+            // Keep the diagnostic bounded and omit the rest of local storage.
+          }
+          return {
+            photos,
+            visibleAlerts: [...document.querySelectorAll("[role='alert']")]
+              .filter((element) => element.getClientRects().length > 0)
+              .map((element) => element.textContent?.replace(/\s+/g, " ").trim()),
+            visibleStatuses: [...document.querySelectorAll("[role='status']")]
+              .filter((element) => element.getClientRects().length > 0)
+              .map((element) => element.textContent?.replace(/\s+/g, " ").trim()),
+            checkedTriage: document.querySelector("input[type='radio']:checked")?.parentElement
+              ?.textContent,
+          };
+        });
+        throw new Error(
+          `${viewport.name}: batch permissions stayed disabled: ${JSON.stringify(diagnostic)}; ${String(cause?.message ?? cause)}`,
+        );
       }
       for (let index = 0; index < count; index += 1) await checks.nth(index).check();
     };
