@@ -69,3 +69,11 @@ test("tick is a no-op after stop and when the second has not advanced", () => {
   useSession.getState().tick(t0 + 9000);
   assert.equal(useSession.getState().elapsed, 2);
 });
+
+test("tick never stores a negative elapsed under clock skew", () => {
+  fresh();
+  useSession.getState().start();
+  const t0 = useSession.getState().startedAt!;
+  useSession.getState().tick(t0 - 5000);
+  assert.equal(useSession.getState().elapsed, 0);
+});
