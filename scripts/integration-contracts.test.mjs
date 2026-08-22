@@ -40,7 +40,7 @@ test("accepting a capture preserves the committed permission ledger", () => {
   const camera = read("src/components/camera-capture.tsx");
   assert.match(camera, /setBatchCommitted\(true\)/);
   assert.match(camera, /permissionExpiryTimerRef\.current = window\.setTimeout/);
-  assert.match(studio, /disabled=\{stopped \|\| mediaBlocked \|\| triage !== "none"\}/);
+  assert.match(studio, /disabled=\{cameraGateReason !== "enabled"\}/);
 });
 
 test("camera capability preflight stays passive and cannot certify a device or scene", () => {
@@ -127,6 +127,7 @@ test("Studio requires yes for negotiated actions and blocks every voice path", (
   const studio = read("src/routes/studio.tsx");
   const policy = read("src/lib/studio/negotiation.ts");
   const store = read("src/lib/stores/negotiate.ts");
+  const consentGate = read("src/components/consent-gate.tsx");
   assert.match(policy, /normalizeNegotiationItems\(items\)/);
   assert.match(policy, /normalizedItems\.filter\(\(item\) => item\.rank !== "yes"\)/);
   assert.match(policy, /mediaBlocked: !approvedIds\.has\("photos"\)/);
@@ -143,15 +144,24 @@ test("Studio requires yes for negotiated actions and blocks every voice path", (
   assert.match(store, /storage: safeJsonStorage<State>\(\)/);
   assert.match(store, /migrate: \(persisted\) => persisted as State/);
   assert.match(studio, /buildStudioNegotiationPolicy\(items\)/);
-  assert.match(studio, /useNegotiate\.persist\.hasHydrated\(\)/);
+  assert.match(studio, /const \[negotiationReady, setNegotiationReady\] = useState\(false\)/);
+  assert.doesNotMatch(studio, /useState\(\(\) =>\s*useNegotiate\.persist\.hasHydrated\(\)\s*\)/);
   assert.match(studio, /useNegotiate\.persist[\s\S]*?onFinishHydration\(finish\)/);
   const hydration = between(studio, "const api = useNegotiate.persist", "useEffect(() => {");
+  assert.match(hydration, /api\.hasHydrated\(\)/);
   assert.doesNotMatch(hydration, /setTimeout/);
+  const consentHydration = between(consentGate, "const api = useSettings.persist", "  }, []);");
+  assert.match(consentHydration, /api\.onFinishHydration\(finish\)/);
+  assert.match(consentHydration, /api\.hasHydrated\(\)/);
+  assert.doesNotMatch(consentHydration, /setTimeout/);
   assert.match(
     studio,
     /mediaBlocked: negotiatedMediaBlocked,[\s\S]*?const mediaBlocked = !negotiationReady \|\| negotiatedMediaBlocked/,
   );
-  assert.match(studio, /if \(negotiationReady && negotiatedMediaBlocked\)/);
+  assert.match(studio, /const mediaAllowed = negotiationReady && !negotiatedMediaBlocked/);
+  assert.match(studio, /const previousMediaAllowedRef = useRef\(mediaAllowed\)/);
+  assert.match(studio, /mediaAuthorizationWasRevoked\(previouslyAllowed, mediaAllowed\)/);
+  assert.doesNotMatch(studio, /if \(negotiationReady && negotiatedMediaBlocked\)/);
   assert.match(studio, /disabled=\{!negotiationReady\}/);
   assert.match(studio, /const studioVoice = settings\.voice && !voiceBlocked/);
   assert.match(studio, /if \(!studioVoice\) stopCoachVoice\(\)/);
@@ -159,22 +169,24 @@ test("Studio requires yes for negotiated actions and blocks every voice path", (
   assert.match(studio, /voice=\{studioVoice && !micArmed\}/);
   assert.match(studio, /disabled=\{stopped \|\| !studioVoice\}/);
   assert.match(studio, /data-negotiation-ready=\{negotiationReady \? "true" : "false"\}/);
-  assert.match(
-    studio,
-    /data-media-blocked=\{negotiatedMediaBlocked \? "true" : "false"\}/,
-  );
+  assert.match(studio, /data-media-blocked=\{negotiatedMediaBlocked \? "true" : "false"\}/);
+  assert.match(studio, /data-camera-ready=/);
+  assert.match(studio, /data-camera-gate-reason=\{cameraGateReason\}/);
   assert.match(
     studio,
     /event\.key !== null &&[\s\S]*?event\.key !== "knotty-negotiate" &&[\s\S]*?event\.key !== "knotty-settings"[\s\S]*?analysisRequestRef\.current \+= 1;[\s\S]*?stopCoachVoice\(\);[\s\S]*?window\.location\.reload\(\)/,
   );
   const negotiatedRevocation = between(
     studio,
-    "if (negotiationReady && negotiatedMediaBlocked)",
-    "  }, [tieBlocked",
+    "if (!mediaAuthorizationWasRevoked(previouslyAllowed, mediaAllowed)) return;",
+    "  }, [mediaAllowed]",
   );
   assert.match(negotiatedRevocation, /analysisRequestRef\.current \+= 1;\s*stopCoachVoice\(\)/);
   const contextInvalidation = between(studio, "if (contextChanged && capture)", "  }, [capture");
-  assert.match(contextInvalidation, /stopCoachVoice\(\);\s*captureContextAtCommitRef\.current = null/);
+  assert.match(
+    contextInvalidation,
+    /stopCoachVoice\(\);\s*captureContextAtCommitRef\.current = null/,
+  );
   assert.doesNotMatch(studio, /playCoachVoice\([^\n]+, settings\.voice\)/);
 });
 

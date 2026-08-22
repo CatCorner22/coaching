@@ -12,7 +12,7 @@ capture, photo/video import, observation reports, knowledge routing, provider
 contracts, authentication, build behavior, and release automation.
 
 No remaining reproducible source-level release blocker was found after the final
-camera-to-report-to-knowledge re-probe. Local validation passed all 406
+camera-to-report-to-knowledge re-probe. Local validation passed all 407
 source-owned tests, TypeScript, zero-warning ESLint, the production build,
 generated server-module syntax checks, and secret/PGLite artifact scans. The
 exact Node 22.23.2 GitHub pipeline and its production Chromium smoke remain the
@@ -112,6 +112,11 @@ the 23-case repository suite, a 126-case multilingual corpus, and a second
 - Studio action gates now require an affirmative yes. An unresolved maybe blocks
   media, mapped ties/equipment, and every Studio speech path; every rank change
   also invalidates the capture-bound context.
+- Negotiation readiness now starts fail-closed until React has synchronized the
+  live persisted snapshot. Media cleanup runs only on a genuine
+  allowed-to-blocked transition, so an initial blocked hydration snapshot cannot
+  erase a newer action-first answer. The UI and smoke evidence expose the exact
+  camera-gate reason, and every new photo/video batch must answer triage again.
 - Reviewed local observation text is no longer scanned as if it were an
   untrusted activity proposal. This removes false Stops caused by generic words
   such as “rope” and “use,” while incoming action prose still passes the
@@ -207,16 +212,16 @@ the 23-case repository suite, a 126-case multilingual corpus, and a second
 
 ## Verification evidence
 
-- `npm test`: 406/406 assertions passed, zero failures (groups: 266, 41, 85,
-  and 14).
+- `npm test`: 407/407 assertions passed, zero failures (groups: 266, 41, 85,
+  and 15).
 - Integrated focused corpus: 155/155 passed.
 - Final independent camera/knowledge re-probe: 107/107 passed.
 - `tsc --noEmit`: passed.
 - `eslint . --max-warnings=0`: passed.
 - Production Vite/Nitro/Vercel build: passed; 1,985 client modules, 413 SSR
   modules, and 2,475 Nitro modules transformed.
-- Client entry: 371,501 bytes raw / 115,923 bytes gzip, down from 536,396 /
-  165,560. The complete static entry graph is 478,270 bytes raw / 154,341
+- Client entry: 371,424 bytes raw / 115,894 bytes gzip, down from 536,396 /
+  165,560. The complete static entry graph is 478,193 bytes raw / 154,312
   bytes gzip and passes committed regression budgets.
 - Every emitted server `.js`/`.mjs` module passed `node --check`.
 - Production artifact scans found neither a credential-shaped preview OAuth

@@ -16,20 +16,11 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   const [consent, setConsent] = useState(false);
 
   useEffect(() => {
-    let done = false;
-    const finish = () => {
-      if (done) return;
-      done = true;
-      setMounted(true);
-    };
+    const finish = () => setMounted(true);
     const api = useSettings.persist;
     const unsubscribe = api.onFinishHydration(finish);
     if (api.hasHydrated()) finish();
-    const timeout = window.setTimeout(finish, 80);
-    return () => {
-      unsubscribe();
-      window.clearTimeout(timeout);
-    };
+    return unsubscribe;
   }, []);
 
   if (!mounted) {
@@ -87,10 +78,10 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
           Enter
         </Button>
         <p className="mt-4 text-xs leading-relaxed text-subtle">
-          Captures remain page-memory only unless you explicitly save a text summary. If cloud
-          voice is enabled later, its exact spoken text is also sent to xAI. Browser speech and
-          local storage may involve device or platform services; do not use a shared device if
-          that exposure is unacceptable.
+          Captures remain page-memory only unless you explicitly save a text summary. If cloud voice
+          is enabled later, its exact spoken text is also sent to xAI. Browser speech and local
+          storage may involve device or platform services; do not use a shared device if that
+          exposure is unacceptable.
         </p>
       </div>
     </div>

@@ -34,6 +34,19 @@ function blockedByIds(
 }
 
 /**
+ * Media cleanup is required only after an approval that was already active is
+ * lost. An initial blocked hydration snapshot is not a revocation: treating it
+ * as one lets a stale passive effect erase a newer action-first answer after
+ * persisted approval finishes loading.
+ */
+export function mediaAuthorizationWasRevoked(
+  previouslyAllowed: boolean,
+  currentlyAllowed: boolean,
+): boolean {
+  return previouslyAllowed && !currentlyAllowed;
+}
+
+/**
  * Resolve action-facing Studio policy from negotiation state. A maybe remains
  * unresolved and therefore blocks the same actions as no until it becomes yes.
  */
@@ -56,8 +69,7 @@ export function buildStudioNegotiationPolicy(items: readonly NegItem[]) {
     negotiationKey: JSON.stringify(negotiationEntries),
     mediaBlocked: !approvedIds.has("photos"),
     voiceBlocked: !approvedIds.has("voice"),
-    isTieBlocked: (slug: string | undefined) =>
-      blockedByIds(slug, TIE_LIMIT_IDS, approvedIds),
+    isTieBlocked: (slug: string | undefined) => blockedByIds(slug, TIE_LIMIT_IDS, approvedIds),
     isFurnitureBlocked: (slug: string | undefined) =>
       blockedByIds(slug, FURNITURE_LIMIT_IDS, approvedIds),
   };

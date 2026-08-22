@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-  normalizeNegotiationItems,
-  type NegItem,
-  type Rank,
-} from "@/lib/stores/negotiate";
-import { buildStudioNegotiationPolicy } from "./negotiation.ts";
+import { normalizeNegotiationItems, type NegItem, type Rank } from "@/lib/stores/negotiate";
+import { buildStudioNegotiationPolicy, mediaAuthorizationWasRevoked } from "./negotiation.ts";
 
 function item(id: string, rank: Rank): NegItem {
   return { id, label: id, rank };
@@ -20,6 +16,30 @@ test("photo and Studio voice require affirmative yes", () => {
   const approved = buildStudioNegotiationPolicy([item("photos", "yes"), item("voice", "yes")]);
   assert.equal(approved.mediaBlocked, false);
   assert.equal(approved.voiceBlocked, false);
+});
+
+test("media cleanup runs only on a genuine allowed-to-blocked transition", () => {
+  const matrix = [
+    { previous: false, current: false, revoked: false },
+    { previous: false, current: true, revoked: false },
+    { previous: true, current: true, revoked: false },
+    { previous: true, current: false, revoked: true },
+  ];
+  for (const row of matrix) {
+    assert.equal(
+      mediaAuthorizationWasRevoked(row.previous, row.current),
+      row.revoked,
+      JSON.stringify(row),
+    );
+  }
+
+  let previous = true;
+  let invalidations = 0;
+  for (const current of [false, true]) {
+    if (mediaAuthorizationWasRevoked(previous, current)) invalidations += 1;
+    previous = current;
+  }
+  assert.equal(invalidations, 1, "reapproval cannot undo an already-observed revocation");
 });
 
 test("maybe blocks mapped ties and equipment until each item becomes yes", () => {
@@ -89,9 +109,12 @@ test("persisted negotiation normalization restores and locks the canonical polic
   assert.deepEqual(normalized.find((entry) => entry.id === "neck")?.rank, "no");
   assert.deepEqual(normalized.find((entry) => entry.id === "cuffs")?.rank, "no");
   assert.deepEqual(normalized.find((entry) => entry.id === "gote")?.rank, "no");
-  assert.deepEqual(normalized.find((entry) => entry.id === "custom"), {
-    id: "custom",
-    label: "Custom limit",
-    rank: "no",
-  });
+  assert.deepEqual(
+    normalized.find((entry) => entry.id === "custom"),
+    {
+      id: "custom",
+      label: "Custom limit",
+      rank: "no",
+    },
+  );
 });

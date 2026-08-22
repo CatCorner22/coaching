@@ -812,6 +812,8 @@ export const CameraCapture = memo(function CameraCapture({
       </section>
       <fieldset
         disabled={disabled}
+        data-camera-permissions="true"
+        data-capture-disabled={disabled ? "true" : "false"}
         className="rounded-lg border border-border bg-surface p-3 disabled:opacity-60"
       >
         <legend className="px-1 text-xs uppercase tracking-wide text-subtle">

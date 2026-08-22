@@ -16,7 +16,10 @@ import { useJournal } from "@/lib/stores/journal";
 import { useNegotiate } from "@/lib/stores/negotiate";
 import { useSession } from "@/lib/stores/session";
 import { useSettings } from "@/lib/stores/settings";
-import { buildStudioNegotiationPolicy } from "@/lib/studio/negotiation";
+import {
+  buildStudioNegotiationPolicy,
+  mediaAuthorizationWasRevoked,
+} from "@/lib/studio/negotiation";
 import { listenForWords, playCoachVoice, stopCoachVoice } from "@/lib/voice/play";
 import { DIRECT_CHECK_REMINDER } from "@/lib/voice/reviewed-lines";
 import { buildDeterministic } from "@/lib/ml/predict";
@@ -43,9 +46,10 @@ function StudioPage() {
   const addEntry = useJournal((j) => j.add);
   const removeEntry = useJournal((j) => j.remove);
   const items = useNegotiate((s) => s.items);
-  const [negotiationReady, setNegotiationReady] = useState(() =>
-    useNegotiate.persist.hasHydrated(),
-  );
+  // Persist middleware can finish before React switches from its initial
+  // hydration snapshot to the live store. Keep actions fail-closed until the
+  // mounted effect synchronizes both layers.
+  const [negotiationReady, setNegotiationReady] = useState(false);
   const stopSession = useSession((s) => s.stop);
   const setStep = useSession((s) => s.setStep);
   const setTie = useSession((s) => s.setTie);
@@ -64,6 +68,8 @@ function StudioPage() {
     mediaBlocked: negotiatedMediaBlocked,
   } = negotiationPolicy;
   const mediaBlocked = !negotiationReady || negotiatedMediaBlocked;
+  const mediaAllowed = negotiationReady && !negotiatedMediaBlocked;
+  const previousMediaAllowedRef = useRef(mediaAllowed);
   const captureContextKey = `${tieSlug ?? ""}|${stepIndex}|${furnitureSlug ?? ""}|${negotiationKey}`;
   const [capture, setCapture] = useState<CaptureResult | null>(null);
   const [report, setReport] = useState<CoachReport | null>(null);
@@ -91,6 +97,17 @@ function StudioPage() {
   const tieBlocked = negotiationPolicy.isTieBlocked(tieSlug);
   const furnitureBlocked = negotiationPolicy.isFurnitureBlocked(furnitureSlug);
   const studioVoice = settings.voice && !voiceBlocked;
+  const cameraGateReason = stopped
+    ? "session-stopped"
+    : !negotiationReady
+      ? "negotiation-hydrating"
+      : negotiatedMediaBlocked
+        ? "media-not-approved"
+        : triage === "unanswered"
+          ? "triage-unanswered"
+          : triage !== "none"
+            ? "triage-concern"
+            : "enabled";
 
   useEffect(() => {
     const api = useNegotiate.persist;
@@ -102,11 +119,7 @@ function StudioPage() {
 
   useEffect(() => {
     const invalidateAcrossTabs = (event: StorageEvent) => {
-      if (
-        event.key !== null &&
-        event.key !== "knotty-negotiate" &&
-        event.key !== "knotty-settings"
-      )
+      if (event.key !== null && event.key !== "knotty-negotiate" && event.key !== "knotty-settings")
         return;
       analysisRequestRef.current += 1;
       captureContextAtCommitRef.current = null;
@@ -121,18 +134,22 @@ function StudioPage() {
   useEffect(() => {
     if (tieBlocked || instructorOnlyTie) useSession.getState().setTie(undefined);
     if (furnitureBlocked) useSession.getState().setFurniture(undefined);
-    if (negotiationReady && negotiatedMediaBlocked) {
-      analysisRequestRef.current += 1;
-      stopCoachVoice();
-      captureContextAtCommitRef.current = null;
-      setCapture(null);
-      setReport(null);
-      setObservationReport(null);
-      setAnalysisConsumed(false);
-      setTriage("unanswered");
-      setPending(false);
-    }
-  }, [tieBlocked, instructorOnlyTie, furnitureBlocked, negotiationReady, negotiatedMediaBlocked]);
+  }, [tieBlocked, instructorOnlyTie, furnitureBlocked]);
+
+  useEffect(() => {
+    const previouslyAllowed = previousMediaAllowedRef.current;
+    previousMediaAllowedRef.current = mediaAllowed;
+    if (!mediaAuthorizationWasRevoked(previouslyAllowed, mediaAllowed)) return;
+    analysisRequestRef.current += 1;
+    stopCoachVoice();
+    captureContextAtCommitRef.current = null;
+    setCapture(null);
+    setReport(null);
+    setObservationReport(null);
+    setAnalysisConsumed(false);
+    setTriage("unanswered");
+    setPending(false);
+  }, [mediaAllowed]);
 
   useEffect(() => {
     if (!studioVoice) stopCoachVoice();
@@ -693,15 +710,23 @@ function StudioPage() {
                 Loading negotiation choices…
               </p>
             ) : mediaBlocked ? (
-              <p className="mb-3 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
+              <p
+                role="status"
+                className="mb-3 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger"
+              >
                 Media is not affirmatively approved. Resolve no or maybe together before enabling
                 photo or video capture.
               </p>
             ) : null}
             <fieldset
               disabled={!negotiationReady}
+              data-camera-gate="action-first"
               data-negotiation-ready={negotiationReady ? "true" : "false"}
               data-media-blocked={negotiatedMediaBlocked ? "true" : "false"}
+              data-triage={triage}
+              data-session-stopped={stopped ? "true" : "false"}
+              data-camera-gate-reason={cameraGateReason}
+              data-camera-ready={cameraGateReason === "enabled" ? "true" : "false"}
               className="mb-3 rounded-lg border border-border bg-surface p-3 disabled:opacity-60"
             >
               <legend className="px-1 text-xs uppercase tracking-wide text-subtle">
@@ -734,11 +759,19 @@ function StudioPage() {
                 />
               </div>
             </fieldset>
+            {cameraGateReason === "triage-unanswered" && (
+              <p
+                role="status"
+                className="mb-3 rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted"
+              >
+                Answer the action-first screen for this batch before confirming media permissions.
+              </p>
+            )}
             <CameraCapture
               key={captureContextKey}
               onCapture={acceptCapture}
               onDiscard={discardCapture}
-              disabled={stopped || mediaBlocked || triage !== "none"}
+              disabled={cameraGateReason !== "enabled"}
             />
           </div>
           {capture && captureMatchesContext && (
