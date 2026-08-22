@@ -224,3 +224,46 @@ test("safewords still match when the recognizer punctuates them differently", as
     h.restore();
   }
 });
+
+test("a safeword mentioned inside a sentence does not stop the scene", async () => {
+  // The default safeword is "red", and "red" is also hardcoded alongside any
+  // custom one. Ordinary scene talk therefore stopped the session: "hand me the
+  // red rope", "her marks are going red", "is that red or just pressure".
+  const h = harness();
+  try {
+    const { listenForWords } = await import("./listen.ts");
+    const hits: string[] = [];
+    listenForWords(["red", "banana split"], (word) => hits.push(word));
+    await h.flush();
+    const rec = FakeRecognition.instances[0]!;
+
+    for (const sentence of [
+      "hand me the red rope",
+      "her marks are going red",
+      "is that red or just pressure",
+      "the red one is softer than the jute",
+    ]) {
+      rec.speak(sentence);
+      await h.flush();
+      h.advance(3_000);
+    }
+    assert.deepEqual(hits, [], "conversation must not trigger a stop");
+
+    // Called out, in the forms people actually use, it must still fire.
+    for (const [utterance, expected] of [
+      ["red", "red"],
+      ["red red red", "red"],
+      ["ok red", "red"],
+      ["im calling red", "red"],
+      ["banana split", "banana split"],
+    ] as const) {
+      hits.length = 0;
+      h.advance(3_000);
+      rec.speak(utterance);
+      await h.flush();
+      assert.deepEqual(hits, [expected], `"${utterance}" must be heard`);
+    }
+  } finally {
+    h.restore();
+  }
+});

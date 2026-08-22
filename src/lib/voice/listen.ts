@@ -47,6 +47,15 @@ export function listenForWords(
   rec.interimResults = false;
   rec.lang = "en-US";
   const last = new Map<string, number>();
+  // A safeword is called out, not mentioned in passing. Without this, ordinary
+  // scene talk stopped the session: with a custom safeword the hardcoded "red"
+  // fired on "hand me the red rope" and "her marks are going red", and the
+  // default safeword IS "red", so the same sentences broke it out of the box.
+  // Two words of room around the safeword covers how it is actually said —
+  // "red", "red red red", "ok red", "im calling red" — while a sentence that
+  // merely contains it does not fire.
+  const UTTERANCE_SLACK_WORDS = 2;
+  const wordCount = (value: string) => (value.match(/[a-z0-9]+/gu) ?? []).length;
   // Recognizers are inconsistent about apostrophes and hyphens: the same word
   // arrives as "don't" or "dont", "co-signed" or "co signed". Normalise both
   // sides identically so a safeword spelled either way still matches.
@@ -74,6 +83,7 @@ export function listenForWords(
         if (!needle) continue;
         const re = new RegExp(`(?:^|[^a-z0-9])${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:[^a-z0-9]|$)`);
         if (!re.test(t)) continue;
+        if (wordCount(t) > wordCount(needle) + UTTERANCE_SLACK_WORDS) continue;
         if ((last.get(w) ?? 0) + 2500 > now) continue;
         last.set(w, now);
         onHit(w);

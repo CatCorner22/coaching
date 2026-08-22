@@ -650,8 +650,8 @@ function StudioPage() {
               : "Enable optional mic word detection for this session"}
           </button>
           <span className="ml-2" role="status" aria-live="polite">
-            Status: {micStatus}. It can only surface configured red/yellow words; convenience only,
-            never a safety control.
+            Status: {micStatus}. It surfaces your configured words plus a called-out "red" or
+            "yellow"; convenience only, never a safety control.
           </span>
         </div>
       )}
