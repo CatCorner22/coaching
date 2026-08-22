@@ -377,9 +377,13 @@ export const analyzeRope = createServerFn({ method: "POST" })
             hardLimit: admitted.hardLimit,
             invented:
               parsed.data.audit.nonvisual_inference || parsed.data.audit.exact_identification,
+            // App-authored only. The model's own audit note was transported to
+            // the client on every successful classification although no UI
+            // renders it — free-form provider prose crossing the boundary for
+            // no purpose. Its flags are still honoured above.
             note: admitted.hardLimit
               ? "Remote output reported a prohibited inference. High-consequence categories were kept; the rest was discarded."
-              : sanitizeQuestion(parsed.data.audit.note, 240),
+              : "Remote classification completed within the closed contract.",
           };
         }
       }

@@ -327,3 +327,39 @@ test("withdrawing an attestation only claims a discard when work existed", () =>
   assert.match(withdraw, /const hadPendingWork =/);
   assert.match(withdraw, /if \(hadPendingWork\) \{[\s\S]*?onDiscard\(\);/);
 });
+
+test("every test file on disk is registered in an npm test script", async () => {
+  const { readdirSync, statSync } = await import("node:fs");
+  const pkg = JSON.parse(read("package.json"));
+  // Platform-owned chrome that this app must not modify. Its injector resolves
+  // src/lib/og/site.json from process.cwd(), so 8 of its 47 cases assert
+  // template defaults and fail from the repo root. Excluded deliberately, not
+  // by omission; every app-owned test file must still be registered.
+  const PLATFORM_OWNED = ["scripts/grok-pwa-plugin.test.mjs"];
+  const registered = [
+    pkg.scripts["test:scripts"],
+    pkg.scripts["test:typed-core"],
+    pkg.scripts["test:stores"],
+  ].join(" ");
+
+  const found = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir)) {
+      if (entry === "node_modules" || entry.startsWith(".")) continue;
+      const full = `${dir}/${entry}`;
+      if (statSync(full).isDirectory()) walk(full);
+      else if (/\.test\.(mjs|ts)$/.test(entry)) found.push(full.replace(/^\.\//, ""));
+    }
+  };
+  walk("scripts");
+  walk("src");
+
+  const missing = found
+    .filter((file) => !PLATFORM_OWNED.includes(file))
+    .filter((file) => !registered.includes(file));
+  assert.deepEqual(
+    missing,
+    [],
+    `these test files exist but no npm script runs them: ${missing.join(", ")}`,
+  );
+});

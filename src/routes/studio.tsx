@@ -868,7 +868,11 @@ function StudioPage() {
                 notes: contextBoundReport.final.coaching.slice(0, 280),
                 flags: contextBoundReport.final.flags.map((flag) => flag.code),
                 disposition: contextBoundObservationReport.disposition,
-                limitations: contextBoundObservationReport.limitations.slice(0, 3),
+                // The store bounds this to 6. Truncating to 3 here dropped the
+                // resize caveat and the "remote classification did not
+                // complete — insufficient view" disclosure, which is exactly
+                // the caveat a saved report must carry.
+                limitations: contextBoundObservationReport.limitations.slice(0, 6),
                 sourceIds: contextBoundObservationReport.source_ids,
               });
               setSavedEntryId(entryId);
