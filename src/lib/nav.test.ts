@@ -36,3 +36,16 @@ test("isActive claims detail routes for their section without over-matching", ()
   assert.equal(isActive("/tie/karada", "/knowledge"), false);
   assert.equal(isActive("/studio", "/library"), false);
 });
+
+test("the emergency card is the first item behind the More sheet", () => {
+  // On a phone every MORE destination is behind one sheet, and measured at
+  // 390x844 Emergency sat 12th of 13 — between Rope calc and Settings. It is
+  // the only time-critical route in the list, so it opens the sheet.
+  assert.equal(MORE[0]?.to, "/emergency");
+  assert.equal(MORE.filter((item) => item.to === "/emergency").length, 1);
+  // It must not also be in the bottom bar, or the two would disagree. Widened
+  // because the literal union already excludes it today — this keeps the check
+  // meaningful if the bottom bar ever gains the route.
+  const navRoutes: readonly { to: string }[] = NAV;
+  assert.equal(navRoutes.filter((item) => item.to === "/emergency").length, 0);
+});
