@@ -501,9 +501,9 @@ function normalizeMatches(matches: ModelCategoryMatch[], allowedFrameIds: readon
   for (const [index, match] of matches.slice(0, 12).entries()) {
     if (!isCanonicalId(match?.canonical_id)) continue;
     // The capture flow assigns frame labels but never receives user-attested
-    // chronology. A transition label therefore cannot satisfy its ontology
-    // discriminator and is replaced by a per-frame abstention below.
-    if (match.canonical_id === "transition_across_frames_possible") continue;
+    // chronology, so a transition match keeps its C3 consequence routing while
+    // abstaining on chronology below. Deleting it here would silently degrade
+    // an instructor-route signal to an ordinary insufficient view.
     const frameId = normalizeFrameId(match?.frame_id, index);
     if (!allowed.has(frameId)) continue;
     const key = `${frameId}:${match.canonical_id}`;
@@ -809,7 +809,9 @@ export function validateObservationReport(
       }
       if (
         category.canonical_id === "transition_across_frames_possible" &&
-        report.media_quality?.chronology !== "user_labeled"
+        report.media_quality?.chronology !== "user_labeled" &&
+        (category.evidence_state === "observed" ||
+          category.abstain_reason !== "chronology_unknown")
       ) {
         issues.push("transition evidence requires user-labeled chronology");
       }
