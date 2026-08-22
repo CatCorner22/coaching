@@ -155,6 +155,26 @@ const SEARCH_ALIASES: Readonly<Record<string, string>> = {
   "article:photography-ethics":
     "secret recording coercion privacy deletion revoke permission sharing retention minor underage under 18 teen ambiguous age nude naked explicit image explicit photo unsupported media",
   "article:safewords": "red yellow safeword safe word stop signal nonverbal signal",
+  "article:positional-asphyxia":
+    "prone face down facedown chest compression can't expand chest belly compression folded position hogtie breathing position restricted breathing positional asphyxia",
+  "article:gag-signal-safety":
+    "ball gag gagged mouth covered tape over mouth nose blocked congestion stuffy nose drop signal held object nonverbal safeword",
+  "article:nerve-self-checks":
+    "hand check finger check thumbs up ok sign wiggle fingers grip strength tingling fingers sleepy hand numb patch self check",
+  "article:circulation-vs-nerve":
+    "cold hand whole hand numb part of hand few fingers purple hand swollen hand pins and needles which is it circulation or nerve",
+  "article:fainting-response":
+    "faint fainting fainted lightheaded light-headed dizzy woozy tunnel vision graying vision nausea standing too long vasovagal syncope suspension syndrome",
+  "article:cuff-and-collar-fit":
+    "cuff cuffs handcuff leather cuff two finger fit collar leash spreader bar padlock key quick release too tight",
+  "article:solo-self-tying":
+    "self tie self-tie solo alone by myself self bondage self-bondage practice alone escape release plan",
+  "article:medical-disclosure":
+    "health condition medical history diabetes neuropathy blood thinner anticoagulant ehlers danlos hypermobile asthma seizure epilepsy pregnant pregnancy medication disclosure",
+  "article:rope-inspection-retirement":
+    "inspect inspection fray frayed fuzzy worn core damage retire retirement wash washing store storage mildew",
+  "article:incident-response":
+    "injury injured hurt after injury wrist drop weak hand still numb next day doctor urgent care report debrief what happened",
   "gear:shears":
     "trauma shears emergency release cut rope cut rope now rapid release unresponsive passed out seizure serious fall ロープを切る 緊急 切断 意識がない 失神 痙攣 転倒 绳索 紧急 切断绳索 昏倒 无反应 癫痫发作 摔倒",
   "tie:takate-kote": "tk takatekote takate kote box tie box-tie",
@@ -743,11 +763,25 @@ const ACTION_HIT_ALLOWLIST: Record<
   Exclude<KnowledgeDispositionKind, "ordinary">,
   ReadonlySet<string>
 > = {
-  emergency: new Set(["article:emergency-stop", "article:hard-limits", "gear:shears"]),
-  prompt_medical: new Set(["article:emergency-stop", "article:hard-limits"]),
+  emergency: new Set([
+    "article:emergency-stop",
+    "article:hard-limits",
+    "article:positional-asphyxia",
+    "article:fainting-response",
+    "gear:shears",
+  ]),
+  prompt_medical: new Set([
+    "article:emergency-stop",
+    "article:hard-limits",
+    "article:positional-asphyxia",
+    "article:fainting-response",
+    "article:incident-response",
+  ]),
   release_now: new Set([
     "article:circulation",
     "article:nerve-atlas",
+    "article:nerve-self-checks",
+    "article:circulation-vs-nerve",
     "article:emergency-stop",
     "gear:shears",
   ]),

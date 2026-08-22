@@ -610,3 +610,89 @@ test("curated answers are deterministic and available without a server or AI", (
   assert.equal(answer, knowledgeAnswer("coercion"));
   assert.match(knowledgeAnswer("zzzzqvvvv"), /No curated local entry matched/);
 });
+
+test("expansion safety articles are discoverable through natural wording", () => {
+  assert.ok(
+    searchKnowledge("positional asphyxia", 8).some((hit) => hit.slug === "positional-asphyxia"),
+  );
+  assert.ok(
+    searchKnowledge("prone position restricted breathing", 8).some(
+      (hit) => hit.slug === "positional-asphyxia",
+    ),
+  );
+  assert.ok(
+    searchKnowledge("ball gag stuffy nose", 8).some((hit) => hit.slug === "gag-signal-safety"),
+  );
+  assert.ok(
+    searchKnowledge("self bondage alone", 8).some((hit) => hit.slug === "solo-self-tying"),
+  );
+  assert.ok(
+    searchKnowledge("blood thinner disclosure", 8).some((hit) => hit.slug === "medical-disclosure"),
+  );
+  assert.ok(
+    searchKnowledge("frayed rope retire", 8).some(
+      (hit) => hit.slug === "rope-inspection-retirement",
+    ),
+  );
+  assert.ok(
+    searchKnowledge("debrief what happened injury", 8).some(
+      (hit) => hit.slug === "incident-response",
+    ),
+  );
+  assert.ok(searchKnowledge("padded cuffs", 8).some((hit) => hit.slug === "cuffs"));
+  assert.ok(searchKnowledge("collar leash", 8).some((hit) => hit.slug === "collar"));
+});
+
+test("expansion safety articles carry source anchors and honest notes", () => {
+  for (const slug of [
+    "positional-asphyxia",
+    "gag-signal-safety",
+    "nerve-self-checks",
+    "circulation-vs-nerve",
+    "fainting-response",
+    "cuff-and-collar-fit",
+    "solo-self-tying",
+    "medical-disclosure",
+    "rope-inspection-retirement",
+    "incident-response",
+  ]) {
+    const evidence = getArticleEvidence(slug);
+    assert.equal(evidence.status, "source_anchored", slug);
+    assert.ok(evidence.sourceIds.length > 0, slug);
+  }
+  assert.ok(getArticleEvidence("positional-asphyxia").sourceIds.includes("ASPHYX-1"));
+  assert.ok(getArticleEvidence("fainting-response").sourceIds.includes("SYNCOPE-1"));
+  assert.ok(getArticleEvidence("medical-disclosure").sourceIds.includes("CONSENT-3"));
+});
+
+test("emergency routing still leads with action-first guidance beside expansion entries", () => {
+  const hits = searchKnowledge("not breathing", 6);
+  assert.equal(hits[0]?.slug, "emergency-stop");
+  assert.ok(hits.slice(0, 3).some((hit) => hit.slug === "shears"));
+  for (const hit of hits) {
+    assert.ok(
+      [
+        "emergency-stop",
+        "hard-limits",
+        "positional-asphyxia",
+        "fainting-response",
+        "shears",
+      ].includes(hit.slug),
+      `unexpected emergency result ${hit.slug}`,
+    );
+  }
+  const release = searchKnowledge("fingers are numb", 8);
+  for (const hit of release) {
+    assert.ok(
+      [
+        "circulation",
+        "nerve-atlas",
+        "nerve-self-checks",
+        "circulation-vs-nerve",
+        "emergency-stop",
+        "shears",
+      ].includes(hit.slug),
+      `unexpected release result ${hit.slug}`,
+    );
+  }
+});

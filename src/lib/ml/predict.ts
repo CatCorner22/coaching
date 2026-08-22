@@ -66,6 +66,9 @@ export function buildDeterministic(
   notes.push(`An unvalidated color/edge heuristic marked ${wrapBands.length} possible horizontal rope-like feature${wrapBands.length === 1 ? "" : "s"}.`);
   notes.push("The app does not use skin color to localize a body or hands and does not infer physiology.");
   if ((last?.ropeShare ?? 0) < 0.01) notes.push("Very little rope-colored signal was visible; an image may not be useful.");
+  if ((last?.ropeShare ?? 0) > 0.5 && wrapBands.length === 0) {
+    notes.push("Rope-colored area dominates this view without band structure; skin, clothing, or furniture may be filling the frame rather than rope.");
+  }
 
   return {
     wrapCount: wrapBands.length,

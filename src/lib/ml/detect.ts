@@ -47,12 +47,30 @@ export function observeFrame(
 
   const sampled = Math.max(1, Math.ceil(width / step) * Math.ceil(height / step));
   const series = smooth(Array.from(rowRope), 7);
-  const wrapBands: WrapBand[] = findPeaks(series, 0.4)
-    .filter((peak) => peak.value > 2)
-    .map((peak) => ({
-      yNorm: peak.index / Math.max(1, height),
-      strength: peak.value,
-    }));
+
+  // Structure gate: rope reads as a few thin horizontal bands. Skin, clothing
+  // and lingerie fabric, furniture, and walls read as tall blobs. Natural-fiber
+  // rope overlaps skin in color space, so geometry — not pixel color — is the
+  // only local separator, and both gates fail toward "no band" on ambiguity.
+  const coverage = ropeN / sampled;
+  const saturated = coverage > 0.5;
+  const maxBandRows = Math.max(6, Math.round(height * 0.09));
+  const bandIsThin = (peak: { index: number; value: number }) => {
+    const floor = peak.value * 0.6;
+    let rows = 1;
+    for (let j = peak.index - 1; j >= 0 && series[j]! >= floor; j--) rows++;
+    for (let j = peak.index + 1; j < series.length && series[j]! >= floor; j++) rows++;
+    return rows <= maxBandRows;
+  };
+
+  const wrapBands: WrapBand[] = saturated
+    ? []
+    : findPeaks(series, 0.4)
+        .filter((peak) => peak.value > 2 && bandIsThin(peak))
+        .map((peak) => ({
+          yNorm: peak.index / Math.max(1, height),
+          strength: peak.value,
+        }));
 
   return {
     width,

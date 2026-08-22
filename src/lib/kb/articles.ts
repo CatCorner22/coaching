@@ -1,5 +1,6 @@
 import type { Article } from "./types";
 import { MORE_ARTICLES } from "./more-articles";
+import { EXPANSION_ARTICLES } from "./expansion-articles";
 
 const CORE_ARTICLES: Article[] = [
   {
@@ -549,7 +550,7 @@ const CORE_ARTICLES: Article[] = [
   },
 ];
 
-export const ARTICLES: Article[] = [...CORE_ARTICLES, ...MORE_ARTICLES];
+export const ARTICLES: Article[] = [...CORE_ARTICLES, ...MORE_ARTICLES, ...EXPANSION_ARTICLES];
 
 export function getArticle(slug: string) {
   return ARTICLES.find((a) => a.slug === slug);
