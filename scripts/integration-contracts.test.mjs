@@ -371,3 +371,32 @@ test("every test file on disk is registered in an npm test script", async () => 
     `these test files exist but no npm script runs them: ${missing.join(", ")}`,
   );
 });
+
+test("the backgrounding hint tracks a real in-flight import, not any past one", () => {
+  const camera = read("src/components/camera-capture.tsx");
+  // The controller ref is never nulled, so testing it for null reported "in
+  // flight" forever after the first import and every later app switch claimed
+  // work had been lost.
+  assert.match(camera, /const mediaOperationActiveRef = useRef\(false\)/);
+  assert.match(camera, /const hadMediaOperation = mediaOperationActiveRef\.current;/);
+  assert.doesNotMatch(camera, /hadMediaOperation = mediaOperationRef\.current !== null/);
+  // Set when an operation starts, cleared when it settles and at every abort.
+  assert.match(camera, /mediaOperationRef\.current = controller;\s*\n\s*mediaOperationActiveRef\.current = true;/);
+  const aborts = camera.match(/mediaOperationRef\.current\?\.abort\(\);/g) ?? [];
+  const clears = camera.match(/mediaOperationActiveRef\.current = false;/g) ?? [];
+  assert.ok(
+    clears.length >= aborts.length,
+    `every abort site must clear the in-flight flag (${aborts.length} aborts, ${clears.length} clears)`,
+  );
+});
+
+test("the clip-still commit cannot fire while a file import is validating", () => {
+  const camera = read("src/components/camera-capture.tsx");
+  // Validation now precedes clearing the pending stills, which leaves the
+  // panel on screen during the read; the commit must be disabled in that
+  // window or a tap commits stale stills and drops the chosen photo.
+  assert.match(
+    camera,
+    /!selectedFrames\.length \|\| busy \|\| recording \|\| disabled \|\| !permissionsReady/,
+  );
+});
