@@ -55,6 +55,10 @@ export function observeFrame(
   const coverage = ropeN / sampled;
   const saturated = coverage > 0.5;
   const maxBandRows = Math.max(6, Math.round(height * 0.09));
+  // A real wrap crosses a meaningful share of the row; scattered pixels that
+  // leak past the color exclusions on noisy skin or fabric do not.
+  const sampledCols = Math.ceil(width / step);
+  const minBandStrength = Math.max(2, sampledCols * 0.22);
   const bandIsThin = (peak: { index: number; value: number }) => {
     const floor = peak.value * 0.6;
     let rows = 1;
@@ -66,7 +70,7 @@ export function observeFrame(
   const wrapBands: WrapBand[] = saturated
     ? []
     : findPeaks(series, 0.4)
-        .filter((peak) => peak.value > 2 && bandIsThin(peak))
+        .filter((peak) => peak.value > minBandStrength && bandIsThin(peak))
         .map((peak) => ({
           yNorm: peak.index / Math.max(1, height),
           strength: peak.value,
