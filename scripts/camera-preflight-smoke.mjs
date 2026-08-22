@@ -58,7 +58,9 @@ try {
       await enter.click();
     }
 
-    const noConcern = page.getByRole("radio").first();
+    const noConcern = page.getByRole("radio", {
+      name: /^No urgent symptom, coercion or secret-recording concern/,
+    });
     await noConcern.waitFor({ state: "visible", timeout: 10_000 });
     await noConcern.check();
     await page.evaluate(() => {
