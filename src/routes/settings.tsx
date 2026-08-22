@@ -89,7 +89,7 @@ function SettingsPage() {
           While armed, Knotty listens only for the configured red/yellow words and suppresses its
           own speech to reduce feedback.
         </p>
-        <Button variant="outline" onClick={() => s.set({ consented: false })}>
+        <Button variant="outline" onClick={() => s.resetConsent()}>
           Reset consent gate
         </Button>
         <section className="rounded-lg border border-border bg-surface p-4">

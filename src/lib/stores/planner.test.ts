@@ -74,3 +74,35 @@ test("clampRopeCount rejects non-finite, negative, and oversized persisted value
   assert.equal(clampRopeCount(8, 2), 8);
   assert.equal(clampRopeCount(null, 2), 2);
 });
+
+test("storageEventTargetsKey rehydrates on a matching key or a full clear only", async () => {
+  const { storageEventTargetsKey } = await import("./persist.ts");
+  assert.equal(storageEventTargetsKey("knotty-negotiate", "knotty-negotiate"), true);
+  assert.equal(storageEventTargetsKey(null, "knotty-negotiate"), true); // storage.clear()
+  assert.equal(storageEventTargetsKey("knotty-settings", "knotty-negotiate"), false);
+  assert.equal(storageEventTargetsKey("some-other-app-key", "knotty-negotiate"), false);
+});
+
+test("syncPersistedAcrossTabs rehydrates when another tab rewrites the same key", async () => {
+  const { syncPersistedAcrossTabs } = await import("./persist.ts");
+  const listeners: Array<(e: { key: string | null }) => void> = [];
+  const originalWindow = (globalThis as { window?: unknown }).window;
+  (globalThis as { window?: unknown }).window = {
+    addEventListener: (type: string, cb: (e: { key: string | null }) => void) => {
+      if (type === "storage") listeners.push(cb);
+    },
+  };
+  try {
+    let rehydrated = 0;
+    syncPersistedAcrossTabs("knotty-negotiate", () => {
+      rehydrated += 1;
+    });
+    assert.equal(listeners.length, 1);
+    listeners[0]!({ key: "knotty-negotiate" });
+    listeners[0]!({ key: null });
+    listeners[0]!({ key: "unrelated" });
+    assert.equal(rehydrated, 2);
+  } finally {
+    (globalThis as { window?: unknown }).window = originalWindow;
+  }
+});

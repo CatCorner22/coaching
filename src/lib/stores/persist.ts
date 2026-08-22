@@ -66,6 +66,34 @@ export function safeJsonStorage<State>(): PersistStorage<State> {
   })!;
 }
 
+/**
+ * Whether a `storage` event should trigger a rehydrate for the store at `name`.
+ * A null key means the whole store was cleared (storage.clear()); a matching
+ * key means another tab rewrote this store. Same-key writes from other tabs are
+ * exactly the consent-revocation case that must propagate here.
+ */
+export function storageEventTargetsKey(eventKey: string | null, name: string): boolean {
+  return eventKey === null || eventKey === name;
+}
+
+/**
+ * Rehydrate a persisted store when another tab rewrites its key, so a consent
+ * revocation in one tab cannot be silently overwritten by a stale tab's later
+ * write. Rehydrate only reads storage into state (it never writes), so there is
+ * no cross-tab feedback loop. No-op outside the browser.
+ */
+export function syncPersistedAcrossTabs(name: string, rehydrate: () => void): void {
+  if (typeof window === "undefined" || typeof window.addEventListener !== "function") return;
+  window.addEventListener("storage", (event) => {
+    if (!storageEventTargetsKey(event.key, name)) return;
+    try {
+      rehydrate();
+    } catch {
+      // Best effort: a failed rehydrate leaves the current in-memory state.
+    }
+  });
+}
+
 /** Copy a legacy persisted blob to its current key without overwriting newer data. */
 export function adoptPersistKey(next: string, previous: string) {
   const storage = safeBrowserStorage();

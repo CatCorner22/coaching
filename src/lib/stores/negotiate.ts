@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { adoptPersistKey, safeJsonStorage } from "./persist";
+import { adoptPersistKey, safeJsonStorage, syncPersistedAcrossTabs } from "./persist";
 
 export type Rank = "yes" | "maybe" | "no";
 
@@ -147,3 +147,9 @@ export const useNegotiate = create<State>()(
     },
   ),
 );
+
+// Propagate a limit revocation (including the media-gating "photos" yes) from
+// another tab instead of letting a stale tab's later write resurrect it.
+syncPersistedAcrossTabs("knotty-negotiate", () => {
+  void useNegotiate.persist.rehydrate();
+});
