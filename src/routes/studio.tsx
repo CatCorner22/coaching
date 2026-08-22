@@ -82,6 +82,7 @@ function StudioPage() {
     "idle" | "starting" | "active" | "error" | "unsupported"
   >("idle");
   const analysisRequestRef = useRef(0);
+  const mountedRef = useRef(true);
   const currentContextRef = useRef(captureContextKey);
   const captureContextAtCommitRef = useRef<string | null>(null);
   currentContextRef.current = captureContextKey;
@@ -96,13 +97,25 @@ function StudioPage() {
     const finish = () => setNegotiationReady(true);
     const unsubscribe = api.onFinishHydration(finish);
     if (api.hasHydrated()) finish();
-    // Block on the fail-closed defaults rather than wedging the Studio if
-    // browser storage is unavailable and hydration never reports completion.
-    const timeout = window.setTimeout(finish, 250);
-    return () => {
-      unsubscribe();
-      window.clearTimeout(timeout);
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const invalidateAcrossTabs = (event: StorageEvent) => {
+      if (
+        event.key !== null &&
+        event.key !== "knotty-negotiate" &&
+        event.key !== "knotty-settings"
+      )
+        return;
+      analysisRequestRef.current += 1;
+      captureContextAtCommitRef.current = null;
+      micArmedRef.current = false;
+      stopCoachVoice();
+      window.location.reload();
     };
+    window.addEventListener("storage", invalidateAcrossTabs);
+    return () => window.removeEventListener("storage", invalidateAcrossTabs);
   }, []);
 
   useEffect(() => {
@@ -110,6 +123,7 @@ function StudioPage() {
     if (furnitureBlocked) useSession.getState().setFurniture(undefined);
     if (negotiationReady && negotiatedMediaBlocked) {
       analysisRequestRef.current += 1;
+      stopCoachVoice();
       captureContextAtCommitRef.current = null;
       setCapture(null);
       setReport(null);
@@ -127,13 +141,20 @@ function StudioPage() {
   useEffect(() => {
     if (search.tie) {
       const requestedTie = getTie(search.tie);
-      setTie(requestedTie && requestedTie.minutes[1] > 0 ? search.tie : undefined);
+      setTie(
+        negotiationReady &&
+          requestedTie &&
+          requestedTie.minutes[1] > 0 &&
+          !negotiationPolicy.isTieBlocked(search.tie)
+          ? search.tie
+          : undefined,
+      );
     }
     if (!useSession.getState().startedAt) startSession();
     useSession.getState().tick(Date.now());
     const id = window.setInterval(() => useSession.getState().tick(Date.now()), 1000);
     return () => window.clearInterval(id);
-  }, [search.tie, setTie, startSession]);
+  }, [negotiationPolicy, negotiationReady, search.tie, setTie, startSession]);
 
   const stopAlertRef = useRef<HTMLDivElement>(null);
 
@@ -171,6 +192,7 @@ function StudioPage() {
     setPending(false);
     setAnalysisError(null);
     if (contextChanged && capture) {
+      stopCoachVoice();
       captureContextAtCommitRef.current = null;
       setCapture(null);
       setReport(null);
@@ -217,7 +239,17 @@ function StudioPage() {
     stopAlertRef.current?.focus();
   }, [stopped]);
 
-  useEffect(() => () => stopCoachVoice(), []);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      analysisRequestRef.current += 1;
+      currentContextRef.current = "";
+      captureContextAtCommitRef.current = null;
+      micArmedRef.current = false;
+      stopCoachVoice();
+    };
+  }, []);
 
   useEffect(() => {
     if (!det || !capture) return;
@@ -284,7 +316,31 @@ function StudioPage() {
     );
   }, [capture, triage, stopSession]);
 
+  function chooseTriage(next: TriageState) {
+    analysisRequestRef.current += 1;
+    stopCoachVoice();
+    setPending(false);
+    setAnalysisError(null);
+    if (next !== "none") {
+      micArmedRef.current = false;
+      setMicArmed(false);
+      setMicStatus("idle");
+      setReport(null);
+      setSavedReportRevision(null);
+      setAnalysisConsumed(true);
+      stopSession(
+        next === "emergency"
+          ? "medical-emergency"
+          : next === "prompt_medical"
+            ? "medical"
+            : "consent",
+      );
+    }
+    setTriage(next);
+  }
+
   async function runAnalyze() {
+    if (!mountedRef.current) return;
     if (!capture || !det) return;
     if (authEnabled && !currentUser) {
       setAnalysisError("Sign in before sending selected stills to xAI.");
@@ -321,10 +377,13 @@ function StudioPage() {
           consent: capture.consent,
         },
       });
+      const liveNegotiationPolicy = buildStudioNegotiationPolicy(useNegotiate.getState().items);
       if (
+        !mountedRef.current ||
         request !== analysisRequestRef.current ||
         requestContext !== currentContextRef.current ||
         captureContextAtCommitRef.current !== requestContext ||
+        liveNegotiationPolicy.mediaBlocked ||
         useSession.getState().stopped
       )
         return;
@@ -339,31 +398,36 @@ function StudioPage() {
           res.selfAudit.hardLimit
         ) {
           stopSession("observation");
-        } else if (studioVoice && !micArmedRef.current) {
-          void playCoachVoice(res.report.final.speak, studioVoice);
+        } else if (
+          useSettings.getState().voice &&
+          !liveNegotiationPolicy.voiceBlocked &&
+          !micArmedRef.current
+        ) {
+          void playCoachVoice(res.report.final.speak, true);
         }
       } else {
         setAnalysisError(res.error || "The analysis could not be completed.");
-        // The server sets this flag only when admission failed before any
-        // provider request and the replay reservation was rolled back. Never
-        // reopen a batch after an ambiguous network/provider outcome or replay.
+        // Only a server-declared retryable admission denial before durable
+        // reservation can reopen this batch. Never reopen after reservation,
+        // selected-media dispatch, an ambiguous outcome, or replay.
         if (res.retryableBeforeProvider && res.providerAttempted === false) {
           setAnalysisConsumed(false);
         }
       }
     } catch (cause) {
-      if (request === analysisRequestRef.current) {
+      if (mountedRef.current && request === analysisRequestRef.current) {
         setAnalysisError(
           cause instanceof Error ? cause.message : "The analysis could not be completed.",
         );
       }
     } finally {
-      if (request === analysisRequestRef.current) setPending(false);
+      if (mountedRef.current && request === analysisRequestRef.current) setPending(false);
     }
   }
 
   const acceptCapture = useCallback((next: CaptureResult) => {
     analysisRequestRef.current += 1;
+    stopCoachVoice();
     captureContextAtCommitRef.current = currentContextRef.current;
     setPending(false);
     setAnalysisError(null);
@@ -380,6 +444,7 @@ function StudioPage() {
 
   const discardCapture = useCallback(() => {
     analysisRequestRef.current += 1;
+    stopCoachVoice();
     captureContextAtCommitRef.current = null;
     setPending(false);
     setAnalysisError(null);
@@ -505,8 +570,11 @@ function StudioPage() {
             id="studio-tie"
             className="mt-1 h-11 w-full rounded-md border border-border bg-elevated px-3 text-sm"
             value={tieSlug ?? ""}
-            disabled={stopped}
-            onChange={(e) => setTie(e.target.value || undefined)}
+            disabled={stopped || pending}
+            onChange={(e) => {
+              if (useSession.getState().stopped || pending) return;
+              setTie(e.target.value || undefined);
+            }}
           >
             <option value="">Freeform</option>
             {TIES.map((t) => (
@@ -534,8 +602,11 @@ function StudioPage() {
             id="studio-surface"
             className="mt-1 h-11 w-full rounded-md border border-border bg-elevated px-3 text-sm"
             value={furnitureSlug ?? ""}
-            disabled={stopped}
-            onChange={(e) => setFurniture(e.target.value || undefined)}
+            disabled={stopped || pending}
+            onChange={(e) => {
+              if (useSession.getState().stopped || pending) return;
+              setFurniture(e.target.value || undefined);
+            }}
           >
             <option value="">Floor / bed</option>
             {DUNGEON.map((d) => (
@@ -629,6 +700,8 @@ function StudioPage() {
             ) : null}
             <fieldset
               disabled={!negotiationReady}
+              data-negotiation-ready={negotiationReady ? "true" : "false"}
+              data-media-blocked={negotiatedMediaBlocked ? "true" : "false"}
               className="mb-3 rounded-lg border border-border bg-surface p-3 disabled:opacity-60"
             >
               <legend className="px-1 text-xs uppercase tracking-wide text-subtle">
@@ -641,22 +714,22 @@ function StudioPage() {
               <div className="space-y-2 text-xs text-fg">
                 <TriageOption
                   checked={triage === "none"}
-                  onChange={() => setTriage("none")}
+                  onChange={() => chooseTriage("none")}
                   label="No urgent symptom, coercion or secret-recording concern, unconsented bystander, or unresolved media-permission issue is being reported. This is not safety clearance."
                 />
                 <TriageOption
                   checked={triage === "prompt_medical"}
-                  onChange={() => setTriage("prompt_medical")}
+                  onChange={() => chooseTriage("prompt_medical")}
                   label="After release, a symptom such as numbness, weakness, pain, swelling, discoloration, temperature change, dizziness, or loss of function is persistent or worsening."
                 />
                 <TriageOption
                   checked={triage === "emergency"}
-                  onChange={() => setTriage("emergency")}
+                  onChange={() => chooseTriage("emergency")}
                   label="There is abnormal breathing, unresponsiveness, seizure, chest pain, a serious fall, stroke-like signs, major weakness, severe confusion, or concerning symptoms after neck pressure."
                 />
                 <TriageOption
                   checked={triage === "coercion_or_secret_recording"}
-                  onChange={() => setTriage("coercion_or_secret_recording")}
+                  onChange={() => chooseTriage("coercion_or_secret_recording")}
                   label="There is coercion, secret recording, unclear adult status, absent or revoked permission, or an unconsented bystander."
                 />
               </div>
@@ -755,9 +828,11 @@ function StudioPage() {
           <p className="text-xs leading-relaxed text-subtle">
             Captures stay in page memory until replaced, stopped, or the page closes; the journal
             never saves them. One Analyze request sends only selected compressed stills and generic
-            frame labels to xAI. Already-transmitted data cannot be recalled and may be retained
-            under workspace settings. Closed consequence floors can force a stop or instructor
-            route, but model misses remain possible and no report is clearance.
+            frame labels to xAI. A fixed, non-sensitive request must first confirm zero data
+            retention, and the selected-media response must confirm it again before the app reads
+            the body. A missing confirmation is discarded, but an already-initiated request cannot
+            be recalled. Closed consequence floors can force a stop or instructor route, but model
+            misses remain possible and no report is clearance.
           </p>
         </div>
       </div>

@@ -260,6 +260,7 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
     /\b(?:breathless|short of breath|shortness of breath|struggling for breath|gasping|suffocat(?:e|ed|ing))\b/u.test(text) ||
     /\b(?:can't|cant|cannot|unable to)\s+(?:get (?:enough )?air|speak)\b/u.test(text) ||
     /\b(?:barely|labou?red|shallow|agonal|irregular)\s+breathing\b/u.test(text) ||
+    /\bno\s+breathing\b/u.test(text) ||
     /\bwheez(?:e|ed|ing)\b[^.!?]{0,32}\b(?:can't|cant|cannot|unable to)\s+speak\b/u.test(text) ||
     /\b(?:gasping for air|(?:can't|cant|cannot|unable to) catch (?:their |his |her |my )?breath)\b/u.test(text) ||
     includesAny(text, [
@@ -278,7 +279,7 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
     ]);
   const chokingEmergency = /\bchok(?:e|ed|ing)\b/u.test(text);
   const responsivenessEmergency =
-    /\b(?:passed out|pass(?:es|ed|ing)? out|fainted|fainting|unconscious|unresponsive|out cold|not conscious|not responding|not responsive|lost consciousness|loss of consciousness|blackout|blacked out|collapsed?|won't wake(?: up)?|will not wake(?: up)?|does not wake(?: up)?|(?:can't|cant|cannot|unable to) (?:wake|awaken)(?: (?:them|him|her|me))?(?: up)?|(?:can't|cant|cannot|unable to) stay awake|not waking(?: up)?)\b/u.test(
+    /\b(?:passed out|pass(?:es|ed|ing)? out|fainted|fainting|unconscious|unresponsive|out cold|knocked out|not conscious|not awake|not responding|not responsive|stopped responding|lost consciousness|loss of consciousness|blackout|blacked out|collapsed?|won't wake(?: up)?|will not wake(?: up)?|does not wake(?: up)?|(?:can't|cant|cannot|unable to) (?:wake|awaken)(?: (?:them|him|her|me))?(?: up)?|(?:can't|cant|cannot|unable to) stay (?:awake|conscious)|not waking(?: up)?)\b/u.test(
       text,
     ) ||
     includesAny(text, [
@@ -300,12 +301,17 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
     includesAny(text, ["けいれん", "痙攣", "癫痫发作", "抽搐", "발작"]);
   const chestPainEmergency = /\bchest pain\b/u.test(text) || includesAny(text, ["胸痛", "흉통"]);
   const cardiacEmergency =
-    /\b(?:cardiac arrest|heart attack|heart (?:has )?stopped|no pulse|pulseless)\b/u.test(text);
+    /\b(?:cardiac arrest|heart attack|heart (?:has )?stopped|no (?:pulse|heart ?beat)|pulseless)\b/u.test(
+      text,
+    );
   const bleedingEmergency =
     /\b(?:severe|serious|heavy|major|uncontrolled|won't stop|will not stop)\s+bleed(?:ing)?\b/u.test(text) ||
     /\bbleed(?:ing)?\s+(?:profusely|heavily|severely|uncontrollably)\b/u.test(text) ||
     /\bbleed(?:ing)?\b[^.!?]{0,24}\b(?:won't|will not|does not)\s+stop\b/u.test(text) ||
-    /\b(?:blood (?:is )?spurting|massive blood loss|h[ae]morrhag(?:e|ed|ing))\b/u.test(text) ||
+    /\bblood\b[^.!?]{0,24}\b(?:won't|will not|does not)\s+stop\b/u.test(text) ||
+    /\b(?:blood (?:is )?(?:spurting|gushing)|(?:spurting|gushing) blood|bleeding out|massive blood loss|h[ae]morrhag(?:e|ed|ing))\b/u.test(
+      text,
+    ) ||
     includesAny(text, [
       "大量出血",
       "激しい出血",
@@ -317,7 +323,7 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
       "피가 멈추지 않아요",
     ]);
   const strokeEmergency =
-    /\b(?:stroke(?:-like)?(?: signs?| symptoms?)?|facial droop|drooping face|face (?:is )?drooping|one[- ]sided weakness|major weakness|sudden weakness|slurred speech|speech (?:is |became )?slurred)\b/u.test(
+    /\b(?:stroke(?:-like)?(?: signs?| symptoms?)?|facial droop|drooping face|face (?:is )?drooping|one[- ]sided weakness|one side (?:is )?weak|weak on (?:the )?(?:left|right) side|major weakness|sudden weakness|(?:left|right) (?:arm|leg) (?:is |became |suddenly )?(?:suddenly )?weak|slurred speech|(?:speech|words?) (?:are |is |became )?slurred|slurring (?:speech|words?))\b/u.test(
       text,
     ) ||
     includesAny(text, ["脳卒中", "片側の脱力", "中风症状", "中风", "单侧无力", "뇌졸중 증상"]);
@@ -336,15 +342,35 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
   const materialColorChange =
     /\b(?:rope|cord|line|fabric|screen|light)\b[^.!?]{0,32}\bturning blue\b/u.test(text);
   const cyanosisEmergency =
-    /\b(?:cyanotic|cyanosis|blue lips|lips (?:are |is )?(?:turning )?blue|turning blue around (?:the )?lips)\b/u.test(
+    /\b(?:cyanotic|cyanosis|(?:blue|gr[ae]y|ashen) (?:face|lips|skin|tongue)|(?:face|lips|skin|tongue) (?:are |is )?(?:turning )?(?:blue|gr[ae]y|ashen)|turning (?:blue|gr[ae]y|ashen) around (?:the )?(?:face|lips))\b/u.test(
       text,
     ) || (/\bturning blue\b/u.test(text) && !materialColorChange);
+  const neckTerminologyContext =
+    /\b(?:chokehold|strangulation|asphyxiation)\s+(?:terminology|definition|meaning|history)\b/u.test(
+      text,
+    );
   const neckContext =
-    /\b(?:neck pressure|neck compression|strangl(?:e|ed|ing|ation)|chok(?:e|ed|ing))\b/u.test(text) ||
-    /\b(?:rope|cord|line|ligature)\b[^.!?]{0,48}\b(?:around|on|across|near)\s+(?:the\s+)?(?:neck|throat)\b/u.test(text) ||
-    includesAny(text, ["首を圧迫", "首が締", "喉が締まっている", "颈部受压", "勒颈", "목 압박"]);
+    !neckTerminologyContext &&
+    (/\b(?:neck (?:pressure|compression|constriction|was squeezed)|pressure (?:on|to) (?:the |my |their |his |her )?(?:neck|throat)|(?:squeezed|grabbed|compressed) (?:the |my |their |his |her )?(?:neck|throat)|strang(?:le|led|ling|ulation|ulated)|chok(?:e|ed|ing|ehold)|throttl(?:e|ed|ing)|garrot(?:e|ed|ing)|manual strangulation|(?:erotic )?asphyxi(?:a|ation|ated))\b/u.test(
+      text,
+    ) ||
+      /\b(?:rope|cord|line|ligature|noose|hands?)\b[^.!?]{0,48}\b(?:around|on|across|near|over|touching)\s+(?:the\s+|my\s+|their\s+|his\s+|her\s+)?(?:neck|throat)\b/u.test(
+        text,
+      ) ||
+      /\bbreath\s*play\b[^.!?]{0,32}\b(?:last night|yesterday|earlier|happened|after|during)\b/u.test(
+        text,
+      ) ||
+      /\b(?:after|during)\b[^.!?]{0,32}\bbreath\s*play\b/u.test(text) ||
+      includesAny(text, [
+        "首を圧迫",
+        "首が締",
+        "喉が締まっている",
+        "颈部受压",
+        "勒颈",
+        "목 압박",
+      ]));
   const concerningNeckSymptom =
-    /\b(?:concerning symptoms?|breath(?:ing)?|swallow(?:ing)?|voice chang(?:e|ed|ing)|hoarse|raspy voice|(?:can't|cant|cannot|unable to) speak|confusion|confused|faint(?:ed|ing|ness)?|headache|dizz(?:y|iness)|weakness|vision change)\b/u.test(
+    /\b(?:concerning symptoms?|breath(?:ing)? (?:change|changed|difficulty|problem)|swallow(?:ing)?|voice chang(?:e|ed|ing)|hoarse|raspy voice|(?:can't|cant|cannot|unable to) speak|confusion|confused|faint(?:ed|ing|ness)?|headache|dizz(?:y|iness)|weakness|vision change)\b/u.test(
       text,
     ) ||
     includesAny(text, [
@@ -408,60 +434,171 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
     /\b(?:(?:i|we|they|he|she)\s+)?(?:do not|don't|does not|doesn't)\s+consent\b/u.test(text) ||
     /\b(?:there is |there's )?no consent\b/u.test(text) ||
     /\b(?:stop|quit)\s+(?:recording|filming|photographing)\s+me\b/u.test(text) ||
+    /\b(?:i |they |he |she |the person |my partner )?(?:said|says?)\s+stop\s+(?:recording|filming|photographing|taking (?:photos|pictures))\b/u.test(
+      text,
+    ) ||
+    /\bstop\s+taking\s+(?:photos|pictures)\s+of\s+(?:me|them|him|her)\b/u.test(text) ||
     /\bdelete\s+(?:my|their|his|her)\s+(?:photo|image|picture|video|recording|upload)\b/u.test(text) ||
+    /\b(?:revoke|withdraw|cancel)\s+(?:my |their |his |her )?(?:upload|recording|camera|photo|video)\s+permission\b/u.test(
+      text,
+    ) ||
+    /\bpermission\s+to\s+(?:upload|record|film|photograph|share)\s+(?:was |is |has been )?(?:withdrawn|revoked|cancelled|canceled)\b/u.test(
+      text,
+    ) ||
     /\bchanged\s+(?:my|their|his|her)\s+mind\b/u.test(text) ||
     /\b(?:they|he|she|the person|my partner)\s+(?:told|asked)\s+me\s+to\s+stop\b/u.test(text) ||
     includesAny(text, ["やめてと言われた", "对方说停下", "상대가 그만하라고 했어요"]) ||
     (text.includes("同意") && ["撤回", "取り消し", "取消", "撤销", "收回"].some((term) => text.includes(term)));
+  const secretRecordingPrevention =
+    /\bhow to (?:prevent|avoid|detect|protect against)\b[^.!?]{0,48}\bsecret recording\b/u.test(
+      text,
+    );
   const secretOrCoercedRecording =
-    /\b(?:secret(?:ly)?|hidden|without (?:their|his|her|my)?\s*permission|coerced?|forced)\s+(?:camera|recording|photo|image|upload)\b/u.test(
+    !secretRecordingPrevention &&
+    (/\b(?:secret(?:ly)?|hidden|without (?:their|his|her|my)?\s*permission|coerced?|forced)\s+(?:camera|recording|photo|image|upload)\b/u.test(
       text,
     ) ||
-    /\b(?:recorded|filmed|photographed|uploaded|shared)\b[^.!?]{0,32}\bwithout\s+(?:their|his|her|my)?\s*permission\b/u.test(
-      text,
-    ) ||
-    /\b(?:recording|photo|image|upload)\s+(?:is|was)\s+(?:secret|hidden|coerced|forced)\b/u.test(text) ||
-    /\b(?:camera|recorder)\s+(?:is|was)\s+(?:secret|hidden)\b/u.test(text) ||
-    /\b(?:forced|coerced)\b[^.!?]{0,48}\b(?:pose|posing)\b[^.!?]{0,32}\b(?:photo|image|picture)\b/u.test(
+      /\b(?:recorded|filmed|photographed|uploaded|shared)\b[^.!?]{0,32}\bwithout\s+(?:their|his|her|my)?\s*permission\b/u.test(
+        text,
+      ) ||
+      /\b(?:recorded|filmed|photographed|uploaded|shared)\b[^.!?]{0,32}\bwithout\s+(?:their|his|her|my)?\s*consent\b/u.test(
+        text,
+      ) ||
+      /\b(?:didn't|did not|never)\s+agree\s+to\s+(?:the\s+)?(?:camera|recording|filming|photo|video|upload|sharing)\b/u.test(
+        text,
+      ) ||
+      /\b(?:recording|photo|image|upload)\s+(?:is|was)\s+(?:secret|hidden|coerced|forced)\b/u.test(
+        text,
+      ) ||
+      /\b(?:camera|recorder)\s+(?:is|was)\s+(?:secret|hidden)\b/u.test(text) ||
+      /\b(?:forced|coerced)\b[^.!?]{0,48}\b(?:pose|posing)\b[^.!?]{0,32}\b(?:photo|image|picture)\b/u.test(
+        text,
+      ) ||
+      /\b(?:surreptitious|nonconsensual|unconsented)\s+(?:camera|recording|video|photo|image|upload)\b/u.test(
+        text,
+      ) ||
+      /\b(?:took|captured|recorded|filmed)\b[^.!?]{0,48}\b(?:photo|picture|image|video)?\b[^.!?]{0,24}\bwhile (?:asleep|sleeping|unconscious)\b/u.test(
+        text,
+      ) ||
+      /\b(?:spy\s*cam|spy camera)\b[^.!?]{0,32}\b(?:video|photo|image|recording|footage)\b/u.test(
+        text,
+      ) ||
+      /\b(?:shared|uploaded|posted)\b[^.!?]{0,32}\bagainst\s+(?:their|his|her|my)\s+wishes\b/u.test(
+        text,
+      ) ||
+      /\b(?:revenge porn|stolen (?:intimate|nude|explicit) (?:photo|image|video|recording))\b/u.test(
+        text,
+      ) ||
+      /\b(?:didn't|did not|never) ask\b[^.!?]{0,48}\bbefore (?:filming|recording|photographing|uploading)\b/u.test(
+        text,
+      ) ||
+      /\bno permission to (?:record|film|photograph|upload|share)\b/u.test(text) ||
+      /\b(?:they|he|she|the person|my partner) (?:said|told me) no to (?:the )?(?:camera|recording|photo|video|upload)\b/u.test(
+        text,
+      ) ||
+      includesAny(text, [
+        "隠し撮り",
+        "盗撮",
+        "未经同意拍摄",
+        "未经同意录像",
+        "몰래 촬영",
+        "몰래 찍",
+      ]));
+  const mediaContext =
+    /\b(?:camera|capture|clip|filming|image|media|model|photo|photograph|picture|recording|still|upload|video)\b/u.test(
       text,
     );
-  if (consentWithdrawal || secretOrCoercedRecording) {
-    return {
-      kind: "consent_withdrawn",
-      action:
-        "Consent is absent or withdrawn: stop the activity, release any restraint, keep the camera off, and delete any unsent local batch. Do not substitute another activity or upload. A request already transmitted cannot be recalled by this app.",
-    };
-  }
-
+  const minorNonAgeContext =
+    /\bminor (?:damage|fraying|injur(?:y|ies)|issue|repair|rope|wear)\b/u.test(text);
+  const ambiguousAgeMedia =
+    !minorNonAgeContext &&
+    (/^(?:minor|underage|under[- ]?18|under eighteen|ambiguous age|child)$/u.test(text) ||
+      /\b(?:underage|under[- ]?18|under eighteen|below 18|ambiguous age|age (?:is )?(?:unknown|unclear|unconfirmed|not verified)|unknown age|unknown[- ]aged|young[- ]looking (?:person|participant|model)|childlike (?:person|participant|model)|looks? young (?:in (?:the )?)?(?:photo|image|picture|video)|not sure (?:if )?(?:(?:they are|he is|she is|the person is) )?(?:an )?adult|(?:can't|cant|cannot|unable to) (?:confirm|verify) (?:an )?adult|(?:don't|do not) know (?:their|his|her|the person's) age|not eighteen|not of age|below (?:the )?legal age|under (?:the )?legal age)\b/u.test(
+        text,
+      ) ||
+      (mediaContext &&
+        /\b(?:minor|teen(?:ager)?|child|kid|preteen|adolescent|schoolchild|high school student|middle school student|schoolgirl|schoolboy|juvenile)\b/u.test(
+          text,
+        )) ||
+    (mediaContext &&
+      /\b(?:id|age) (?:was |is )?not (?:checked|verified|confirmed)\b/u.test(text)) ||
+    /\b(?:(?:[0-9]|1[0-7])|(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen))[- ]years?[- ]old\b/u.test(
+      text,
+    ) ||
+    /\b(?:age[ds]?\s*:?\s*(?:[0-9]|1[0-7])|(?:[0-9]|1[0-7])\s*years? of age)\b[^.!?]{0,32}\b(?:photo|image|picture|video|media|model|person)\b/u.test(
+      text,
+    ) ||
+    /\b(?:[0-9]|1[0-7])\s*(?:yo\b|y\/o\b|y\.?\s*o\.?|yrs? old\b)[^!?]{0,32}\b(?:photo|image|picture|video|media|model|person)\b/u.test(
+      text,
+    ) ||
+    /\baged\s+(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen)\b[^.!?]{0,32}\b(?:photo|image|video|media|model|person)\b/u.test(
+      text,
+    ) ||
+    /\b(?:kid|schoolgirl|schoolboy|juvenile|childlike (?:person|participant|model))\b[^.!?]{0,32}\b(?:photo|image|video|media|model|person)\b/u.test(
+      text,
+    ));
+  const explicitScanText = text.replace(/\bnon[- ]explicit\b/gu, "");
+  const nudeColorContext =
+    /\bnude(?:[- ](?:pink|beige|tan|tone|toned|colou?r(?:ed)?))?\s+(?:rope|cord|line|shade|paint)\b/u.test(
+      text,
+    );
+  const explicitMedia =
+    (!nudeColorContext && /\b(?:nude|nudes|nudity|naked|nakedness|nsfw)\b/u.test(explicitScanText)) ||
+    /^(?:porn|pornographic|xxx|explicit (?:image|photo|video|media))$/u.test(explicitScanText) ||
+    (mediaContext &&
+      /\b(?:nude|nudes|nudity|naked|nakedness|topless|nsfw|undressed|unclothed|no clothes|full frontal|bare (?:breasts?|chest)|(?:breasts?|nipples?|private parts?|genitals?)(?: are| is| look)? visible|genital|vulva|penis|sex(?:ual)? acts?|sexual activity|sexual intercourse|sex scene|graphic sex|xxx|intimate|explicit|porn(?:ographic)?|hardcore|adult content|lewd)\b/u.test(
+        explicitScanText,
+      ));
   const unsupportedMedia =
-    /\b(?:minor|underage|under[- ]?18|under eighteen|teen(?:ager)?|child|ambiguous age|nude|nudity|naked|explicit (?:image|photo|video|media)|porn(?:ographic)?)\b/u.test(
-      text,
-    );
-  if (unsupportedMedia) {
-    return {
-      kind: "unsupported_media",
-      action:
-        "Unsupported media: do not capture or upload it. Camera analysis is limited to confirmed legal adults in clothed, non-explicit, consented images or selected video stills. The app does not automatically detect these conditions; ambiguous age, nudity, explicit sexual activity, secret recording, and coerced media are prohibited and must not be selected or uploaded.",
-    };
-  }
-
+    ambiguousAgeMedia ||
+    explicitMedia ||
+    /(?:[0-9]|1[0-7])歳(?:の)?写真/u.test(text) ||
+    /(?:[0-9]|1[0-7])岁照片/u.test(text) ||
+    /(?:[0-9]|1[0-7])살 사진/u.test(text) ||
+    includesAny(text, [
+      "未成年の写真",
+      "露出写真",
+      "裸の写真",
+      "ヌード写真",
+      "未成年照片",
+      "裸体照片",
+      "成人视频",
+      "미성년자 사진",
+      "나체 사진",
+      "성인물 영상",
+    ]);
   const releaseSymptom =
-    /\b(?:new |sudden |worsening )?(?:numb(?:ness)?|tingl(?:e|ing)|burning|electric sensation|weakness|loss of (?:movement|function|coordination)|severe pain|escalating pain|faintness|lightheaded(?:ness)?|swollen|swelling)\b/u.test(
+    /\b(?:new |sudden |worsening |sharp worsening |increasing )?(?:numb(?:ness)?|tingl(?:e|ing|y)|pins and needles|burning|electric sensation|weakness|loss of (?:movement|function|coordination|sensation)|no sensation|reduced movement|weak grip|foot drop|severe pain|escalating pain|excruciating pain|faintness|lightheaded(?:ness)?|swollen|swelling|edema)\b/u.test(
       text,
     ) ||
+    /\bloss of grip\b(?![^.!?]{0,24}\b(?:rope )?tool\b)/u.test(text) ||
+    /\b(?:dropping things|hand (?:feels?|felt) dead)\b/u.test(text) ||
     /\b(?:can't|cant|cannot|unable to)\s+feel\s+(?:my|their|his|her)?\s*(?:finger|fingers|hand|hands|toe|toes|foot|feet)\b/u.test(
       text,
     ) ||
     /\b(?:finger|fingers|hand|hands|toe|toes|foot|feet)\b[^.!?]{0,24}\b(?:won't|will not|cannot|can't)\s+move\b/u.test(
       text,
     ) ||
-    /\b(?:arm|arms|hand|hands|leg|legs|foot|feet|finger|fingers|toe|toes)\s+(?:is |are )?(?:purple|blue|grey|gray|cold|pale)\b/u.test(
+    /\b(?:can't|cant|cannot|unable to)\s+(?:grip|wiggle (?:my |their |his |her )?(?:fingers?|toes?))\b/u.test(
       text,
     ) ||
-    /\b(?:purple|blue|grey|gray|cold|pale)\s+(?:arm|arms|hand|hands|leg|legs|limb|limbs|foot|feet|finger|fingers|toe|toes)\b/u.test(
+    /\b(?:can't|cant|cannot|unable to)\s+move\s+(?:my |their |his |her )?(?:fingers?|hands?|toes?|feet)\b/u.test(
       text,
     ) ||
-    /\bpain\s+(?:is\s+)?(?:getting|becoming|growing)\s+worse\b/u.test(text) ||
+    /\b(?:arm|arms|hand|hands|leg|legs|limb|limbs|foot|feet|finger|fingers|fingertip|fingertips|toe|toes)\s+(?:is |are )?(?:purple|blue|black|white|grey|gray|cold|cool|pale|asleep|puffy)\b/u.test(
+      text,
+    ) ||
+    /\b(?:purple|blue|black|white|grey|gray|cold|cool|pale|puffy)\s+(?:arm|arms|hand|hands|leg|legs|limb|limbs|foot|feet|finger|fingers|fingertip|fingertips|toe|toes)\b/u.test(
+      text,
+    ) ||
+    /\b(?:arm|arms|hand|hands|leg|legs|limb|limbs|foot|feet|finger|fingers|fingertip|fingertips|toe|toes)\b[^.!?]{0,16}\b(?:went|feels?|became|looks?)\s+(?:purple|blue|black|white|grey|gray|cold|cool|pale|puffy)\b/u.test(
+      text,
+    ) ||
+    /\b(?:discolou?red)\s+(?:arm|hand|leg|limb|foot|finger|fingertip|toe)s?\b/u.test(text) ||
+    /\b(?:sharp worsening|increasing)\s+pain\b/u.test(text) ||
+    /\bpain\s+(?:has |is\s+)?(?:increased|worsened|getting|becoming|growing)\s*(?:worse)?\b/u.test(
+      text,
+    ) ||
     /\b(?:rope|cord|line)\b[^.!?]{0,48}\bcut\s+off\s+(?:the\s+)?circulation\b/u.test(text) ||
     includesAny(text, [
       "しびれ",
@@ -476,11 +613,36 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
       "손에 감각이 없어요",
     ]);
   if (releaseSymptom) {
+    const consentAction =
+      consentWithdrawal || secretOrCoercedRecording
+        ? " Consent is absent or withdrawn: keep the camera off, delete any unsent local batch, and do not substitute another activity or upload."
+        : "";
+    const unsupportedMediaAction = unsupportedMedia
+      ? " Do not capture or upload unsupported media; ambiguous age, nudity, and explicit sexual activity are outside this app's camera scope."
+      : "";
     return {
       kind: "release_now",
       action:
-        "Stop and release now without creating a fall. Check the person directly; a photo or normal appearance cannot clear sensation, movement, circulation, pain, or injury. Seek prompt medical assessment for persistent or worsening symptoms, and call emergency services for any emergency sign.",
+        "Stop and release now without creating a fall. Check the person directly; a photo or normal appearance cannot clear sensation, movement, circulation, pain, or injury. Seek prompt medical assessment for persistent or worsening symptoms, and call emergency services for any emergency sign." +
+        consentAction +
+        unsupportedMediaAction,
       emergencyHref: "/emergency",
+    };
+  }
+
+  if (consentWithdrawal || secretOrCoercedRecording) {
+    return {
+      kind: "consent_withdrawn",
+      action:
+        "Consent is absent or withdrawn: stop the activity, release any restraint, keep the camera off, and delete any unsent local batch. Do not substitute another activity or upload. A request already transmitted cannot be recalled by this app.",
+    };
+  }
+
+  if (unsupportedMedia) {
+    return {
+      kind: "unsupported_media",
+      action:
+        "Unsupported media: do not capture or upload it. Camera analysis is limited to confirmed legal adults in clothed, non-explicit, consented images or selected video stills. The app does not automatically detect these conditions; ambiguous age, nudity, explicit sexual activity, secret recording, and coerced media are prohibited and must not be selected or uploaded.",
     };
   }
 

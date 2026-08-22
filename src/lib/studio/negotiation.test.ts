@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { NegItem, Rank } from "@/lib/stores/negotiate";
+import {
+  normalizeNegotiationItems,
+  type NegItem,
+  type Rank,
+} from "@/lib/stores/negotiate";
 import { buildStudioNegotiationPolicy } from "./negotiation.ts";
 
 function item(id: string, rank: Rank): NegItem {
@@ -31,9 +35,63 @@ test("maybe blocks mapped ties and equipment until each item becomes yes", () =>
   assert.equal(approved.isFurnitureBlocked("hismith"), false);
 });
 
-test("every rank transition changes the capture-bound negotiation key", () => {
+test("every policy change has a collision-resistant capture-bound negotiation key", () => {
   const keys = (["no", "maybe", "yes"] as const).map(
     (rank) => buildStudioNegotiationPolicy([item("photos", rank)]).negotiationKey,
   );
   assert.equal(new Set(keys).size, 3);
+
+  const embeddedDelimiter = buildStudioNegotiationPolicy([
+    { id: "!a", rank: "yes", label: "x\u0000!b:no:y" },
+  ]);
+  const separateRows = buildStudioNegotiationPolicy([
+    { id: "!a", rank: "yes", label: "x" },
+    { id: "!b", rank: "no", label: "y" },
+  ]);
+  assert.notEqual(embeddedDelimiter.negotiationKey, separateRows.negotiationKey);
+});
+
+test("missing and duplicate canonical approvals fail closed in Studio policy", () => {
+  const missing = buildStudioNegotiationPolicy([item("custom", "yes")]);
+  assert.equal(missing.mediaBlocked, true);
+  assert.equal(missing.voiceBlocked, true);
+  assert.equal(missing.isTieBlocked("takate-kote"), true);
+  assert.equal(missing.isFurnitureBlocked("hismith"), true);
+
+  const duplicated = buildStudioNegotiationPolicy([
+    item("photos", "yes"),
+    item("photos", "yes"),
+    item("voice", "yes"),
+    item("gote", "yes"),
+    item("machine", "yes"),
+  ]);
+  assert.equal(duplicated.mediaBlocked, true);
+  assert.equal(duplicated.voiceBlocked, false);
+  assert.equal(duplicated.isTieBlocked("takate-kote"), false);
+  assert.equal(duplicated.isFurnitureBlocked("hismith"), false);
+});
+
+test("persisted negotiation normalization restores and locks the canonical policy", () => {
+  const normalized = normalizeNegotiationItems([
+    item("photos", "yes"),
+    { id: "photos", label: null, rank: "no" },
+    item("voice", "yes"),
+    item("neck", "yes"),
+    { id: "cuffs", label: 42, rank: "yes" },
+    { id: " custom ", label: " Custom limit ", rank: "yes" },
+    { id: "custom", label: "Duplicate custom", rank: "maybe" },
+    { id: "", label: "invalid", rank: "yes" },
+  ]);
+
+  assert.equal(normalized.length, 23);
+  assert.deepEqual(normalized.find((entry) => entry.id === "photos")?.rank, "no");
+  assert.deepEqual(normalized.find((entry) => entry.id === "voice")?.rank, "yes");
+  assert.deepEqual(normalized.find((entry) => entry.id === "neck")?.rank, "no");
+  assert.deepEqual(normalized.find((entry) => entry.id === "cuffs")?.rank, "no");
+  assert.deepEqual(normalized.find((entry) => entry.id === "gote")?.rank, "no");
+  assert.deepEqual(normalized.find((entry) => entry.id === "custom"), {
+    id: "custom",
+    label: "Custom limit",
+    rank: "no",
+  });
 });

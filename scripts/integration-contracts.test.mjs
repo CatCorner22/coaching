@@ -33,6 +33,9 @@ test("accepting a capture preserves the committed permission ledger", () => {
   const accept = between(studio, "const acceptCapture", "const discardCapture");
   assert.doesNotMatch(accept, /setTriage\("unanswered"\)/);
   assert.match(accept, /setCapture\(next\)/);
+  assert.match(accept, /stopCoachVoice\(\)/);
+  const discard = between(studio, "const discardCapture", "const spoke");
+  assert.match(discard, /analysisRequestRef\.current \+= 1;\s*stopCoachVoice\(\)/);
 
   const camera = read("src/components/camera-capture.tsx");
   assert.match(camera, /setBatchCommitted\(true\)/);
@@ -98,26 +101,52 @@ test("capture analysis is synchronously bound to the current Studio context", ()
   assert.match(studio, /requestContext !== currentContextRef\.current/);
   assert.match(studio, /captureContextAtCommitRef\.current !== requestContext/);
   assert.match(studio, /disabled=\{stopped \|\| pending \|\| stepIndex === 0\}/);
+  assert.equal((studio.match(/disabled=\{stopped \|\| pending\}/g) ?? []).length, 2);
 });
 
-test("a late analysis response rechecks the current mic state before speaking", () => {
+test("late analysis responses cannot survive unmount or withdrawn voice approval", () => {
   const studio = read("src/routes/studio.tsx");
   const analyze = between(studio, "async function runAnalyze()", "const acceptCapture");
   assert.match(studio, /const micArmedRef = useRef\(false\)/);
+  assert.match(studio, /const mountedRef = useRef\(true\)/);
   assert.match(studio, /micArmedRef\.current = true;\s*setMicArmed\(true\)/);
-  assert.match(analyze, /studioVoice && !micArmedRef\.current/);
+  assert.match(
+    studio,
+    /mountedRef\.current = false;[\s\S]*?analysisRequestRef\.current \+= 1;[\s\S]*?captureContextAtCommitRef\.current = null;[\s\S]*?stopCoachVoice\(\)/,
+  );
+  assert.match(analyze, /!mountedRef\.current \|\|[\s\S]*?liveNegotiationPolicy\.mediaBlocked/);
+  assert.match(
+    analyze,
+    /useSettings\.getState\(\)\.voice &&[\s\S]*?!liveNegotiationPolicy\.voiceBlocked &&[\s\S]*?!micArmedRef\.current/,
+  );
   assert.doesNotMatch(analyze, /studioVoice && !micArmed\)/);
+  assert.match(analyze, /mountedRef\.current && request === analysisRequestRef\.current/);
 });
 
 test("Studio requires yes for negotiated actions and blocks every voice path", () => {
   const studio = read("src/routes/studio.tsx");
   const policy = read("src/lib/studio/negotiation.ts");
-  assert.match(policy, /items\.filter\(\(item\) => item\.rank !== "yes"\)/);
-  assert.match(policy, /mediaBlocked: operationalLimitIds\.has\("photos"\)/);
-  assert.match(policy, /voiceBlocked: operationalLimitIds\.has\("voice"\)/);
+  const store = read("src/lib/stores/negotiate.ts");
+  assert.match(policy, /normalizeNegotiationItems\(items\)/);
+  assert.match(policy, /normalizedItems\.filter\(\(item\) => item\.rank !== "yes"\)/);
+  assert.match(policy, /mediaBlocked: !approvedIds\.has\("photos"\)/);
+  assert.match(policy, /voiceBlocked: !approvedIds\.has\("voice"\)/);
+  assert.match(policy, /negotiationKey: JSON\.stringify\(negotiationEntries\)/);
+  assert.match(store, /export function normalizeNegotiationItems\(value: unknown\)/);
+  assert.match(
+    store,
+    /matches\.length === 1 && matches\[0\]\.label && !LOCKED_NO\.has\(seed\.id\)/,
+  );
+  const merge = between(store, "merge: (persisted, current) =>", "      },\n    },");
+  assert.match(merge, /\.\.\.current/);
+  assert.doesNotMatch(merge, /\.\.\.p[,}]/);
+  assert.match(store, /storage: safeJsonStorage<State>\(\)/);
+  assert.match(store, /migrate: \(persisted\) => persisted as State/);
   assert.match(studio, /buildStudioNegotiationPolicy\(items\)/);
   assert.match(studio, /useNegotiate\.persist\.hasHydrated\(\)/);
   assert.match(studio, /useNegotiate\.persist[\s\S]*?onFinishHydration\(finish\)/);
+  const hydration = between(studio, "const api = useNegotiate.persist", "useEffect(() => {");
+  assert.doesNotMatch(hydration, /setTimeout/);
   assert.match(
     studio,
     /mediaBlocked: negotiatedMediaBlocked,[\s\S]*?const mediaBlocked = !negotiationReady \|\| negotiatedMediaBlocked/,
@@ -129,6 +158,23 @@ test("Studio requires yes for negotiated actions and blocks every voice path", (
   assert.match(studio, /voice=\{studioVoice\}/);
   assert.match(studio, /voice=\{studioVoice && !micArmed\}/);
   assert.match(studio, /disabled=\{stopped \|\| !studioVoice\}/);
+  assert.match(studio, /data-negotiation-ready=\{negotiationReady \? "true" : "false"\}/);
+  assert.match(
+    studio,
+    /data-media-blocked=\{negotiatedMediaBlocked \? "true" : "false"\}/,
+  );
+  assert.match(
+    studio,
+    /event\.key !== null &&[\s\S]*?event\.key !== "knotty-negotiate" &&[\s\S]*?event\.key !== "knotty-settings"[\s\S]*?analysisRequestRef\.current \+= 1;[\s\S]*?stopCoachVoice\(\);[\s\S]*?window\.location\.reload\(\)/,
+  );
+  const negotiatedRevocation = between(
+    studio,
+    "if (negotiationReady && negotiatedMediaBlocked)",
+    "  }, [tieBlocked",
+  );
+  assert.match(negotiatedRevocation, /analysisRequestRef\.current \+= 1;\s*stopCoachVoice\(\)/);
+  const contextInvalidation = between(studio, "if (contextChanged && capture)", "  }, [capture");
+  assert.match(contextInvalidation, /stopCoachVoice\(\);\s*captureContextAtCommitRef\.current = null/);
   assert.doesNotMatch(studio, /playCoachVoice\([^\n]+, settings\.voice\)/);
 });
 
@@ -143,13 +189,20 @@ test("direct triage invalidates stale visual coaching before rendering or journa
     triageEffect,
     /analysisRequestRef\.current \+= 1[\s\S]*?setPending\(false\)[\s\S]*?setReport\(null\)[\s\S]*?setSavedReportRevision\(null\)[\s\S]*?setObservationReport\(/,
   );
+  const chooseTriage = between(studio, "function chooseTriage", "async function runAnalyze()");
+  assert.match(
+    chooseTriage,
+    /analysisRequestRef\.current \+= 1;[\s\S]*?stopCoachVoice\(\);[\s\S]*?setPending\(false\);/,
+  );
+  assert.match(chooseTriage, /if \(next !== "none"\) \{[\s\S]*?stopSession\(/);
+  assert.equal((studio.match(/onChange=\{\(\) => chooseTriage\(/g) ?? []).length, 4);
   assert.match(
     studio,
     /disabled=\{\s*!contextBoundReport\s*\|\|\s*!contextBoundObservationReport\s*\|\|\s*!reportRevision\s*\|\|\s*currentReportSaved\s*\}/,
   );
 });
 
-test("only verified pre-provider admission denials reopen a batch", () => {
+test("only verified pre-reservation admission denials reopen a batch", () => {
   const analyze = read("src/lib/ai/analyze.ts");
   const preflight = analyze.indexOf('if (data.triage === "none" && !grokProviderConfigured())');
   const authorization = analyze.indexOf("await authorizeAiRequest(context.userId)");
@@ -161,11 +214,22 @@ test("only verified pre-provider admission denials reopen a batch", () => {
       preflight < authorization &&
       authorization < reservation &&
       authorization < quota &&
+      reservation < provider &&
+      quota < provider &&
       authorization < provider,
   );
   assert.match(
     analyze.slice(preflight, reservation),
     /providerAttempted: false[\s\S]*?code: "AI_PROVIDER_UNAVAILABLE"[\s\S]*?retryableBeforeProvider: true/,
+  );
+  const privacy = analyze.slice(provider, analyze.indexOf("if (!grok.ok) {", provider));
+  assert.match(
+    privacy,
+    /privacyFailure === "preflight"[\s\S]*?providerAttempted: false[\s\S]*?retryableBeforeProvider: false/,
+  );
+  assert.match(
+    privacy,
+    /privacyFailure === "response"[\s\S]*?providerAttempted: true[\s\S]*?AI_PRIVACY_RESPONSE_UNVERIFIED[\s\S]*?retryableBeforeProvider: false/,
   );
   const rateLimit = between(
     analyze,
@@ -199,5 +263,8 @@ test("instructor-only entries cannot route into Studio", () => {
 
   const studio = read("src/routes/studio.tsx");
   assert.match(studio, /disabled=\{t\.minutes\[1\] === 0 \|\| negotiationPolicy\.isTieBlocked/);
-  assert.match(studio, /requestedTie && requestedTie\.minutes\[1\] > 0/);
+  assert.match(
+    studio,
+    /requestedTie &&[\s\S]*?requestedTie\.minutes\[1\] > 0 &&[\s\S]*?!negotiationPolicy\.isTieBlocked\(search\.tie\)/,
+  );
 });

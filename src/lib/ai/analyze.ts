@@ -318,6 +318,33 @@ export const analyzeRope = createServerFn({ method: "POST" })
         ],
       });
 
+      if (!grok.ok && grok.providerAttempted === false) {
+        return {
+          ok: false,
+          error:
+            grok.privacyFailure === "preflight"
+              ? "No media was sent to xAI. This batch's non-sensitive zero-data-retention preflight failed, so the one-use batch was closed. Discard it and confirm a new batch after the deployment's xAI team settings are corrected."
+              : "No media was sent to xAI. The provider became unavailable after this one-use batch was reserved. Discard it and confirm a new batch after the deployment is corrected.",
+          providerAttempted: false,
+          code:
+            grok.privacyFailure === "preflight"
+              ? "AI_PRIVACY_UNAVAILABLE"
+              : "AI_PROVIDER_UNAVAILABLE",
+          status: 503,
+          retryableBeforeProvider: false,
+        };
+      }
+      if (!grok.ok && grok.privacyFailure === "response") {
+        return {
+          ok: false,
+          error:
+            "The media request may have reached xAI, but no response confirmed zero data retention. The response was discarded. Do not retry this batch; correct the deployment's xAI privacy settings, then capture and confirm a new batch.",
+          providerAttempted: true,
+          code: "AI_PRIVACY_RESPONSE_UNVERIFIED",
+          status: 502,
+          retryableBeforeProvider: false,
+        };
+      }
       if (!grok.ok) {
         refusal = grok.refused === true;
         modelStatus =

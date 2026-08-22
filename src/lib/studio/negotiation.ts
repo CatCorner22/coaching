@@ -1,4 +1,4 @@
-import type { NegItem } from "@/lib/stores/negotiate";
+import { normalizeNegotiationItems, type NegItem } from "@/lib/stores/negotiate";
 
 const TIE_LIMIT_IDS: Readonly<Record<string, readonly string[]>> = {
   "takate-kote": ["gote"],
@@ -28,9 +28,9 @@ const FURNITURE_LIMIT_IDS: Readonly<Record<string, readonly string[]>> = {
 function blockedByIds(
   slug: string | undefined,
   table: Readonly<Record<string, readonly string[]>>,
-  blockedIds: ReadonlySet<string>,
+  approvedIds: ReadonlySet<string>,
 ) {
-  return !!slug && (table[slug] ?? []).some((id) => blockedIds.has(id));
+  return !!slug && (table[slug] ?? []).some((id) => !approvedIds.has(id));
 }
 
 /**
@@ -38,19 +38,27 @@ function blockedByIds(
  * unresolved and therefore blocks the same actions as no until it becomes yes.
  */
 export function buildStudioNegotiationPolicy(items: readonly NegItem[]) {
-  const operationalLimits = items.filter((item) => item.rank !== "yes");
-  const operationalLimitIds = new Set(operationalLimits.map((item) => item.id));
+  const normalizedItems = normalizeNegotiationItems(items);
+  const operationalLimits = normalizedItems.filter((item) => item.rank !== "yes");
+  const approvedIds = new Set(
+    normalizedItems.filter((item) => item.rank === "yes").map((item) => item.id),
+  );
+  const negotiationEntries = normalizedItems
+    .map((item) => [item.id, item.rank, item.label] as const)
+    .sort(
+      (left, right) =>
+        left[0].localeCompare(right[0]) ||
+        left[1].localeCompare(right[1]) ||
+        left[2].localeCompare(right[2]),
+    );
   return {
     operationalLimits,
-    negotiationKey: items
-      .map((item) => `${item.id}:${item.rank}:${item.label}`)
-      .sort()
-      .join("\u0000"),
-    mediaBlocked: operationalLimitIds.has("photos"),
-    voiceBlocked: operationalLimitIds.has("voice"),
+    negotiationKey: JSON.stringify(negotiationEntries),
+    mediaBlocked: !approvedIds.has("photos"),
+    voiceBlocked: !approvedIds.has("voice"),
     isTieBlocked: (slug: string | undefined) =>
-      blockedByIds(slug, TIE_LIMIT_IDS, operationalLimitIds),
+      blockedByIds(slug, TIE_LIMIT_IDS, approvedIds),
     isFurnitureBlocked: (slug: string | undefined) =>
-      blockedByIds(slug, FURNITURE_LIMIT_IDS, operationalLimitIds),
+      blockedByIds(slug, FURNITURE_LIMIT_IDS, approvedIds),
   };
 }

@@ -72,7 +72,7 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
           <Check
             checked={photos}
             onChange={setPhotos}
-            label="I understand Analyze sends selected compressed stills and generic frame labels to xAI once per batch; xAI may retain inputs and outputs under the workspace's data-retention settings."
+            label="I understand Analyze sends selected compressed stills and generic frame labels to xAI once per batch only after a non-sensitive zero-data-retention check; the response must confirm that setting again, but an initiated request cannot be recalled."
           />
         </ul>
         <Button

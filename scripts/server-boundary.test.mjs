@@ -77,11 +77,16 @@ test("the compile-time dev-server boundary owns PGLite and server-injected previ
   assert.match(workflow, /"\$\{#modules\[@\]\}" -eq 0/);
   assert.match(workflow, /scan_status=\$\?/);
   assert.match(workflow, /"\$scan_status" -ne 1/);
-  assert.match(workflow, /env:\s+VITE_AUTH_ENABLED: "false"\s+DATABASE_URL: ""\s+XAI_API_KEY: ""/);
   assert.match(
     workflow,
-    /XAI_API_KEY=\s+DATABASE_URL=\s+VITE_AUTH_ENABLED=false\s+NODE_ENV=development npm run preview/,
+    /env:\s+VITE_AUTH_ENABLED: "false"\s+DATABASE_URL: ""\s+XAI_API_KEY: ""\s+XAI_REQUIRE_ZERO_DATA_RETENTION: ""/,
   );
+  assert.match(
+    workflow,
+    /XAI_API_KEY=\s+XAI_REQUIRE_ZERO_DATA_RETENTION=\s+DATABASE_URL=\s+VITE_AUTH_ENABLED=false\s+NODE_ENV=development npm run preview/,
+  );
+  assert.match(read("src/lib/ai/grok.ts"), /cache: "no-store",\s+redirect: "error"/);
+  assert.match(read("src/lib/ai/voice-provider.ts"), /cache: "no-store",\s+redirect: "error"/);
   assert.match(workflow, /api\/auth\/get-session/);
 });
 
@@ -287,8 +292,10 @@ test("session cookie parse failures never log credential previews", () => {
 test("provider requests receive the originating request cancellation signal", () => {
   const analyze = read("src/lib/ai/analyze.ts");
   const voice = read("src/lib/ai/voice.ts");
+  const voiceProvider = read("src/lib/ai/voice-provider.ts");
   assert.match(analyze, /signal: authorization\.signal/);
-  assert.match(voice, /authorization\.signal\.addEventListener\("abort"/);
+  assert.match(voice, /signal: authorization\.signal/);
+  assert.match(voiceProvider, /options\.signal\?\.addEventListener\("abort"/);
 });
 
 test("vision input bounds frame labels and the deterministic hint structure", () => {

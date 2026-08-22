@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Disposition, SourceId } from "@/lib/observation/report";
 import { SAFETY_SOURCE_IDS } from "@/lib/kb/sources";
-import { adoptPersistKey } from "./persist";
+import { adoptPersistKey, safeJsonStorage } from "./persist";
 
 export type JournalEntry = {
   id: string;
@@ -84,6 +84,7 @@ export const useJournal = create<JournalState>()(
     }),
     {
       name: "knotty-journal",
+      storage: safeJsonStorage<JournalState>(),
       merge: (persisted, current) => {
         const snapshot = (persisted ?? {}) as Partial<JournalState>;
         const entries = Array.isArray(snapshot.entries)

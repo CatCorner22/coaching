@@ -12,7 +12,7 @@ capture, photo/video import, observation reports, knowledge routing, provider
 contracts, authentication, build behavior, and release automation.
 
 No remaining reproducible source-level release blocker was found after the final
-camera-to-report-to-knowledge re-probe. Local validation passed all 409
+camera-to-report-to-knowledge re-probe. Local validation passed all 406
 source-owned tests, TypeScript, zero-warning ESLint, the production build,
 generated server-module syntax checks, and secret/PGLite artifact scans. The
 exact Node 22.23.2 GitHub pipeline and its production Chromium smoke remain the
@@ -59,8 +59,8 @@ roles, then re-probed the integrated result:
    journal duplication, and failure to discard invalidated reports.
 4. Model boundary: prompt injection, invented ontology IDs, unsupported
    nonvisual inference, exact-tie claims, contradictory severity, structured
-   refusal variants, nonterminal completions, prefixed/fenced JSON, and provider
-   contract violations.
+   refusal variants, nonterminal completions, prefixed/fenced JSON, provider
+   contract violations, and ZDR flag/probe/header/rotation/timeout failures.
 5. Knowledge routing: emergency, immediate-release, consent-withdrawal, and
    neurovascular phrases in English, Japanese, Simplified Chinese, and Korean;
    neighboring negative controls; procedural-result suppression; and action-first
@@ -78,8 +78,11 @@ roles, then re-probed the integrated result:
 
 The final focused camera/knowledge pass completed 107/107 cases and reported no
 remaining high-severity defect. A broader integrated focused pass completed
-155/155 cases. The deterministic observation-report state storm continues to
-cover 32,832 state combinations without an invalid report or throw.
+155/155 cases. The negotiation/state storm added 100,000 seeded malformed
+snapshots and 61 mapped tie/equipment assertions without an invalid policy,
+unsafe approval, key collision, or throw. Independent knowledge storms passed
+the 23-case repository suite, a 126-case multilingual corpus, and a second
+100-case synonym/negative-control corpus without a false negative.
 
 ## Material corrections
 
@@ -119,8 +122,21 @@ cover 32,832 state combinations without an invalid report or throw.
 ### Observation and provider contracts
 
 - Provider availability is checked before durable batch reservation and quota
-  use. A missing or blank `XAI_API_KEY` returns a typed, retryable
+  use. A missing or blank `XAI_API_KEY`, or an absent explicit ZDR deployment
+  flag, returns a typed, retryable
   `AI_PROVIDER_UNAVAILABLE` response without consuming the batch.
+- After authentication and durable reservation/quota admission, every selected
+  media batch performs an uncached, fixed text-only ZDR probe. The probe and
+  media request use one snapshotted API key, disallow redirects and caches, and
+  require an exact `x-zero-data-retention: true` header. The actual media
+  response must repeat the header before its body is read. A failed probe sends
+  no selected media but closes the reserved one-use batch; missing or unavailable
+  confirmation after dispatch discards the response and returns an explicit,
+  non-retryable privacy failure.
+- Reviewed cloud voice uses the same per-call, same-key probe and response-header
+  boundary. A privacy failure discards remote audio and falls back to browser
+  speech; post-header body/transport failures are not mislabeled as privacy
+  incidents.
 - Only a terminal `finish_reason: "stop"` can be admitted. Missing, null,
   truncated, or otherwise nonterminal completions fail closed.
 - HTTP 200 `message.refusal` is recognized without displaying provider prose.
@@ -174,8 +190,8 @@ cover 32,832 state combinations without an invalid report or throw.
 - Production builds have no migration side effect. Schema migration is an
   explicit `npm run db:migrate` deployment operation.
 - CI pins Node 22.23.2, installs without lifecycle scripts, builds before
-  typecheck, and fixes its standalone auth-off/no-database/no-provider contract
-  at both build and preview time. It scans emitted JavaScript and
+  typecheck, and fixes its standalone auth-off/no-database/no-provider contract,
+  including an empty ZDR-intent flag, at both build and preview time. It scans emitted JavaScript and
   credentials/database artifacts, runs the full test/lint corpus, enforces
   client entry and complete eager-import budgets, probes direct route loads,
   and captures root plus Studio desktop/mobile evidence. The Studio browser
@@ -191,15 +207,16 @@ cover 32,832 state combinations without an invalid report or throw.
 
 ## Verification evidence
 
-- `npm test`: 409/409 passed, zero failures (groups: 262, 50, 85, and 12).
+- `npm test`: 406/406 assertions passed, zero failures (groups: 266, 41, 85,
+  and 14).
 - Integrated focused corpus: 155/155 passed.
 - Final independent camera/knowledge re-probe: 107/107 passed.
 - `tsc --noEmit`: passed.
 - `eslint . --max-warnings=0`: passed.
-- Production Vite/Nitro/Vercel build: passed; 1,985 client modules, 412 SSR
+- Production Vite/Nitro/Vercel build: passed; 1,985 client modules, 413 SSR
   modules, and 2,475 Nitro modules transformed.
-- Client entry: 370,980 bytes raw / 115,779 bytes gzip, down from 536,396 /
-  165,560. The complete static entry graph is 477,749 bytes raw / 154,198
+- Client entry: 371,501 bytes raw / 115,923 bytes gzip, down from 536,396 /
+  165,560. The complete static entry graph is 478,270 bytes raw / 154,341
   bytes gzip and passes committed regression budgets.
 - Every emitted server `.js`/`.mjs` module passed `node --check`.
 - Production artifact scans found neither a credential-shaped preview OAuth
@@ -249,8 +266,10 @@ greens.
    behavior reach contract parity.
 4. **Knowledge review manifest.** Add reviewer role, source revision, claim tier,
    checksum, next-review date, and stale flag; fail CI for broken provenance.
-5. **Verified retention status.** Surface a server-derived provider/retention
-   mode and verify `x-zero-data-retention` when claiming ZDR.
+5. **ZDR operations evidence.** Add a protected deploy-time probe, restrict team
+   setting changes to a small operator group, and alert on privacy-gate failures
+   using counts and request classes only—never media, provider bodies, or stable
+   participant identifiers.
 6. **Shared abuse controls.** Move rate and concurrency budgets from per-process
    memory to a bounded shared store before multi-replica scaling.
 7. **Release evidence dashboard.** Track build SHA, schema/ledger revision,

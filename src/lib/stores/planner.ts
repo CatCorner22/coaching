@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { SEQUENCES } from "@/lib/kb";
-import { adoptPersistKey } from "./persist";
+import { adoptPersistKey, safeJsonStorage } from "./persist";
 
 type PlannerState = {
   slugs: string[];
@@ -33,6 +33,6 @@ export const usePlanner = create<PlannerState>()(
       },
       clear: () => set({ slugs: [] }),
     }),
-    { name: "knotty-plan" },
+    { name: "knotty-plan", storage: safeJsonStorage<PlannerState>() },
   ),
 );

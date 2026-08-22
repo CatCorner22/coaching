@@ -10,6 +10,7 @@ The camera accepts photos or short clips, converts video to user-selected labele
 - Prefer equipment-only or clothed, non-identifying media; exclude faces, intimate contact, tattoos, screens, mail, and room details.
 - The non-explicit boundary is an operator attestation, not automatic content moderation. The app does not certify or reliably detect nudity; do not select explicit media.
 - Video stays local and is reduced to one to three stills selected by the user.
+- Remote analysis and reviewed cloud voice require an operator-enabled xAI team-wide Zero Data Retention setting. Before every selected-media or TTS request, the server sends a fixed text-only probe with the same snapshotted API key and requires an exact `x-zero-data-retention: true` response; it requires the same header again before reading the media or audio response. Failed probes send no selected media. Missing or unavailable confirmation after dispatch causes the response to be discarded and the one-use media batch to remain closed.
 - The current page submits a confirmed batch at most once. A shared Postgres reservation rejects the same verified-user batch across replicas for two hours, exceeding the one-hour permission window; this is not a permanent global exactly-once guarantee. Already-transmitted data cannot be recalled.
 - C3 categories route to qualified in-person instruction. C4 categories stop or decline. Every other result remains lower-consequence learning only or insufficient view—never clearance.
 - Directly reported symptoms and coercion bypass image analysis and route action first.
@@ -43,9 +44,10 @@ untrusted pull-request or preview build.
 - Serve production over HTTPS. Live camera APIs are unavailable in an insecure context; `localhost` is the development exception.
 - If embedded, the top-level site must deliberately grant the frame camera permission through Permissions Policy. The app never requests microphone audio as part of camera capture.
 - Set provider-level spend/concurrency limits in addition to the per-user, per-instance application limits.
+- Use a dedicated, access-restricted xAI team and API key for this deployment. Enable team-wide Zero Data Retention in the xAI console, verify it with a non-sensitive deployment probe, and only then set server-only `XAI_REQUIRE_ZERO_DATA_RETENTION=true`. An API key without this explicit flag leaves remote analysis and cloud voice unavailable. Keep provider-setting changes restricted: a setting can change between the preflight and request, so the second response-header check detects but cannot recall a request already initiated.
 - Enable real authentication for production AI. Cost-bearing endpoints reject the shared development identity and require a same-origin browser request in production.
 - Auth-on live preview requires the confidential `GROK_PREVIEW_CLIENT_SECRET` as a server-only injected variable. Never place it in `VITE_*`, source, client configuration, or build artifacts; rotate the previously shared preview credential before reuse.
-- Confirm the applicable xAI account terms, retention configuration, and availability of Zero Data Retention before accepting personal data. The UI assumes already-transmitted requests cannot be recalled.
+- Confirm the applicable xAI account terms and Zero Data Retention eligibility before accepting personal data. ZDR does not establish anonymity, legal-adult status, consent, supported content, or safety; those remain operator attestations and product boundaries.
 - Install from the committed `package-lock.json` with `npm ci --ignore-scripts`. CI uses exact Node 22.23.2 and fails if a production build changes the committed lockfile or generated route tree.
 - Validate from a clean provider workspace with its generated `.grok/app-env.json`. CI runs the app-specific PWA fixture plus production desktop/mobile browser smoke, but provider authentication and camera hardware still require environment testing.
 

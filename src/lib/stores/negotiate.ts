@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { adoptPersistKey } from "./persist";
+import { adoptPersistKey, safeJsonStorage } from "./persist";
 
 export type Rank = "yes" | "maybe" | "no";
 
@@ -37,17 +37,56 @@ function clampRank(r: unknown): Rank {
   return r === "yes" || r === "maybe" || r === "no" ? r : "no";
 }
 
-function lockItems(items: NegItem[]): NegItem[] {
-  const mapped = items.slice(0, 40).map((i) => ({
-    id: String(i.id).slice(0, 80),
-    label: String(i.label).slice(0, 80),
-    rank: LOCKED_NO.has(i.id) ? ("no" as Rank) : clampRank(i.rank),
-  }));
-  const have = new Set(mapped.map((i) => i.id));
-  for (const seed of STARTER) {
-    if (LOCKED_NO.has(seed.id) && !have.has(seed.id)) mapped.push({ ...seed, rank: "no" });
+function parseCandidate(value: unknown): NegItem | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Record<string, unknown>;
+  const id = typeof candidate.id === "string" ? candidate.id.trim().slice(0, 80) : "";
+  const label =
+    typeof candidate.label === "string" ? candidate.label.trim().slice(0, 80) : "";
+  // Keep a canonical ID even when its untrusted label is malformed so that a
+  // duplicate cannot disappear during sanitization and preserve a prior yes.
+  if (!id) return null;
+  return { id, label, rank: clampRank(candidate.rank) };
+}
+
+/**
+ * Normalize untrusted persisted negotiation data into one bounded, complete
+ * policy. Missing or duplicated canonical rows revert to no; locked rows can
+ * never be restored as yes. Custom rows are retained once by ID.
+ */
+export function normalizeNegotiationItems(value: unknown): NegItem[] {
+  const candidates = Array.isArray(value)
+    ? value.slice(0, 40).map(parseCandidate).filter((item): item is NegItem => item !== null)
+    : [];
+  const starterIds = new Set(STARTER.map((item) => item.id));
+  const matchesById = new Map<string, NegItem[]>();
+  for (const candidate of candidates) {
+    const matches = matchesById.get(candidate.id) ?? [];
+    matches.push(candidate);
+    matchesById.set(candidate.id, matches);
   }
-  return mapped;
+
+  const normalized = STARTER.map((seed) => {
+    const matches = matchesById.get(seed.id) ?? [];
+    const rank =
+      matches.length === 1 && matches[0].label && !LOCKED_NO.has(seed.id)
+        ? matches[0].rank
+        : ("no" as Rank);
+    return { ...seed, rank };
+  });
+
+  const customIds = new Set<string>();
+  for (const candidate of candidates) {
+    if (!candidate.label || starterIds.has(candidate.id) || customIds.has(candidate.id)) continue;
+    const matches = matchesById.get(candidate.id) ?? [];
+    normalized.push({
+      ...candidate,
+      rank: matches.length === 1 ? candidate.rank : "no",
+    });
+    customIds.add(candidate.id);
+    if (normalized.length === 40) break;
+  }
+  return normalized;
 }
 
 type State = {
@@ -65,7 +104,7 @@ export const useNegotiate = create<State>()(
   persist(
     (set, get) => ({
       negotiationVersion: 2,
-      items: STARTER,
+      items: normalizeNegotiationItems(STARTER),
       notes: "",
       setRank: (id, rank) =>
         set({
@@ -79,24 +118,27 @@ export const useNegotiate = create<State>()(
         if (!clean) return;
         if (get().items.some((item) => item.label.toLowerCase() === clean.toLowerCase())) return;
         set({
-          items: [
+          items: normalizeNegotiationItems([
             ...get().items,
             { id: crypto.randomUUID(), label: clean, rank: "no" as Rank },
-          ].slice(0, 40),
+          ]),
         });
       },
     }),
     {
       name: "knotty-negotiate",
+      storage: safeJsonStorage<State>(),
+      version: 1,
+      migrate: (persisted) => persisted as State,
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<State>;
         const currentPolicy = p.negotiationVersion === 2;
-        const items = currentPolicy && Array.isArray(p.items) && p.items.length
-          ? lockItems(p.items as NegItem[])
-          : current.items;
+        const items =
+          currentPolicy && Array.isArray(p.items)
+            ? normalizeNegotiationItems(p.items)
+            : current.items;
         return {
           ...current,
-          ...p,
           negotiationVersion: 2,
           items,
           notes: typeof p.notes === "string" ? p.notes.slice(0, 600) : current.notes,

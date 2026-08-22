@@ -43,21 +43,27 @@ try {
     });
     page.on("pageerror", (error) => pageErrors.push(String(error?.message ?? error)));
 
+    const waitForConsentReady = async () => {
+      const enter = page.getByRole("button", { name: "Enter", exact: true });
+      await Promise.race([
+        enter.waitFor({ state: "visible", timeout: 10_000 }),
+        page.locator("main").waitFor({ state: "visible", timeout: 10_000 }),
+      ]);
+      if (await enter.isVisible().catch(() => false)) {
+        const checks = page.getByRole("checkbox");
+        if ((await checks.count()) !== 4) {
+          throw new Error(`${viewport.name}: consent gate changed`);
+        }
+        for (let index = 0; index < 4; index += 1) await checks.nth(index).check();
+        await enter.click();
+        await page.locator("main").waitFor({ state: "visible", timeout: 10_000 });
+      }
+    };
+
     const response = await page.goto(studioUrl, { waitUntil: "domcontentloaded", timeout: 45_000 });
     if (response?.status() !== 200)
       throw new Error(`${viewport.name}: HTTP ${response?.status() ?? 0}`);
-    await page.getByText("Loading your consent on this device…", { exact: true }).waitFor({
-      state: "hidden",
-      timeout: 10_000,
-    });
-
-    const enter = page.getByRole("button", { name: "Enter", exact: true });
-    if (await enter.isVisible().catch(() => false)) {
-      const checks = page.getByRole("checkbox");
-      if ((await checks.count()) !== 4) throw new Error(`${viewport.name}: consent gate changed`);
-      for (let index = 0; index < 4; index += 1) await checks.nth(index).check();
-      await enter.click();
-    }
+    await waitForConsentReady();
 
     const negotiateResponse = await page.goto(negotiateUrl, {
       waitUntil: "domcontentloaded",
@@ -66,6 +72,7 @@ try {
     if (negotiateResponse?.status() !== 200) {
       throw new Error(`${viewport.name}: negotiate HTTP ${negotiateResponse?.status() ?? 0}`);
     }
+    await waitForConsentReady();
     const photoPermissionRow = page
       .getByRole("listitem")
       .filter({ hasText: "Photos / video for coaching" });
@@ -87,17 +94,24 @@ try {
     if (studioResponse?.status() !== 200) {
       throw new Error(`${viewport.name}: studio reload HTTP ${studioResponse?.status() ?? 0}`);
     }
-    await page.getByText("Loading your consent on this device…", { exact: true }).waitFor({
-      state: "hidden",
-      timeout: 10_000,
+    await waitForConsentReady();
+
+    const actionFirst = page.getByRole("group", {
+      name: "Action-first screen · required before media",
+      exact: true,
     });
-    await page.getByText("Loading negotiation choices…", { exact: true }).waitFor({
-      state: "hidden",
-      timeout: 10_000,
-    });
-    await page
-      .getByText("Media is not affirmatively approved.", { exact: false })
-      .waitFor({ state: "hidden", timeout: 10_000 });
+    await actionFirst.waitFor({ state: "visible", timeout: 10_000 });
+    const actionFirstElement = await actionFirst.elementHandle();
+    if (!actionFirstElement) throw new Error(`${viewport.name}: action-first screen is missing`);
+    await page.waitForFunction(
+      (element) =>
+        element instanceof HTMLFieldSetElement &&
+        element.dataset.negotiationReady === "true" &&
+        element.dataset.mediaBlocked === "false" &&
+        !element.disabled,
+      actionFirstElement,
+      { timeout: 10_000 },
+    );
 
     const noConcern = page.getByRole("radio", {
       name: /^No urgent symptom, coercion or secret-recording concern/,
