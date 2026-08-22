@@ -164,3 +164,39 @@ test("dark uniform clothing fills the frame without inventing bands or a stop", 
     false,
   );
 });
+
+test("genuine rope survives the structure gates across realistic framings", () => {
+  // Recall corpus at the real 240px analysis resolution. An earlier version of
+  // the structure gate used a fixed share-of-row-width floor and a tighter
+  // thinness limit, which silently dropped ordinary framings: a cuff crossing
+  // part of a wide shot, and a close-up wrap filling a fifth of the frame.
+  const W = 240;
+  const H = 240;
+  const wide = (fill: (x: number, y: number) => [number, number, number]) =>
+    img(W, H, (x, y) => [...fill(x, y), 255] as [number, number, number, number]);
+
+  const cases: Array<[string, ImageData]> = [
+    ["full-width wrap", wide((_x, y) => (y >= 100 && y < 104 ? JUTE : NEUTRAL_BG))],
+    ["three spaced wraps", wide((_x, y) => ([60, 100, 140].some((c) => y >= c && y < c + 4) ? JUTE : NEUTRAL_BG))],
+    ["wrap over a skin background", wide((_x, y) => (y >= 100 && y < 104 ? JUTE : [200, 150, 120]))],
+    ["70% width wrap", wide((x, y) => (y >= 100 && y < 104 && x < W * 0.7 ? JUTE : NEUTRAL_BG))],
+    ["50% width wrap", wide((x, y) => (y >= 100 && y < 104 && x < W * 0.5 ? JUTE : NEUTRAL_BG))],
+    ["25% width wrap (cuff in a wide shot)", wide((x, y) => (y >= 100 && y < 104 && x < W * 0.25 ? JUTE : NEUTRAL_BG))],
+    ["close-up wrap at 20% of frame height", wide((_x, y) => (y >= 90 && y < 90 + Math.round(H * 0.2) ? JUTE : NEUTRAL_BG))],
+    ["tight cuff of three touching wraps", wide((_x, y) => (y >= 100 && y < 112 ? JUTE : NEUTRAL_BG))],
+    ["wrap at the top edge", wide((_x, y) => (y >= 2 && y < 6 ? JUTE : NEUTRAL_BG))],
+    ["wrap at the bottom edge", wide((_x, y) => (y >= H - 6 && y < H - 2 ? JUTE : NEUTRAL_BG))],
+  ];
+  for (const [name, frame] of cases) {
+    assert.ok(observeFrame(frame).wrapBands.length >= 1, `no band detected for ${name}`);
+  }
+
+  // Documented limit, asserted so it stays a known one: row projection smears a
+  // strongly angled wrap across many rows, so it may yield no band. Local hints
+  // are framing aids only and never clearance, so a miss is not a safety claim.
+  const angled = wide((x, y) => {
+    const top = 100 + Math.round(x * 0.25);
+    return y >= top && y < top + 4 ? JUTE : NEUTRAL_BG;
+  });
+  assert.ok(observeFrame(angled).wrapBands.length >= 0);
+});

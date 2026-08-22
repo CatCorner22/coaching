@@ -54,14 +54,19 @@ export function observeFrame(
   // only local separator, and both gates fail toward "no band" on ambiguity.
   const coverage = ropeN / sampled;
   const saturated = coverage > 0.5;
-  // Wide enough that two or three touching wraps still read as one band
-  // cluster; tight enough that a forearm, a lace-covered region, or furniture
-  // (typically a quarter of the frame or more) stays suppressed.
-  const maxBandRows = Math.max(8, Math.round(height * 0.14));
-  // A real wrap crosses a meaningful share of the row; scattered pixels that
-  // leak past the color exclusions on noisy skin or fabric do not.
+  // Wide enough that a close-up wrap filling a fifth of the frame survives;
+  // tight enough that a half-frame expanse of rope-coloured fabric does not.
+  const maxBandRows = Math.max(8, Math.round(height * 0.22));
   const sampledCols = Math.ceil(width / step);
-  const minBandStrength = Math.max(2, sampledCols * 0.22);
+  // A band must stand out from its own background rather than cross some fixed
+  // share of the row. A fixed share rejected partial-width wraps — a cuff in a
+  // wide shot, or rope entering frame — which are ordinary framings. Scaling
+  // the floor by the median row instead rejects the case it was added for
+  // (colour-exclusion leakage on noisy skin, where every row leaks similarly)
+  // while keeping a genuine wrap on a clean background.
+  const sortedRows = Array.from(series).sort((a, b) => a - b);
+  const medianRow = sortedRows[Math.floor(sortedRows.length / 2)] ?? 0;
+  const minBandStrength = Math.max(3, medianRow * 3);
   const bandIsThin = (peak: { index: number; value: number }) => {
     const floor = peak.value * 0.6;
     let rows = 1;
