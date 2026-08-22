@@ -223,12 +223,64 @@ try {
     const committed = page.getByText("This page locks the batch to the attestations above", {
       exact: false,
     });
+    const waitForCommittedBatch = async (stage) => {
+      try {
+        await committed.waitFor({ state: "visible", timeout: 15_000 });
+      } catch (cause) {
+        const failurePng = checkedOutputPath(
+          `${stem}.${viewport.name}.${stage}-failure${extension}`,
+          ["/workspace"],
+        );
+        await page.screenshot({ path: failurePng, type: "png", fullPage: true });
+        const diagnostic = await page.evaluate(() => {
+          const video = document.querySelector("video[aria-label^='Live camera preview']");
+          const textFor = (selector) =>
+            [...document.querySelectorAll(selector)]
+              .filter((element) => element.getClientRects().length > 0)
+              .map((element) => element.textContent?.replace(/\s+/g, " ").trim())
+              .filter(Boolean);
+          return {
+            alerts: textFor("[role='alert']"),
+            statuses: textFor("[role='status']"),
+            relevantButtons: [...document.querySelectorAll("button")]
+              .filter((element) =>
+                /camera|capture|clip|record|batch|discard/i.test(element.textContent ?? ""),
+              )
+              .map((element) => ({
+                text: element.textContent?.replace(/\s+/g, " ").trim(),
+                disabled: element.disabled,
+                ariaDisabled: element.getAttribute("aria-disabled"),
+              })),
+            video:
+              video instanceof HTMLVideoElement
+                ? {
+                    readyState: video.readyState,
+                    width: video.videoWidth,
+                    height: video.videoHeight,
+                    hidden: video.classList.contains("hidden"),
+                  }
+                : null,
+            syntheticCamera: globalThis.__syntheticCamera
+              ? {
+                  calls: globalThis.__syntheticCamera.calls,
+                  trackStates: globalThis.__syntheticCamera.streams.map((stream) =>
+                    stream.getTracks().map((track) => track.readyState),
+                  ),
+                }
+              : null,
+          };
+        });
+        throw new Error(
+          `${viewport.name}: ${stage} did not commit: ${JSON.stringify(diagnostic)}; evidence ${failurePng}; ${String(cause?.message ?? cause)}`,
+        );
+      }
+    };
 
     await confirmBatchPermissions();
     await page.getByRole("button", { name: "Open live camera", exact: true }).click();
     await waitForLivePreview();
     await page.getByRole("button", { name: "Capture still", exact: true }).click();
-    await committed.waitFor({ state: "visible", timeout: 15_000 });
+    await waitForCommittedBatch("photo");
 
     await page
       .getByRole("button", { name: "Discard batch and start another", exact: true })
@@ -250,7 +302,7 @@ try {
     });
     await page.getByRole("img", { name: "F01 video still", exact: true }).click();
     await page.getByRole("button", { name: "Use selected stills", exact: true }).click();
-    await committed.waitFor({ state: "visible", timeout: 15_000 });
+    await waitForCommittedBatch("video");
 
     const syntheticCapture = await page.evaluate(() => ({
       calls: globalThis.__syntheticCamera.calls,
