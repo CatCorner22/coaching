@@ -31,14 +31,20 @@ export function isSkinLike(r: number, g: number, b: number) {
   if (isSkin(r, g, b)) return true;
   const y = luma(r, g, b);
   const s = sat(r, g, b);
+  // Skin sits at a redder hue than jute or hemp: its red-green gap exceeds its
+  // green-blue gap, while fibre is yellower and reverses that. Without this,
+  // the broad branches below swallowed dark, shadowed and flash-blown rope and
+  // the app reported no rope signal at all for brown or dyed cordage.
+  const redderThanFibre = r - g > g - b;
   // Pale or brightly lit skin: bright, low saturation, warm channel ordering.
-  if (y > 150 && s < 0.28 && r >= g && g >= b - 4 && r - g <= 42) return true;
+  if (y > 150 && s < 0.28 && r >= g && g >= b - 4 && r - g <= 42 && redderThanFibre) return true;
   // Deep skin tones: warm chroma inside the YCbCr skin box at luminance and
   // red levels below what the Kovac rule admits. Bounded at r ≤ 115 so
   // midtone jute/hemp (typically r ≥ 140) is not swallowed.
   const cb = 128 - 0.168736 * r - 0.331264 * g + 0.5 * b;
   const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
   return (
+    redderThanFibre &&
     r <= 115 &&
     y >= 20 &&
     y <= 110 &&

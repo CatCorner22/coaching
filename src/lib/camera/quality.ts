@@ -83,6 +83,7 @@ function isDarkJute(r: number, g: number, b: number): boolean {
 export function ropeHint(data: ImageData): number {
   const buf = data.data;
   let rope = 0;
+  let ropeColour = 0;
   let n = 0;
   let lumaSum = 0;
   let lumaSquaredSum = 0;
@@ -103,7 +104,9 @@ export function ropeHint(data: ImageData): number {
       Math.abs(
         luma - (0.299 * buf[i - 4]! + 0.587 * buf[i - 3]! + 0.114 * buf[i - 2]!),
       ) >= 5;
-    if (contrast && (isRope(r, g, b) || isDarkFiber(r, g, b) || isDarkJute(r, g, b))) rope++;
+    const ropeColoured = isRope(r, g, b) || isDarkFiber(r, g, b) || isDarkJute(r, g, b);
+    if (ropeColoured) ropeColour++;
+    if (contrast && ropeColoured) rope++;
     n++;
   }
   if (n < 4) return 0;
@@ -114,7 +117,10 @@ export function ropeHint(data: ImageData): number {
 
   // A flat dark/brown/skin-colored surface is not evidence of rope. Require scene
   // texture and some non-rope context before using color as a ranking hint.
-  if (Math.sqrt(lumaVariance) < 6 || share > 0.85) return 0;
+  // The saturation guard must read the UNGATED colour share: the texture gate
+  // removes pixels from the numerator, so testing the gated share let a
+  // full-frame body pass the very guard that exists to reject it.
+  if (Math.sqrt(lumaVariance) < 6 || ropeColour / n > 0.85) return 0;
   return share;
 }
 
