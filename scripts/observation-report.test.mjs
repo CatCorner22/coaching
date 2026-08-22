@@ -7,6 +7,7 @@ import {
   consequenceFloor,
   validateObservationReport,
 } from "../src/lib/observation/report.ts";
+import { SAFETY_SOURCE_IDS } from "../src/lib/kb/sources.ts";
 
 const consent = {
   adults: true,
@@ -658,4 +659,57 @@ test("a report the model never ran says so in the line that is actually rendered
   // A completed report must not claim the classification failed.
   const completed = buildObservationReport({ ...base, modelStatus: "completed" });
   assert.ok(!completed.limitations.some((l) => /did not complete/.test(l)));
+});
+
+test("hazard sources are chosen by the categories that actually matched", () => {
+  // sourcesFor substring-matched "rope"/"load" plus a hardcoded airway trio, so
+  // six hazard sources in the ledger could never be emitted by any report — the
+  // positional-asphyxia bulletin, the suspension-syncope pair, the
+  // handcuff-neuropathy series, the fatal-outcome review and the nerve-safety
+  // reference all existed to be cited and never were.
+  const base = {
+    mediaMode: "static_photos",
+    consent,
+    quality: { sharpness: 0.8, exposure: 0.8, score: 0.8 },
+    allowedFrameIds: ["F01"],
+    modelStatus: "completed",
+  };
+  const sourcesFor = (id) =>
+    buildObservationReport({
+      ...base,
+      matches: [{ canonical_id: id, confidence: "possible", frame_id: "F01", evidence: "x" }],
+    }).source_ids;
+
+  // Breathing failure from position alone, with no neck contact.
+  for (const id of ["positional_restraint_possible", "inverted_orientation", "torso_breathing_restriction_possible"]) {
+    assert.ok(sourcesFor(id).includes("ASPHYX-1"), `${id} should cite ASPHYX-1`);
+  }
+  // Fainting and circulatory collapse while upright or suspended.
+  for (const id of ["off_ground_load_bearing_possible", "partial_load_bearing_possible", "fall_exposure_possible"]) {
+    const ids = sourcesFor(id);
+    assert.ok(ids.includes("SYNCOPE-1") && ids.includes("SYNCOPE-2"), `${id} should cite the syncope pair`);
+  }
+  // Manufactured restraints have their own compression-injury literature.
+  for (const id of ["cuff_strap_or_wrap_restraint", "lock_or_key_mechanism_connected_possible"]) {
+    assert.ok(sourcesFor(id).includes("CUFF-1"), `${id} should cite CUFF-1`);
+  }
+  // Nerve-safety guidance accompanies the injury series for any restraint.
+  assert.ok(sourcesFor("rope_restraint_unspecified").includes("ROPE-2"));
+  // Catastrophic-outcome patterns.
+  for (const id of ["neck_or_airway_overlap_possible", "off_ground_load_bearing_possible", "attending_adult_not_visible"]) {
+    assert.ok(sourcesFor(id).includes("FATAL-1"), `${id} should cite FATAL-1`);
+  }
+
+  // A benign category must not drag hazard sources in with it.
+  const benign = sourcesFor("negotiation_materials_visible");
+  for (const id of ["ASPHYX-1", "SYNCOPE-1", "SYNCOPE-2", "CUFF-1", "FATAL-1", "NFS-1", "ROPE-1", "ROPE-2"]) {
+    assert.ok(!benign.includes(id), `a benign category cited ${id}`);
+  }
+
+  // Every emitted id must exist in the ledger.
+  for (const id of CANONICAL_IDS) {
+    for (const source of sourcesFor(id)) {
+      assert.ok(SAFETY_SOURCE_IDS.includes(source), `${id} emitted unknown source ${source}`);
+    }
+  }
 });

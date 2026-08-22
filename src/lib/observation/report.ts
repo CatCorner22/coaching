@@ -688,18 +688,67 @@ function sourcesFor(
     sources.add("XAI-TERMS-1");
   }
   if (mediaMode === "selected_video_stills") sources.add("XAI-VIDEO-1");
-  if (categories.some((category) => category.canonical_id.includes("rope") || category.canonical_id.includes("load"))) {
+  // Hazard sources are selected by the categories that actually matched. This
+  // used to substring-match "rope"/"load" plus a hardcoded airway trio, which
+  // left six hazard sources in the ledger unreachable by any report — including
+  // the positional-asphyxia bulletin, the suspension-syncope pair and the
+  // handcuff-neuropathy series, each of which exists precisely to be cited when
+  // its category appears.
+  const matched = new Set(categories.map((category) => category.canonical_id));
+  const anyOf = (...ids: CanonicalId[]) => ids.some((id) => matched.has(id));
+
+  // Nerve and circulation injury from restraint of any kind.
+  if (anyOf(
+    "rope_restraint_unspecified",
+    "rope_present_no_visible_load_path",
+    "cuff_strap_or_wrap_restraint",
+    "multiple_restraint_modalities",
+    "ground_or_surface_supported_restraint_possible",
+    "partial_load_bearing_possible",
+    "off_ground_load_bearing_possible",
+    "load_path_component_visible",
+  )) {
     sources.add("ROPE-1");
+    sources.add("ROPE-2");
   }
-  if (
-    categories.some((category) =>
-      [
-        "neck_or_airway_overlap_possible",
-        "torso_breathing_restriction_possible",
-        "mouth_covering_or_signal_limitation_possible",
-      ].includes(category.canonical_id),
-    )
-  ) {
+  // Manufactured restraints have their own compression-injury literature.
+  if (anyOf("cuff_strap_or_wrap_restraint", "lock_or_key_mechanism_connected_possible")) {
+    sources.add("CUFF-1");
+  }
+  // Breathing failure from position alone, with no neck contact.
+  if (anyOf(
+    "positional_restraint_possible",
+    "inverted_orientation",
+    "torso_breathing_restriction_possible",
+  )) {
+    sources.add("ASPHYX-1");
+  }
+  // Fainting and circulatory collapse while upright or suspended.
+  if (anyOf(
+    "off_ground_load_bearing_possible",
+    "partial_load_bearing_possible",
+    "inverted_orientation",
+    "fall_exposure_possible",
+  )) {
+    sources.add("SYNCOPE-1");
+    sources.add("SYNCOPE-2");
+  }
+  // Catastrophic-outcome patterns: the categories this app treats as stop or
+  // instructor-only, plus being left without an attendant.
+  if (anyOf(
+    "neck_or_airway_overlap_possible",
+    "torso_breathing_restriction_possible",
+    "mouth_covering_or_signal_limitation_possible",
+    "off_ground_load_bearing_possible",
+    "attending_adult_not_visible",
+  )) {
+    sources.add("FATAL-1");
+  }
+  if (anyOf(
+    "neck_or_airway_overlap_possible",
+    "torso_breathing_restriction_possible",
+    "mouth_covering_or_signal_limitation_possible",
+  )) {
     sources.add("NFS-1");
   }
   if (triage === "emergency" || triage === "prompt_medical") sources.add("FIRSTAID-1");
