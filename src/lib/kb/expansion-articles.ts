@@ -169,8 +169,9 @@ export const EXPANSION_ARTICLES: Article[] = [
       {
         type: "ul",
         items: [
-          "Snug without compression is the goal; a commonly taught reference is being able to slide two fingers flat under the cuff. That is a starting fit, not a safety guarantee.",
-          "Place cuffs on the meatier forearm above the wrist bones, not in the narrow groove at the base of the hand where nerves and tendons are shallow.",
+          "No finger-width or gap rule establishes safe pressure. Published references disagree — a fingertip, one finger, two fingers — precisely because none of them measures what actually injures a nerve. Treat any such number as a rough starting point you then monitor, never as a check that passed.",
+          "Both directions fail. Too tight compresses: cuff injury to the nerves at the wrist is a documented pattern, and cuffs that can ratchet or slip tighter after they are applied are a recognized part of it. Too loose is not the safe side either — a cuff that slides under load concentrates its edge on the narrow wrist, which is exactly where those nerves lie shallow.",
+          "Because both ends fail, the check that matters is the person, repeated: ask what they feel, and release for any change. A cuff that felt right at the start is not a cuff that is still right ten minutes later.",
           "Prefer equipment with fast, practiced release: buckles you have actually operated under mild stress beat locks whose key has a single location. If it locks, the key stays in arm's reach of the scene.",
           "The same signals as rope apply: tingling, numbness, coldness, color change, or weakness at any point means release now.",
           "A collar is symbolic equipment. Never attach a load, a downward line, or a pulling force to anything around a neck, and never leave a collared person attached to a fixed point unattended.",
@@ -193,7 +194,7 @@ export const EXPANSION_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "Practicing pattern craft on your own body with free hands and no fixed attachment is a reasonable way to learn rope handling. Genuine self-restraint alone is categorically different: the fatal-outcome literature repeatedly features people who were alone, restrained, and unable to free themselves when something — a faint, a slip, a jammed release, position trouble — went wrong.",
+        text: "Practicing pattern craft on your own body with free hands and no fixed attachment is a reasonable way to learn rope handling. Genuine self-restraint alone is categorically different, for a structural reason rather than a statistical one: it removes the only person who could notice trouble and act. A faint, a slip, a jammed release, or position trouble all become unrecoverable at the moment they happen, because the one thing every emergency response in this app assumes — someone present and able — is absent.",
       },
       {
         type: "ul",
