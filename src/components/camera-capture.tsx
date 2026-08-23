@@ -26,6 +26,11 @@ import {
   validateMediaSignature,
   type ProcessedMediaFrame,
 } from "@/lib/media";
+import {
+  mediaUploadScope,
+  uploadScopeAttestation,
+  uploadScopeSummary,
+} from "@/lib/media-scope";
 import { observeFrame } from "@/lib/ml/detect";
 import type { FrameObservation } from "@/lib/ml/types";
 import { cn } from "@/lib/utils";
@@ -129,6 +134,9 @@ export const CameraCapture = memo(function CameraCapture({
   const [hint, setHint] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [permissions, setPermissions] = useState(EMPTY_PERMISSIONS);
+  // What this deployment is configured to transmit. An operator setting, so it
+  // is read once rather than being something anyone can flip mid-scene.
+  const scope = mediaUploadScope();
   const [capabilityReport, setCapabilityReport] = useState<CameraCapabilityReport | null>(null);
   const [checkingCapabilities, setCheckingCapabilities] = useState(false);
   const [capabilityError, setCapabilityError] = useState<string | null>(null);
@@ -895,12 +903,12 @@ export const CameraCapture = memo(function CameraCapture({
         <p className="mb-2 text-xs leading-relaxed text-muted">
           Confirm legal-adult status, upload scope, and all four permissions separately for each
           batch. Prefer equipment-only, non-identifying stills, and exclude faces, tattoos, screens,
-          mail, and room details. Clothed and intimate-wear views of consenting adults can be
-          uploaded; full nudity and sexual activity cannot. That limit is on what this app sends to
-          the analysis provider, whose policy governs it and publishes no list of permitted adult
-          content — it is not a rule about what you photograph, keep, or share yourselves, and this
-          app has no visibility into any of that. The app cannot detect or certify what a still
-          contains; the confirmation is yours.
+          mail, and room details. {uploadScopeSummary(scope)} That limit is on what this app sends
+          to the analysis provider, and is configured for this deployment by whoever read that
+          provider's policy — it is not a rule about what you photograph, keep, or share
+          yourselves, and this app has no visibility into any of that. Ambiguous age and
+          secretly or coercively obtained media are refused at every setting. The app cannot detect
+          or certify what a still contains; the confirmation is yours.
         </p>
         <div className="space-y-2 text-xs text-fg">
           <PermissionCheck
@@ -911,7 +919,7 @@ export const CameraCapture = memo(function CameraCapture({
           <PermissionCheck
             checked={permissions.nonExplicit}
             onChange={(checked) => updatePermission("nonExplicit", checked)}
-            label="I confirm this batch is within upload scope: lingerie or intimate wear is fine; no full nudity or sexual activity."
+            label={uploadScopeAttestation(scope)}
           />
           <PermissionCheck
             checked={permissions.nonSecret}
