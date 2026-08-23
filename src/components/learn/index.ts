@@ -1,5 +1,10 @@
-export { AcademyShell, StepNav } from "./academy-shell";
+export { AcademyShell } from "./academy-shell";
+export { BeforeYouStart } from "./before-you-start";
+export { HowToLearn } from "./how-to-learn";
 export { StepCard } from "./step-card";
+export { emptyStepConfirm, type StepConfirm } from "./step-confirm";
 export { StepFilmstrip } from "./step-filmstrip";
+export { StepNav } from "./step-nav";
+export { StepProgress } from "./step-progress";
 export { StopStrip } from "./stop-strip";
 export { InstructorPrepCard } from "./instructor-prep-card";

@@ -24,6 +24,8 @@ export type KnotStep = {
   speak: string;
   do?: string;
   check?: string;
+  doBullets?: string[];
+  checkBullets?: string[];
   diagramId?: string;
 };
 
@@ -34,6 +36,9 @@ export type TieStep = {
   check: string;
   speak: string;
   goal?: string;
+  riggerBullets?: string[];
+  checkBullets?: string[];
+  bottomBullets?: string[];
   expected: {
     wrapBands: number;
     pose: Pose;

@@ -1,6 +1,5 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type AcademyShellProps = {
@@ -44,10 +43,12 @@ export function AcademyShell({
         {eyebrow && <p className="text-xs uppercase tracking-[0.22em] text-muted">{eyebrow}</p>}
         <h1 className="mt-1 font-display text-4xl leading-none sm:text-5xl">{title}</h1>
         {badges && <div className="mt-3 flex flex-wrap gap-2">{badges}</div>}
-        {subtitle && <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted">{subtitle}</p>}
+        {subtitle && <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted">{subtitle}</p>}
         {goal && (
-          <p className="academy-goal mt-4 max-w-2xl rounded-lg border border-accent/20 bg-accent/5 px-4 py-3 text-sm leading-relaxed text-fg">
-            <span className="mr-2 text-[10px] font-medium uppercase tracking-[0.18em] text-accent">Goal</span>
+          <p className="academy-goal mt-4 max-w-2xl rounded-lg border border-accent/20 bg-accent/5 px-4 py-4 text-base leading-relaxed text-fg">
+            <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-accent">
+              Your goal — one sentence
+            </span>
             {goal}
           </p>
         )}
@@ -59,27 +60,6 @@ export function AcademyShell({
       </div>
 
       {footer && <footer className="mt-10 border-t border-border pt-8">{footer}</footer>}
-    </div>
-  );
-}
-
-type StepNavProps = {
-  step: number;
-  total: number;
-  onBack: () => void;
-  onNext: () => void;
-  nextLabel?: string;
-};
-
-export function StepNav({ step, total, onBack, onNext, nextLabel = "Next step" }: StepNavProps) {
-  return (
-    <div className="flex gap-2">
-      <Button variant="outline" className="flex-1" disabled={step === 0} onClick={onBack}>
-        Back
-      </Button>
-      <Button className="flex-1" disabled={step >= total - 1} onClick={onNext}>
-        {step >= total - 1 ? "Complete" : nextLabel}
-      </Button>
     </div>
   );
 }

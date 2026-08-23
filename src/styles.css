@@ -144,3 +144,18 @@
 .academy-hub .academy-feature:hover {
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-accent) 25%, transparent);
 }
+
+/* Easy-read mode — larger type and spacing for instructional pages */
+.easy-read {
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.easy-read .academy-step-card {
+  line-height: 1.7;
+}
+
+.easy-read input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+}

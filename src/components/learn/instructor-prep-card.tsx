@@ -12,16 +12,30 @@ export function InstructorPrepCard({ tieName, className }: InstructorPrepCardPro
       <div className="flex items-start gap-3">
         <GraduationCap className="mt-0.5 size-5 shrink-0 text-warn" aria-hidden />
         <div>
-          <h3 className="font-display text-lg text-warn">Instructor route</h3>
-          <p className="mt-2 text-sm leading-relaxed text-muted">
-            <strong className="font-medium text-fg">{tieName}</strong> is recognition and prep only in Knotty
-            Academy. Do not construct this on a person from the app. Use these steps to rehearse vocabulary,
-            risk questions, and release planning with a qualified instructor.
+          <h3 className="font-display text-lg text-warn">Instructor route — look only</h3>
+          <p className="mt-2 text-base leading-relaxed text-muted">
+            <strong className="font-medium text-fg">{tieName}</strong> is for learning words and risks here. Do not tie
+            this on a person from the app.
           </p>
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-muted">
-            <li>Unoccupied form drills only</li>
-            <li>Studio and camera observation disabled</li>
-            <li>No body-loading or restraint clearance</li>
+          <ul className="mt-3 space-y-2 text-base text-muted">
+            <li className="flex gap-2">
+              <span className="text-warn" aria-hidden>
+                •
+              </span>
+              Practice on an empty form only
+            </li>
+            <li className="flex gap-2">
+              <span className="text-warn" aria-hidden>
+                •
+              </span>
+              Camera / Studio is off for this route
+            </li>
+            <li className="flex gap-2">
+              <span className="text-warn" aria-hidden>
+                •
+              </span>
+              A qualified instructor must teach body use in person
+            </li>
           </ul>
         </div>
       </div>

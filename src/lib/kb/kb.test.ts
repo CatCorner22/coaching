@@ -234,6 +234,10 @@ test("academy foundation bundles resolve enriched content", async () => {
     const knot = getAcademyKnot(slug);
     assert.ok(knot?.goal, `${slug} missing goal`);
     assert.ok(knot.steps.every((s) => s.do && s.check && s.diagramId), `${slug} missing step enrichment`);
+    assert.ok(
+      knot.steps.every((s) => (s.doBullets?.length ?? 0) >= 1),
+      `${slug} missing easy-read bullet steps`,
+    );
   }
 
   for (const slug of FOUNDATION_TIE_SLUGS) {
@@ -242,6 +246,10 @@ test("academy foundation bundles resolve enriched content", async () => {
     assert.ok(tie?.goal, `${slug} missing goal`);
     assert.ok(tie.steps.length >= 1, `${slug} missing steps`);
     assert.ok(tie.steps.every((s) => s.goal && s.check), `${slug} missing academy step fields`);
+    assert.ok(
+      tie.steps.every((s) => (s.riggerBullets?.length ?? 0) >= 1),
+      `${slug} missing easy-read bullet steps`,
+    );
   }
 
   const single = getAcademyTie("single-column");
