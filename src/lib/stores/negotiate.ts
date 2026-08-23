@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { MAX_NEGOTIATION_ITEMS } from "@/lib/negotiation-bounds";
 import { persist } from "zustand/middleware";
 import {
   adoptPersistKey,
@@ -6,6 +7,10 @@ import {
   nextNegotiationStamp,
   syncPersistedAcrossTabs,
 } from "./persist";
+
+// Re-exported: the ceiling is shared with the analyze request schema, which
+// must accept the whole list being at no. See @/lib/negotiation-bounds.
+export { MAX_NEGOTIATION_ITEMS };
 
 export type Rank = "yes" | "maybe" | "no";
 
@@ -64,16 +69,6 @@ const STARTER: NegItem[] = [
   { id: "suspension", label: "Full suspension", rank: "no" },
   { id: "alone", label: "Being left tied and alone", rank: "no" },
 ];
-
-/**
- * Ceiling on stored rows, headroom for custom ones included.
- *
- * This was a bare 40 when the starter list held 22 rows. The list is now longer,
- * and a fixed 40 would first squeeze out anyone's own additions and then start
- * truncating persisted state on read — silently, and on the one screen where
- * losing a row means losing a recorded no.
- */
-export const MAX_NEGOTIATION_ITEMS = STARTER.length + 24;
 
 function clampRank(r: unknown): Rank {
   return r === "yes" || r === "maybe" || r === "no" ? r : "no";

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getTie } from "@/lib/kb";
+import { MAX_HARD_NOS } from "@/lib/negotiation-bounds";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { fuseCoach } from "@/lib/ml/fuse";
 import { clampStep, isCameraDataUrl, sanitizeDet, sanitizeQuestion } from "@/lib/ml/sanitize";
@@ -157,7 +158,7 @@ const analyzeInputSchema = z
     tieSlug: z.string().max(60).optional(),
     stepIndex: z.number().finite().optional(),
     elapsedSec: z.number().finite().optional(),
-    hardNos: z.array(z.string().max(80)).max(24).optional(),
+    hardNos: z.array(z.string().max(80)).max(MAX_HARD_NOS).optional(),
     triage: z.enum(triageValues),
     media: z
       .object({
