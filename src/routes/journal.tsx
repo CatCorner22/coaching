@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DeleteButton } from "@/components/confirm-button";
+import { JournalBackupPanel } from "@/components/journal-backup";
 import { SourceEvidence } from "@/components/source-evidence";
 import { getTie } from "@/lib/kb";
 import { purgeLegacyStills, useJournal } from "@/lib/stores/journal";
@@ -38,10 +39,12 @@ function JournalPage() {
         Delete legacy stored stills
       </Button>
       {purgeStatus && <p className="mt-2 text-xs text-muted" role="status">{purgeStatus}</p>}
+      <JournalBackupPanel />
       {entries.length > 0 && (
         <Button
-          variant="outline"
-          className="mt-4"
+          variant="ghost"
+          size="sm"
+          className="mt-3 px-0"
           onClick={() => {
             const blob = new Blob([JSON.stringify(entries, null, 2)], { type: "application/json" });
             const a = document.createElement("a");
@@ -51,7 +54,7 @@ function JournalPage() {
             window.setTimeout(() => URL.revokeObjectURL(a.href), 1000);
           }}
         >
-          Export notes
+          Export unencrypted notes instead
         </Button>
       )}
       {entries.length === 0 ? (

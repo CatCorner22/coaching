@@ -3,6 +3,7 @@ import { Menu } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ConsentGate } from "@/components/consent-gate";
 import { subscribeToLocalDataErase } from "@/lib/privacy/local-data";
+import { registerEmergencyWorker } from "@/lib/offline-emergency";
 import { getPersistFailure, onPersistFailure, type PersistFailure } from "@/lib/stores/persist";
 import { authEnabled } from "@/lib/auth/client";
 import { SignedIn, SignedOut, UserButton } from "@/lib/auth/gates";
@@ -16,15 +17,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     () => subscribeToLocalDataErase(() => window.location.reload()),
     [],
   );
+  // Installs the emergency-card fallback (public/sw.js). Best-effort: it does
+  // one thing — serve /emergency with no network — and a failure to register
+  // leaves the app exactly as it was.
+  useEffect(() => {
+    void registerEmergencyWorker();
+  }, []);
   // Never leave the sheet covering the screen after a navigation.
   useEffect(() => setMoreOpen(false), [pathname]);
-  // A failed write used to be silent: the tab looked correct and the change was
-  // gone on reload. Consent lives in these stores, so the failure has to be
-  // visible on every screen rather than discovered later.
-  const [persistFailure, setPersistFailure] = useState<PersistFailure | null>(() =>
-    getPersistFailure(),
-  );
-  useEffect(() => onPersistFailure(setPersistFailure), []);
   // The sheet's markup precedes its trigger, so forward Tab walked straight
   // past it and out of the page. Move focus in on open, close on Escape, and
   // hand focus back to the trigger — it is the only route to 13 destinations
@@ -60,6 +60,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
   if (pathname === "/emergency") {
     return <div className="min-h-dvh bg-bg text-fg">{children}</div>;
+  }
+  // Rig Mode is the arm's-length scene view. It drops the sidebar, header and
+  // bottom bar on purpose, so nothing competes with the clock and the stop
+  // control — but it stays behind the consent gate, and it still carries the
+  // unsaved-changes banner, which has to appear on every screen.
+  if (pathname === "/rig") {
+    return (
+      <ConsentGate>
+        <div className="min-h-dvh bg-bg text-fg">
+          <div className="px-4 pt-4">
+            <PersistFailureBanner />
+          </div>
+          {children}
+        </div>
+      </ConsentGate>
+    );
   }
   return (
     <ConsentGate>
@@ -159,19 +175,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-label={routeTitle(pathname)}
             className="pb-24 outline-none md:pb-10"
           >
-            {persistFailure && (
-              <div
-                role="alert"
-                className="mx-auto mb-4 max-w-5xl rounded-lg border border-danger/50 bg-danger/10 px-4 py-3 text-sm leading-relaxed text-fg"
-              >
-                <strong className="text-danger-text">Changes are not being saved.</strong>{" "}
-                {persistFailure.reason === "quota"
-                  ? "This device is out of storage for this app, so the last change stayed in this tab only."
-                  : "This browser is blocking storage for this app, so the last change stayed in this tab only."}{" "}
-                Anything you set — including limits and consent — will revert when the page reloads.
-                Treat what is on screen as unsaved until this clears.
-              </div>
-            )}
+            <PersistFailureBanner />
             {children}
           </main>
         </div>
@@ -248,5 +252,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
       </div>
     </ConsentGate>
+  );
+}
+
+/**
+ * A failed write used to be silent: the tab looked correct and the change was
+ * gone on reload. Consent lives in these stores, so the failure has to be
+ * visible on every screen — including the chromeless ones — rather than
+ * discovered later.
+ */
+function PersistFailureBanner() {
+  const [persistFailure, setPersistFailure] = useState<PersistFailure | null>(() =>
+    getPersistFailure(),
+  );
+  useEffect(() => onPersistFailure(setPersistFailure), []);
+  if (!persistFailure) return null;
+  return (
+    <div
+      role="alert"
+      className="mx-auto mb-4 max-w-5xl rounded-lg border border-danger/50 bg-danger/10 px-4 py-3 text-sm leading-relaxed text-fg"
+    >
+      <strong className="text-danger-text">Changes are not being saved.</strong>{" "}
+      {persistFailure.reason === "quota"
+        ? "This device is out of storage for this app, so the last change stayed in this tab only."
+        : "This browser is blocking storage for this app, so the last change stayed in this tab only."}{" "}
+      Anything you set — including limits and consent — will revert when the page reloads. Treat
+      what is on screen as unsaved until this clears.
+    </div>
   );
 }

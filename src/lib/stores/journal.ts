@@ -2,7 +2,13 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Disposition, SourceId } from "@/lib/observation/report";
 import { SAFETY_SOURCE_IDS } from "@/lib/kb/sources";
-import { adoptPersistKey, journalMergingStorage, syncPersistedAcrossTabs } from "./persist";
+import { summarizeImport, type ImportSummary } from "@/lib/journal-backup";
+import {
+  adoptPersistKey,
+  journalMergingStorage,
+  mergeJournalEntriesById,
+  syncPersistedAcrossTabs,
+} from "./persist";
 
 export type JournalEntry = {
   id: string;
@@ -27,6 +33,8 @@ type JournalState = {
   add: (e: Omit<JournalEntry, "id" | "at">) => string;
   remove: (id: string) => void;
   clear: () => void;
+  /** Merge a decrypted backup in, never replacing what is already here. */
+  importEntries: (entries: readonly unknown[], removedIds: readonly string[]) => ImportSummary;
 };
 
 const DISPOSITIONS = new Set<Disposition>([
@@ -96,6 +104,43 @@ export const useJournal = create<JournalState>()(
           removedIds: [...get().removedIds, ...get().entries.map((x) => x.id)].slice(-200),
           nerveHits: 0,
         }),
+      /**
+       * Restore is a union, not a replace: an old backup must never delete
+       * entries written since it was taken. Every incoming row goes through the
+       * same normalizer as a rehydrate, and tombstones from either side win —
+       * so restoring a backup cannot bring back something already deleted.
+       */
+      importEntries: (incoming, incomingRemoved) => {
+        const existing = get().entries;
+        const existingRemoved = get().removedIds;
+        const summary = summarizeImport(
+          incoming as readonly { id?: unknown }[],
+          existing,
+          existingRemoved,
+          incomingRemoved,
+        );
+        const normalized = incoming
+          .map(normalizeJournalEntry)
+          .filter((entry): entry is JournalEntry => entry !== null);
+        const merged = mergeJournalEntriesById(
+          normalized,
+          existing,
+          incomingRemoved,
+          existingRemoved,
+        );
+        if (!merged) return { added: 0, alreadyPresent: 0, skippedDeleted: 0 };
+        const entries = merged.entries as JournalEntry[];
+        set({
+          entries,
+          removedIds: merged.removedIds,
+          nerveHits: entries.reduce(
+            (count, entry) =>
+              count + (entry.flags.some((flag) => /nerve|radial|numb/i.test(flag)) ? 1 : 0),
+            0,
+          ),
+        });
+        return summary;
+      },
     }),
     {
       name: "knotty-journal",

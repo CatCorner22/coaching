@@ -26,6 +26,8 @@ Run it locally with `npm run dev` (port 8080). The camera needs a secure context
 
 **Negotiated limits gate the app.** Ties that map to a limit stay blocked until that limit is set to yes on `/negotiate` — takate-kote needs `gote`, the karada family needs `torso`, matanawa needs `crotch`. Ties with no mapped limit, such as a single column, are open from the start. The `photos` limit gates the whole camera path. Four limits — neck, breath, suspension, alone — are locked to no and cannot be set otherwise, so partial-suspension stays blocked however the list is edited. Limits sync between open tabs, and a revocation in one tab wins over a stale tab's later save.
 
+**Rig mode** (`/rig`, or the button in the Studio header) is the same session with the chrome removed: elapsed time and the direct-check countdown in large type, the current step, and the two safeword buttons at the bottom where a thumb reaches. It holds a screen wake lock so the phone stops locking mid-tie — where the browser allows it; the header says "Screen may sleep" when it does not — and pulses once when the check reminder elapses. It observes nothing and clears nothing; the countdown is the reminder you set on `/settings`, not a deadline.
+
 **Safewords.** Set yours on `/settings`; the plain words *red* and *yellow* are always heard as well. Optional microphone detection fires only when a word is called out, not when it appears inside a sentence — "hand me the red rope" does not stop the session. Red stops and raises the release banner; yellow raises a check-in banner and leaves the session running. Browser speech recognition can fail silently and is never a substitute for a physical stop signal, particularly with anything over the mouth.
 
 **What is saved, and where.** Everything is local to the browser; there is no account sync.
@@ -38,7 +40,9 @@ Run it locally with `npm run dev` (port 8080). The camera needs a secure context
 
 If a save ever fails — a full device, or a browser blocking storage — a banner says so on every screen. Treat what is on screen as unsaved until it clears.
 
-**The emergency card** at `/emergency` is the first item in the mobile More sheet, is offered from the stop banner, and works without passing the adult gate. It needs the network to load: there is no offline cache, so open it before you need it if connectivity is uncertain.
+**Journal backups are encrypted.** `/journal` exports the journal as a single passphrase-encrypted file (AES-GCM, PBKDF2-SHA256 at 600,000 iterations), because an export lands in a downloads folder and downloads folders get synced. Restoring merges into what is already there and never deletes anything, and an entry you deleted stays deleted even if an older backup still contains it. There is no recovery: lose the passphrase and the file is gone. This does not encrypt the journal inside the browser, which stays as described above. The plaintext export is still available, one tap further away.
+
+**The emergency card** at `/emergency` is the first item in the mobile More sheet, is offered from the stop banner, and works without passing the adult gate. It also works with no network: a service worker (`public/sw.js`) precaches a self-contained copy on first load and serves it when the live page cannot be fetched, so a sleeping laptop or dropped wifi does not take the card with it. The offline copy says that it is the offline copy. Neither version guesses an emergency number from browser language or location — use the device's dialer.
 
 **What the camera does not do.** It never infers age, consent, physiology, pain, pressure, load, injury, or safety, and no result is ever clearance. Remote analysis is one request per confirmed batch and cannot be recalled once sent.
 
