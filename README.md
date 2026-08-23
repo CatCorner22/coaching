@@ -7,14 +7,59 @@ The camera accepts photos or short clips, converts video to user-selected labele
 ## Camera privacy and safety boundary
 
 - Per batch: legal-adult attestation; separate clothed/non-explicit, non-secret, non-coerced, and all-people-consented attestations; and separate activity, recording, upload, and output permission.
-- Prefer equipment-only or non-identifying media; exclude faces, tattoos, screens, mail, and room details. Clothed or intimate-wear (lingerie) views of consenting adults are within the supported upload scope; full nudity and sexually explicit content are not.
-- The supported scope mirrors the xAI Acceptable Use Policy, which prohibits pornographic depictions of real people across consumer and API use. Verify the current policy before capturing intimate batches; a policy change changes this boundary.
+- Prefer equipment-only or non-identifying media; exclude faces, tattoos, screens, mail, and room details.
+- What may be uploaded is an operator setting, `VITE_MEDIA_UPLOAD_SCOPE` (see **Upload scope** below). Intimate wear is always within it; full nudity is within it only when the operator has set it so; explicit sexual activity never is.
+- Two limits are not the provider's policy and are not configurable at any setting: apparent or ambiguous minor age, and secretly or coercively obtained media. Both are refused outright.
+- The setting governs the upload only. It says nothing about what anyone photographs, keeps, or shares, and the app has no visibility into any of that — its controls end at its own local batch.
 - The non-explicit boundary is an operator attestation, not automatic content moderation. The app does not certify or reliably detect nudity; do not select explicit media.
 - Video stays local and is reduced to one to three stills selected by the user.
 - Remote analysis and reviewed cloud voice require an operator-enabled xAI team-wide Zero Data Retention setting. Before every selected-media or TTS request, the server sends a fixed text-only probe with the same snapshotted API key and requires an exact `x-zero-data-retention: true` response; it requires the same header again before reading the media or audio response. Failed probes send no selected media. Missing or unavailable confirmation after dispatch causes the response to be discarded and the one-use media batch to remain closed.
 - The current page submits a confirmed batch at most once. A shared Postgres reservation rejects the same verified-user batch across replicas for two hours, exceeding the one-hour permission window; this is not a permanent global exactly-once guarantee. Already-transmitted data cannot be recalled.
 - C3 categories route to qualified in-person instruction. C4 categories stop or decline. Every other result remains lower-consequence learning only or insufficient view—never clearance.
 - Directly reported symptoms and coercion bypass image analysis and route action first.
+
+## Using it
+
+Run it locally with `npm run dev` (port 8080). The camera needs a secure context, so live capture works on `localhost` and on HTTPS, not on a plain-HTTP LAN address — on a phone, reach it over HTTPS or import from the photo library instead.
+
+**The adult gate** asks for four separate attestations before anything opens, and reappears per browser profile. It is not a login.
+
+**Negotiated limits gate the app.** Ties that map to a limit stay blocked until that limit is set to yes on `/negotiate` — takate-kote needs `gote`, the karada family needs `torso`, matanawa needs `crotch`. Ties with no mapped limit, such as a single column, are open from the start. The `photos` limit gates the whole camera path. Four limits — neck, breath, suspension, alone — are locked to no and cannot be set otherwise, so partial-suspension stays blocked however the list is edited. Limits sync between open tabs, and a revocation in one tab wins over a stale tab's later save.
+
+**Safewords.** Set yours on `/settings`; the plain words *red* and *yellow* are always heard as well. Optional microphone detection fires only when a word is called out, not when it appears inside a sentence — "hand me the red rope" does not stop the session. Red stops and raises the release banner; yellow raises a check-in banner and leaves the session running. Browser speech recognition can fail silently and is never a substitute for a physical stop signal, particularly with anything over the mouth.
+
+**What is saved, and where.** Everything is local to the browser; there is no account sync.
+
+| | Saved |
+| --- | --- |
+| Negotiated limits, settings, journal entries | Browser storage, merged across tabs |
+| Direct check-ins | The open tab only — they hold health and consent detail and are deliberately not written to storage |
+| Captures and clips | Page memory until replaced, stopped, or the page closes |
+
+If a save ever fails — a full device, or a browser blocking storage — a banner says so on every screen. Treat what is on screen as unsaved until it clears.
+
+**The emergency card** at `/emergency` is the first item in the mobile More sheet, is offered from the stop banner, and works without passing the adult gate. It needs the network to load: there is no offline cache, so open it before you need it if connectivity is uncertain.
+
+**What the camera does not do.** It never infers age, consent, physiology, pain, pressure, load, injury, or safety, and no result is ever clearance. Remote analysis is one request per confirmed batch and cannot be recalled once sent.
+
+## Upload scope
+
+`VITE_MEDIA_UPLOAD_SCOPE` records what this deployment may transmit to the analysis provider. It is an operator setting rather than an in-app toggle: it answers a question about the provider's acceptable-use policy, not about any one batch, so it is read once from the build environment and cannot be flipped mid-scene.
+
+| Value | Uploads |
+| --- | --- |
+| `non_explicit` (default) | Clothed and intimate-wear views of consenting adults. |
+| `adult_nudity` | Adds full nudity of confirmed adults. Sexual activity is still refused. |
+
+Unset — or set to anything else — means `non_explicit`. An operator who has not read the provider's policy has not agreed to anything, and the failure mode of guessing is intimate images sent somewhere the terms did not permit.
+
+Set it for this workspace in `.grok/app-env.json` (gitignored):
+
+```json
+{ "VITE_MEDIA_UPLOAD_SCOPE": "adult_nudity" }
+```
+
+or in the deployment's project environment, which takes precedence. Read the provider's current Acceptable Use Policy before widening it; a policy change changes what this setting is allowed to be. The capture panel states the setting in force on every batch.
 
 ## Development
 
