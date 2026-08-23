@@ -1,6 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Button } from "@/components/ui/button";
-import { getKnot } from "@/lib/kb";
+import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { KnotFigure } from "@/components/knot-figure";
+import { AcademyShell, StepCard, StepFilmstrip, StepNav, StopStrip } from "@/components/learn";
+import { getAcademyKnot, isFoundationKnot } from "@/lib/kb";
 import { useSettings } from "@/lib/stores/settings";
 import { playCoachVoice } from "@/lib/voice/play";
 
@@ -8,8 +11,10 @@ export const Route = createFileRoute("/knot/$slug")({ component: KnotPage });
 
 function KnotPage() {
   const { slug } = Route.useParams();
-  const knot = getKnot(slug);
+  const knot = getAcademyKnot(slug);
   const cloudVoice = useSettings((settings) => settings.voice);
+  const [step, setStep] = useState(0);
+
   if (!knot) {
     return (
       <div className="px-5 py-16 text-muted">
@@ -17,31 +22,68 @@ function KnotPage() {
       </div>
     );
   }
+
+  const s = knot.steps[step]!;
+  const foundation = isFoundationKnot(slug);
+  const voiceLabel = cloudVoice ? "Speak with cloud voice" : "Browser voice · no xAI";
+
   return (
-    <div className="mx-auto max-w-2xl px-5 py-10">
-      <p className="text-xs uppercase tracking-[0.22em] text-muted">{knot.jp}</p>
-      <h1 className="mt-2 font-display text-4xl">{knot.name}</h1>
-      <p className="mt-4 text-sm leading-relaxed text-muted">{knot.summary}</p>
-      <ol className="mt-8 space-y-5">
-        {knot.steps.map((s, i) => (
-          <li key={s.title} className="rounded-lg border border-border bg-surface p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-wide text-muted">Pass {i + 1}</p>
-              <Button variant="ghost" size="sm" onClick={() => void playCoachVoice(s.speak, cloudVoice)}>
-                {cloudVoice ? "Speak with cloud voice" : "Browser voice · no xAI"}
-              </Button>
+    <AcademyShell
+      backTo={foundation ? "/learn" : "/knots"}
+      backLabel={foundation ? "Knotty Academy" : "All knots"}
+      eyebrow={knot.jp}
+      title={knot.name}
+      subtitle={knot.summary}
+      goal={knot.goal}
+      badges={
+        <>
+          {foundation && <Badge className="border-accent/30 bg-accent/10 text-accent">Academy</Badge>}
+          <Badge>{knot.cinches ? "Cinches" : "Non-cinching"}</Badge>
+          {knot.loadBearing && <Badge>Load-bearing category</Badge>}
+        </>
+      }
+      sidebar={
+        <div className="rounded-xl border border-border bg-surface p-4">
+          <KnotFigure diagramId={s.diagramId ?? `${slug}-${step}`} className="aspect-[5/4] w-full" />
+          <p className="mt-2 text-center text-[11px] uppercase tracking-wide text-subtle">Prop-only diagram</p>
+        </div>
+      }
+      footer={
+        knot.usedIn.length > 0 ? (
+          <div>
+            <h3 className="font-display text-2xl">Used in</h3>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {knot.usedIn.map((tieSlug) => (
+                <Link
+                  key={tieSlug}
+                  to="/tie/$slug"
+                  params={{ slug: tieSlug }}
+                  className="rounded-full border border-border px-3 py-1 text-xs text-muted hover:text-fg"
+                >
+                  {tieSlug.replace(/-/g, " ")}
+                </Link>
+              ))}
             </div>
-            <h2 className="mt-1 font-display text-2xl">{s.title}</h2>
-            <p className="mt-2 text-sm leading-relaxed text-fg">{s.body}</p>
-          </li>
-        ))}
-      </ol>
-      <h3 className="mt-10 font-display text-2xl">Watch</h3>
-      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted">
-        {knot.watch.map((w) => (
-          <li key={w}>{w}</li>
-        ))}
-      </ul>
-    </div>
+          </div>
+        ) : undefined
+      }
+    >
+      <StepFilmstrip steps={knot.steps} active={step} onSelect={setStep} />
+
+      <StepCard
+        index={step}
+        total={knot.steps.length}
+        title={s.title}
+        doText={s.do ?? s.body}
+        checkText={s.check ?? "Structure matches the diagram."}
+        speak={s.speak}
+        voiceLabel={voiceLabel}
+        onSpeak={() => void playCoachVoice(s.speak, cloudVoice)}
+      />
+
+      <StepNav step={step} total={knot.steps.length} onBack={() => setStep((n) => n - 1)} onNext={() => setStep((n) => n + 1)} />
+
+      <StopStrip items={knot.watch} className="mt-8 rounded-xl border border-danger/20 bg-danger/5 p-5" />
+    </AcademyShell>
   );
 }

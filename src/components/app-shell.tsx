@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { BookOpen, Camera, House, Library, Shield } from "lucide-react";
+import { BookOpen, Camera, GraduationCap, House, Shield } from "lucide-react";
 import { useEffect } from "react";
 import { ConsentGate } from "@/components/consent-gate";
 import { subscribeToLocalDataErase } from "@/lib/privacy/local-data";
@@ -9,13 +9,14 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { to: "/", label: "Home", icon: House },
+  { to: "/learn", label: "Learn", icon: GraduationCap },
   { to: "/library", label: "Library", icon: BookOpen },
   { to: "/studio", label: "Studio", icon: Camera },
-  { to: "/knowledge", label: "Guide", icon: Library },
   { to: "/safety", label: "Safety", icon: Shield },
 ] as const;
 
 const MORE = [
+  { to: "/knowledge", label: "Guide" },
   { to: "/checklist", label: "Pre-scene" },
   { to: "/checkin", label: "Check-in" },
   { to: "/knots", label: "Knots" },

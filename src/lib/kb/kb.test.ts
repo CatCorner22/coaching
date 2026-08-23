@@ -218,3 +218,34 @@ test("reviewed answers are deterministic and available without a server or AI", 
   assert.equal(answer, knowledgeAnswer("coercion"));
   assert.match(knowledgeAnswer("zzzzqvvvv"), /No reviewed entry matched/);
 });
+
+test("academy foundation bundles resolve enriched content", async () => {
+  const {
+    FOUNDATION_KNOT_SLUGS,
+    FOUNDATION_TIE_SLUGS,
+    getAcademyKnot,
+    getAcademyTie,
+    isFoundationKnot,
+    isFoundationTie,
+  } = await import("./academy.ts");
+
+  for (const slug of FOUNDATION_KNOT_SLUGS) {
+    assert.ok(isFoundationKnot(slug), slug);
+    const knot = getAcademyKnot(slug);
+    assert.ok(knot?.goal, `${slug} missing goal`);
+    assert.ok(knot.steps.every((s) => s.do && s.check && s.diagramId), `${slug} missing step enrichment`);
+  }
+
+  for (const slug of FOUNDATION_TIE_SLUGS) {
+    assert.ok(isFoundationTie(slug), slug);
+    const tie = getAcademyTie(slug);
+    assert.ok(tie?.goal, `${slug} missing goal`);
+    assert.ok(tie.steps.length >= 1, `${slug} missing steps`);
+    assert.ok(tie.steps.every((s) => s.goal && s.check), `${slug} missing academy step fields`);
+  }
+
+  const single = getAcademyTie("single-column");
+  assert.equal(single?.steps.length, 4);
+  const instructor = getAcademyTie("takate-kote");
+  assert.ok(instructor && instructor.minutes[1] === 0);
+});

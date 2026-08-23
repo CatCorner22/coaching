@@ -13,12 +13,27 @@ export type WrapSpec =
   | { kind: "hip" }
   | { kind: "chest" };
 
+export type LearnMedia =
+  | { kind: "diagram"; diagramId: string }
+  | { kind: "video"; src: string; poster?: string }
+  | { kind: "wraps"; wraps: WrapSpec[] };
+
+export type KnotStep = {
+  title: string;
+  body: string;
+  speak: string;
+  do?: string;
+  check?: string;
+  diagramId?: string;
+};
+
 export type TieStep = {
   title: string;
   rigger: string;
   bottom: string;
   check: string;
   speak: string;
+  goal?: string;
   expected: {
     wrapBands: number;
     pose: Pose;
@@ -43,6 +58,7 @@ export type Tie = {
   nerves: string[];
   intent: string[];
   why: string;
+  goal?: string;
   stop: string[];
   steps: TieStep[];
   mistakes: { title: string; body: string }[];
@@ -55,10 +71,11 @@ export type Knot = {
   name: string;
   jp?: string;
   summary: string;
+  goal?: string;
   cinches: boolean;
   loadBearing: boolean;
   usedIn: string[];
-  steps: { title: string; body: string; speak: string }[];
+  steps: KnotStep[];
   watch: string[];
 };
 
