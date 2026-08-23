@@ -24,6 +24,8 @@ const STARTER: NegItem[] = [
   { id: "voice", label: "Being spoken to in protocol", rank: "no" },
   { id: "cuffs", label: "Wrist and ankle cuffs", rank: "no" },
   { id: "torso", label: "Chest / karada harnesses", rank: "no" },
+  { id: "arms", label: "Arm and shoulder ties", rank: "no" },
+  { id: "legs", label: "Leg and thigh ties", rank: "no" },
   { id: "gote", label: "Takate-kote (box tie)", rank: "no" },
   { id: "crotch", label: "Crotch rope", rank: "no" },
   { id: "gag", label: "Gags", rank: "no" },
@@ -36,6 +38,25 @@ const STARTER: NegItem[] = [
   { id: "bench", label: "Bench / table bondage", rank: "no" },
   { id: "machine", label: "Machine use while bound", rank: "no" },
   { id: "toys", label: "Large toys while bound", rank: "no" },
+  // Activity families beyond rope. Each is its own row because negotiating
+  // "impact" or "sensation" as one item is close to useless — the categories
+  // inside them have almost nothing in common.
+  { id: "spanking", label: "Hand spanking", rank: "no" },
+  { id: "implements", label: "Floggers, paddles, canes", rank: "no" },
+  { id: "wax", label: "Wax or temperature play", rank: "no" },
+  { id: "clamps", label: "Clamps and pinching", rank: "no" },
+  { id: "blindfold", label: "Blindfold", rank: "no" },
+  { id: "hood", label: "Hood or anything over the head", rank: "no" },
+  { id: "electrical", label: "Electrical play", rank: "no" },
+  { id: "denial", label: "Orgasm control or denial", rank: "no" },
+  { id: "chastity", label: "Chastity device", rank: "no" },
+  { id: "degradation", label: "Degrading or humiliating language", rank: "no" },
+  { id: "roleplay", label: "Personas and role play", rank: "no" },
+  { id: "objectify", label: "Objectification / held positions", rank: "no" },
+  { id: "anal", label: "Anal play", rank: "no" },
+  { id: "cnc", label: "Consensual non-consent / resistance", rank: "no" },
+  { id: "discipline", label: "Punishment or discipline", rank: "no" },
+  { id: "substances", label: "Playing after drinking", rank: "no" },
   { id: "face", label: "Face in photos", rank: "no" },
   { id: "public", label: "Anyone else seeing the stills", rank: "no" },
   { id: "neck", label: "Anything on the neck", rank: "no" },
@@ -43,6 +64,16 @@ const STARTER: NegItem[] = [
   { id: "suspension", label: "Full suspension", rank: "no" },
   { id: "alone", label: "Being left tied and alone", rank: "no" },
 ];
+
+/**
+ * Ceiling on stored rows, headroom for custom ones included.
+ *
+ * This was a bare 40 when the starter list held 22 rows. The list is now longer,
+ * and a fixed 40 would first squeeze out anyone's own additions and then start
+ * truncating persisted state on read — silently, and on the one screen where
+ * losing a row means losing a recorded no.
+ */
+export const MAX_NEGOTIATION_ITEMS = STARTER.length + 24;
 
 function clampRank(r: unknown): Rank {
   return r === "yes" || r === "maybe" || r === "no" ? r : "no";
@@ -73,7 +104,7 @@ function parseCandidate(value: unknown): NegItem | null {
  */
 export function normalizeNegotiationItems(value: unknown): NegItem[] {
   const candidates = Array.isArray(value)
-    ? value.slice(0, 40).map(parseCandidate).filter((item): item is NegItem => item !== null)
+    ? value.slice(0, MAX_NEGOTIATION_ITEMS).map(parseCandidate).filter((item): item is NegItem => item !== null)
     : [];
   const starterIds = new Set(STARTER.map((item) => item.id));
   const matchesById = new Map<string, NegItem[]>();
@@ -102,7 +133,7 @@ export function normalizeNegotiationItems(value: unknown): NegItem[] {
       rank: matches.length === 1 ? candidate.rank : "no",
     });
     customIds.add(candidate.id);
-    if (normalized.length === 40) break;
+    if (normalized.length === MAX_NEGOTIATION_ITEMS) break;
   }
   return normalized;
 }

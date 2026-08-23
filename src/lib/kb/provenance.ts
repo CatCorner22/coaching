@@ -70,6 +70,50 @@ const ARTICLE_SOURCE_IDS: Readonly<Record<string, readonly SafetySourceId[]>> = 
   "rope-materials": ["MAT-1"],
   "rope-inspection-retirement": ["MAT-1"],
   "incident-response": ["ROPE-1", "FIRSTAID-1"],
+
+  // ── D/s practice and activity families ──────────────────────────────────
+  // Most of this material is app-authored and stays editorial_only on purpose.
+  // The consent sources anchor the structure-of-consent argument wherever it
+  // appears; the clinical ones anchor a specific named mechanism and nothing
+  // else in the entry. Where no source in the ledger bears on a topic — the
+  // shape of a protocol, what a role obliges, how a debrief goes — the entry
+  // claims no anchor rather than borrowing a loosely related one.
+  "power-exchange-scope": ["CONSENT-1", "CONSENT-2"],
+  "submissive-agency": ["CONSENT-2"],
+  "rules-vs-limits": ["CONSENT-2", "CONSENT-3"],
+  "discipline-and-punishment": ["CONSENT-1", "CONSENT-2", "CONSENT-3"],
+  "orders-and-obedience": ["CONSENT-2"],
+  // Anchors the neck half only: the strangulation and fatality reviews for why
+  // nothing attaches or tightens, and the handcuff series for worn-device fit.
+  // What a collar means between two people has no source and needs none.
+  "collars-and-symbols": ["NFS-1", "FATAL-1", "CUFF-1"],
+  "ongoing-consent-longterm": ["CONSENT-1", "CONSENT-2", "CONSENT-3"],
+  "blanket-consent": ["CONSENT-1", "CONSENT-2"],
+  "consensual-non-consent": ["CONSENT-1", "CONSENT-2", "CONSENT-3"],
+  // The first-aid guidance anchors the unresponsive-person half. That a home
+  // scene lacks a third person is an observation, not a cited finding.
+  "two-person-scene": ["FIRSTAID-1", "ASPHYX-1"],
+  // Injury patterns and first response only. No source here endorses any
+  // technique, target, or intensity, and the entry teaches none.
+  "impact-risk-families": ["NFS-1", "FIRSTAID-1"],
+  // Burn assessment only.
+  "temperature-play": ["FIRSTAID-1"],
+  // The compression series anchors what sustained restriction does to a
+  // circumscribed area; the clock-not-sensation argument follows from it.
+  "clamps-and-constriction": ["ROPE-1", "ROPE-2", "FIRSTAID-1"],
+  // Anchors the airway and position half, which is the part that can kill.
+  "sensory-deprivation": ["ASPHYX-1", "FATAL-1"],
+  "edge-play-line": ["FATAL-1", "ASPHYX-1", "NFS-1"],
+  // The handcuff neuropathy series is the closest published analogue for a
+  // rigid device worn against the body over hours.
+  "chastity-devices": ["CUFF-1"],
+  "humiliation-and-degradation": ["CONSENT-2"],
+  // Stillness, position and breathing; the psychological framing is
+  // app-authored.
+  objectification: ["ASPHYX-1", "FIRSTAID-1"],
+  // Capacity to consent only.
+  "substances-and-play": ["CONSENT-1", "CONSENT-3"],
+  "consent-incident": ["CONSENT-2", "CONSENT-3"],
 };
 
 export function getArticleEvidence(slug: string): ArticleEvidence {
