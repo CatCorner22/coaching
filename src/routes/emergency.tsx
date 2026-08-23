@@ -39,11 +39,19 @@ function EmergencyPage() {
       {/* This page renders outside the app shell (deliberately, so it bypasses
           the consent gate), which also left it with no header, no nav, and no
           way back except the browser's own control. */}
+      {/* Comfortable targets, not bare 20px text links: this page gets used
+          one-handed and under stress. */}
       <div className="mt-8 flex flex-wrap gap-3 text-sm">
-        <Link to="/checkin" className="text-fg underline underline-offset-4">
+        <Link
+          to="/checkin"
+          className="inline-flex min-h-11 items-center text-fg underline underline-offset-4"
+        >
           Log a direct check-in
         </Link>
-        <Link to="/" className="text-muted underline underline-offset-4">
+        <Link
+          to="/"
+          className="inline-flex min-h-11 items-center text-muted underline underline-offset-4"
+        >
           Back to Knotty
         </Link>
       </div>
