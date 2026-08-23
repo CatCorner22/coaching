@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { tieShape, tieShapeLabel } from "@/lib/kb/tie-factories";
 import { MiniTie } from "@/components/rope-figure";
 import { TIES, type Level } from "@/lib/kb";
 
@@ -25,8 +26,12 @@ function LibraryPage() {
       <p className="text-xs uppercase tracking-[0.22em] text-muted">Ties</p>
       <h1 className="mt-2 font-display text-4xl">Library</h1>
       <p className="mt-3 max-w-xl text-sm text-muted">
-        Unoccupied handling drills are separated from instructor-only restraint categories. A
-        library entry is education, never a construction clearance or safe-use approval.
+        Three kinds of entry. <strong className="text-fg">Taught step by step</strong> is
+        exactly that — the full sequence, from rehearsing the release to taking it off the next
+        morning. <strong className="text-fg">Prop drill</strong> is handling practice for a dress
+        form, with nobody in rope. <strong className="text-fg">Instructor route</strong> names a
+        category and its risk and stops there, because written instruction is a poor medium for
+        it. No entry of any kind is a construction clearance or a safe-use approval.
       </p>
       <div className="mt-6 flex flex-wrap gap-2">
         <input
@@ -70,9 +75,15 @@ function LibraryPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-display text-2xl leading-none">{t.name}</span>
-                      <Badge>
-                        {t.minutes[1] === 0 ? "Instructor route" : `${t.minutes[0]}–${t.minutes[1]}m study`}
+                      {/* The taught ties are the reason someone opens this page,
+                          and they were previously indistinguishable from a prop
+                          drill: both simply showed a duration. */}
+                      <Badge variant={tieShape(t) === "guided" ? "accent" : "default"}>
+                        {tieShapeLabel(tieShape(t))}
                       </Badge>
+                      {t.minutes[1] > 0 && (
+                        <Badge>{`${t.minutes[0]}–${t.minutes[1]}m`}</Badge>
+                      )}
                     </div>
                     <p className="mt-2 line-clamp-3 text-sm text-muted">{t.summary}</p>
                   </div>

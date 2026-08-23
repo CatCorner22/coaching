@@ -114,6 +114,18 @@ const ARTICLE_SOURCE_IDS: Readonly<Record<string, readonly SafetySourceId[]>> = 
   // Capacity to consent only.
   "substances-and-play": ["CONSENT-1", "CONSENT-3"],
   "consent-incident": ["CONSENT-2", "CONSENT-3"],
+
+  // ── Technique and mechanism ─────────────────────────────────────────────
+  // The compression series and the rope-specific nerve guidance anchor the
+  // mechanism claims: that nerve injury is the common one, that it occurs
+  // without circulatory change, and that it can present late. The asphyxia
+  // bulletin anchors the positional-breathing mechanism. Everything about how
+  // to hold a rope is craft, and craft has no citation here.
+  "how-rope-injures": ["ROPE-1", "ROPE-2", "ASPHYX-1", "FIRSTAID-1"],
+  // Anchors only the claim that colour, warmth and refill do not detect nerve
+  // compression — which is the entire point of the entry.
+  "the-check-that-works": ["ROPE-1", "ROPE-2", "FIRSTAID-1"],
+  "getting-rope-off": ["FIRSTAID-1"],
 };
 
 export function getArticleEvidence(slug: string): ArticleEvidence {

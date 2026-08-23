@@ -26,7 +26,19 @@ Run it locally with `npm run dev` (port 8080). The camera needs a secure context
 
 **Negotiated limits gate the app.** Every restraint category in the catalog maps to at least one limit and stays blocked until that limit is set to yes on `/negotiate` — takate-kote needs `gote`, the karada family needs `torso`, arm ties need `arms`, leg ties need `legs`, matanawa needs `crotch`. Unoccupied prop drills, such as the single column, are open from the start; they put rope on nobody. The `photos` limit gates the whole camera path. Four limits — neck, breath, suspension, alone — are locked to no and cannot be set otherwise, so partial-suspension, neck rope and every suspension category stay blocked however the list is edited. The list also carries the activity families beyond rope, one row each, because a single "impact" row would cover a hand and a cane alike. Limits sync between open tabs, and a revocation in one tab wins over a stale tab's later save.
 
-**What's in the catalog.** 63 ties and 79 articles. Ties come in exactly two shapes and nothing in between: an unoccupied-practice drill for a dress form, or an instructor route that names a restraint category, states its risk family, and sends you to someone who can teach it in a room. There is deliberately no third shape — the app publishes no body-placement recipes, for rope or for anything else. The articles cover consent and negotiation, the body, scene practice, D/s protocol and power exchange, the activity families that get combined with rope, aftercare, and risk. Each carries an evidence panel saying whether it is source-anchored or app-authored.
+**What's in the catalog.** 63 ties and 85 articles. Ties come in exactly three shapes, labelled on every card:
+
+| Shape | What it means |
+| --- | --- |
+| **Taught step by step** | The full sequence, from rehearsing the release to checking again the next morning. May go on a consenting adult once its negotiated limit is agreed. |
+| **Prop drill** | Handling practice for a dress form. Nobody is placed in rope. |
+| **Instructor route** | The category and its risk family, named — and nothing more. |
+
+The line between the second and third is not how advanced a tie looks. It is whether written instruction has a track record of producing injury. Limb cuffs, decorative patterns, handling, tension and removal are taught in writing everywhere and are taught here. Upper-arm bands — the box-tie and chest-harness family — are the documented source of most rope nerve injury, they fail without a visible warning, and they stay instructor-only. So does anything bearing weight, anything on the neck, anything restricting breathing.
+
+Every check in a taught tie tells you when to stop. None tells you it is safe to continue, because none can: nerve compression happens without changing circulation, so colour, warmth and capillary refill stay normal while the damage does. The catalog says this out loud on every taught tie rather than leaving it implied.
+
+The articles cover consent and negotiation, the body and how rope actually injures it, technique and craft, scene practice, D/s protocol and power exchange, the activity families combined with rope, aftercare, and risk. Each carries an evidence panel saying whether it is source-anchored or app-authored.
 
 **Rig mode** (`/rig`, or the button in the Studio header) is the same session with the chrome removed: elapsed time and the direct-check countdown in large type, the current step, and the two safeword buttons at the bottom where a thumb reaches. It holds a screen wake lock so the phone stops locking mid-tie — where the browser allows it; the header says "Screen may sleep" when it does not — and pulses once when the check reminder elapses. It observes nothing and clears nothing; the countdown is the reminder you set on `/settings`, not a deadline.
 

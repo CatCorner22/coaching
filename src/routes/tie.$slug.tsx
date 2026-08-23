@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RopeFigure } from "@/components/rope-figure";
 import { getKnot, getTie } from "@/lib/kb";
+import { tieShape, tieShapeBlurb, tieShapeLabel } from "@/lib/kb/tie-factories";
 import { useSettings } from "@/lib/stores/settings";
 import { playCoachVoice } from "@/lib/voice/play";
 
@@ -29,12 +30,15 @@ function TiePage() {
         <p className="text-xs uppercase tracking-[0.22em] text-muted">{tie.jp}</p>
         <h1 className="mt-2 font-display text-4xl">{tie.name}</h1>
         <div className="mt-3 flex flex-wrap gap-2">
-          <Badge>{tie.level}</Badge>
-          <Badge>
-            {tie.minutes[1] === 0 ? "Instructor route" : `${tie.minutes[0]}–${tie.minutes[1]} min study`}
+          <Badge variant={tieShape(tie) === "guided" ? "accent" : "default"}>
+            {tieShapeLabel(tieShape(tie))}
           </Badge>
-          <Badge>{tie.position}</Badge>
+          <Badge>{tie.level}</Badge>
+          {tie.minutes[1] > 0 && <Badge>{`${tie.minutes[0]}–${tie.minutes[1]} min`}</Badge>}
         </div>
+        {/* Says up front what the reader may actually do with this entry,
+            rather than leaving it to be inferred from a duration badge. */}
+        <p className="mt-3 text-sm leading-relaxed text-fg">{tieShapeBlurb(tieShape(tie))}</p>
         <p className="mt-4 text-sm leading-relaxed text-muted">{tie.summary}</p>
         <p className="mt-3 text-sm text-fg">{tie.why}</p>
         <p className="mt-3 rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-xs leading-relaxed text-warn">

@@ -1,34 +1,10 @@
 import type { Tie } from "./types";
 import { instructorRoute, unoccupiedPractice } from "./tie-factories";
 import { MORE_TIES } from "./more-ties";
+import { GUIDED_TIES } from "./guided-ties";
 import { SHIBARI_TIES } from "./shibari-ties";
 
 const CORE_TIES: Tie[] = [
-  unoccupiedPractice({
-    slug: "single-column",
-    name: "Single Column: Unoccupied Practice",
-    jp: "一本縛り",
-    summary:
-      "Learn to recognize and dress a non-cinching single-column structure on a smooth prop. This app does not teach wrist, ankle, limb, attachment, or loaded use.",
-    level: "foundation",
-    knots: ["somerville-bowline"],
-    nerves: ["ulnar", "radial"],
-    intent: ["foundation", "craft"],
-    purpose: "The drill builds rope-handling vocabulary and makes a cinching error easier to see on an object.",
-  }),
-  unoccupiedPractice({
-    slug: "double-column",
-    name: "Double Column: Unoccupied Practice",
-    jp: "二本縛り",
-    summary:
-      "Recognize a two-column structure on paired props. This app does not teach binding limbs or using a gap, color, warmth, or movement as clearance.",
-    level: "foundation",
-    knots: ["wrap-cinch", "somerville-bowline"],
-    nerves: ["ulnar", "radial"],
-    intent: ["foundation", "craft"],
-    purpose: "The drill shows how two columns and a cinch differ from a single constricting bundle.",
-    bands: 2,
-  }),
   unoccupiedPractice({
     slug: "larks-head-cuff",
     name: "Lark's Head: Object-Only",
@@ -51,19 +27,6 @@ const CORE_TIES: Tie[] = [
     intent: ["legs", "floor"],
     risks: "A folded limb can develop concerning symptoms and may be difficult to release quickly.",
     alternative: "Practice the rope pattern on an unoccupied bolster or choose an unrestrained, self-selected position.",
-  }),
-  unoccupiedPractice({
-    slug: "karada",
-    name: "Karada Pattern: Unoccupied Practice",
-    jp: "体",
-    summary:
-      "A diamond-pattern vocabulary drill for an unoccupied dress form. This app excludes neck contact, intimate passes, restraint, and loaded use.",
-    level: "foundation",
-    knots: ["larks-head", "reverse-tension", "square"],
-    nerves: [],
-    intent: ["decorative", "craft"],
-    purpose: "The drill develops even patterning and reversible rope handling without placing rope on a person.",
-    bands: 3,
   }),
   instructorRoute({
     slug: "shinju",
@@ -216,7 +179,8 @@ const CORE_TIES: Tie[] = [
   }),
 ];
 
-export const TIES: Tie[] = [...CORE_TIES, ...MORE_TIES, ...SHIBARI_TIES];
+// Guided first: these are the ones a reader can actually act on.
+export const TIES: Tie[] = [...GUIDED_TIES, ...CORE_TIES, ...MORE_TIES, ...SHIBARI_TIES];
 
 export function getTie(slug: string) {
   if (!slug) return undefined;

@@ -107,11 +107,37 @@ test("routes present blocked categories as instructor routes rather than timed p
   const planner = await readFile("src/routes/plan.tsx", "utf8");
   const copy = `${library}\n${tie}\n${dungeon}\n${planner}`;
 
-  assert.match(library, /t\.minutes\[1\] === 0 \? "Instructor route"/);
-  assert.match(tie, /tie\.minutes\[1\] === 0 \? "Instructor route"/);
+  // Both tie surfaces must label an entry from its own shape marker rather than
+  // from a duration proxy. These used to assert the literal
+  // `minutes[1] === 0 ? "Instructor route"`, which was standing in for this and
+  // broke as soon as the label became something the tie itself declares — a
+  // strictly better source, since a duration of zero was only ever a tell.
+  for (const [name, source] of [["library", library], ["tie", tie]]) {
+    assert.match(source, /tieShape\(/, `${name} must derive its label from the tie's shape`);
+    assert.match(source, /tieShapeLabel\(/, `${name} must use the shared label`);
+    // And must not reintroduce a hand-rolled label that could disagree with it.
+    assert.doesNotMatch(
+      source,
+      /minutes\[1\] === 0 \? "Instructor route"/,
+      `${name} still labels from a duration proxy`,
+    );
+  }
   assert.match(dungeon, /s\.minutes === 0 \? "Instructor route"/);
   assert.doesNotMatch(copy, /suspension is a primer|rope dresses her|furniture\s+holds her|next wrap/i);
   assert.doesNotMatch(dungeon, /Load in planner|Open studio/);
+
+  // The data has to agree with the presentation: an instructor route never
+  // carries a duration, and a taught tie always does.
+  const { TIES } = await import("../src/lib/kb/index.ts");
+  const { tieShape } = await import("../src/lib/kb/tie-factories.ts");
+  for (const entry of TIES) {
+    const shape = tieShape(entry);
+    if (shape === "instructor") {
+      assert.equal(entry.minutes[1], 0, `${entry.slug} is an instructor route with a duration`);
+    } else {
+      assert.ok(entry.minutes[1] > 0, `${entry.slug} is presented as doable with no duration`);
+    }
+  }
 });
 
 test("camera reports and saved journal entries retain visible source provenance", async () => {
