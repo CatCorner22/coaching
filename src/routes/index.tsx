@@ -143,8 +143,11 @@ function Home() {
             >
               <MiniTie wraps={t.steps.at(-1)?.wraps ?? []} pose={t.steps.at(-1)?.expected.pose} />
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="font-display text-2xl">{t.name}</p>
+                {/* Wrapping, not a nested nowrap row: side by side the title's
+                    longest word plus the badge set a min-content wider than a
+                    390px phone, and the whole page scrolled sideways. */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="min-w-0 wrap-anywhere font-display text-2xl">{t.name}</p>
                   <Badge>{t.level}</Badge>
                 </div>
                 <p className="text-xs text-subtle">{t.jp}</p>
