@@ -51,15 +51,14 @@ If a save ever fails — a full device, or a browser blocking storage — a bann
 | `non_explicit` (default) | Clothed and intimate-wear views of consenting adults. |
 | `adult_nudity` | Adds full nudity of confirmed adults. Sexual activity is still refused. |
 
-Unset — or set to anything else — means `non_explicit`. An operator who has not read the provider's policy has not agreed to anything, and the failure mode of guessing is intimate images sent somewhere the terms did not permit.
+**This repository is configured for `adult_nudity`**, recorded in `DEFAULT_APP_ENV` in `scripts/with-app-env.mjs` so it travels with the repo and applies to `dev`, `build` and `preview` alike. The owner set it having accepted that the provider's Acceptable Use Policy is the governing document and that this repository cannot verify it.
 
-Set it for this workspace in `.grok/app-env.json` (gitignored):
+To change it, edit that value, or override it without touching the repo:
 
-```json
-{ "VITE_MEDIA_UPLOAD_SCOPE": "adult_nudity" }
-```
+- `.grok/app-env.json` in a workspace (gitignored, so it does not survive a fresh clone or reach a deployment), or
+- a real `VITE_MEDIA_UPLOAD_SCOPE` in the deployment's project environment, which beats both.
 
-or in the deployment's project environment, which takes precedence. Read the provider's current Acceptable Use Policy before widening it; a policy change changes what this setting is allowed to be. The capture panel states the setting in force on every batch.
+An unrecognised value falls back to `non_explicit` rather than widening, so a typo cannot silently open the boundary. Read the provider's current Acceptable Use Policy before changing it upward; a policy change changes what this setting is allowed to be. The capture panel states the setting in force on every batch.
 
 ## Development
 

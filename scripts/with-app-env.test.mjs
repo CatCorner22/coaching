@@ -42,12 +42,18 @@ test("drops non-VITE keys, non-string values and malformed documents", () => {
 });
 
 test("a missing app-env.json uses the safe standalone auth-off default", () => {
-  assert.deepEqual(readAppEnv(makeWorkspace()), { VITE_AUTH_ENABLED: "false" });
+  assert.deepEqual(readAppEnv(makeWorkspace()), {
+    VITE_AUTH_ENABLED: "false",
+    VITE_MEDIA_UPLOAD_SCOPE: "adult_nudity",
+  });
 });
 
 test("reads the app env from a workspace", () => {
   const root = makeWorkspace('{"VITE_AUTH_ENABLED":"false"}');
-  assert.deepEqual(readAppEnv(root), { VITE_AUTH_ENABLED: "false" });
+  assert.deepEqual(readAppEnv(root), {
+    VITE_AUTH_ENABLED: "false",
+    VITE_MEDIA_UPLOAD_SCOPE: "adult_nudity",
+  });
 });
 
 test("an explicit process-env override wins over the file", () => {
@@ -59,8 +65,14 @@ test("an explicit process-env override wins over the file", () => {
   assert.equal(merged.PATH, "/usr/bin");
 });
 
-test("the template ships auth off", () => {
-  assert.deepEqual(readAppEnv(projectRoot()), { VITE_AUTH_ENABLED: "false" });
+test("the template ships auth off and records the chosen upload scope", () => {
+  // The scope is a tracked repo-level setting rather than a workspace file,
+  // because .grok/ is gitignored: a value set there would not survive a fresh
+  // clone or reach a deployment. A real process.env entry still overrides it.
+  assert.deepEqual(readAppEnv(projectRoot()), {
+    VITE_AUTH_ENABLED: "false",
+    VITE_MEDIA_UPLOAD_SCOPE: "adult_nudity",
+  });
 });
 
 test("vite loadEnv resolves the wrapped value", () => {

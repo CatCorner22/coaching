@@ -29,7 +29,16 @@ import { checkDeployAuthConfig } from "./check-auth-invariant.mjs";
 export const APP_ENV_REL_PATH = ".grok/app-env.json";
 
 const VITE_PREFIX = "VITE_";
-const DEFAULT_APP_ENV = Object.freeze({ VITE_AUTH_ENABLED: "false" });
+const DEFAULT_APP_ENV = Object.freeze({
+  VITE_AUTH_ENABLED: "false",
+  // This deployment's owner set the upload scope, having accepted that the
+  // provider's Acceptable Use Policy is the governing document and that this
+  // repository cannot verify it. See "Upload scope" in the README to change it.
+  // A real process.env entry still wins, so a deployment can override; and an
+  // unrecognised value still falls back to non_explicit rather than widening,
+  // so a typo here cannot silently open the boundary.
+  VITE_MEDIA_UPLOAD_SCOPE: "adult_nudity",
+});
 
 /**
  * Parse an app-env document, keeping only `VITE_`-prefixed string entries.
