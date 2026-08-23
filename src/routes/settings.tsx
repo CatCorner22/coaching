@@ -77,7 +77,7 @@ function SettingsPage() {
               s.set({ voice: event.target.checked });
             }}
           />
-          Enable cloud voice; send each spoken line to xAI TTS
+          Enable sultry female cloud voice; send each spoken line to xAI TTS
         </label>
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={s.listen} onChange={(e) => s.set({ listen: e.target.checked })} />
@@ -98,7 +98,7 @@ function SettingsPage() {
             Names and titles, safewords, negotiation choices and notes, plans, kit state, and journal
             summaries are stored unencrypted in this browser profile until erased. The app holds
             current captures in page memory; pressing Analyze sends selected compressed stills and
-            generic labels through the app server to xAI. Cloud voice sends each spoken line to xAI
+            generic labels through the app server to xAI. Cloud voice uses a warm female coach voice via xAI
             TTS, and browser speech recognition may use a browser-vendor service. Providers may log
             or retain transmitted data according to their service and workspace settings. This is
             unsuitable for a shared or monitored device.

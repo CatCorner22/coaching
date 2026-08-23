@@ -1,6 +1,7 @@
 import type { Knot, KnotStep, Tie, TieStep } from "./types";
 import { getKnot } from "./knots";
 import { getTie } from "./ties";
+import { defaultKnotStepMedia, defaultTieStepMedia } from "./media-registry";
 
 export const FOUNDATION_KNOT_SLUGS = [
   "somerville-bowline",
@@ -8,7 +9,7 @@ export const FOUNDATION_KNOT_SLUGS = [
   "double-half-hitch",
   "square",
   "half-hitch",
-  "figure-eight",
+  "overhand-on-bight",
 ] as const;
 
 export const FOUNDATION_TIE_SLUGS = [
@@ -17,7 +18,19 @@ export const FOUNDATION_TIE_SLUGS = [
   "shinju",
   "tasuki",
   "hip-harness",
-  "double-column",
+  "chair",
+] as const;
+
+export const FOUNDATION_PRACTICE_TIE_SLUGS = [
+  "single-column",
+  "karada",
+  "tasuki",
+] as const;
+
+export const FOUNDATION_INSTRUCTOR_TIE_SLUGS = [
+  "shinju",
+  "hip-harness",
+  "chair",
 ] as const;
 
 type KnotEnrichment = {
@@ -203,6 +216,26 @@ const KNOT_ENRICHMENTS: Record<string, KnotEnrichment> = {
           "The tail points in a clear direction.",
         ],
         diagramId: "figure-eight-0",
+      },
+    ],
+  },
+  "overhand-on-bight": {
+    goal: "Make a simple loop (overhand on a bight) — for stoppers, not cuffs.",
+    steps: [
+      {
+        do: "Fold the rope at the middle. Wrap the standing pair. Pull the bight through.",
+        doBullets: [
+          "Find the middle of the rope and fold it into a bight.",
+          "Wrap the bight around the two standing rope parts.",
+          "Pull the bight through the loop you made.",
+          "Dress the knot flat.",
+        ],
+        check: "You see a simple overhand loop. Remember: it jams under load.",
+        checkBullets: [
+          "The knot looks like a simple overhand on doubled rope.",
+          "You are not using this as a cuff on a person.",
+        ],
+        diagramId: "overhand-on-bight-0",
       },
     ],
   },
@@ -485,6 +518,58 @@ const TIE_ACADEMY: Record<string, { goal: string; steps: TieStep[] }> = {
       },
     ],
   },
+  chair: {
+    goal: "Inspect an empty chair for rope risks — do not attach rope to a person.",
+    steps: [
+      {
+        title: "Empty chair walk-around",
+        goal: "Identify pinch points and exits on an unoccupied chair.",
+        rigger:
+          "Place an empty chair in your practice space. Walk around it and point to legs, seat edge, back rest, and floor contact points.",
+        riggerBullets: [
+          "Use a stable chair with no person in it.",
+          "Point to each leg and the seat edge.",
+          "Find where rope could pinch or snag.",
+          "Locate where trauma shears could reach every rope path.",
+        ],
+        bottom: "Household chairs are not verified restraint systems.",
+        bottomBullets: [
+          "Do not sit anyone in rope from this app.",
+          "This is a risk map, not a tie lesson.",
+        ],
+        check: "You named exits, pinch points, and shear access without loading the chair.",
+        checkBullets: [
+          "The chair stayed empty the whole time.",
+          "You can name at least two pinch or snag zones.",
+          "Shears are within reach of the chair.",
+        ],
+        speak: "Empty chair inspection only. No attachment.",
+        expected: { wrapBands: 0, pose: "sit", view: "front", handsVisible: true, neckClear: true },
+        wraps: [],
+      },
+      {
+        title: "Questions for your instructor",
+        goal: "Prepare questions before any in-person furniture work.",
+        rigger:
+          "Write down: How do we monitor circulation? What is the release order? What if the person slides off the seat?",
+        riggerBullets: [
+          "List three questions about monitoring.",
+          "List two questions about rapid release.",
+          "List one question about chair stability.",
+        ],
+        bottom: "Furniture restraint requires qualified hands-on instruction.",
+        bottomBullets: ["Do not combine chair and rope on a person from this app."],
+        check: "You have written questions — not a construction plan.",
+        checkBullets: [
+          "Your notes are questions, not step-by-step body steps.",
+          "You understand Studio is unavailable for this route.",
+        ],
+        speak: "Prep questions only. Seek in-person instruction.",
+        expected: { wrapBands: 0, pose: "sit", view: "front", handsVisible: true, neckClear: true },
+        wraps: [],
+      },
+    ],
+  },
 };
 
 export function enrichKnotStep(
@@ -494,13 +579,15 @@ export function enrichKnotStep(
   fallbackCheck?: string,
 ): KnotStep {
   const patch = KNOT_ENRICHMENTS[slug]?.steps[index];
+  const diagramId = patch?.diagramId ?? `${slug}-${index}`;
   return {
     ...step,
     do: patch?.do ?? step.body,
     check: patch?.check ?? fallbackCheck ?? "It looks like the diagram.",
     doBullets: patch?.doBullets,
     checkBullets: patch?.checkBullets,
-    diagramId: patch?.diagramId ?? `${slug}-${index}`,
+    diagramId,
+    media: patch?.media ?? defaultKnotStepMedia(slug, index, diagramId),
   };
 }
 
@@ -520,10 +607,17 @@ export function getAcademyTie(slug: string): Tie | undefined {
   if (!base) return undefined;
   const academy = TIE_ACADEMY[slug];
   if (!academy) return { ...base, goal: base.why.split(".")[0] + "." };
+  const steps = academy.steps.map((step, i) => {
+    const cumulative = academy.steps.slice(0, i + 1).flatMap((x) => x.wraps);
+    return {
+      ...step,
+      media: step.media ?? defaultTieStepMedia(cumulative, slug, i),
+    };
+  });
   return {
     ...base,
     goal: academy.goal,
-    steps: academy.steps,
+    steps,
   };
 }
 

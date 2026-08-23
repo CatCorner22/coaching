@@ -1,5 +1,10 @@
 import { speakCoach } from "@/lib/ai/voice";
 import { scrubBannedAnswer, textIsBanned } from "@/lib/ml/audit";
+import {
+  applyCoachBrowserVoice,
+  coachVoiceCacheKey,
+  loadCoachBrowserVoices,
+} from "@/lib/voice/coach-profile";
 
 type CachedVoice = { url: string; bytes: number };
 const cache = new Map<string, CachedVoice>();
@@ -41,13 +46,14 @@ export async function playCoachVoice(text: string, cloudEnabled = false) {
   if (!key) return;
   stopCoachVoice();
   const generation = playbackGeneration;
+  const cacheKey = coachVoiceCacheKey(key);
   if (cloudEnabled) {
     try {
-      const cached = cache.get(key) ?? (await loadVoice(key, generation));
+      const cached = cache.get(cacheKey) ?? (await loadVoice(key, cacheKey, generation));
       if (cached && generation === playbackGeneration) {
         // Refresh LRU order without duplicating the object URL.
-        cache.delete(key);
-        cache.set(key, cached);
+        cache.delete(cacheKey);
+        cache.set(cacheKey, cached);
         const audio = new Audio(cached.url);
         currentAudio = audio;
         audio.addEventListener("ended", () => {
@@ -63,14 +69,14 @@ export async function playCoachVoice(text: string, cloudEnabled = false) {
   if (generation === playbackGeneration && "speechSynthesis" in window) {
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(key);
-    u.rate = 0.95;
-    u.pitch = 0.95;
+    const voices = await loadCoachBrowserVoices();
+    applyCoachBrowserVoice(u, voices);
     window.speechSynthesis.speak(u);
   }
 }
 
-async function loadVoice(key: string, generation: number): Promise<CachedVoice | null> {
-  const existing = inflight.get(key);
+async function loadVoice(key: string, cacheKey: string, generation: number): Promise<CachedVoice | null> {
+  const existing = inflight.get(cacheKey);
   if (existing) return existing;
   if (inflight.size >= MAX_INFLIGHT_VOICES) return null;
   const pending = (async () => {
@@ -87,16 +93,16 @@ async function loadVoice(key: string, generation: number): Promise<CachedVoice |
       url: URL.createObjectURL(new Blob([audioBuffer], { type: response.mime })),
       bytes: bytes.byteLength,
     };
-    cache.set(key, entry);
+    cache.set(cacheKey, entry);
     cachedVoiceBytes += entry.bytes;
     evictVoiceCache();
     return entry;
   })();
-  inflight.set(key, pending);
+  inflight.set(cacheKey, pending);
   try {
     return await pending;
   } finally {
-    inflight.delete(key);
+    inflight.delete(cacheKey);
   }
 }
 

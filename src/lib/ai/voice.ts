@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { scrubBannedAnswer, textIsBanned } from "@/lib/ml/audit";
+import { COACH_CLOUD_VOICE_ID } from "@/lib/voice/coach-profile";
 import { authorizeAiRequest } from "./guard.server";
 
 const TTS_TIMEOUT_MS = 15_000;
@@ -36,7 +37,7 @@ export const speakCoach = createServerFn({ method: "POST" })
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({ text: data.text, voice_id: "eve", language: "en" }),
+        body: JSON.stringify({ text: data.text, voice_id: COACH_CLOUD_VOICE_ID, language: "en" }),
         signal: controller.signal,
       });
       if (!res.ok) {

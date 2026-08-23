@@ -27,6 +27,7 @@ export type KnotStep = {
   doBullets?: string[];
   checkBullets?: string[];
   diagramId?: string;
+  media?: LearnMedia[];
 };
 
 export type TieStep = {
@@ -39,6 +40,7 @@ export type TieStep = {
   riggerBullets?: string[];
   checkBullets?: string[];
   bottomBullets?: string[];
+  media?: LearnMedia[];
   expected: {
     wrapBands: number;
     pose: Pose;

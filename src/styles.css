@@ -159,3 +159,11 @@
   width: 1.25rem;
   height: 1.25rem;
 }
+
+.learn-wrap-highlight {
+  filter: drop-shadow(0 0 4px color-mix(in oklab, var(--color-accent) 55%, transparent));
+}
+
+.learn-panel .learn-video video {
+  background: var(--color-elevated);
+}

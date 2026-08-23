@@ -21,7 +21,7 @@ test("cloud voice is fail-closed and route controls pass the saved opt-in", () =
     const route = read(path);
     assert.match(route, /useSettings\(\(settings\) => settings\.voice\)/, path);
     assert.match(route, /playCoachVoice\([^\n]+, cloudVoice\)/, path);
-    assert.match(route, /Browser voice · no xAI/, path);
+    assert.match(route, /coachVoiceLabel\(cloudVoice\)/, path);
   }
 
   const settings = read("src/routes/settings.tsx");

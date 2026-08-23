@@ -28,8 +28,14 @@ import {
 
 export const Route = createFileRoute("/studio")({
   ssr: false,
-  validateSearch: (s: Record<string, unknown>): { tie?: string } => ({
+  validateSearch: (s: Record<string, unknown>): { tie?: string; step?: number } => ({
     tie: typeof s.tie === "string" && s.tie.length > 0 ? s.tie : undefined,
+    step:
+      typeof s.step === "number" && Number.isFinite(s.step) && s.step >= 0
+        ? Math.floor(s.step)
+        : typeof s.step === "string" && /^\d+$/.test(s.step)
+          ? Number.parseInt(s.step, 10)
+          : undefined,
   }),
   component: StudioPage,
 });
@@ -125,12 +131,15 @@ function StudioPage() {
     if (search.tie) {
       const requestedTie = getTie(search.tie);
       setTie(requestedTie && requestedTie.minutes[1] > 0 ? search.tie : undefined);
+      if (requestedTie && search.step != null && search.step < requestedTie.steps.length) {
+        setStep(search.step);
+      }
     }
     if (!useSession.getState().startedAt) startSession();
     useSession.getState().tick(Date.now());
     const id = window.setInterval(() => useSession.getState().tick(Date.now()), 1000);
     return () => window.clearInterval(id);
-  }, [search.tie, setTie, startSession]);
+  }, [search.tie, search.step, setTie, setStep, startSession]);
 
   const stopAlertRef = useRef<HTMLDivElement>(null);
 

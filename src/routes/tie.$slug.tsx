@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  AcademyCoachPanel,
   AcademyShell,
   BeforeYouStart,
   InstructorPrepCard,
@@ -14,9 +15,10 @@ import {
   emptyStepConfirm,
   type StepConfirm,
 } from "@/components/learn";
-import { RopeFigure } from "@/components/rope-figure";
 import { bulletsOrFallback } from "@/lib/learn/plain-language";
 import { getAcademyTie, getKnot, isFoundationTie, isInstructorRoute } from "@/lib/kb";
+import { coachVoiceLabel } from "@/lib/voice/coach-profile";
+import { useLearnProgress } from "@/lib/stores/learn-progress";
 import { useSettings } from "@/lib/stores/settings";
 import { playCoachVoice } from "@/lib/voice/play";
 
@@ -26,12 +28,18 @@ function TiePage() {
   const { slug } = Route.useParams();
   const tie = getAcademyTie(slug);
   const cloudVoice = useSettings((settings) => settings.voice);
+  const markStepComplete = useLearnProgress((s) => s.markStepComplete);
+  const setLast = useLearnProgress((s) => s.setLast);
   const [step, setStep] = useState(0);
   const [confirm, setConfirm] = useState<StepConfirm>(emptyStepConfirm);
 
   useEffect(() => {
     setConfirm(emptyStepConfirm());
   }, [step]);
+
+  useEffect(() => {
+    if (tie) setLast({ kind: "tie", slug, step });
+  }, [tie, slug, step, setLast]);
 
   if (!tie) {
     return (
@@ -45,8 +53,42 @@ function TiePage() {
   const wraps = tie.steps.slice(0, step + 1).flatMap((x) => x.wraps);
   const instructor = isInstructorRoute(tie);
   const foundation = isFoundationTie(slug);
-  const voiceLabel = cloudVoice ? "Speak with cloud voice" : "Browser voice · no xAI";
+  const voiceLabel = coachVoiceLabel(cloudVoice);
   const bottomLines = bulletsOrFallback(s.bottomBullets, s.bottom);
+  const voiceStep = {
+    stepIndex: step,
+    totalSteps: tie.steps.length,
+    title: s.title,
+    stepGoal: s.goal,
+    doText: s.rigger,
+    checkText: s.check,
+    doBullets: s.riggerBullets,
+    checkBullets: s.checkBullets,
+    speak: s.speak,
+  };
+
+  function goNext() {
+    markStepComplete("tie", slug, step);
+    setStep((n) => n + 1);
+  }
+
+  const coachPanel = (
+    <AcademyCoachPanel
+      voice={voiceStep}
+      cloudVoice={cloudVoice}
+      media={s.media}
+      tie={tie}
+      stepIndex={step}
+      expectedBands={s.expected.wrapBands}
+      tieContext={{
+        pose: s.expected.pose,
+        view: s.expected.view,
+        nerves: tie.nerves,
+        highlightIndex: wraps.length - 1,
+      }}
+      showCamera={!instructor}
+    />
+  );
 
   return (
     <AcademyShell
@@ -68,10 +110,7 @@ function TiePage() {
       sidebar={
         <div className="space-y-4">
           <BeforeYouStart />
-          <div className="rounded-xl border border-border bg-surface p-4">
-            <RopeFigure pose={s.expected.pose} view={s.expected.view} wraps={wraps} nerves={tie.nerves} />
-            <p className="mt-2 text-center text-sm text-muted">Picture for this step</p>
-          </div>
+          {coachPanel}
           {instructor && <InstructorPrepCard tieName={tie.name} />}
         </div>
       }
@@ -79,6 +118,8 @@ function TiePage() {
       {instructor && <InstructorPrepCard tieName={tie.name} className="lg:hidden" />}
 
       <BeforeYouStart className="lg:hidden" />
+
+      <div className="lg:hidden">{coachPanel}</div>
 
       <p className="rounded-lg border border-warn/30 bg-warn/10 px-4 py-3 text-base leading-relaxed text-warn">
         These steps teach words and patterns. They are not permission to tie a person. Stop any time you feel unsure.
@@ -121,7 +162,7 @@ function TiePage() {
         step={step}
         total={tie.steps.length}
         onBack={() => setStep((n) => n - 1)}
-        onNext={() => setStep((n) => n + 1)}
+        onNext={goNext}
         nextLabel="Next section"
         canAdvance={!foundation || (confirm.didDo && confirm.didCheck)}
       />
@@ -166,7 +207,7 @@ function TiePage() {
         </Button>
       ) : (
         <Button asChild className="mt-8 w-full sm:w-auto">
-          <Link to="/studio" search={{ tie: tie.slug }}>
+          <Link to="/studio" search={{ tie: tie.slug, step }}>
             Open limited observation—not coaching
           </Link>
         </Button>

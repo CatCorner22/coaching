@@ -29,8 +29,8 @@ function LearnPage() {
           <p className="text-sm uppercase tracking-wide text-muted">Knotty Academy</p>
           <h1 className="mt-2 font-display text-4xl sm:text-5xl">Easy-read lessons</h1>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted">
-            Short steps. Plain words. Pictures on every step. Practice on a post or dress form only — never on a
-            person from these lessons.
+            Short steps. Plain words. Pictures on every step. Listen aloud or use the practice cam for hints. Practice
+            on a post or dress form only — never on a person from these lessons.
           </p>
         </div>
       </div>

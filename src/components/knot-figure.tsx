@@ -43,6 +43,9 @@ export function KnotFigure({ diagramId, className, animate = true }: KnotFigureP
       {diagramId.startsWith("half-hitch") && (
         <HalfHitch rope={rope} accent={accent} ink={ink} animate={animate} />
       )}
+      {diagramId.startsWith("overhand-on-bight") && (
+        <OverhandOnBight rope={rope} accent={accent} ink={ink} animate={animate} />
+      )}
       {diagramId.startsWith("figure-eight") && (
         <FigureEight rope={rope} accent={accent} ink={ink} animate={animate} />
       )}
@@ -62,6 +65,7 @@ function isKnownDiagram(id: string) {
     id.startsWith("double-half-hitch") ||
     id.startsWith("square") ||
     id.startsWith("half-hitch") ||
+    id.startsWith("overhand-on-bight") ||
     id.startsWith("figure-eight")
   );
 }
@@ -265,7 +269,29 @@ function HalfHitch({ rope, accent, ink, animate }: { rope: string; accent: strin
       <RopePath d="M 40 100 L 160 100" rope={rope} animate={animate} />
       <RopePath d="M 160 100 Q 140 72 120 88 Q 100 104 120 120 Q 140 136 160 100" rope={rope} animate={animate} />
       <PulseDot cx={120} cy={104} accent={accent} />
-      <Label x={36} y={40} ink={ink} text="one hitch" />
+      <Label x={36} y={40} ink={ink} text="half hitch" />
+    </g>
+  );
+}
+
+function OverhandOnBight({
+  rope,
+  accent,
+  ink,
+  animate,
+}: {
+  rope: string;
+  accent: string;
+  ink: string;
+  animate: boolean;
+}) {
+  return (
+    <g>
+      <RopePath d="M 56 88 Q 100 52 144 88" rope={rope} animate={animate} />
+      <RopePath d="M 144 88 Q 100 124 56 88" rope={rope} animate={animate} />
+      <RopePath d="M 100 52 L 100 128" rope={rope} animate={animate} dash />
+      <PulseDot cx={100} cy={88} accent={accent} />
+      <Label x={36} y={40} ink={ink} text="loop + tuck" />
     </g>
   );
 }
@@ -291,18 +317,3 @@ function Label({ x, y, ink, text }: { x: number; y: number; ink: string; text: s
     </text>
   );
 }
-
-export const FOUNDATION_DIAGRAM_IDS = [
-  "somerville-bowline-0",
-  "somerville-bowline-1",
-  "somerville-bowline-2",
-  "somerville-bowline-3",
-  "larks-head-0",
-  "larks-head-1",
-  "double-half-hitch-0",
-  "double-half-hitch-1",
-  "square-0",
-  "square-1",
-  "half-hitch-0",
-  "figure-eight-0",
-] as const;

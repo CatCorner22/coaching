@@ -1,0 +1,53 @@
+import { AcademyObservePanel } from "./academy-observe-panel";
+import { AcademyVoiceBar } from "./academy-voice-bar";
+import { LearnMediaPanel } from "./learn-media";
+import type { LearnMedia } from "@/lib/kb/types";
+import type { Tie } from "@/lib/kb/types";
+import type { VoiceStepInput } from "@/lib/learn/voice-script";
+
+type AcademyCoachPanelProps = {
+  voice: VoiceStepInput;
+  cloudVoice: boolean;
+  media?: LearnMedia[];
+  tie?: Tie;
+  stepIndex: number;
+  expectedBands?: number;
+  tieContext?: {
+    pose: Tie["steps"][0]["expected"]["pose"];
+    view: Tie["steps"][0]["expected"]["view"];
+    nerves: string[];
+    highlightIndex?: number;
+  };
+  showCamera?: boolean;
+};
+
+export function AcademyCoachPanel({
+  voice,
+  cloudVoice,
+  media,
+  tie,
+  stepIndex,
+  expectedBands,
+  tieContext,
+  showCamera = true,
+}: AcademyCoachPanelProps) {
+  return (
+    <div className="space-y-4">
+      <AcademyVoiceBar step={voice} cloudVoice={cloudVoice} />
+      {media && media.length > 0 && (
+        <div className="learn-panel rounded-xl border border-border bg-surface p-4">
+          <p className="mb-3 text-sm font-medium text-fg">Diagram &amp; motion</p>
+          <LearnMediaPanel media={media} tieContext={tieContext} />
+        </div>
+      )}
+      {showCamera && (
+        <AcademyObservePanel
+          tie={tie}
+          stepIndex={stepIndex}
+          expectedBands={expectedBands}
+          cloudVoice={cloudVoice}
+        />
+      )}
+    </div>
+  );
+}

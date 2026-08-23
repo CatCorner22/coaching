@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { KnotFigure } from "@/components/knot-figure";
 import {
+  AcademyCoachPanel,
   AcademyShell,
   BeforeYouStart,
   StepCard,
@@ -14,6 +14,8 @@ import {
   type StepConfirm,
 } from "@/components/learn";
 import { getAcademyKnot, isFoundationKnot } from "@/lib/kb";
+import { coachVoiceLabel } from "@/lib/voice/coach-profile";
+import { useLearnProgress } from "@/lib/stores/learn-progress";
 import { useSettings } from "@/lib/stores/settings";
 import { playCoachVoice } from "@/lib/voice/play";
 
@@ -23,12 +25,18 @@ function KnotPage() {
   const { slug } = Route.useParams();
   const knot = getAcademyKnot(slug);
   const cloudVoice = useSettings((settings) => settings.voice);
+  const markStepComplete = useLearnProgress((s) => s.markStepComplete);
+  const setLast = useLearnProgress((s) => s.setLast);
   const [step, setStep] = useState(0);
   const [confirm, setConfirm] = useState<StepConfirm>(emptyStepConfirm);
 
   useEffect(() => {
     setConfirm(emptyStepConfirm());
   }, [step]);
+
+  useEffect(() => {
+    if (knot) setLast({ kind: "knot", slug, step });
+  }, [knot, slug, step, setLast]);
 
   if (!knot) {
     return (
@@ -40,7 +48,22 @@ function KnotPage() {
 
   const s = knot.steps[step]!;
   const foundation = isFoundationKnot(slug);
-  const voiceLabel = cloudVoice ? "Speak with cloud voice" : "Browser voice · no xAI";
+  const voiceLabel = coachVoiceLabel(cloudVoice);
+  const voiceStep = {
+    stepIndex: step,
+    totalSteps: knot.steps.length,
+    title: s.title,
+    doText: s.do ?? s.body,
+    checkText: s.check ?? "It looks like the diagram.",
+    doBullets: s.doBullets,
+    checkBullets: s.checkBullets,
+    speak: s.speak,
+  };
+
+  function goNext() {
+    markStepComplete("knot", slug, step);
+    setStep((n) => n + 1);
+  }
 
   return (
     <AcademyShell
@@ -59,10 +82,13 @@ function KnotPage() {
       sidebar={
         <div className="space-y-4">
           <BeforeYouStart />
-          <div className="rounded-xl border border-border bg-surface p-4">
-            <KnotFigure diagramId={s.diagramId ?? `${slug}-${step}`} className="aspect-[5/4] w-full" />
-            <p className="mt-2 text-center text-sm text-muted">Picture for this step (post only)</p>
-          </div>
+          <AcademyCoachPanel
+            voice={voiceStep}
+            cloudVoice={cloudVoice}
+            media={s.media}
+            stepIndex={step}
+            showCamera={foundation}
+          />
         </div>
       }
       footer={
@@ -86,6 +112,16 @@ function KnotPage() {
       }
     >
       <BeforeYouStart className="lg:hidden" />
+
+      <div className="lg:hidden">
+        <AcademyCoachPanel
+          voice={voiceStep}
+          cloudVoice={cloudVoice}
+          media={s.media}
+          stepIndex={step}
+          showCamera={foundation}
+        />
+      </div>
 
       <StepProgress step={step} total={knot.steps.length} />
 
@@ -111,7 +147,7 @@ function KnotPage() {
         step={step}
         total={knot.steps.length}
         onBack={() => setStep((n) => n - 1)}
-        onNext={() => setStep((n) => n + 1)}
+        onNext={goNext}
         canAdvance={!foundation || (confirm.didDo && confirm.didCheck)}
       />
 
