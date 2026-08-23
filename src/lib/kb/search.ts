@@ -1,4 +1,10 @@
 import { ARTICLES } from "./articles";
+import {
+  allowsAdultNudity,
+  mediaUploadScope,
+  uploadScopeSummary,
+  type MediaUploadScope,
+} from "@/lib/media-scope";
 import { GEAR } from "./gear";
 import { KNOTS } from "./knots";
 import { DUNGEON } from "./dungeon";
@@ -285,7 +291,12 @@ function includesAny(text: string, phrases: readonly string[]) {
  * This is deliberately separate from relevance scoring: a high score must never
  * be the only thing standing between an urgent query and an action-first answer.
  */
-export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
+export function knowledgeDisposition(
+  query: unknown,
+  // Explicit for tests and for any caller that needs to reason about a scope
+  // other than the one this build runs under.
+  scope: MediaUploadScope = mediaUploadScope(),
+): KnowledgeDisposition {
   const text = intentText(query);
   if (!text) return ORDINARY_DISPOSITION;
 
@@ -626,13 +637,21 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
     );
   const secretOrCoercedRecording =
     !secretRecordingPrevention &&
-    (/\b(?:secret(?:ly)?|hidden|without (?:their|his|her|my)?\s*permission|coerced?|forced)\s+(?:camera|recording|photo|image|upload)\b/u.test(
+    (/\b(?:secret(?:ly)?|hidden|without (?:their|his|her|my)?\s*permission|coerced?|forced|nonconsensual|non[- ]consensual)\s+(?:\w+\s+){0,2}(?:camera|recording|photo|photos|picture|pictures|image|images|video|videos|upload|still|stills)\b/u.test(
       text,
     ) ||
-      /\b(?:recorded|filmed|photographed|uploaded|shared)\b[^.!?]{0,32}\bwithout\s+(?:their|his|her|my)?\s*permission\b/u.test(
+      // "secretly recorded", "covertly filmed": the adverb can govern a verb,
+      // not only a noun. These were reaching unsupported_media only because a
+      // nudity word happened to be in the same query, so they fell through the
+      // moment nudity became configurable.
+      /\b(?:secretly|covertly|surreptitiously)\s+(?:recorded|filmed|photographed|taped|captured|took|taken|shot|uploaded|shared|posted)\b/u.test(
         text,
       ) ||
-      /\b(?:recorded|filmed|photographed|uploaded|shared)\b[^.!?]{0,32}\bwithout\s+(?:their|his|her|my)?\s*consent\b/u.test(
+      /\b(?:recorded|filmed|photographed|photograph|uploaded|shared|posted|sent|took|taken|take|captured|shot)\b[^.!?]{0,32}\bwithout\s+(?:their|his|her|my|our)?\s*(?:permission|consent|knowledge|agreement|say[- ]?so)\b/u.test(
+        text,
+      ) ||
+      // "a photo of her without her consent" names no verb at all.
+      /\b(?:photo|photos|picture|pictures|image|images|video|videos|clip|clips|footage|recording|still|stills)\b[^.!?]{0,40}\bwithout\s+(?:their|his|her|my|our)?\s*(?:permission|consent|knowledge|agreement|say[- ]?so)\b/u.test(
         text,
       ) ||
       /\b(?:didn't|did not|never)\s+agree\s+to\s+(?:the\s+)?(?:camera|recording|filming|photo|video|upload|sharing)\b/u.test(
@@ -648,7 +667,7 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
       /\b(?:surreptitious|nonconsensual|unconsented)\s+(?:camera|recording|video|photo|image|upload)\b/u.test(
         text,
       ) ||
-      /\b(?:took|captured|recorded|filmed)\b[^.!?]{0,48}\b(?:photo|picture|image|video)?\b[^.!?]{0,24}\bwhile (?:asleep|sleeping|unconscious)\b/u.test(
+      /\b(?:took|captured|recorded|filmed)\b[^.!?]{0,48}\b(?:photo|picture|image|video)?\b[^.!?]{0,24}\bwhile\s+(?:\w+\s+){0,3}(?:asleep|sleeping|unconscious|passed out|out cold)\b/u.test(
         text,
       ) ||
       /\b(?:spy\s*cam|spy camera)\b[^.!?]{0,32}\b(?:video|photo|image|recording|footage)\b/u.test(
@@ -715,7 +734,7 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
   const ambiguousAgeMedia =
     !minorNonAgeContext &&
     (/^(?:minor|underage|under[- ]?18|under eighteen|ambiguous age|child)$/u.test(text) ||
-      /\b(?:underage|under[- ]?18|under eighteen|below 18|ambiguous age|age (?:is )?(?:unknown|unclear|unconfirmed|not verified)|unknown age|unknown[- ]aged|young[- ]looking (?:person|participant|model)|childlike (?:person|participant|model)|looks? young (?:in (?:the )?)?(?:photo|image|picture|video)|not sure (?:if )?(?:(?:they are|he is|she is|the person is) )?(?:an )?adult|(?:can't|cant|cannot|unable to) (?:confirm|verify) (?:an )?adult|(?:don't|do not) know (?:their|his|her|the person's) age|not eighteen|not of age|below (?:the )?legal age|under (?:the )?legal age)\b/u.test(
+      /\b(?:underage|under[- ]?18|under eighteen|below 18|ambiguous age|age (?:is )?(?:unknown|unclear|unconfirmed|not verified)|unknown age|unknown[- ]aged|young[- ]looking (?:person|participant|model)|childlike (?:person|participant|model)|looks? young (?:in (?:the )?)?(?:photo|image|picture|video)|not sure (?:if )?(?:(?:they are|he is|she is|the person is) )?(?:an )?adult|not sure (?:if |whether )?(?:they |he |she |the person )?(?:is |are |was |were )?(?:over |at least |really )?(?:18|eighteen|of age|legal)|(?:can't|cant|cannot|unable to) (?:confirm|verify) (?:an )?adult|(?:don't|do not) know (?:their|his|her|the person's) age|not eighteen|not of age|below (?:the )?legal age|under (?:the )?legal age)\b/u.test(
         text,
       ) ||
       (mediaContext &&
@@ -749,14 +768,23 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
     /\bnude(?:[- ](?:pink|beige|tan|tone|toned|colou?r(?:ed)?))?\s+(?:rope|cord|line|shade|paint)\b/u.test(
       text,
     );
-  const explicitMedia =
+  // Split so the configurable half can move on its own. Nudity is a body with
+  // no clothes on it; sexual activity is an act. Only the first is governed by
+  // MEDIA_UPLOAD_SCOPE — the second stays out of scope at every setting.
+  const nudityMedia =
     (!nudeColorContext &&
       /\b(?:nude|nudes|nudity|naked|nakedness|nsfw)\b/u.test(explicitScanText)) ||
-    /^(?:porn|pornographic|xxx|explicit (?:image|photo|video|media))$/u.test(explicitScanText) ||
     (mediaContext &&
-      /\b(?:nude|nudes|nudity|naked|nakedness|topless|nsfw|undressed|unclothed|no clothes|full frontal|bare (?:breasts?|chest)|(?:breasts?|nipples?|private parts?|genitals?)(?: are| is| look)? visible|genital|vulva|penis|sex(?:ual)? acts?|sexual activity|sexual intercourse|sex scene|graphic sex|xxx|intimate|explicit|porn(?:ographic)?|hardcore|adult content|lewd)\b/u.test(
+      /\b(?:nude|nudes|nudity|naked|nakedness|topless|nsfw|undressed|unclothed|no clothes|full frontal|bare (?:breasts?|chest)|(?:breasts?|nipples?|private parts?|genitals?)(?: are| is| look)? visible|genital|vulva|penis)\b/u.test(
         explicitScanText,
       ));
+  const sexualActivityMedia =
+    /^(?:porn|pornographic|xxx|explicit (?:image|photo|video|media))$/u.test(explicitScanText) ||
+    (mediaContext &&
+      /\b(?:sex(?:ual)? acts?|sexual activity|sexual intercourse|sex scene|graphic sex|xxx|intimate|explicit|porn(?:ographic)?|hardcore|adult content|lewd)\b/u.test(
+        explicitScanText,
+      ));
+  const explicitMedia = sexualActivityMedia || (nudityMedia && !allowsAdultNudity(scope));
   const unsupportedMedia =
     ambiguousAgeMedia ||
     explicitMedia ||
@@ -848,7 +876,7 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
         ? " Consent is absent or withdrawn: keep the camera off, delete any unsent local batch, and do not substitute another activity or upload."
         : "";
     const unsupportedMediaAction = unsupportedMedia
-      ? " Do not send this batch to analysis; ambiguous age, full nudity, and explicit sexual activity are outside what this app uploads."
+      ? ` Do not send this batch to analysis; ambiguous age${allowsAdultNudity(scope) ? "" : ", full nudity"}, and explicit sexual activity are outside what this app uploads.`
       : "";
     return {
       kind: "release_now",
@@ -872,7 +900,7 @@ export function knowledgeDisposition(query: unknown): KnowledgeDisposition {
     return {
       kind: "unsupported_media",
       action:
-        "Outside upload scope: do not send this to analysis. Uploads are limited to confirmed legal adults in consented images or selected video stills; clothed and intimate-wear views are within scope. Ambiguous age, full nudity, explicit sexual activity, secret recording, and coerced media are not, and the app cannot detect any of them for you. The nudity and explicit limits are the analysis provider's policy on what may be sent, not a rule about what you photograph or keep; ambiguous age and non-consensual recording are refused outright.",
+        `Outside upload scope: do not send this to analysis. Uploads are limited to confirmed legal adults in consented images or selected video stills. ${uploadScopeSummary(scope)} Ambiguous age, secret recording, and coerced media are refused outright at every setting, and the app cannot detect any of this for you. The nudity and sexual-activity limits are the analysis provider's policy on what may be sent, configured for this deployment — not a rule about what you photograph or keep.`,
     };
   }
 

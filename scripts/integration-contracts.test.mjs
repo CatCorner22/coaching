@@ -523,3 +523,29 @@ test("the elapsed direct-check reminder is announced, not just drawn", () => {
   // Polite, not assertive: the copy says this is not a safety deadline.
   assert.doesNotMatch(banner, /aria-live="assertive"/);
 });
+
+test("the media upload scope is an operator setting with a conservative default", () => {
+  const scopeModule = read("src/lib/media-scope.ts");
+  // A deployment that never sets it must get the tightest setting: an operator
+  // who has not read the provider's policy has not agreed to anything.
+  assert.match(scopeModule, /DEFAULT_MEDIA_UPLOAD_SCOPE: MediaUploadScope = "non_explicit"/);
+  // Read from the build flag carrier, not from user-editable app state — this
+  // is a question about the provider's policy, not about any one batch.
+  assert.match(scopeModule, /import\.meta\.env\?\.VITE_MEDIA_UPLOAD_SCOPE/);
+  assert.match(scopeModule, /process\?\.env\?\.VITE_MEDIA_UPLOAD_SCOPE/);
+
+  const search = read("src/lib/kb/search.ts");
+  // Only the nudity term list is gated on the scope. Sexual activity, and the
+  // age and consent guards, must not consult it at all.
+  assert.match(search, /const explicitMedia = sexualActivityMedia \|\| \(nudityMedia && !allowsAdultNudity\(scope\)\)/);
+  const ageGuard = between(search, "const ambiguousAgeMedia =", "const explicitScanText");
+  assert.doesNotMatch(ageGuard, /scope|allowsAdultNudity/);
+  const consentGuard = between(search, "const secretOrCoercedRecording =", "const mediaContext");
+  assert.doesNotMatch(consentGuard, /scope|allowsAdultNudity/);
+
+  // The capture panel states the setting in force rather than a fixed rule.
+  const camera = read("src/components/camera-capture.tsx");
+  assert.match(camera, /const scope = mediaUploadScope\(\);/);
+  assert.match(camera, /label=\{uploadScopeAttestation\(scope\)\}/);
+  assert.match(camera, /\{uploadScopeSummary\(scope\)\}/);
+});

@@ -66,7 +66,7 @@ export const MORE_ARTICLES: Article[] = [
         type: "ul",
         items: [
           "Start with unoccupied equipment or rope laid on a surface.",
-          "If a person must appear, keep the view non-identifying. Clothed or intimate wear can be uploaded; full nudity and sexual activity cannot — that is the analysis provider's limit on what may be sent, not a judgement about what you photograph or keep between consenting adults.",
+          "If a person must appear, keep the view non-identifying. What may be uploaded is a deployment setting, read from the analysis provider's policy by whoever configured this app: intimate wear is always within it, full nudity may or may not be, and sexual activity never is. The capture panel states the setting in force. None of it is a judgement about what you photograph or keep between consenting adults — the app cannot see any of that.",
           "Include enough ordinary context to avoid treating crop or overlap as contact or load.",
           "Use neutral light; do not ask a camera to judge skin color or circulation.",
           "For video, choose one to three labeled stills yourself; the clip is not uploaded.",

@@ -514,7 +514,7 @@ test("action-first routing covers release, delayed neck symptoms, consent, and m
     assert.equal(knowledgeDisposition(query).kind, "unsupported_media", query);
     assert.equal(searchKnowledge(query, 1)[0]?.slug, "photography-ethics", query);
     assert.match(knowledgeAnswer(query), /^Outside upload scope:/u, query);
-    assert.match(knowledgeAnswer(query), /the app cannot detect any of them for you/u, query);
+    assert.match(knowledgeAnswer(query), /the app cannot detect any of this for you/u, query);
   }
   for (const [query, secondaryAction] of [
     ["nude photo and my fingers are numb", /Do not send this batch to analysis/u],
