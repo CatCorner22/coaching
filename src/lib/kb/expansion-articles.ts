@@ -169,8 +169,9 @@ export const EXPANSION_ARTICLES: Article[] = [
       {
         type: "ul",
         items: [
-          "Snug without compression is the goal; a commonly taught reference is being able to slide two fingers flat under the cuff. That is a starting fit, not a safety guarantee.",
-          "Place cuffs on the meatier forearm above the wrist bones, not in the narrow groove at the base of the hand where nerves and tendons are shallow.",
+          "No finger-width or gap rule establishes safe pressure. Published references disagree — a fingertip, one finger, two fingers — precisely because none of them measures what actually injures a nerve. Treat any such number as a rough starting point you then monitor, never as a check that passed.",
+          "Both directions fail. Too tight compresses: cuff injury to the nerves at the wrist is a documented pattern, and cuffs that can ratchet or slip tighter after they are applied are a recognized part of it. Too loose is not the safe side either — a cuff that slides under load concentrates its edge on the narrow wrist, which is exactly where those nerves lie shallow.",
+          "Because both ends fail, the check that matters is the person, repeated: ask what they feel, and release for any change. A cuff that felt right at the start is not a cuff that is still right ten minutes later.",
           "Prefer equipment with fast, practiced release: buckles you have actually operated under mild stress beat locks whose key has a single location. If it locks, the key stays in arm's reach of the scene.",
           "The same signals as rope apply: tingling, numbness, coldness, color change, or weakness at any point means release now.",
           "A collar is symbolic equipment. Never attach a load, a downward line, or a pulling force to anything around a neck, and never leave a collared person attached to a fixed point unattended.",
@@ -193,7 +194,7 @@ export const EXPANSION_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "Practicing pattern craft on your own body with free hands and no fixed attachment is a reasonable way to learn rope handling. Genuine self-restraint alone is categorically different: the fatal-outcome literature repeatedly features people who were alone, restrained, and unable to free themselves when something — a faint, a slip, a jammed release, position trouble — went wrong.",
+        text: "Practicing pattern craft on your own body with free hands and no fixed attachment is a reasonable way to learn rope handling. Genuine self-restraint alone is categorically different, for a structural reason rather than a statistical one: it removes the only person who could notice trouble and act. A faint, a slip, a jammed release, or position trouble all become unrecoverable at the moment they happen, because the one thing every emergency response in this app assumes — someone present and able — is absent.",
       },
       {
         type: "ul",
@@ -208,6 +209,105 @@ export const EXPANSION_ARTICLES: Article[] = [
       {
         type: "warn",
         text: "This entry cannot make solo restraint safe; it can only shrink what you attempt alone. The activities this app treats as instructor-route or stop categories remain so — alone, doubly.",
+      },
+    ],
+  },
+  {
+    slug: "top-incapacitated",
+    title: "If the Top Goes Down",
+    section: "risk",
+    minutes: 6,
+    summary:
+      "Every emergency instruction in this app is addressed to the person who can act. This is the one where that person is the emergency.",
+    related: ["solo-self-tying", "emergency-stop", "hard-limits", "fainting-response"],
+    blocks: [
+      {
+        type: "p",
+        text: "Read the rest of this app and you will notice something: every emergency response assumes someone present and able. Stop and release. Support the position. Call for help. All of it is addressed to the person with free hands. A two-person household practising alone has exactly one of those people, and tops are not exempt from fainting, seizures, cardiac events, strokes, low blood sugar, or simply falling and hitting their head. None of that has anything to do with rope, and none of it announces itself in advance.",
+      },
+      {
+        type: "p",
+        text: "What makes this different from every other risk here is that it has no in-the-moment answer. The restrained person cannot be talked through a response they have no hands for. So the whole of the mitigation happens earlier, when you are deciding what to tie — which means it is a negotiation decision, not a safety technique.",
+      },
+      {
+        type: "ul",
+        items: [
+          "The question to settle before a tie, every time: if the top stopped responding right now, could the bottom get out or get help without them? If the answer is no, that is the tie being chosen, not an unlucky outcome.",
+          "Rehearse the bottom's unaided exit while calm, unhurried, and not in the middle of a scene. An escape nobody has actually performed is a plan, not a capability — and hands that are cold, numb, or shaking do not perform it the way rested hands do.",
+          "Keep a phone within the bottom's reach, unlocked or with voice activation and emergency SOS already enabled and tested. Test it: many phones will not answer a voice assistant from a locked screen, and a phone across the room is decoration.",
+          "Anything the bottom cannot exit alone — fixed attachment, load, suspension, anything on the neck, anything blocking the mouth, hands secured beyond reach of a release — has no version of this that works. Those are already stop or instructor-route categories in this app; alone with one partner, they are also unrecoverable.",
+          "Someone outside should notice. A scheduled message, a friend expecting a check-in at a set time, anything that turns silence into a knock. It does not have to explain what you are doing.",
+        ],
+      },
+      {
+        type: "p",
+        text: "If it happens and you are the restrained one: your own position and breathing come first, because an unresponsive partner cannot be helped by someone who has passed out beside them. Get your airway clear of pressure, get out by the route you rehearsed, and call emergency services — an unresponsive person needs them whether or not you are free yet. Say plainly that someone is unresponsive and give the address; dispatchers do not need the rest of the context, and no part of what you were doing changes the medical response.",
+      },
+      {
+        type: "warn",
+        text: "This entry cannot make the scenario survivable after the fact. It can only move the decision to the point where it is still a decision. If you would not accept the outcome of the top going down mid-tie, do not build the tie that makes it unrecoverable.",
+      },
+    ],
+  },
+  {
+    slug: "where-the-images-live",
+    title: "Where the Images Actually Live",
+    section: "consent",
+    minutes: 6,
+    summary:
+      "This app's privacy copy covers the hop to the model. It says nothing about the phone, which is where the copies pile up.",
+    related: ["photography-ethics", "photo-for-coaching", "consent-frameworks", "hard-limits"],
+    blocks: [
+      {
+        type: "p",
+        text: "Read this app's disclosures and you learn what happens to a still after you press Analyze: it is compressed, sent once, and covered by whatever retention setting the operator verified. That is a narrow and honest account of one hop. It is also not where the risk is. The risk is that the picture existed on a phone at all.",
+      },
+      {
+        type: "ul",
+        items: [
+          "A photo taken with the camera app lands in the phone's library first. If iCloud Photos or Google Photos backup is on — it is on by default for most people — a copy is on someone else's servers within seconds, before you have decided whether you wanted to keep it.",
+          "Deleting it does not delete it. Both platforms hold deleted photos in a recovery album for around thirty days, and the cloud copy follows the same schedule. Anyone with the unlocked phone in that window has the whole set.",
+          "Copies breed. Share sheets, messaging apps that auto-save to the gallery, screenshots of a preview, a re-encode sent to a partner, a device backup to a laptop. Each one is a separate thing to remember to remove later.",
+          "Photos carry a location and a device identifier in their metadata unless something strips it. That data does not care that the image is anonymous — a cropped, faceless picture can still say where it was taken.",
+          "Cloud providers scan what is uploaded to them. That is a fact about the storage, not a judgement about the content, and it applies to lawful private material between adults exactly as it applies to anything else.",
+        ],
+      },
+      {
+        type: "p",
+        text: "Publishing is a separate decision from capturing, and it is the one that cannot be walked back. A picture that has been posted, sent, or shared has been copied by strangers, caches, and archives that will not honour a later change of mind. Consent to be photographed is not consent to be published, and consent to be published today is not consent that holds next year — which is why the person in the picture should be the one deciding each time, in specific terms, and should be able to withdraw the ongoing part of it even though the already-distributed part is gone.",
+      },
+      {
+        type: "warn",
+        text: "This app cannot see, reach, or delete anything in your photo library, your cloud account, or anywhere a picture has been sent. Its controls end at its own local batch. Treat every copy outside it as permanent unless you have personally removed it.",
+      },
+    ],
+  },
+  {
+    slug: "getting-cold",
+    title: "Getting Cold, Not a Cold Hand",
+    section: "body",
+    minutes: 5,
+    summary:
+      "Everywhere else in this app, cold means a limb and means release. Whole-body cooling is a different thing and it builds quietly.",
+    related: ["circulation", "temperature-and-drop", "aftercare", "fainting-response"],
+    blocks: [
+      {
+        type: "p",
+        text: "This app uses cold as a limb signal: a whole-limb temperature change is an immediate-release sign, and every mention of it points that way. That framing is correct for a limb and unhelpful for a person. Someone undressed, still, and restrained for an hour is losing heat the entire time, from a much larger surface than the one being watched, and nothing about that reads as an emergency until it is well along.",
+      },
+      {
+        type: "ul",
+        items: [
+          "Restraint removes the responses that normally fix this. You cannot curl up, rub your arms, put on a layer, or move around, and effective shivering needs muscles that are free to shiver.",
+          "Being still is the whole difference. A clothed, moving person in the same room is comfortable; that room temperature was never chosen for someone undressed and motionless.",
+          "It arrives as shivering, then as not shivering — clumsiness, slurred or slowed speech, confusion, apathy, or a bottom who has simply gone quiet. Quiet is easy to read as subspace. Check rather than assume, and treat confusion as a reason to stop and warm rather than a state to enjoy.",
+          "Sedatives, alcohol, and cannabis blunt both the shivering and the noticing, in both people.",
+          "Warm the room before, not the person after. Blankets over an already-cold person are slow; layers, a warmer room, and a shorter scene are what actually work.",
+        ],
+      },
+      {
+        type: "p",
+        text: "Warm someone gradually once they are out — a warm room, dry layers, warm sweet drinks if they are fully alert and swallowing normally. Do not use hot water, a hot shower, or direct heat on cold skin, and do not rub cold limbs. Confusion, slurred speech, drowsiness, or shivering that has stopped without the person warming up are reasons to call emergency services, not to try harder at home.",
       },
     ],
   },
@@ -236,7 +336,7 @@ export const EXPANSION_ARTICLES: Article[] = [
       },
       {
         type: "warn",
-        text: "Disclosure changes the plan; it never transfers responsibility or makes an elevated-risk activity safe. This entry is a conversation guide, not medical advice, and it cannot assess any individual condition.",
+        text: "The conditions above are prompts for the conversation, not sourced clinical findings — this app publishes no citation for what any one of them does to any one person. Disclosure changes the plan; it never transfers responsibility or makes an elevated-risk activity safe. Where a condition raises a question neither partner can answer, that is a question for a clinician who knows the person, not for this entry.",
       },
     ],
   },

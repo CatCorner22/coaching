@@ -93,17 +93,49 @@ jobs:
       - name: Verify production excludes a baked preview OAuth secret
         shell: bash
         run: |
-          functions_dir=.vercel/output/functions
+          # Scan the whole build output, not just the server functions. The
+          # client bundle under .vercel/output/static is the one artifact
+          # actually served to a browser, and it was never scanned: a leak
+          # planted there passed this step while the identical leak in
+          # functions/ was caught. The pattern was always fine; the path was
+          # the hole.
+          output_dir=.vercel/output
+          if [[ ! -d "$output_dir/static" ]]; then
+            echo "Production build did not emit a static client directory."
+            exit 1
+          fi
           if grep --recursive --line-number --binary-files=without-match \
             --extended-regexp --include='*.mjs' --include='*.js' \
             '(grok_preview.{0,512}[[:xdigit:]]{64}|[[:xdigit:]]{64}.{0,512}grok_preview)' \
-            "$functions_dir"; then
-            echo "Production server output retained a credential-shaped preview OAuth secret."
+            "$output_dir"; then
+            echo "Production output retained a credential-shaped preview OAuth secret."
             exit 1
           else
             scan_status=$?
             if [[ "$scan_status" -ne 1 ]]; then
               echo "Preview credential artifact scan failed with status $scan_status."
+              exit "$scan_status"
+            fi
+          fi
+
+      - name: Verify the client bundle names no server-only secret
+        shell: bash
+        run: |
+          # The credential-shaped scan above needs the client id and a 64-hex
+          # value to sit close together. A secret inlined under its own name by
+          # a stray VITE_ definition looks nothing like that, so match the names
+          # directly, case-insensitively, in the browser-served bundle only.
+          static_dir=.vercel/output/static
+          if grep --recursive --line-number --binary-files=without-match \
+            --ignore-case --extended-regexp \
+            'GROK_PREVIEW_CLIENT_SECRET|XAI_API_KEY|GROK_API_KEY' \
+            "$static_dir"; then
+            echo "Client bundle names a server-only secret."
+            exit 1
+          else
+            scan_status=$?
+            if [[ "$scan_status" -ne 1 ]]; then
+              echo "Client secret-name scan failed with status $scan_status."
               exit "$scan_status"
             fi
           fi

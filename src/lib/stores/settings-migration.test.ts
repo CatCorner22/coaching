@@ -76,3 +76,31 @@ test("resetConsent drops the consent-bearing voice and mic opt-ins immediately",
   assert.equal(s.voice, false);
   assert.equal(s.listen, false);
 });
+
+test("a safeword the microphone could never hear falls back to the default", async () => {
+  const { normalizePersistedSettings } = await import("./settings.ts");
+  // Speech recognition emits words. "!!!", "$$$" and an emoji were all accepted
+  // and all undetectable, with nothing to say the mic would never fire. Digits
+  // are the subtle one: a recognizer transcribes "42" as "forty two", never as
+  // the digits, so it fails just as silently.
+  const base = normalizePersistedSettings({}, {
+    safeword: "red",
+    yellowWord: "yellow",
+    greenWord: "green",
+  } as never);
+  for (const word of ["!!!", "...", "42", "12345", "$$$", "🚨", "x", " "]) {
+    assert.equal(
+      normalizePersistedSettings({ ...base, safeword: word }, base).safeword,
+      base.safeword,
+      `${JSON.stringify(word)} should not be accepted as a safeword`,
+    );
+  }
+  // Real words are kept, including the forms recognizers punctuate inconsistently.
+  for (const word of ["pineapple", "don't", "co-signed", "banana split", "ok"]) {
+    assert.equal(
+      normalizePersistedSettings({ ...base, safeword: word }, base).safeword,
+      word,
+      `${JSON.stringify(word)} should be accepted`,
+    );
+  }
+});

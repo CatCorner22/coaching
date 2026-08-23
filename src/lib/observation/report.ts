@@ -422,7 +422,7 @@ export function buildObservationReport(options: {
     media_quality: mediaQuality,
     recognized_categories: categories,
     observations: triage === "none" ? observationsFor(matches, mediaQuality) : [],
-    nonvisual_checks: nonvisualChecksFor(triage),
+    nonvisual_checks: nonvisualChecksFor(triage, urgentStop),
     limitations: limitationsFor(options.modelStatus, mediaMode, options.hardLimit === true),
     escalation,
     next_step_id: nextStep,
@@ -595,7 +595,17 @@ function highestBand(bands: ConsequenceBand[]): ConsequenceBand {
   );
 }
 
-function nonvisualChecksFor(triage: TriageState): string[] {
+/**
+ * The direct checks to run, which an image cannot stand in for.
+ *
+ * This keyed only off `triage`, so a report whose DISPOSITION was stop_now —
+ * a possible neck or airway overlap, torso breathing restriction, mouth
+ * covering, fire, electrical, needle, chemical or weapon context — led its red
+ * action list with "Confirm current, specific, revocable consent directly".
+ * Consent is not the first move when the image may show something over an
+ * airway. The stop steps go first, and the ordinary checks follow them.
+ */
+function nonvisualChecksFor(triage: TriageState, urgentStop: boolean): string[] {
   if (triage === "emergency") {
     return [
       "Release restraint now without creating a fall and call local emergency services.",
@@ -615,10 +625,16 @@ function nonvisualChecksFor(triage: TriageState): string[] {
       "Prioritize immediate personal safety and contact a trusted local resource or emergency service if anyone is in danger.",
     ];
   }
-  return [
+  const ordinary = [
     "Confirm current, specific, revocable consent directly; an image cannot establish it.",
     "Ask directly about sensation, movement, breathing or speech change, pain, distress, and release readiness; release for any concern or uncertainty.",
     "Confirm continuous adult attendance and an immediately accessible, rehearsed release plan outside the image.",
+  ];
+  if (!urgentStop) return ordinary;
+  return [
+    "Stop and release now without creating a fall. The match is unvalidated and may be wrong, which is a reason to release rather than to look again.",
+    "Check the person directly for breathing, speech, and responsiveness before anything else; call local emergency services for any breathing change, unresponsiveness, or symptom following neck pressure.",
+    ...ordinary,
   ];
 }
 
@@ -644,7 +660,13 @@ function limitationsFor(
       "Remote visual classification violated the closed output contract. Only any conservative high-consequence match was retained; do not proceed from the remaining output.",
     );
   } else if (status !== "completed") {
-    limitations.push(
+    // unshift, not push: every surface that shows limitations renders only
+    // limitations[0] (coach-panel.tsx, journal.tsx). Appended, this sat at
+    // index 4 and was invisible, so a report the model never ran was displayed
+    // and journaled headed by the generic resize caveat — with nothing saying
+    // the classification had not happened. The hardLimit branch above already
+    // unshifts for exactly this reason.
+    limitations.unshift(
       "Remote visual classification did not complete; this is an insufficient-view, lower-consequence-only report.",
     );
   }
@@ -666,18 +688,67 @@ function sourcesFor(
     sources.add("XAI-TERMS-1");
   }
   if (mediaMode === "selected_video_stills") sources.add("XAI-VIDEO-1");
-  if (categories.some((category) => category.canonical_id.includes("rope") || category.canonical_id.includes("load"))) {
+  // Hazard sources are selected by the categories that actually matched. This
+  // used to substring-match "rope"/"load" plus a hardcoded airway trio, which
+  // left six hazard sources in the ledger unreachable by any report — including
+  // the positional-asphyxia bulletin, the suspension-syncope pair and the
+  // handcuff-neuropathy series, each of which exists precisely to be cited when
+  // its category appears.
+  const matched = new Set(categories.map((category) => category.canonical_id));
+  const anyOf = (...ids: CanonicalId[]) => ids.some((id) => matched.has(id));
+
+  // Nerve and circulation injury from restraint of any kind.
+  if (anyOf(
+    "rope_restraint_unspecified",
+    "rope_present_no_visible_load_path",
+    "cuff_strap_or_wrap_restraint",
+    "multiple_restraint_modalities",
+    "ground_or_surface_supported_restraint_possible",
+    "partial_load_bearing_possible",
+    "off_ground_load_bearing_possible",
+    "load_path_component_visible",
+  )) {
     sources.add("ROPE-1");
+    sources.add("ROPE-2");
   }
-  if (
-    categories.some((category) =>
-      [
-        "neck_or_airway_overlap_possible",
-        "torso_breathing_restriction_possible",
-        "mouth_covering_or_signal_limitation_possible",
-      ].includes(category.canonical_id),
-    )
-  ) {
+  // Manufactured restraints have their own compression-injury literature.
+  if (anyOf("cuff_strap_or_wrap_restraint", "lock_or_key_mechanism_connected_possible")) {
+    sources.add("CUFF-1");
+  }
+  // Breathing failure from position alone, with no neck contact.
+  if (anyOf(
+    "positional_restraint_possible",
+    "inverted_orientation",
+    "torso_breathing_restriction_possible",
+  )) {
+    sources.add("ASPHYX-1");
+  }
+  // Fainting and circulatory collapse while upright or suspended.
+  if (anyOf(
+    "off_ground_load_bearing_possible",
+    "partial_load_bearing_possible",
+    "inverted_orientation",
+    "fall_exposure_possible",
+  )) {
+    sources.add("SYNCOPE-1");
+    sources.add("SYNCOPE-2");
+  }
+  // Catastrophic-outcome patterns: the categories this app treats as stop or
+  // instructor-only, plus being left without an attendant.
+  if (anyOf(
+    "neck_or_airway_overlap_possible",
+    "torso_breathing_restriction_possible",
+    "mouth_covering_or_signal_limitation_possible",
+    "off_ground_load_bearing_possible",
+    "attending_adult_not_visible",
+  )) {
+    sources.add("FATAL-1");
+  }
+  if (anyOf(
+    "neck_or_airway_overlap_possible",
+    "torso_breathing_restriction_possible",
+    "mouth_covering_or_signal_limitation_possible",
+  )) {
     sources.add("NFS-1");
   }
   if (triage === "emergency" || triage === "prompt_medical") sources.add("FIRSTAID-1");

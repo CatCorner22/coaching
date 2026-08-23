@@ -1,4 +1,4 @@
-export const SOURCE_LEDGER_REVISION = "2026-08-22.1" as const;
+export const SOURCE_LEDGER_REVISION = "2026-08-22.2" as const;
 
 export const SAFETY_SOURCES = [
   {
@@ -144,6 +144,12 @@ export const SAFETY_SOURCES = [
     title: "Planned Parenthood · The FRIES model of consent",
     href: "https://www.plannedparenthood.org/planned-parenthood-greater-ohio/media/blog-copy-2/would-you-like-fries-with-that-the-5-pillars-of-consent-everyone-should-know",
     note: "Public-health education describing freely given, reversible, informed, enthusiastic, and specific consent; it is educational framing, not legal advice or scene clearance.",
+  },
+  {
+    id: "CUFF-1",
+    title: "Neurology · Handcuff neuropathies",
+    href: "https://www.neurology.org/doi/10.1212/WNL.41.1.145",
+    note: "Clinical series describing compression injury of the superficial radial and other wrist nerves from cuffs, including accidental tightening after application. It describes an injury pattern; it does not define a safe cuff, fit, or duration.",
   },
   {
     id: "MAT-1",

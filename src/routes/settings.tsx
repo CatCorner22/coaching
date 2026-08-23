@@ -95,8 +95,10 @@ function SettingsPage() {
         <p className="text-xs leading-relaxed text-subtle">
           Browser speech recognition can fail silently or use a cloud speech service. It is never a
           safeword system or substitute for direct communication and agreed nonverbal signals.
-          While armed, Knotty listens only for the configured red/yellow words and suppresses its
-          own speech to reduce feedback.
+          While armed, Knotty listens for your configured words plus the plain words "red" and
+          "yellow", and only when one is called out rather than mentioned inside a sentence — so
+          "hand me the red rope" does not stop the session. It suppresses its own speech to reduce
+          feedback.
         </p>
         <Button variant="outline" onClick={() => s.resetConsent()}>
           Reset consent gate

@@ -24,6 +24,7 @@ import {
   processMediaFrame,
   validateMediaFile,
   validateMediaSignature,
+  type ProcessedMediaFrame,
 } from "@/lib/media";
 import { observeFrame } from "@/lib/ml/detect";
 import type { FrameObservation } from "@/lib/ml/types";
@@ -546,7 +547,7 @@ export const CameraCapture = memo(function CameraCapture({
     const operation = beginMediaOperation();
     const { signal } = operation;
     try {
-      const frames: { jpeg: string; imageData: ImageData }[] = [];
+      const frames: ProcessedMediaFrame[] = [];
       for (let i = 0; i < 3; i++) {
         signal.throwIfAborted();
         frames.push(await processMediaFrame(v, 1600, 240, 0.82));
@@ -571,7 +572,7 @@ export const CameraCapture = memo(function CameraCapture({
         "photo",
         [chosen.jpeg],
         [chosen.observation],
-        [scoreFrame(chosen.imageData)],
+        [scoreFrame(chosen.imageData, chosen.detailData)],
       );
     } catch (cause) {
       if (
@@ -684,7 +685,7 @@ export const CameraCapture = memo(function CameraCapture({
         id: `F${String(index + 1).padStart(2, "0")}`,
         jpeg: x.f.jpeg,
         observation: x.obs,
-        quality: scoreFrame(x.f.imageData),
+        quality: scoreFrame(x.f.imageData, x.f.detailData),
       })),
     );
     setSelectedFrames([]);
@@ -892,12 +893,14 @@ export const CameraCapture = memo(function CameraCapture({
           Permission for this batch
         </legend>
         <p className="mb-2 text-xs leading-relaxed text-muted">
-          Confirm legal-adult status, non-explicit media scope, and all four permissions separately
-          for each batch. Prefer equipment-only, non-identifying stills. Clothed or intimate-wear
-          views of consenting adults are supported; full nudity and sexual activity are not. Exclude
-          faces, nudity, intimate contact, tattoos, screens, mail, and room details. The app does
-          not automatically detect or certify that media is non-explicit; do not select explicit
-          media.
+          Confirm legal-adult status, upload scope, and all four permissions separately for each
+          batch. Prefer equipment-only, non-identifying stills, and exclude faces, tattoos, screens,
+          mail, and room details. Clothed and intimate-wear views of consenting adults can be
+          uploaded; full nudity and sexual activity cannot. That limit is on what this app sends to
+          the analysis provider, whose policy governs it and publishes no list of permitted adult
+          content — it is not a rule about what you photograph, keep, or share yourselves, and this
+          app has no visibility into any of that. The app cannot detect or certify what a still
+          contains; the confirmation is yours.
         </p>
         <div className="space-y-2 text-xs text-fg">
           <PermissionCheck
@@ -908,7 +911,7 @@ export const CameraCapture = memo(function CameraCapture({
           <PermissionCheck
             checked={permissions.nonExplicit}
             onChange={(checked) => updatePermission("nonExplicit", checked)}
-            label="I confirm this batch is non-explicit: lingerie or intimate wear is fine; no full nudity or sexual activity."
+            label="I confirm this batch is within upload scope: lingerie or intimate wear is fine; no full nudity or sexual activity."
           />
           <PermissionCheck
             checked={permissions.nonSecret}

@@ -124,17 +124,166 @@ test("negotiation writes resolve per item by stamp, so a stale tab cannot resurr
   const after = mergeNegotiationItemsByStamp(reapproval, revokedExisting) as Array<{ rank: string }>;
   assert.equal(after[0]!.rank, "yes");
 
-  // Equal stamps keep the writing tab's own value; unknown ids pass through;
-  // malformed input is left alone rather than throwing.
+  // A tie must resolve to the restriction, not to whichever tab wrote last.
+  // This previously asserted "yes", which made the outcome of two simultaneous
+  // edits decide whether consent stood.
   const tie = mergeNegotiationItemsByStamp(
     [{ id: "photos", rank: "yes", updatedAt: 5 }],
     [{ id: "photos", rank: "no", updatedAt: 5 }],
   ) as Array<{ rank: string }>;
-  assert.equal(tie[0]!.rank, "yes");
+  assert.equal(tie[0]!.rank, "no");
+
   assert.deepEqual(
     mergeNegotiationItemsByStamp([{ id: "new", rank: "no" }], []),
     [{ id: "new", rank: "no" }],
   );
   assert.equal(mergeNegotiationItemsByStamp(null, []), null);
   assert.equal(mergeNegotiationItemsByStamp([], "junk"), null);
+});
+
+test("a cross-tab merge loses neither a custom limit nor a revocation under a backward clock", async () => {
+  const { mergeNegotiationItemsByStamp, nextNegotiationStamp } = await import("./persist.ts");
+
+  // A limit added in the other tab is not in this tab's array at all. Mapping
+  // over the incoming items alone deleted it on the next unrelated save.
+  const stale = [{ id: "photos", rank: "yes", updatedAt: 1000 }];
+  const stored = [
+    { id: "photos", rank: "no", updatedAt: 2000 },
+    { id: "custom", label: "No gags in the bedroom", rank: "no", updatedAt: 2000 },
+  ];
+  const merged = mergeNegotiationItemsByStamp(stale, stored) as Array<{ id: string; rank: string }>;
+  assert.equal(merged.find((i) => i.id === "photos")?.rank, "no");
+  assert.ok(
+    merged.some((i) => i.id === "custom"),
+    "a limit that exists only in storage was deleted",
+  );
+
+  // Restrictiveness ordering, at equal stamps: no beats maybe beats yes.
+  for (const [mine, theirs, want] of [
+    ["yes", "maybe", "maybe"],
+    ["maybe", "no", "no"],
+    ["no", "yes", "no"],
+    ["maybe", "yes", "maybe"],
+  ] as const) {
+    const out = mergeNegotiationItemsByStamp(
+      [{ id: "x", rank: mine, updatedAt: 100 }],
+      [{ id: "x", rank: theirs, updatedAt: 100 }],
+    ) as Array<{ rank: string }>;
+    assert.equal(out[0]!.rank, want, `mine=${mine} stored=${theirs}`);
+  }
+
+  // Stamps are monotonic, so a backward wall-clock correction cannot make a
+  // fresh revocation look older than the approval it replaces.
+  // Capture the base once: reading the clock on both sides of the comparison
+  // makes the assertion fail whenever a millisecond elapses between them.
+  const ahead = Date.now() + 60_000;
+  assert.ok(nextNegotiationStamp([ahead]) > ahead);
+  assert.ok(nextNegotiationStamp([]) > 0);
+  assert.ok(nextNegotiationStamp(["junk", null, undefined, NaN]) > 0);
+
+  // Preserving survivors must not let the stored array grow without bound.
+  let storage: unknown[] = Array.from({ length: 40 }, (_, i) => ({ id: "s" + i, rank: "no", updatedAt: 1 }));
+  for (let round = 0; round < 20; round++) {
+    const incoming = Array.from({ length: 40 }, (_, i) => ({
+      id: `r${round}-${i}`,
+      rank: "no",
+      updatedAt: round + 2,
+    }));
+    storage = mergeNegotiationItemsByStamp(incoming, storage) as unknown[];
+  }
+  assert.ok(storage.length <= 80, `merged array grew to ${storage.length}`);
+});
+
+test("a write that cannot be persisted is reported instead of swallowed", async () => {
+  const { safeBrowserStorage, onPersistFailure, getPersistFailure, resetPersistFailure } =
+    await import("./persist.ts");
+  const originalWindow = (globalThis as { window?: unknown }).window;
+  const originalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  try {
+    resetPersistFailure();
+    const seen: Array<{ key: string; reason: string }> = [];
+    const off = onPersistFailure((failure) => seen.push(failure));
+
+    // A storage that is full, exactly as a browser reports it.
+    const quotaError = new Error("exceeded");
+    quotaError.name = "QuotaExceededError";
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: () => null,
+        setItem: () => {
+          throw quotaError;
+        },
+        removeItem: () => undefined,
+      },
+    });
+
+    const storage = safeBrowserStorage();
+    // It must not throw — the live store keeps working from memory.
+    storage.setItem("knotty-negotiate", "{}");
+    assert.deepEqual(seen, [{ key: "knotty-negotiate", reason: "quota" }]);
+    assert.deepEqual(getPersistFailure(), { key: "knotty-negotiate", reason: "quota" });
+
+    // A blocked storage is a different cause and is reported as one, because
+    // the two need different things from the user.
+    const securityError = new Error("blocked");
+    securityError.name = "SecurityError";
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: () => null,
+        setItem: () => {
+          throw securityError;
+        },
+        removeItem: () => undefined,
+      },
+    });
+    safeBrowserStorage().setItem("knotty-settings", "{}");
+    assert.deepEqual(getPersistFailure(), { key: "knotty-settings", reason: "blocked" });
+
+    off();
+    safeBrowserStorage().setItem("knotty-journal", "{}");
+    assert.equal(seen.length, 2, "unsubscribing must stop delivery");
+    resetPersistFailure();
+    assert.equal(getPersistFailure(), null);
+  } finally {
+    if (originalStorage) Object.defineProperty(globalThis, "localStorage", originalStorage);
+    else delete (globalThis as { localStorage?: unknown }).localStorage;
+    (globalThis as { window?: unknown }).window = originalWindow;
+  }
+});
+
+test("journal entries survive a cross-tab write, and deleted ones stay deleted", async () => {
+  const { mergeJournalEntriesById } = await import("./persist.ts");
+
+  // Tab A saved a report; tab B, stale, saves an unrelated one. Whole-blob
+  // last-writer-wins erased whichever landed first.
+  const a = [{ id: "a1", at: 200 }];
+  const b = [{ id: "b1", at: 100 }];
+  const union = mergeJournalEntriesById(a, b, [], []);
+  assert.deepEqual(
+    union?.entries.map((e) => (e as { id: string }).id),
+    ["a1", "b1"],
+    "both tabs' entries must survive, newest first",
+  );
+
+  // The mirror bug a plain union would introduce: a deleted entry coming back
+  // from the other tab's older copy. Tombstones from either side apply.
+  const afterDelete = mergeJournalEntriesById([{ id: "b1", at: 100 }], [{ id: "a1", at: 200 }], ["a1"], []);
+  assert.deepEqual(afterDelete?.entries.map((e) => (e as { id: string }).id), ["b1"]);
+  assert.deepEqual(afterDelete?.removedIds, ["a1"]);
+
+  const otherSideDeleted = mergeJournalEntriesById([{ id: "a1", at: 200 }], [], [], ["a1"]);
+  assert.deepEqual(otherSideDeleted?.entries, [], "the other tab's deletion must apply too");
+
+  // Bounded: neither entries nor tombstones may grow without limit.
+  const many = Array.from({ length: 120 }, (_, i) => ({ id: `e${i}`, at: i }));
+  const capped = mergeJournalEntriesById(many, many, [], []);
+  assert.equal(capped?.entries.length, 80);
+  const manyRemoved = Array.from({ length: 400 }, (_, i) => `r${i}`);
+  assert.equal(mergeJournalEntriesById([], [], manyRemoved, [])?.removedIds.length, 200);
+
+  // Malformed input is left alone rather than throwing.
+  assert.equal(mergeJournalEntriesById(null, [], [], []), null);
+  assert.equal(mergeJournalEntriesById([], "junk", [], []), null);
 });

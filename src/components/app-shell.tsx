@@ -3,6 +3,7 @@ import { Menu } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ConsentGate } from "@/components/consent-gate";
 import { subscribeToLocalDataErase } from "@/lib/privacy/local-data";
+import { getPersistFailure, onPersistFailure, type PersistFailure } from "@/lib/stores/persist";
 import { authEnabled } from "@/lib/auth/client";
 import { SignedIn, SignedOut, UserButton } from "@/lib/auth/gates";
 import { isActive, MORE, NAV, routeTitle } from "@/lib/nav";
@@ -17,6 +18,30 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
   // Never leave the sheet covering the screen after a navigation.
   useEffect(() => setMoreOpen(false), [pathname]);
+  // A failed write used to be silent: the tab looked correct and the change was
+  // gone on reload. Consent lives in these stores, so the failure has to be
+  // visible on every screen rather than discovered later.
+  const [persistFailure, setPersistFailure] = useState<PersistFailure | null>(() =>
+    getPersistFailure(),
+  );
+  useEffect(() => onPersistFailure(setPersistFailure), []);
+  // The sheet's markup precedes its trigger, so forward Tab walked straight
+  // past it and out of the page. Move focus in on open, close on Escape, and
+  // hand focus back to the trigger — it is the only route to 13 destinations
+  // on a phone, including Emergency and Settings.
+  useEffect(() => {
+    if (!moreOpen) return;
+    moreSheetRef.current?.querySelector("a")?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setMoreOpen(false);
+      moreButtonRef.current?.focus();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [moreOpen]);
+  const moreSheetRef = useRef<HTMLDivElement>(null);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const firstRenderRef = useRef(true);
   useEffect(() => {
@@ -50,7 +75,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="text-[11px] uppercase tracking-[0.28em] text-muted">Rope studio</p>
             <p className="font-display text-3xl leading-none">Knotty</p>
           </Link>
-          <nav aria-label="Main" className="mt-8 flex flex-1 flex-col gap-1">
+          <nav aria-label="Main" className="mt-8 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
             {NAV.map((item) => {
               const active = isActive(pathname, item.to);
               return (
@@ -134,6 +159,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-label={routeTitle(pathname)}
             className="pb-24 outline-none md:pb-10"
           >
+            {persistFailure && (
+              <div
+                role="alert"
+                className="mx-auto mb-4 max-w-5xl rounded-lg border border-danger/50 bg-danger/10 px-4 py-3 text-sm leading-relaxed text-fg"
+              >
+                <strong className="text-danger-text">Changes are not being saved.</strong>{" "}
+                {persistFailure.reason === "quota"
+                  ? "This device is out of storage for this app, so the last change stayed in this tab only."
+                  : "This browser is blocking storage for this app, so the last change stayed in this tab only."}{" "}
+                Anything you set — including limits and consent — will revert when the page reloads.
+                Treat what is on screen as unsaved until this clears.
+              </div>
+            )}
             {children}
           </main>
         </div>
@@ -149,6 +187,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
         <div
           id="more-sheet"
+          ref={moreSheetRef}
           hidden={!moreOpen}
           className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-40 max-h-[60vh] overflow-y-auto border-t border-border bg-surface px-3 py-3 md:hidden"
         >
@@ -194,6 +233,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
           <button
             type="button"
+            ref={moreButtonRef}
             onClick={() => setMoreOpen((open) => !open)}
             aria-expanded={moreOpen}
             aria-controls="more-sheet"

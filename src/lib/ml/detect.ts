@@ -53,7 +53,11 @@ export function observeFrame(
   // rope overlaps skin in color space, so geometry — not pixel color — is the
   // only local separator, and both gates fail toward "no band" on ambiguity.
   const coverage = ropeN / sampled;
-  const saturated = coverage > 0.5;
+  // Only a frame that is almost entirely one rope-coloured expanse is treated
+  // as structureless. At 0.5 an ordinary equipment-only photo — a coil, or
+  // three wide wraps filling the frame — was blanked and then described as
+  // possibly being skin or furniture.
+  const saturated = coverage > 0.92;
   // Wide enough that a close-up wrap filling a fifth of the frame survives;
   // tight enough that a half-frame expanse of rope-coloured fabric does not.
   const maxBandRows = Math.max(8, Math.round(height * 0.22));
@@ -64,9 +68,13 @@ export function observeFrame(
   // the floor by the median row instead rejects the case it was added for
   // (colour-exclusion leakage on noisy skin, where every row leaks similarly)
   // while keeping a genuine wrap on a clean background.
+  // A low percentile, not the median: with a periodic wrap pattern covering
+  // half the rows the median sits ON the bands, so a median-scaled floor
+  // rejected the pattern outright. The 25th percentile stays in the gaps for a
+  // banded frame while still rising with uniform colour-exclusion leakage.
   const sortedRows = Array.from(series).sort((a, b) => a - b);
-  const medianRow = sortedRows[Math.floor(sortedRows.length / 2)] ?? 0;
-  const minBandStrength = Math.max(3, medianRow * 3);
+  const quartileRow = sortedRows[Math.floor(sortedRows.length * 0.25)] ?? 0;
+  const minBandStrength = Math.max(3, quartileRow * 3);
   const bandIsThin = (peak: { index: number; value: number }) => {
     const floor = peak.value * 0.6;
     let rows = 1;

@@ -1,4 +1,5 @@
 import { getRequest } from "@tanstack/react-start/server";
+import { isTrustedAppOrigin } from "./origin";
 import { DEV_USER_ID, UnauthorizedError, requireUserId } from "@/lib/auth/verify.server";
 import { viteDevServer } from "@/lib/runtime-mode";
 
@@ -34,21 +35,6 @@ export async function authorizeAiRequest(verifiedUserId?: string): Promise<{ use
   const request = getRequest();
   if (!request) throw new Error("Request context is unavailable");
 
-  let requestUrl: URL;
-  try {
-    requestUrl = new URL(request.url);
-  } catch {
-    throw new AiRequestDeniedError("Request URL is invalid");
-  }
-  if (userId === DEV_USER_ID) {
-    if (process.env.ALLOW_DEV_AI?.trim().toLowerCase() !== "true") {
-      throw new AiRequestDeniedError("Development AI is disabled");
-    }
-    if (!trustedDevelopmentHost(requestUrl.hostname)) {
-      throw new AiRequestDeniedError("Development AI is limited to loopback and trusted preview hosts");
-    }
-  }
-
   const fetchSite = request.headers.get("sec-fetch-site")?.toLowerCase();
   if (fetchSite === "cross-site") throw new AiRequestDeniedError("Cross-site AI requests are not allowed");
 
@@ -56,8 +42,24 @@ export async function authorizeAiRequest(verifiedUserId?: string): Promise<{ use
   if (!origin) {
     throw new AiRequestDeniedError("AI requests require a same-origin browser request");
   }
-  if (origin) {
-    if (origin !== requestUrl.origin) throw new AiRequestDeniedError("Request origin is not allowed");
+  if (
+    !isTrustedAppOrigin(origin, {
+      configuredOrigin: process.env.BETTER_AUTH_URL,
+      allowLoopback: viteDevServer,
+    })
+  ) {
+    throw new AiRequestDeniedError("Request origin is not allowed");
+  }
+
+  if (userId === DEV_USER_ID) {
+    if (process.env.ALLOW_DEV_AI?.trim().toLowerCase() !== "true") {
+      throw new AiRequestDeniedError("Development AI is disabled");
+    }
+    // Judged on the Origin the browser sent, which the checks above have already
+    // matched against configuration, rather than on the request's own Host.
+    if (!trustedDevelopmentHost(new URL(origin).hostname)) {
+      throw new AiRequestDeniedError("Development AI is limited to loopback and trusted preview hosts");
+    }
   }
   return { userId, signal: request.signal };
 }

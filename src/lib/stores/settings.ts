@@ -44,6 +44,13 @@ function clampWord(v: unknown, fallback: string) {
   const s = typeof v === "string" ? v.trim().slice(0, 24) : "";
   if (s.length < 2) return fallback;
   if (RESERVED.has(s.toLowerCase())) return fallback;
+  // A safeword the microphone can never hear is worse than a default one,
+  // because nothing says it is not working. Speech recognition emits words, so
+  // "!!!", "42", "$$" and an emoji were all accepted and all undetectable.
+  // Digits are the subtle case: a recognizer transcribes "42" as "forty two",
+  // never as the digits, so it fails silently too.
+  if (!/\p{L}{2}/u.test(s)) return fallback;
+  if (/[^\p{L}\p{M}\s'’-]/u.test(s)) return fallback;
   return s;
 }
 

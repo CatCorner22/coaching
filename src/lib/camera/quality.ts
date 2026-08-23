@@ -110,16 +110,45 @@ export function ropeHint(data: ImageData): number {
 
   const meanLuma = lumaSum / n;
   const lumaVariance = Math.max(0, lumaSquaredSum / n - meanLuma * meanLuma);
+  const lumaSd = Math.sqrt(lumaVariance);
   const share = rope / n;
 
-  // A flat dark/brown/skin-colored surface is not evidence of rope. Require scene
-  // texture and some non-rope context before using color as a ranking hint.
-  if (Math.sqrt(lumaVariance) < 6 || share > 0.85) return 0;
+  // A flat dark/brown/skin-coloured surface is not evidence of rope, but
+  // flatness has to be judged relative to how bright the frame is. Luminance
+  // spread scales with exposure, so an absolute threshold fails in both
+  // directions at once: it rejected black rope close-ups, whose whole tonal
+  // range is compressed near zero, while admitting evenly lit bare skin whose
+  // spread is larger in absolute terms and yet featureless.
+  //
+  // A share of rope-COLOURED pixels cannot stand in for this either. It reads
+  // 1.00 for bare deep skin, a brown wall and an unlit room, and 0.99 for a
+  // pure rope close-up, so the guard that used it returned zero for exactly the
+  // equipment-only framing this app asks people to prefer — while bare skin
+  // scored higher. Measured across jute, hemp, dark jute and black rope at two
+  // exposures against five skin tones, relative spread separates them with
+  // margin on both sides: rope frames sit at 0.089 and above, bare skin and
+  // flat surfaces at 0.079 and below.
+  //
+  // One pair resists this and is left resisting it: hemp on olive skin at full
+  // exposure lands at 0.079, indistinguishable from heavily noised bare skin at
+  // 0.079, because the two colours differ by almost no luminance. Loosening the
+  // threshold to admit it also admits bare skin at a rope share of 0.38, which
+  // would steer the app to transmit a body frame as the rope frame — a worse
+  // trade than losing a ranking bonus. Band detection in observeFrame is
+  // unaffected and still reports that tie; only this frame-ranking hint abstains.
+  const relativeSpread = lumaSd / Math.max(1, meanLuma);
+  if (lumaSd < 2 || relativeSpread < 0.08) return 0;
   return share;
 }
 
-export function scoreFrame(data: ImageData): FrameQuality {
-  const sharpness = Math.min(1, Math.log1p(laplacianVar(data)) / Math.log1p(900));
+/**
+ * @param data   Downscaled frame, for exposure and the rope colour hint.
+ * @param detail Native-scale crop of the transmitted image, for focus. Falls
+ *   back to `data` when absent, which understates blur — a downscale is a
+ *   low-pass filter, so it removes the very frequencies shake destroys.
+ */
+export function scoreFrame(data: ImageData, detail?: ImageData): FrameQuality {
+  const sharpness = Math.min(1, Math.log1p(laplacianVar(detail ?? data)) / Math.log1p(900));
   const exposure = exposureScore(data);
   const rope = Math.min(1, ropeHint(data) / 0.12);
   const notes: string[] = [];

@@ -21,7 +21,8 @@ import {
   mediaAuthorizationWasRevoked,
   studioPolicySignature,
 } from "@/lib/studio/negotiation";
-import { listenForWords, playCoachVoice, stopCoachVoice } from "@/lib/voice/play";
+import { listenForWords } from "@/lib/voice/listen";
+import { playCoachVoice, stopCoachVoice } from "@/lib/voice/play";
 import { DIRECT_CHECK_REMINDER } from "@/lib/voice/reviewed-lines";
 import { buildDeterministic } from "@/lib/ml/predict";
 import {
@@ -58,10 +59,25 @@ function StudioPage() {
   const startSession = useSession((s) => s.start);
   const resetSession = useSession((s) => s.reset);
   const stopped = useSession((s) => s.stopped);
+  const stopReason = useSession((s) => s.stopReason);
+  const yellowAt = useSession((s) => s.yellowAt);
   const stepIndex = useSession((s) => s.stepIndex);
   const tieSlug = useSession((s) => s.tieSlug);
   const furnitureSlug = useSession((s) => s.furnitureSlug);
-  const negotiationPolicy = useMemo(() => buildStudioNegotiationPolicy(items), [items]);
+  const derivedPolicy = useMemo(() => buildStudioNegotiationPolicy(items), [items]);
+  // Keep the previous policy object when the policy itself has not changed.
+  // A cross-tab rehydrate replaces `items` with a new array even when every
+  // rank is identical, and everything derived from it — operationalLimits, the
+  // policy object, the capture context — changed identity with it. That re-ran
+  // the report effect below and replaced a completed model report with the
+  // local "not requested" one, after the batch had already been consumed and
+  // could not be re-requested. negotiationKey is the content of the policy, so
+  // comparing on it is the same test the rest of this route already uses.
+  const policyRef = useRef(derivedPolicy);
+  if (policyRef.current.negotiationKey !== derivedPolicy.negotiationKey) {
+    policyRef.current = derivedPolicy;
+  }
+  const negotiationPolicy = policyRef.current;
   const {
     operationalLimits,
     negotiationKey,
@@ -136,6 +152,14 @@ function StudioPage() {
         const next = signature();
         if (next === lastSignature) return;
         lastSignature = next;
+        // Never reload out of a stop. The session store is memory-only, so a
+        // reload clears `stopped` along with the red alert, the report and the
+        // triage answer, and the page comes back looking like a fresh, running
+        // session. A limit revoked in another tab must never do that: a stopped
+        // session already blocks every action, which is stricter than anything
+        // the new policy could impose, and the gating re-derives from the store
+        // on the next render once the session is reset.
+        if (useSession.getState().stopped) return;
         analysisRequestRef.current += 1;
         captureContextAtCommitRef.current = null;
         micArmedRef.current = false;
@@ -201,9 +225,10 @@ function StudioPage() {
       (w) => {
         const t = w.toLowerCase();
         if (t === settings.safeword.toLowerCase() || t === "red") stopSession("safeword");
-        else if (t === settings.yellowWord.toLowerCase()) {
-          if (useSession.getState().stopped) return;
-          stopSession("yellow");
+        // Yellow is information, not a stop: it raises a check-in banner and
+        // leaves the session running, which is what the knowledge base teaches.
+        else if (t === settings.yellowWord.toLowerCase() || t === "yellow") {
+          useSession.getState().flagYellow();
         }
       },
       (status) => {
@@ -215,6 +240,11 @@ function StudioPage() {
       },
     );
   }, [settings.listen, micArmed, settings.safeword, settings.yellowWord, stopSession]);
+
+  const yellowAlertRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (yellowAt !== null) yellowAlertRef.current?.focus({ preventScroll: true });
+  }, [yellowAt]);
 
   const captureContextRef = useRef(captureContextKey);
 
@@ -508,6 +538,30 @@ function StudioPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
+      {!stopped && yellowAt !== null && (
+        <div
+          ref={yellowAlertRef}
+          role="alert"
+          aria-live="assertive"
+          tabIndex={-1}
+          className="mb-6 rounded-lg border border-warn/40 bg-warn/10 p-4 outline-none focus:ring-2 focus:ring-warn"
+        >
+          <p className="font-display text-3xl text-warn">Yellow</p>
+          <p className="mt-1 text-sm text-fg">
+            Stop adding and check directly. Ask what changed and what they need — do not bargain,
+            finish a wrap first, or wait for another signal. The session is still running; clear
+            this once you have actually checked in.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => useSession.getState().clearYellow()}>
+              Checked in
+            </Button>
+            <Button variant="danger" onClick={() => stopSession("safeword")}>
+              Stop the scene
+            </Button>
+          </div>
+        </div>
+      )}
       {stopped && (
         <div
           ref={stopAlertRef}
@@ -517,6 +571,15 @@ function StudioPage() {
           className="mb-6 rounded-lg border border-danger/40 bg-danger/10 p-4 outline-none focus:ring-2 focus:ring-danger"
         >
           <p className="font-display text-3xl text-danger-text">Stop</p>
+          {stopReason && (
+            <p className="mt-1 text-xs uppercase tracking-wide text-muted">
+              {stopReason === "safeword"
+                ? "Safeword heard"
+                : stopReason === "coach"
+                  ? "Stopped by an observation flag"
+                  : "Stopped manually"}
+            </p>
+          )}
           <p className="mt-1 text-sm text-fg">
             Stop the activity. Support the person's position and release without creating a fall.
             Call emergency services for abnormal breathing, unresponsiveness, seizure, chest pain, a
@@ -587,8 +650,8 @@ function StudioPage() {
               : "Enable optional mic word detection for this session"}
           </button>
           <span className="ml-2" role="status" aria-live="polite">
-            Status: {micStatus}. It can only surface configured red/yellow words; convenience only,
-            never a safety control.
+            Status: {micStatus}. It surfaces your configured words plus a called-out "red" or
+            "yellow"; convenience only, never a safety control.
           </span>
         </div>
       )}
@@ -928,14 +991,22 @@ function CirculationBanner({
     if (!due) nagged.current = false;
   }, [due, voice, micArmed, stopped]);
 
-  if (!due) return null;
+  // The container is always mounted so the live region exists before its content
+  // changes; announcing from a region inserted at the same moment is unreliable.
+  // This used to be a bare <p>, so the reminder appeared with no announcement at
+  // all — and on a long page, off-screen and silent for a sighted user too.
+  // Polite, not assertive: the copy itself says this is not a safety deadline.
   return (
-    <p className="mt-4 rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-warn">
-      The optional direct-check reminder elapsed. It is not a safety deadline or clearance.{" "}
-      <Link to="/checkin" className="underline">
-        Log it
-      </Link>
-    </p>
+    <div role="status" aria-live="polite">
+      {!due ? null : (
+        <p className="mt-4 rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-warn">
+          The optional direct-check reminder elapsed. It is not a safety deadline or clearance.{" "}
+          <Link to="/checkin" className="underline">
+            Log it
+          </Link>
+        </p>
+      )}
+    </div>
   );
 }
 

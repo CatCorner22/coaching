@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Disposition, SourceId } from "@/lib/observation/report";
 import { SAFETY_SOURCE_IDS } from "@/lib/kb/sources";
-import { adoptPersistKey, safeJsonStorage } from "./persist";
+import { adoptPersistKey, journalMergingStorage, syncPersistedAcrossTabs } from "./persist";
 
 export type JournalEntry = {
   id: string;
@@ -18,6 +18,11 @@ export type JournalEntry = {
 
 type JournalState = {
   entries: JournalEntry[];
+  /**
+   * Ids of deleted entries, so a stale tab's older copy cannot resurrect them
+   * when the two are unioned. Bounded; the union keeps both sides' tombstones.
+   */
+  removedIds: string[];
   nerveHits: number;
   add: (e: Omit<JournalEntry, "id" | "at">) => string;
   remove: (id: string) => void;
@@ -67,6 +72,7 @@ export const useJournal = create<JournalState>()(
   persist(
     (set, get) => ({
       entries: [],
+      removedIds: [],
       nerveHits: 0,
       add: (e) => {
         const id = crypto.randomUUID();
@@ -78,13 +84,22 @@ export const useJournal = create<JournalState>()(
         return id;
       },
       remove: (id) => {
-        set({ entries: get().entries.filter((x) => x.id !== id) });
+        set({
+          entries: get().entries.filter((x) => x.id !== id),
+          removedIds: [...get().removedIds, id].slice(-200),
+        });
       },
-      clear: () => set({ entries: [], nerveHits: 0 }),
+      clear: () =>
+        set({
+          entries: [],
+          // Tombstone what was there, or another tab restores all of it.
+          removedIds: [...get().removedIds, ...get().entries.map((x) => x.id)].slice(-200),
+          nerveHits: 0,
+        }),
     }),
     {
       name: "knotty-journal",
-      storage: safeJsonStorage<JournalState>(),
+      storage: journalMergingStorage<JournalState>("knotty-journal"),
       merge: (persisted, current) => {
         const snapshot = (persisted ?? {}) as Partial<JournalState>;
         const entries = Array.isArray(snapshot.entries)
@@ -96,6 +111,9 @@ export const useJournal = create<JournalState>()(
         return {
           ...current,
           entries,
+          removedIds: Array.isArray(snapshot.removedIds)
+            ? snapshot.removedIds.filter((id): id is string => typeof id === "string").slice(-200)
+            : current.removedIds,
           nerveHits: entries.reduce(
             (count, entry) => count + (entry.flags.some((flag) => /nerve|radial|numb/i.test(flag)) ? 1 : 0),
             0,
@@ -117,3 +135,10 @@ export function purgeLegacyStills(): Promise<void> {
     request.onblocked = () => reject(new Error("Close other Knotty tabs, then try again."));
   });
 }
+
+// The journal was the only persisted store without this, so a report saved in
+// one tab was invisible in the other until reload — and the stale tab's next
+// write erased it.
+syncPersistedAcrossTabs("knotty-journal", () => {
+  void useJournal.persist.rehydrate();
+});

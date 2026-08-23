@@ -149,7 +149,13 @@ test("Studio requires yes for negotiated actions and blocks every voice path", (
   const persistModule = read("src/lib/stores/persist.ts");
   assert.match(persistModule, /export function negotiationMergingStorage/);
   assert.match(persistModule, /const base = safeJsonStorage<State>\(\);/);
-  assert.match(persistModule, /stamp\(other\) > stamp\(item\)/);
+  // A tie, or a stale write, must resolve toward the restriction rather than
+  // toward whichever tab wrote last, and an item that exists only in storage
+  // must survive the merge instead of being deleted.
+  assert.match(persistModule, /mineIsMorePermissive && !mineIsStrictlyNewer/);
+  assert.match(persistModule, /if \(!seen\.has\(id\)\) merged\.push\(item\);/);
+  assert.match(persistModule, /export function nextNegotiationStamp/);
+  assert.match(store, /nextNegotiationStamp\(get\(\)\.items\.map\(\(i\) => i\.updatedAt\)\)/);
   assert.match(store, /migrate: \(persisted\) => persisted as State/);
   assert.match(studio, /buildStudioNegotiationPolicy\(items\)/);
   assert.match(studio, /const \[negotiationReady, setNegotiationReady\] = useState\(false\)/);
@@ -399,4 +405,121 @@ test("the clip-still commit cannot fire while a file import is validating", () =
     camera,
     /!selectedFrames\.length \|\| busy \|\| recording \|\| disabled \|\| !permissionsReady/,
   );
+});
+
+test("destructive confirmation cannot be satisfied by a double-tap", () => {
+  const confirm = read("src/components/confirm-button.tsx");
+  // A double-click/double-tap otherwise satisfies both presses at once, which
+  // is the exact accidental input the guard exists to stop.
+  assert.match(confirm, /export const MIN_CONFIRM_DWELL_MS = \d+;/);
+  assert.match(confirm, /armedAt\.current = Date\.now\(\);/);
+  assert.match(confirm, /Date\.now\(\) - armedAt\.current < MIN_CONFIRM_DWELL_MS/);
+});
+
+test("the mobile More sheet is keyboard operable and the sidebar cannot clip its tail", () => {
+  const shell = read("src/components/app-shell.tsx");
+  // The sheet's markup precedes its trigger, so without this focus walks past
+  // it and out of the page; it is the only route to 13 destinations on a phone.
+  assert.match(shell, /moreSheetRef\.current\?\.querySelector\("a"\)\?\.focus\(\)/);
+  assert.match(shell, /event\.key !== "Escape"/);
+  assert.match(shell, /moreButtonRef\.current\?\.focus\(\)/);
+  // At 1280x800 the fixed sidebar clipped Rope calc, Emergency and Settings
+  // below the viewport, and Settings holds the privacy controls.
+  assert.match(shell, /aria-label="Main"[\s\S]{0,120}min-h-0[\s\S]{0,40}overflow-y-auto/);
+});
+
+test("an urgent search disposition reaches the screen without a second tap", () => {
+  const page = read("src/routes/knowledge.tsx");
+  // The action used to render only inside the submitted answer, so typing "she
+  // cant breathe" reordered the result links and showed nothing else until the
+  // user also pressed Find entries. Routing the query and then hiding the
+  // result behind another tap is the failure the routing exists to prevent.
+  // The banner must be gated on the disposition alone, never on `answer`.
+  const banner = page.match(/\{actionFirst && \([\s\S]*?\n {6}\)\}/);
+  assert.ok(banner, "the action banner is not rendered from actionFirst alone");
+  assert.match(banner[0], /role="alert"/);
+  assert.match(banner[0], /aria-live="assertive"/);
+  assert.match(banner[0], /\{disposition\.action\}/);
+  assert.match(banner[0], /disposition\.emergencyHref/);
+  assert.doesNotMatch(banner[0], /\banswer\b/);
+  // knowledgeAnswer prefixes the same action text; the submitted answer must
+  // drop it rather than print it twice.
+  assert.match(page, /answer\.startsWith\(disposition\.action\)/);
+});
+
+test("a cross-tab policy change cannot erase an active stop or a completed report", () => {
+  const studio = read("src/routes/studio.tsx");
+  // The session store is memory-only, so window.location.reload() clears
+  // `stopped` along with the red alert, the report and the triage answer, and
+  // Studio comes back looking like a fresh running session. Verified in a
+  // browser both ways: without this guard the alert is gone after another tab
+  // changes a limit. A stopped session already blocks every action, which is
+  // stricter than anything a new policy could impose.
+  const invalidate = between(studio, "const invalidateAcrossTabs", "window.addEventListener");
+  assert.match(invalidate, /if \(useSession\.getState\(\)\.stopped\) return;/);
+  assert.ok(
+    invalidate.indexOf("stopped) return;") < invalidate.indexOf("window.location.reload()"),
+    "the stop guard must precede the reload",
+  );
+
+  // A rehydrate replaces `items` with a new array even when every rank is
+  // identical. Everything derived from it changed identity with it, which
+  // re-ran the report effect and replaced a completed model report with the
+  // local "not requested" one after the batch was already consumed.
+  assert.match(studio, /const policyRef = useRef\(derivedPolicy\);/);
+  assert.match(
+    studio,
+    /policyRef\.current\.negotiationKey !== derivedPolicy\.negotiationKey/,
+  );
+  assert.match(studio, /const negotiationPolicy = policyRef\.current;/);
+});
+
+test("check-in answers stay on screen at a narrow layout viewport", () => {
+  const checkin = read("src/routes/checkin.tsx");
+  // Buttons are whitespace-nowrap by default and these answer rows did not
+  // wrap, so the concern answer — always the longer, second one — ran off the
+  // edge: 7% clipped at 320px (a WCAG 1.4.10 reflow failure) and 88% hidden at
+  // 195px, which is a 390px phone at 200% zoom. The all-clear answer was always
+  // the one fully reachable, which is the wrong bias for a safety questionnaire.
+  // The action row in the same file already used flex-wrap, so this was an
+  // inconsistency rather than a decision.
+  assert.equal(
+    (checkin.match(/className="mt-2 flex gap-2"/g) ?? []).length,
+    0,
+    "an answer row is missing flex-wrap",
+  );
+  assert.ok(
+    (checkin.match(/className="mt-2 flex flex-wrap gap-2"/g) ?? []).length >= 2,
+    "both answer rows must wrap",
+  );
+  // Sentence-length labels must be allowed to wrap rather than overflow.
+  assert.match(checkin, /className="h-auto whitespace-normal py-2 text-left"/);
+});
+
+test("the emergency card stays offered when the account boundary blocks the app", () => {
+  const provider = read("src/lib/auth/provider.tsx");
+  // /emergency already bypasses this gate, but neither the failure screen nor
+  // the waiting screen said so: a transient session or network failure replaced
+  // the whole app and left "Retry secure erase" as the only way forward, and a
+  // hung check left a status line and nothing else.
+  assert.match(provider, /state\.location\.pathname === "\/emergency"/);
+  const failure = between(provider, "function AccountBoundaryFailure", "\n}\n");
+  assert.match(failure, /href="\/emergency"/);
+  const status = between(provider, "function AccountBoundaryStatus", "\n}\n");
+  assert.match(status, /href="\/emergency"/);
+  // Plain anchors, not router Links: the router is not necessarily usable here.
+  assert.doesNotMatch(failure, /<Link/);
+  assert.doesNotMatch(status, /<Link/);
+});
+
+test("the elapsed direct-check reminder is announced, not just drawn", () => {
+  const studio = read("src/routes/studio.tsx");
+  // It was a bare <p>, so it appeared with no announcement — and on a long page,
+  // off-screen and silent for a sighted user too. The container is always
+  // mounted so the live region exists before its content changes.
+  const banner = between(studio, "function CirculationBanner", "function TriageOption");
+  assert.match(banner, /<div role="status" aria-live="polite">/);
+  assert.match(banner, /\{!due \? null : \(/);
+  // Polite, not assertive: the copy says this is not a safety deadline.
+  assert.doesNotMatch(banner, /aria-live="assertive"/);
 });

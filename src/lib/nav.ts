@@ -9,6 +9,14 @@ export const NAV = [
 ] as const;
 
 export const MORE = [
+  // First on purpose. This is the only route that is time-critical, and on a
+  // phone the whole list lives behind the More sheet: measured at 390x844 it
+  // sat 12th of 13, so reaching it meant scanning past Rope calc and Dungeon.
+  // The Studio stop banner already offers it as a one-tap danger button once a
+  // session is stopped; this covers wanting the card *before* hitting stop.
+  // One name for this destination everywhere; it used to be "Cut down" here,
+  // "Emergency" on the home tools, and "Cut-down card" in Studio.
+  { to: "/emergency", label: "Emergency" },
   { to: "/checklist", label: "Pre-scene" },
   { to: "/checkin", label: "Check-in" },
   { to: "/knots", label: "Knots" },
@@ -20,9 +28,6 @@ export const MORE = [
   { to: "/nerves", label: "Nerves" },
   { to: "/aftercare", label: "Aftercare" },
   { to: "/calc", label: "Rope calc" },
-  // One name for this destination everywhere; it used to be "Cut down" here,
-  // "Emergency" on the home tools, and "Cut-down card" in Studio.
-  { to: "/emergency", label: "Emergency" },
   { to: "/settings", label: "Settings" },
 ] as const;
 

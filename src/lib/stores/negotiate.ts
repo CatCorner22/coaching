@@ -1,6 +1,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { adoptPersistKey, negotiationMergingStorage, syncPersistedAcrossTabs } from "./persist";
+import {
+  adoptPersistKey,
+  negotiationMergingStorage,
+  nextNegotiationStamp,
+  syncPersistedAcrossTabs,
+} from "./persist";
 
 export type Rank = "yes" | "maybe" | "no";
 
@@ -106,6 +111,7 @@ type State = {
   negotiationVersion: number;
   items: NegItem[];
   notes: string;
+  notesUpdatedAt?: number;
   setRank: (id: string, rank: Rank) => void;
   setNotes: (n: string) => void;
   add: (label: string) => void;
@@ -119,19 +125,23 @@ export const useNegotiate = create<State>()(
       negotiationVersion: 2,
       items: normalizeNegotiationItems(STARTER),
       notes: "",
-      setRank: (id, rank) =>
+      setRank: (id, rank) => {
+        // Monotonic, so a backward clock correction cannot stamp a fresh
+        // decision as older than the one it replaces.
+        const stamp = nextNegotiationStamp(get().items.map((i) => i.updatedAt));
         set({
           items: get().items.map((i) =>
             i.id === id
-              ? {
-                  ...i,
-                  rank: LOCKED_NO.has(i.id) ? "no" : clampRank(rank),
-                  updatedAt: Date.now(),
-                }
+              ? { ...i, rank: LOCKED_NO.has(i.id) ? "no" : clampRank(rank), updatedAt: stamp }
               : i,
           ),
+        });
+      },
+      setNotes: (notes) =>
+        set({
+          notes: notes.slice(0, 600),
+          notesUpdatedAt: nextNegotiationStamp([get().notesUpdatedAt]),
         }),
-      setNotes: (notes) => set({ notes: notes.slice(0, 600) }),
       add: (label) => {
         const clean = label.trim().slice(0, 80);
         if (!clean) return;
@@ -139,7 +149,12 @@ export const useNegotiate = create<State>()(
         set({
           items: normalizeNegotiationItems([
             ...get().items,
-            { id: crypto.randomUUID(), label: clean, rank: "no" as Rank, updatedAt: Date.now() },
+            {
+              id: crypto.randomUUID(),
+              label: clean,
+              rank: "no" as Rank,
+              updatedAt: nextNegotiationStamp(get().items.map((i) => i.updatedAt)),
+            },
           ]),
         });
       },
@@ -161,6 +176,7 @@ export const useNegotiate = create<State>()(
           negotiationVersion: 2,
           items,
           notes: typeof p.notes === "string" ? p.notes.slice(0, 600) : current.notes,
+          notesUpdatedAt: Number(p.notesUpdatedAt) || current.notesUpdatedAt,
         };
       },
     },

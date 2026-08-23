@@ -89,8 +89,8 @@ export const GEAR: GearItem[] = [
     summary:
       "Wide, padded cuffs spread pressure better than a narrow edge, but they carry the same nerve and circulation risks as rope and need the same monitoring.",
     notes: [
-      "Fit snug without compression; a commonly taught starting reference is two flat fingers under the cuff, which is a fit check, not a safety guarantee",
-      "Place on the meatier forearm above the wrist bones, never in the groove at the base of the hand",
+      "No finger-width rule establishes safe pressure; published references disagree, and none of them measures what injures a nerve",
+      "Both directions fail: too tight compresses, and too loose slides under load onto the narrow wrist where those nerves lie shallow",
       "Prefer fast, practiced release; if it locks, the key stays in arm's reach for the whole scene",
     ],
   },

@@ -93,6 +93,7 @@ function CheckInPage() {
 
       <div className="mt-6 flex flex-wrap gap-2">
         <Button
+          className="h-auto whitespace-normal py-2 text-left"
           disabled={!ready}
           onClick={() => {
             if (!ready) return;
@@ -145,7 +146,7 @@ function ConsentField({ value, onChange }: { value: ConsentChoice; onChange: (va
     <fieldset>
       <legend className="text-xs uppercase tracking-wide text-subtle">Current consent</legend>
       <p className="mt-1 text-xs text-muted">Does the person directly confirm they want the activity to continue right now?</p>
-      <div className="mt-2 flex gap-2">
+      <div className="mt-2 flex flex-wrap gap-2">
         <Choice active={value === "yes"} onClick={() => onChange("yes")}>Yes, directly confirmed</Choice>
         <Choice active={value === "no"} onClick={() => onChange("no")}>No or uncertain</Choice>
       </div>
@@ -168,7 +169,7 @@ function CheckField({
     <fieldset>
       <legend className="text-xs uppercase tracking-wide text-subtle">{legend}</legend>
       <p className="mt-1 text-xs text-muted">{help}</p>
-      <div className="mt-2 flex gap-2">
+      <div className="mt-2 flex flex-wrap gap-2">
         <Choice active={value === "no_concern"} onClick={() => onChange("no_concern")}>No concern reported</Choice>
         <Choice active={value === "concern"} onClick={() => onChange("concern")}>Concern or uncertain</Choice>
       </div>
@@ -185,6 +186,10 @@ function Choice({ active, onClick, children }: { active: boolean; onClick: () =>
       aria-pressed={active}
       variant={active ? "default" : "outline"}
       size="sm"
+      // Buttons are nowrap by default. These labels are sentences, and at a
+      // narrow layout viewport the concern answer — always the longer, second
+      // one — was the half that ran off the edge.
+      className="h-auto whitespace-normal py-2 text-left"
       onClick={onClick}
     >
       {children}

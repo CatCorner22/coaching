@@ -119,13 +119,20 @@ test("a large rope-colored garment blob is suppressed instead of becoming bands"
   assert.equal(obs.wrapBands.length, 0, "a 40-row fabric blob must not read as a wrap band");
 });
 
-test("a frame saturated with rope-colored fabric yields no bands and a blob note", () => {
-  const frame = img(96, 120, (_x, y) => (y >= 20 ? [...JUTE, 255] : [...NEUTRAL_BG, 255]));
+test("an almost entirely rope-coloured frame abstains without guessing at its content", () => {
+  // Only a near-total expanse counts as structureless. An earlier threshold of
+  // half the frame blanked ordinary equipment photos — a coil, or wide wraps
+  // filling the view — and then asserted they might be skin or furniture,
+  // which is an affirmative claim this app must never make.
+  const frame = img(96, 120, (_x, y) => (y >= 4 ? [...JUTE, 255] : [...NEUTRAL_BG, 255]));
   const obs = observeFrame(frame);
   assert.equal(obs.wrapBands.length, 0);
-  assert.ok(obs.ropeShare > 0.5);
+  assert.ok(obs.ropeShare > 0.9);
   const det = buildDeterministic([obs]);
-  assert.match(det.notes.join(" "), /without band structure/i);
+  const notes = det.notes.join(" ");
+  assert.match(notes, /no band structure could be separated/i);
+  // It must not volunteer what the frame contains.
+  assert.doesNotMatch(notes, /skin, clothing, or furniture may be filling/i);
   assert.equal(
     det.flags.some((flag) => flag.severity === "stop"),
     false,
@@ -199,4 +206,155 @@ test("genuine rope survives the structure gates across realistic framings", () =
     return y >= top && y < top + 4 ? JUTE : NEUTRAL_BG;
   });
   assert.ok(observeFrame(angled).wrapBands.length >= 0);
+});
+
+test("dark and shadowed natural fibre is still rope, not skin", () => {
+  // Widening the skin exclusion had swallowed dark, shadowed and flash-blown
+  // cordage, so a user with dark jute got no rope signal at all. Skin sits at
+  // a redder hue than fibre (r-g > g-b); fibre reverses that.
+  for (const [r, g, b] of [
+    [90, 70, 45], // dark jute
+    [200, 170, 115], // lit jute
+    [220, 205, 180], // flash-blown fibre
+  ] as Array<[number, number, number]>) {
+    assert.equal(isSkinLike(r, g, b), false, `fibre (${r},${g},${b}) must not read as skin`);
+  }
+  for (const [, tone] of SKIN_TONES) {
+    assert.equal(isSkinLike(...tone), true, `skin ${tone.join(",")} must still read as skin`);
+  }
+  // A dark-jute wrap pattern produces bands again.
+  const frame = img(240, 240, (_x, y) =>
+    [70, 130].some((top) => y >= top && y < top + 8) ? [90, 70, 45, 255] : [90, 90, 95, 255],
+  );
+  assert.ok(observeFrame(frame).wrapBands.length >= 1, "dark jute wraps produced no band");
+});
+
+test("a dense multi-wrap pattern is not erased by its own band coverage", () => {
+  // A median-scaled floor sat ON the bands once the pattern covered half the
+  // rows, so an ordinary cuff close-up reported zero. The floor uses a low
+  // percentile, which stays in the gaps.
+  // Six wraps covering 55% of the rows, each individually thin enough to pass
+  // the thinness gate — the shape a real multi-wrap cuff photographs in. A
+  // single slab a quarter of the frame tall is a different case and is
+  // legitimately suppressed.
+  const frame = img(240, 240, (_x, y) => {
+    for (const top of [12, 52, 92, 132, 172, 212]) {
+      if (y >= top && y < top + 22) {
+        const shade = 1 - 0.35 * Math.abs((y - top) / 22 - 0.5) * 2;
+        return [
+          Math.round(180 * shade),
+          Math.round(150 * shade),
+          Math.round(100 * shade),
+          255,
+        ];
+      }
+    }
+    return [200, 150, 120, 255];
+  });
+  assert.ok(observeFrame(frame).wrapBands.length >= 1, "dense wrap pattern was erased");
+});
+
+test("a single rope-coloured slab a quarter of the frame tall is suppressed", () => {
+  // The thinness gate exists so a rope-coloured backdrop, blanket or mat is not
+  // reported as a wrap. Nothing about the hue fix may weaken it.
+  const frame = img(240, 240, (_x, y) =>
+    y >= 60 && y < 124 ? [180, 150, 100, 255] : [200, 150, 120, 255],
+  );
+  assert.equal(observeFrame(frame).wrapBands.length, 0, "a thick slab was reported as a wrap");
+});
+
+test("every listed rope material is visible against every skin tone", () => {
+  // The absolute `g - b < 48` hue gap could not separate fibre from skin,
+  // because channel gaps shrink with brightness: hemp (g-b = 42) and dark jute
+  // (g-b = 38) both fell under it and were admitted as skin, which vetoed
+  // isRope and made hemp wraps produce zero bands against every tone.
+  const SKINS: Array<[string, [number, number, number]]> = [
+    ["fair", [231, 195, 168]],
+    ["medium", [209, 167, 133]],
+    ["olive", [180, 138, 100]],
+    ["brown", [141, 95, 63]],
+    ["deep", [88, 56, 36]],
+  ];
+  const ROPES: Array<[string, [number, number, number]]> = [
+    ["natural jute", [186, 152, 96]],
+    ["hemp", [172, 146, 104]],
+    ["dark jute", [122, 96, 58]],
+    ["black nylon", [30, 30, 32]],
+  ];
+
+  for (const [ropeName, rope] of ROPES) {
+    assert.equal(isSkinLike(...rope), false, `${ropeName} read as skin`);
+    for (const [skinName, skin] of SKINS) {
+      assert.equal(isSkinLike(...skin), true, `${skinName} skin not recognised`);
+      assert.equal(isRope(...skin), false, `${skinName} skin read as rope`);
+
+      // Four wraps with round-strand shading, as a phone photographs them.
+      const frame = img(240, 320, (x, y) => {
+        for (const top of [40, 110, 180, 250]) {
+          if (y >= top && y < top + 14) {
+            const k = 0.62 + 0.5 * Math.sin(Math.PI * ((y - top) / 14));
+            return [
+              Math.round(rope[0] * k),
+              Math.round(rope[1] * k),
+              Math.round(rope[2] * k),
+              255,
+            ];
+          }
+        }
+        const k = 0.88 + 0.12 * Math.sin((x / 240) * Math.PI);
+        return [
+          Math.round(skin[0] * k),
+          Math.round(skin[1] * k),
+          Math.round(skin[2] * k),
+          255,
+        ];
+      });
+      assert.ok(
+        observeFrame(frame).wrapBands.length >= 1,
+        `${ropeName} on ${skinName} skin produced no band`,
+      );
+    }
+  }
+});
+
+test("bare skin and lingerie never invent a wrap band", () => {
+  // The other direction of the same fix: widening what counts as fibre must not
+  // start reading body shading, folds or fabric as rope.
+  const SUBJECTS: Array<[string, [number, number, number]]> = [
+    ["very fair skin", [246, 219, 200]],
+    ["medium skin", [209, 167, 133]],
+    ["brown skin", [141, 95, 63]],
+    ["deepest skin", [48, 31, 22]],
+    ["black lace", [26, 24, 26]],
+    ["red satin", [178, 24, 40]],
+    ["nude mesh", [222, 190, 168]],
+    ["white lace", [245, 243, 240]],
+  ];
+  // Flat, side-lit, rib/fold shadows, vignette, and a top-lit gradient.
+  const SHADING: Array<[string, (x: number, y: number) => number]> = [
+    ["flat", () => 1],
+    ["side-lit", (x) => 0.8 + 0.2 * Math.sin((x / 240) * Math.PI)],
+    ["folds", (_x, y) => 0.86 + 0.14 * Math.sin((y / 320) * Math.PI * 9)],
+    ["vignette", (_x, y) => 0.7 + 0.3 * Math.cos(((y - 160) / 320) * Math.PI)],
+    ["top-lit", (_x, y) => 0.65 + 0.45 * (y / 320)],
+  ];
+
+  for (const [name, colour] of SUBJECTS) {
+    for (const [shadeName, shade] of SHADING) {
+      const frame = img(240, 320, (x, y) => {
+        const k = shade(x, y);
+        return [
+          Math.max(0, Math.min(255, Math.round(colour[0] * k))),
+          Math.max(0, Math.min(255, Math.round(colour[1] * k))),
+          Math.max(0, Math.min(255, Math.round(colour[2] * k))),
+          255,
+        ];
+      });
+      assert.equal(
+        observeFrame(frame).wrapBands.length,
+        0,
+        `${name} under ${shadeName} lighting invented a band`,
+      );
+    }
+  }
 });

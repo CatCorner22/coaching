@@ -48,9 +48,26 @@ const ARTICLE_SOURCE_IDS: Readonly<Record<string, readonly SafetySourceId[]>> = 
   "nerve-self-checks": ["ROPE-1", "ROPE-2"],
   "circulation-vs-nerve": ["ROPE-2", "FIRSTAID-1"],
   "fainting-response": ["SYNCOPE-1", "SYNCOPE-2", "FIRSTAID-1"],
-  "cuff-and-collar-fit": ["NFS-1"],
-  "solo-self-tying": ["FATAL-1", "FIRSTAID-1"],
-  "medical-disclosure": ["CONSENT-1", "CONSENT-2", "CONSENT-3"],
+  "cuff-and-collar-fit": ["CUFF-1", "NFS-1"],
+  "solo-self-tying": ["FIRSTAID-1"],
+  // FIRSTAID-1 anchors only the unresponsive-person half — airway, position,
+  // and calling emergency services. The scoping argument is app-authored.
+  "top-incapacitated": ["FIRSTAID-1"],
+  // Anchored for the consent half only. The device and cloud-storage behaviour
+  // it describes is general platform fact this app publishes no citation for,
+  // so the entry stays honest about being app-authored on that.
+  "where-the-images-live": ["CONSENT-2", "XAI-PRIVACY-1"],
+  "getting-cold": ["FIRSTAID-1"],
+  // The consent sources anchor the disclosure-is-part-of-consent argument. The
+  // clinical items each needed their own: nerve history to the compression
+  // series, fainting to the syncope guidance, breathing and position to the
+  // asphyxia bulletin. The remaining conditions named in the list are
+  // conversation prompts, and the article says so rather than implying every
+  // one of them carries a citation.
+  "medical-disclosure": ["CONSENT-1", "CONSENT-2", "CONSENT-3", "ROPE-1", "SYNCOPE-2", "ASPHYX-1"],
+  // Anchors the fiber comparison and its skin-reaction warning; it is community
+  // education about materials, not a clinical allergy reference.
+  "rope-materials": ["MAT-1"],
   "rope-inspection-retirement": ["MAT-1"],
   "incident-response": ["ROPE-1", "FIRSTAID-1"],
 };
