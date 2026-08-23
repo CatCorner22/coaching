@@ -17,6 +17,9 @@ export const MORE = [
   // One name for this destination everywhere; it used to be "Cut down" here,
   // "Emergency" on the home tools, and "Cut-down card" in Studio.
   { to: "/emergency", label: "Emergency" },
+  // Second for the same reason Emergency is first: both are scene-time
+  // destinations, and everything below here is read before or after.
+  { to: "/rig", label: "Rig mode" },
   { to: "/checklist", label: "Pre-scene" },
   { to: "/checkin", label: "Check-in" },
   { to: "/knots", label: "Knots" },

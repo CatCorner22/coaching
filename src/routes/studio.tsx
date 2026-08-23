@@ -620,6 +620,11 @@ function StudioPage() {
         <div className="flex items-center gap-3 text-sm">
           <Badge variant="danger">{settings.safeword}</Badge>
           <SessionClock limitSec={settings.circulationMins * 60} />
+          {/* Same session, same store — this only strips the chrome so the
+              clock and the stop control are readable at arm's length. */}
+          <Button asChild variant="outline" size="sm">
+            <Link to="/rig">Rig mode</Link>
+          </Button>
         </div>
       </div>
       {operationalLimits.length > 0 && (
