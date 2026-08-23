@@ -276,7 +276,6 @@ function FigureEight({ rope, accent, ink, animate }: { rope: string; accent: str
       <RopePath
         d="M 60 100 Q 60 60 100 60 Q 140 60 140 100 Q 140 140 100 140 Q 60 140 60 100 Q 60 80 100 80 Q 140 80 140 100"
         rope={rope}
-        accent={accent}
         animate={animate}
       />
       <PulseDot cx={100} cy={100} accent={accent} />
