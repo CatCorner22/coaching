@@ -183,6 +183,7 @@ const NO_STOPWORDS = new Set([
   "on",
   "or",
   "play",
+  "rope",
   "safeword",
   "she",
   "support",
@@ -193,6 +194,7 @@ const NO_STOPWORDS = new Set([
   "this",
   "tied",
   "to",
+  "use",
   "while",
   "with",
   "yes",
@@ -252,32 +254,38 @@ export function scrubBannedAnswer(s: string) {
 const WEAK_NO = new Set(["neck", "throat", "nape", "breath", "air", "hang", "alone", "suspension"]);
 
 const KEY_ALIASES: Record<string, string[]> = {
-  neck: ["neck", "throat", "nape"],
-  throat: ["neck", "throat", "nape"],
-  nape: ["neck", "throat", "nape"],
-  breath: ["breath", "air", "airway"],
-  air: ["breath", "air", "airway"],
+  neck: ["neck", "throat", "nape", "cervical"],
+  throat: ["neck", "throat", "nape", "cervical"],
+  nape: ["neck", "throat", "nape", "cervical"],
+  breath: ["breath", "air", "airway", "inhale"],
+  air: ["breath", "air", "airway", "inhale"],
   hang: ["hang", "hoist"],
-  suspension: ["suspension", "hang", "hoist"],
-  alone: ["alone", "unattended", "bound"],
+  suspension: ["suspension", "hang", "hoist", "overhead"],
+  alone: ["alone", "unattended", "bound", "restrained"],
 };
 
 function dangerousWeak(k: string, hay: string) {
   const h = ` ${hay} `;
   if (k === "neck" || k === "throat" || k === "nape") {
-    return / (on|around|at|wrap|rope|collar|cinch|pressure|harness) (her |his |the )?(neck|throat|nape)|(neck|throat|nape) (rope|collar|wrap|cinch|restraint|harness|band|choker)/.test(
+    return / (on|around|at|across|wrap|rope|line|collar|cinch|pressure|harness) (her |his |the )?(neck|throat|nape|cervical( area| region)?)|(neck|throat|nape|cervical) (area|region|rope|line|collar|wrap|cinch|restraint|harness|band|choker)/.test(
       h,
     );
   }
   if (k === "breath" || k === "air") {
-    return /breath play|restrict .{0,12}(breath|air)|hold (her |his )?breath|steal .{0,12}(air|breath)/.test(h);
+    return /breath play|restrict .{0,12}(breath|air)|hold (her |his )?breath|steal .{0,12}(air|breath)|(inhale|breath).{0,20}shallow|shallow.{0,20}(inhale|breath)/.test(
+      h,
+    );
   }
   if (k === "hang") return /hang (her|him|them|from)|hoist (her|him|them|from)/.test(h);
   if (k === "suspension") {
-    return /full suspension|hang (her|him|them|from)|hoist (her|him|them|from)|both feet (off|leave)|string (her|him|them) up/.test(h);
+    return /full suspension|hang (her|him|them|from)|hoist (her|him|them|from)|both feet (off|leave)|string (her|him|them) up|raise (her|him|them).{0,24}(clear|off).{0,12}(mat|floor|ground)|overhead (line|support|point)/.test(
+      h,
+    );
   }
   if (k === "alone") {
-    return /left (tied and )?alone|tied and alone|leave (her|him|them) (tied|alone|bound)|leave (her|him|them) in it|unattended/.test(h);
+    return /left (tied and )?alone|tied and alone|leave (her|him|them) (tied|alone|bound|restrained)|leave (her|him|them) in it|(tied|bound|restrained).{0,32}leave the (room|house|studio|apartment)|unattended/.test(
+      h,
+    );
   }
   return false;
 }
@@ -295,12 +303,38 @@ export function hitsHardNo(token: string, hayRaw: string): boolean {
   const hay = foldText(original);
   if (!folded || !hay) return false;
 
+  // Starter labels use broad user-facing wording. Keep their stable,
+  // high-signal aliases explicit instead of treating a generic word as proof.
+  if (
+    folded.includes("machine use while bound") &&
+    /(?:^| )(machine|hismith)(?: |$)/.test(` ${hay} `)
+  ) {
+    return true;
+  }
+  if (
+    (folded.includes("takate kote") || folded.includes("box tie")) &&
+    /(?:^| )(tk|gote)(?: |$)|takate kote|box tie/.test(` ${hay} `)
+  ) {
+    return true;
+  }
+  if (
+    folded.includes("large toys while bound") &&
+    /(?:^| )toys?(?: |$)|bad dragon/.test(` ${hay} `)
+  ) {
+    return true;
+  }
+
   if (folded.length >= 3) {
     const re = new RegExp(`(?:^| )${escapeRe(folded)}(?: |$)`);
     if (re.test(` ${hay} `)) return true;
   }
 
-  if (!folded.includes(" ") && folded.length >= 2 && folded.length <= 4 && !NO_STOPWORDS.has(folded)) {
+  if (
+    !folded.includes(" ") &&
+    folded.length >= 2 &&
+    folded.length <= 4 &&
+    !NO_STOPWORDS.has(folded)
+  ) {
     const forms = new Set([folded, stemWord(folded)]);
     for (const form of forms) {
       if (!form || NO_STOPWORDS.has(form)) continue;
@@ -350,14 +384,15 @@ export function localAudit(opts: {
   ];
   if (
     incoming &&
-    (incoming.tieGuess !== tieGuess ||
-      incoming.stepGuess !== stepGuess ||
-      incoming.seen.length > 0)
+    (incoming.tieGuess !== tieGuess || incoming.stepGuess !== stepGuess || incoming.seen.length > 0)
   ) {
     droppedClaims.push("Removed unverified model identification and nonvisual claims.");
   }
 
-  let quality = base.quality === "sound" || base.quality === "adjust" || base.quality === "unsafe" ? base.quality : "adjust";
+  let quality =
+    base.quality === "sound" || base.quality === "adjust" || base.quality === "unsafe"
+      ? base.quality
+      : "adjust";
   let coaching = base.coaching;
   let next = base.next;
   let speak = base.speak;
@@ -373,12 +408,7 @@ export function localAudit(opts: {
   };
 
   if (opts.det.recommend === "stop") {
-    halt(
-      "Deterministic stop forced halt language.",
-      STOP_NEXT,
-      STOP_SPEAK,
-      STOP_COACH,
-    );
+    halt("Deterministic stop forced halt language.", STOP_NEXT, STOP_SPEAK, STOP_COACH);
   }
   if (opts.det.recommend === "adjust" && quality === "sound") {
     quality = "adjust";
@@ -388,8 +418,10 @@ export function localAudit(opts: {
     halt("Predictor vetoed continuation on rising risk.");
   }
 
-  const fields = `${coaching} ${next} ${speak}`;
-  if (textIsBanned(fields)) {
+  const incomingActionText = incoming
+    ? `${incoming.coaching} ${incoming.next} ${incoming.speak}`
+    : "";
+  if (incoming && textIsBanned(incomingActionText)) {
     droppedClaims.push("Removed disallowed coaching.");
     halt(
       "Banned coaching stripped.",
@@ -399,16 +431,28 @@ export function localAudit(opts: {
     );
   }
 
-  const originalHay = `${base.coaching} ${base.next} ${base.speak} ${base.stepGuess} ${(base.seen ?? []).join(" ")}`;
-  for (const no of opts.hardNos ?? []) {
-    if (!hitsHardNo(no, originalHay)) continue;
-    droppedClaims.push(`Honored negotiated no: ${no}`);
-    halt(
-      `Negotiated no (${no}) is a hard limit.`,
-      "Stop. That is on the negotiated no list. Do not begin or add it; if it is underway, release.",
-      "That is a negotiated no. Stop and release.",
-      `You marked “${String(no).slice(0, 80)}” as a no. The app will not coach it. Stop and release rather than modifying the setup.`,
-    );
+  // Negotiated-no matching is an output guard for untrusted proposed model
+  // actions. The reviewed fallback contains detector caveats such as
+  // "rope-like" and fixed directions such as "Use direct communication";
+  // treating that app-authored observation text as an activity proposal can
+  // manufacture a stop that is unrelated to the submitted frame.
+  if (incoming) {
+    const proposedActionHay = (
+      incomingActionText.match(/[^.!?]+(?:[.!?]+|$)/g) ?? [incomingActionText]
+    )
+      .map((sentence) => sentence.trim())
+      .filter((sentence) => sentence && !sentenceLooksLikeRefusal(sentence))
+      .join(" ");
+    for (const no of opts.hardNos ?? []) {
+      if (!hitsHardNo(no, proposedActionHay)) continue;
+      droppedClaims.push(`Honored negotiated limit: ${no}`);
+      halt(
+        `Negotiated limit (${no}) is not affirmatively approved.`,
+        "Stop. That activity is not affirmatively approved. Do not begin or add it; if it is underway, release.",
+        "That activity is not approved. Stop and release.",
+        `You did not mark “${String(no).slice(0, 80)}” as yes. The app will not coach it. Stop and release rather than modifying the setup.`,
+      );
+    }
   }
 
   if (opts.det.neckRope > 0.1 && quality !== "unsafe") {
@@ -489,16 +533,9 @@ export function fallbackDraft(opts: {
         ? "adjust"
         : "adjust";
   const notes = opts.det.notes.join(" ");
-  const coaching =
-    quality === "unsafe"
-      ? STOP_COACH
-      : `${notes} ${OBSERVATION_COACH}`;
-  const speak =
-    quality === "unsafe"
-      ? STOP_SPEAK
-      : OBSERVATION_SPEAK;
-  const next =
-    quality === "unsafe" ? STOP_NEXT : OBSERVATION_NEXT;
+  const coaching = quality === "unsafe" ? STOP_COACH : `${notes} ${OBSERVATION_COACH}`;
+  const speak = quality === "unsafe" ? STOP_SPEAK : OBSERVATION_SPEAK;
+  const next = quality === "unsafe" ? STOP_NEXT : OBSERVATION_NEXT;
   return {
     tieGuess: opts.tie?.name ?? "freeform",
     stepGuess: "observation only",
@@ -523,10 +560,8 @@ export function applyModelSelfAudit(
       quality: "unsafe",
       coaching:
         "I cannot coach neck restraint, breath restriction, suspension, or another high-consequence setup from an image. Stop and fully release it.",
-      next:
-        "Do not proceed from camera feedback. If symptoms or immediate danger are present, follow the emergency guidance; otherwise use a qualified in-person instructor.",
-      speak:
-        "Stop and fully release the setup. Camera feedback cannot clear this activity.",
+      next: "Do not proceed from camera feedback. If symptoms or immediate danger are present, follow the emergency guidance; otherwise use a qualified in-person instructor.",
+      speak: "Stop and fully release the setup. Camera feedback cannot clear this activity.",
       circulation: true,
     };
   }
@@ -535,10 +570,8 @@ export function applyModelSelfAudit(
       ...clean,
       quality: "unsafe",
       coaching: STOP_COACH,
-      next:
-        "Stop and fully release the setup. Use direct, nonvisual checks and escalate based on symptoms, not an image grade.",
-      speak:
-        "Stop and release. Treat the conflicting image grade as unreliable.",
+      next: "Stop and fully release the setup. Use direct, nonvisual checks and escalate based on symptoms, not an image grade.",
+      speak: "Stop and release. Treat the conflicting image grade as unreliable.",
       circulation: true,
     };
   }

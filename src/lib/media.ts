@@ -1,17 +1,25 @@
 export const MAX_PHOTO_BYTES = 25 * 1024 * 1024;
 export const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
-export const MAX_ANALYZE_IMAGE_BYTES = 300_000;
+// Encoded-still budget for analysis. Must stay under the client data-URL
+// validator (900,000 chars in sanitize.ts) and the server schema cap after
+// base64 expansion: 640,000 bytes ≈ 853,000 base64 chars.
+export const MAX_ANALYZE_IMAGE_BYTES = 640_000;
 export const MAX_VIDEO_DURATION_SECONDS = 60;
-// Current phones commonly produce 24 MP stills. Accept those uploads, then
-// downsample them before analysis, while retaining an absolute decode budget.
-export const MAX_IMAGE_PIXELS = 26_000_000;
+// Current phones produce up to 48-50 MP stills (e.g. 8064x6048). Accept those
+// uploads - header-read dimensions let the decoder resize during decode - then
+// downsample before analysis, while retaining an absolute decode budget.
+export const MAX_IMAGE_PIXELS = 50_000_000;
 export const MAX_IMAGE_EDGE = 8_192;
 export const MAX_VIDEO_FRAME_PIXELS = 16_000_000;
 export const MAX_VIDEO_FRAME_EDGE = 5_120;
 
 const MEDIA_EVENT_TIMEOUT_MS = 12_000;
 const IMAGE_DECODE_TIMEOUT_MS = 8_000;
-let bitmapDecodePending = false;
+// Native bitmap decoding cannot be cancelled. Keep one orphan at a time, but
+// release the lease after a long cooldown so a decoder promise that never
+// settles cannot permanently disable every later photo import.
+const BITMAP_DECODE_STALL_RESET_MS = 30_000;
+let bitmapDecodeLease: symbol | null = null;
 
 const PHOTO_MIME_TYPES = new Set([
   "image/jpeg",
@@ -34,6 +42,17 @@ type UploadKind = "photo" | "video";
 export type ProcessedMediaFrame = {
   jpeg: string;
   imageData: ImageData;
+  /**
+   * A centre crop of the preview at its own scale, for judging focus.
+   *
+   * `imageData` is a heavy downscale of the frame that is actually transmitted,
+   * which is the right input for colour and band work but the wrong one for
+   * sharpness: shrinking 1600px to 240px is itself a low-pass filter, so it
+   * discards exactly the fine detail camera shake destroys. Measured on
+   * realistic wrap structure, a frame scoring 0.14 at full size scored 1.00
+   * after the downscale — reported as perfectly sharp while badly shaken.
+   */
+  detailData: ImageData;
 };
 
 export function validateMediaFile(file: File, kind: UploadKind): void {
@@ -357,7 +376,9 @@ function withTimeout<T>(
 function assertPixelBudget(width: number, height: number): void {
   if (!width || !height) throw new Error("The image has no readable pixels.");
   if (width > MAX_IMAGE_EDGE || height > MAX_IMAGE_EDGE || width * height > MAX_IMAGE_PIXELS) {
-    throw new Error("Image is too large to score safely.");
+    throw new Error(
+      "Image is too large to score safely. Export or retake it at a smaller size (50 megapixels / 8192 px per side or less).",
+    );
   }
 }
 
@@ -419,23 +440,30 @@ async function canvasFromSource(
   } else if (typeof HTMLImageElement !== "undefined" && src instanceof HTMLImageElement) {
     return drawContain(src, maxEdge, src.naturalWidth, src.naturalHeight);
   } else if (typeof createImageBitmap === "function") {
-    if (bitmapDecodePending) {
+    if (bitmapDecodeLease !== null) {
       throw new Error("A previous image decode is still finishing. Wait before choosing another photo.");
     }
     const bitmapOptions = knownDimensions
       ? resizedBitmapOptions(knownDimensions.width, knownDimensions.height, maxEdge)
       : undefined;
-    bitmapDecodePending = true;
+    const lease = Symbol("bitmap-decode");
+    bitmapDecodeLease = lease;
+    const releaseLease = () => {
+      if (bitmapDecodeLease !== lease) return;
+      bitmapDecodeLease = null;
+      window.clearTimeout(stallTimer);
+    };
+    const stallTimer = window.setTimeout(releaseLease, BITMAP_DECODE_STALL_RESET_MS);
     let bitmapPromise: Promise<ImageBitmap>;
     try {
       bitmapPromise = bitmapOptions ? createImageBitmap(src, bitmapOptions) : createImageBitmap(src);
     } catch (error) {
-      bitmapDecodePending = false;
+      releaseLease();
       throw error;
     }
     void bitmapPromise.then(
-      () => { bitmapDecodePending = false; },
-      () => { bitmapDecodePending = false; },
+      releaseLease,
+      releaseLease,
     );
     const bitmap = await withTimeout(
       bitmapPromise,
@@ -494,6 +522,32 @@ export async function toImageData(
   return ctx.getImageData(0, 0, canvas.width, canvas.height);
 }
 
+/** Maximum edge of the native-scale crop used to judge focus. */
+const DETAIL_CROP_EDGE = 320;
+
+/** Centre crop at 1:1, so fine detail survives to be measured. */
+function centreCrop(source: HTMLCanvasElement, edge: number): ImageData {
+  const w = Math.max(1, Math.min(edge, source.width));
+  const h = Math.max(1, Math.min(edge, source.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("No canvas");
+  ctx.drawImage(
+    source,
+    Math.max(0, Math.floor((source.width - w) / 2)),
+    Math.max(0, Math.floor((source.height - h) / 2)),
+    w,
+    h,
+    0,
+    0,
+    w,
+    h,
+  );
+  return ctx.getImageData(0, 0, w, h);
+}
+
 export async function processMediaFrame(
   src: Blob | HTMLImageElement | HTMLVideoElement,
   previewEdge = 768,
@@ -508,6 +562,7 @@ export async function processMediaFrame(
   return {
     jpeg: encodeJpegWithin(preview, quality, MAX_ANALYZE_IMAGE_BYTES),
     imageData: ctx.getImageData(0, 0, analysis.width, analysis.height),
+    detailData: centreCrop(preview, DETAIL_CROP_EDGE),
   };
 }
 
@@ -517,11 +572,14 @@ function resizedBitmapOptions(
   maxEdge: number,
 ): ImageBitmapOptions {
   const scale = Math.min(1, maxEdge / Math.max(width, height, 1));
-  return {
-    resizeWidth: Math.max(1, Math.round(width * scale)),
-    resizeHeight: Math.max(1, Math.round(height * scale)),
-    resizeQuality: "high",
-  };
+  if (scale >= 1) return {};
+  // Setting both dimensions from raw JPEG metadata can distort EXIF-rotated
+  // images because createImageBitmap applies orientation during decode. Set a
+  // single dimension and let the decoder preserve its oriented aspect ratio;
+  // drawContain enforces the final max edge afterward.
+  return width >= height
+    ? { resizeWidth: Math.max(1, Math.round(width * scale)), resizeQuality: "high" }
+    : { resizeHeight: Math.max(1, Math.round(height * scale)), resizeQuality: "high" };
 }
 
 export async function extractVideoFrames(
@@ -529,7 +587,7 @@ export async function extractVideoFrames(
   count = 4,
   signal?: AbortSignal,
   durationHintSeconds?: number,
-): Promise<{ jpeg: string; imageData: ImageData }[]> {
+): Promise<ProcessedMediaFrame[]> {
   signal?.throwIfAborted();
   const url = URL.createObjectURL(file);
   const video = document.createElement("video");
@@ -584,7 +642,7 @@ export async function extractVideoFrames(
     }
     const requested = Number.isFinite(count) ? Math.trunc(count) : 1;
     const n = Math.max(1, Math.min(12, duration < 1 ? 1 : requested));
-    const frames: { jpeg: string; imageData: ImageData }[] = [];
+    const frames: ProcessedMediaFrame[] = [];
     for (let i = 0; i < n; i++) {
       signal?.throwIfAborted();
       if (duration > 0) {
@@ -592,7 +650,9 @@ export async function extractVideoFrames(
         const t = n === 1 ? end / 2 : Math.min(end, (duration * (i + 0.5)) / n);
         await seekVideo(video, t, signal);
       }
-      frames.push(await processMediaFrame(video, 720, 240, 0.7));
+      // drawContain never upscales, so the still keeps the clip's native
+      // resolution up to this edge - fine texture survives to the model.
+      frames.push(await processMediaFrame(video, 1600, 240, 0.8));
       signal?.throwIfAborted();
     }
     return frames;

@@ -360,6 +360,16 @@ test("exitCodeFor: navigation failure in any viewport exits 1, beating errors", 
   assert.equal(exitCodeFor(verdict({ status: 404 }, { consoleErrors: ["boom"] }).viewports), 1);
 });
 
+test("exitCodeFor: a blank page fails even with HTTP 200 and a clean console", () => {
+  // The #1 failure this smoke exists to catch used to pass: only status and
+  // errors were gated, never whether anything actually rendered.
+  assert.equal(exitCodeFor(verdict({ bodyTextLen: 0 }).viewports), 1);
+  assert.equal(exitCodeFor(verdict({}, { bodyTextLen: 5 }).viewports), 1);
+  assert.equal(exitCodeFor(verdict({ bodyTextLen: undefined }).viewports), 1);
+  // A page with real content still passes.
+  assert.equal(exitCodeFor(verdict({ bodyTextLen: 500 }).viewports), 0);
+});
+
 test("exitCodeFor: 4xx boundary and missing status", () => {
   assert.equal(exitCodeFor(verdict({ status: 399 }).viewports), 0);
   assert.equal(exitCodeFor(verdict({ status: 400 }).viewports), 1);

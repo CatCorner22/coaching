@@ -7,12 +7,62 @@ The camera accepts photos or short clips, converts video to user-selected labele
 ## Camera privacy and safety boundary
 
 - Per batch: legal-adult attestation; separate clothed/non-explicit, non-secret, non-coerced, and all-people-consented attestations; and separate activity, recording, upload, and output permission.
-- Prefer equipment-only or clothed, non-identifying media; exclude faces, intimate contact, tattoos, screens, mail, and room details.
+- Prefer equipment-only or non-identifying media; exclude faces, tattoos, screens, mail, and room details.
+- What may be uploaded is an operator setting, `VITE_MEDIA_UPLOAD_SCOPE` (see **Upload scope** below). Intimate wear is always within it; full nudity is within it only when the operator has set it so; explicit sexual activity never is.
+- Two limits are not the provider's policy and are not configurable at any setting: apparent or ambiguous minor age, and secretly or coercively obtained media. Both are refused outright.
+- The setting governs the upload only. It says nothing about what anyone photographs, keeps, or shares, and the app has no visibility into any of that — its controls end at its own local batch.
 - The non-explicit boundary is an operator attestation, not automatic content moderation. The app does not certify or reliably detect nudity; do not select explicit media.
 - Video stays local and is reduced to one to three stills selected by the user.
+- Remote analysis and reviewed cloud voice require an operator-enabled xAI team-wide Zero Data Retention setting. Before every selected-media or TTS request, the server sends a fixed text-only probe with the same snapshotted API key and requires an exact `x-zero-data-retention: true` response; it requires the same header again before reading the media or audio response. Failed probes send no selected media. Missing or unavailable confirmation after dispatch causes the response to be discarded and the one-use media batch to remain closed.
 - The current page submits a confirmed batch at most once. A shared Postgres reservation rejects the same verified-user batch across replicas for two hours, exceeding the one-hour permission window; this is not a permanent global exactly-once guarantee. Already-transmitted data cannot be recalled.
 - C3 categories route to qualified in-person instruction. C4 categories stop or decline. Every other result remains lower-consequence learning only or insufficient view—never clearance.
 - Directly reported symptoms and coercion bypass image analysis and route action first.
+
+## Using it
+
+Run it locally with `npm run dev` (port 8080). The camera needs a secure context, so live capture works on `localhost` and on HTTPS, not on a plain-HTTP LAN address — on a phone, reach it over HTTPS or import from the photo library instead.
+
+**The adult gate** asks for four separate attestations before anything opens, and reappears per browser profile. It is not a login.
+
+**Negotiated limits gate the app.** Ties that map to a limit stay blocked until that limit is set to yes on `/negotiate` — takate-kote needs `gote`, the karada family needs `torso`, matanawa needs `crotch`. Ties with no mapped limit, such as a single column, are open from the start. The `photos` limit gates the whole camera path. Four limits — neck, breath, suspension, alone — are locked to no and cannot be set otherwise, so partial-suspension stays blocked however the list is edited. Limits sync between open tabs, and a revocation in one tab wins over a stale tab's later save.
+
+**Rig mode** (`/rig`, or the button in the Studio header) is the same session with the chrome removed: elapsed time and the direct-check countdown in large type, the current step, and the two safeword buttons at the bottom where a thumb reaches. It holds a screen wake lock so the phone stops locking mid-tie — where the browser allows it; the header says "Screen may sleep" when it does not — and pulses once when the check reminder elapses. It observes nothing and clears nothing; the countdown is the reminder you set on `/settings`, not a deadline.
+
+**Safewords.** Set yours on `/settings`; the plain words *red* and *yellow* are always heard as well. Optional microphone detection fires only when a word is called out, not when it appears inside a sentence — "hand me the red rope" does not stop the session. Red stops and raises the release banner; yellow raises a check-in banner and leaves the session running. Browser speech recognition can fail silently and is never a substitute for a physical stop signal, particularly with anything over the mouth.
+
+**What is saved, and where.** Everything is local to the browser; there is no account sync.
+
+| | Saved |
+| --- | --- |
+| Negotiated limits, settings, journal entries | Browser storage, merged across tabs |
+| Direct check-ins | The open tab only — they hold health and consent detail and are deliberately not written to storage |
+| Captures and clips | Page memory until replaced, stopped, or the page closes |
+
+If a save ever fails — a full device, or a browser blocking storage — a banner says so on every screen. Treat what is on screen as unsaved until it clears.
+
+**Journal backups are encrypted.** `/journal` exports the journal as a single passphrase-encrypted file (AES-GCM, PBKDF2-SHA256 at 600,000 iterations), because an export lands in a downloads folder and downloads folders get synced. Restoring merges into what is already there and never deletes anything, and an entry you deleted stays deleted even if an older backup still contains it. There is no recovery: lose the passphrase and the file is gone. This does not encrypt the journal inside the browser, which stays as described above. The plaintext export is still available, one tap further away.
+
+**The emergency card** at `/emergency` is the first item in the mobile More sheet, is offered from the stop banner, and works without passing the adult gate. It also works with no network: a service worker (`public/sw.js`) precaches a self-contained copy on first load and serves it when the live page cannot be fetched, so a sleeping laptop or dropped wifi does not take the card with it. The offline copy says that it is the offline copy. Neither version guesses an emergency number from browser language or location — use the device's dialer.
+
+**What the camera does not do.** It never infers age, consent, physiology, pain, pressure, load, injury, or safety, and no result is ever clearance. Remote analysis is one request per confirmed batch and cannot be recalled once sent.
+
+## Upload scope
+
+`VITE_MEDIA_UPLOAD_SCOPE` records what this deployment may transmit to the analysis provider. It is an operator setting rather than an in-app toggle: it answers a question about the provider's acceptable-use policy, not about any one batch, so it is read once from the build environment and cannot be flipped mid-scene.
+
+| Value | Uploads |
+| --- | --- |
+| `non_explicit` (default) | Clothed and intimate-wear views of consenting adults. |
+| `adult_nudity` | Adds full nudity of confirmed adults. Sexual activity is still refused. |
+
+**This repository is configured for `adult_nudity`**, recorded in `DEFAULT_APP_ENV` in `scripts/with-app-env.mjs` so it travels with the repo and applies to `dev`, `build` and `preview` alike. The owner set it having accepted that the provider's Acceptable Use Policy is the governing document and that this repository cannot verify it.
+
+To change it, edit that value, or override it without touching the repo:
+
+- `.grok/app-env.json` in a workspace (gitignored, so it does not survive a fresh clone or reach a deployment), or
+- a real `VITE_MEDIA_UPLOAD_SCOPE` in the deployment's project environment, which beats both.
+
+An unrecognised value falls back to `non_explicit` rather than widening, so a typo cannot silently open the boundary. Read the provider's current Acceptable Use Policy before changing it upward; a policy change changes what this setting is allowed to be. The capture panel states the setting in force on every batch.
 
 ## Development
 
@@ -33,14 +83,20 @@ Camera and media behavior still requires real-device checks on current iOS Safar
 PGLite is a `npm run dev` convenience only. Production builds, `npm run preview`,
 and `npm run build:dev` do not use an embedded database; configure
 `DATABASE_URL` before exercising any server-side database path in those modes.
+`npm run build` is deliberately side-effect-free. Run `npm run db:migrate` once
+from a protected release job against the intended environment before promoting
+the already-verified artifact; never expose a production database URL to an
+untrusted pull-request or preview build.
 
 ## Deployment requirements
 
 - Serve production over HTTPS. Live camera APIs are unavailable in an insecure context; `localhost` is the development exception.
 - If embedded, the top-level site must deliberately grant the frame camera permission through Permissions Policy. The app never requests microphone audio as part of camera capture.
 - Set provider-level spend/concurrency limits in addition to the per-user, per-instance application limits.
+- Use a dedicated, access-restricted xAI team and API key for this deployment. Enable team-wide Zero Data Retention in the xAI console, verify it with a non-sensitive deployment probe, and only then set server-only `XAI_REQUIRE_ZERO_DATA_RETENTION=true`. An API key without this explicit flag leaves remote analysis and cloud voice unavailable. Keep provider-setting changes restricted: a setting can change between the preflight and request, so the second response-header check detects but cannot recall a request already initiated.
 - Enable real authentication for production AI. Cost-bearing endpoints reject the shared development identity and require a same-origin browser request in production.
-- Confirm the applicable xAI account terms, retention configuration, and availability of Zero Data Retention before accepting personal data. The UI assumes already-transmitted requests cannot be recalled.
+- Auth-on live preview requires the confidential `GROK_PREVIEW_CLIENT_SECRET` as a server-only injected variable. Never place it in `VITE_*`, source, client configuration, or build artifacts; rotate the previously shared preview credential before reuse.
+- Confirm the applicable xAI account terms and Zero Data Retention eligibility before accepting personal data. ZDR does not establish anonymity, legal-adult status, consent, supported content, or safety; those remain operator attestations and product boundaries.
 - Install from the committed `package-lock.json` with `npm ci --ignore-scripts`. CI uses exact Node 22.23.2 and fails if a production build changes the committed lockfile or generated route tree.
 - Validate from a clean provider workspace with its generated `.grok/app-env.json`. CI runs the app-specific PWA fixture plus production desktop/mobile browser smoke, but provider authentication and camera hardware still require environment testing.
 

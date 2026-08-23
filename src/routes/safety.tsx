@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ARTICLES } from "@/lib/kb";
-import { SAFETY_SOURCES } from "@/lib/kb/sources";
+import { SAFETY_SOURCES, safetySourceAnchor } from "@/lib/kb/sources";
 
 export const Route = createFileRoute("/safety")({ component: SafetyPage });
 
@@ -48,7 +48,11 @@ function SafetyPage() {
         </p>
         <ul className="mt-4 space-y-3">
           {SAFETY_SOURCES.map((source) => (
-            <li key={source.id} className="rounded-lg border border-border bg-surface p-4">
+            <li
+              key={source.id}
+              id={safetySourceAnchor(source.id)}
+              className="scroll-mt-24 rounded-lg border border-border bg-surface p-4"
+            >
               <a href={source.href} target="_blank" rel="noreferrer" className="text-sm text-fg underline">
                 {source.id} · {source.title}
               </a>

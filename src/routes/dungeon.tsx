@@ -50,8 +50,8 @@ function DungeonPage() {
                 <li key={x}>{x}</li>
               ))}
             </ul>
-            <p className="mt-3 text-xs uppercase tracking-wide text-danger">Never</p>
-            <ul className="mt-1 list-disc pl-5 text-sm text-danger">
+            <p className="mt-3 text-xs uppercase tracking-wide text-danger-text">Never</p>
+            <ul className="mt-1 list-disc pl-5 text-sm text-danger-text">
               {d.never.map((x) => (
                 <li key={x}>{x}</li>
               ))}

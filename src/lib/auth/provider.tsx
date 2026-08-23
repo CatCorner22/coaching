@@ -189,9 +189,20 @@ function AccountIsolationGate({ children }: { children: ReactNode }) {
 function AccountBoundaryStatus({ message }: { message: string }) {
   return (
     <main className="grid min-h-dvh place-items-center bg-canvas px-5 text-foreground">
-      <p className="text-sm text-muted" role="status">
-        {message}
-      </p>
+      <div className="text-center">
+        <p className="text-sm text-muted" role="status">
+          {message}
+        </p>
+        {/* A hung session check leaves this on screen indefinitely. The
+            emergency card bypasses this gate, so offer it rather than making
+            someone wait for a check that may never resolve. */}
+        <a
+          href="/emergency"
+          className="mt-4 inline-block text-sm text-danger-text underline underline-offset-4"
+        >
+          Emergency card
+        </a>
+      </div>
     </main>
   );
 }
@@ -207,16 +218,33 @@ function AccountBoundaryFailure({
     <main className="grid min-h-dvh place-items-center bg-canvas px-5 text-foreground">
       <section className="max-w-md rounded-xl border border-danger/40 bg-surface p-6">
         <h1 className="font-display text-2xl">Local data is blocked</h1>
-        <p className="mt-3 text-sm leading-relaxed text-danger" role="alert">
+        <p className="mt-3 text-sm leading-relaxed text-danger-text" role="alert">
           {message}
         </p>
-        <button
-          type="button"
-          className="mt-5 rounded-md border border-border px-4 py-2 text-sm hover:bg-white/5"
-          onClick={onRetry}
-        >
-          Retry secure erase
-        </button>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="rounded-md border border-border px-4 py-2 text-sm hover:bg-white/5"
+            onClick={onRetry}
+          >
+            Retry secure erase
+          </button>
+          {/* /emergency bypasses this gate entirely (see emergencyBypass above),
+              but nothing here said so: a transient session or network failure
+              replaced the whole app with this screen and left a retry button as
+              the only way forward. A plain anchor rather than a router Link,
+              because the router is not necessarily in a good state here. */}
+          <a
+            href="/emergency"
+            className="rounded-md border border-danger px-4 py-2 text-sm font-medium text-danger-text hover:bg-danger/10"
+          >
+            Emergency card
+          </a>
+        </div>
+        <p className="mt-3 text-xs leading-relaxed text-muted">
+          The emergency card reads no account data and stays available while this
+          boundary is blocked.
+        </p>
       </section>
     </main>
   );

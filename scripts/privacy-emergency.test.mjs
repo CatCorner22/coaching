@@ -10,17 +10,35 @@ const files = Object.fromEntries(
       "src/routes/index.tsx",
       "src/routes/settings.tsx",
       "src/routes/emergency.tsx",
+      // The card's wording moved here so the route and the offline copy the
+      // service worker serves render from one source. The invariants below
+      // follow the copy rather than the file it used to live in.
+      "src/lib/emergency-card.ts",
+      "public/emergency-offline.html",
     ].map(async (path) => [path, await readFile(path, "utf8")]),
   ),
 );
 
 test("emergency call action never assumes a US emergency number", () => {
-  const copy = `${files["src/routes/emergency.tsx"]}\n${files["src/routes/settings.tsx"]}`;
+  // Checked on every surface the card reaches: the route, the module the copy
+  // lives in, the offline copy served with no network, and settings.
+  const surfaces = [
+    "src/routes/emergency.tsx",
+    "src/lib/emergency-card.ts",
+    "public/emergency-offline.html",
+    "src/routes/settings.tsx",
+  ];
+  const copy = surfaces.map((path) => files[path]).join("\n");
   assert.doesNotMatch(copy, /tel:911|call 911/i);
-  assert.match(copy, /will not guess a number from browser language or location/i);
-  assert.match(copy, /Call your local emergency-services number now/i);
+  for (const path of ["src/lib/emergency-card.ts", "public/emergency-offline.html"]) {
+    assert.match(files[path], /will not guess a number from browser language or location/i, path);
+    assert.match(files[path], /Call your local emergency-services number now/i, path);
+    assert.match(files[path], /deliberately reads no saved account\s+data/i, path);
+  }
+  // The route itself still reads nothing and runs nothing: no storage, no
+  // effects, no dialer link on the one page that must work when nothing else does.
   assert.doesNotMatch(files["src/routes/emergency.tsx"], /local-data|localStorage|useEffect|tel:/);
-  assert.match(files["src/routes/emergency.tsx"], /deliberately reads no saved account\s+data/i);
+  assert.doesNotMatch(files["src/lib/emergency-card.ts"], /local-data|localStorage|useEffect|tel:/);
 });
 
 test("privacy copy distinguishes browser, app-server, provider, and unerased data", () => {

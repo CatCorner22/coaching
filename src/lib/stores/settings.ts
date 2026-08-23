@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { adoptPersistKey } from "./persist";
+import { adoptPersistKey, safeJsonStorage, syncPersistedAcrossTabs } from "./persist";
 
 export type Settings = {
   consentVersion: number;
@@ -44,12 +44,20 @@ function clampWord(v: unknown, fallback: string) {
   const s = typeof v === "string" ? v.trim().slice(0, 24) : "";
   if (s.length < 2) return fallback;
   if (RESERVED.has(s.toLowerCase())) return fallback;
+  // A safeword the microphone can never hear is worse than a default one,
+  // because nothing says it is not working. Speech recognition emits words, so
+  // "!!!", "42", "$$" and an emoji were all accepted and all undetectable.
+  // Digits are the subtle case: a recognizer transcribes "42" as "forty two",
+  // never as the digits, so it fails silently too.
+  if (!/\p{L}{2}/u.test(s)) return fallback;
+  if (/[^\p{L}\p{M}\s'’-]/u.test(s)) return fallback;
   return s;
 }
 
 type SettingsState = Settings & {
   set: (p: Partial<Settings>) => void;
   enter: () => void;
+  resetConsent: () => void;
 };
 
 /** Normalize an untrusted persisted snapshot without carrying unknown fields forward. */
@@ -100,9 +108,16 @@ export const useSettings = create<SettingsState>()(
               : s.circulationMins,
         })),
       enter: () => set({ consentVersion: 4, consented: true, adults: true, shears: true, photosOk: true }),
+      // Withdrawing consent also drops the consent-bearing cloud-voice and mic
+      // opt-ins, so the live state matches the hydration invariant (voice and
+      // listen require consented) instead of lingering enabled until reload.
+      resetConsent: () => set({ consented: false, voice: false, listen: false }),
     }),
     {
       name: "knotty-settings",
+      storage: safeJsonStorage<SettingsState>(),
+      version: 1,
+      migrate: (persisted) => persisted as SettingsState,
       merge: (persisted, current) => {
         return {
           ...current,
@@ -112,3 +127,8 @@ export const useSettings = create<SettingsState>()(
     },
   ),
 );
+
+// Propagate a consent reset (which also clears voice/mic) from another tab.
+syncPersistedAcrossTabs("knotty-settings", () => {
+  void useSettings.persist.rehydrate();
+});

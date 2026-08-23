@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { RopeFigure } from "@/components/rope-figure";
-import { NERVES, TIES } from "@/lib/kb";
+import { NERVES } from "@/lib/kb/nerves";
+import { TIES } from "@/lib/kb/ties";
 
 export const Route = createFileRoute("/nerves")({
   validateSearch: (search: Record<string, unknown>): { nerve?: string } => ({
@@ -52,7 +53,7 @@ function NervesPage() {
           </div>
           <div>
             <dt className="text-[11px] uppercase tracking-wide text-subtle">Why changes matter</dt>
-            <dd className="mt-1 text-danger">{n.risk}</dd>
+            <dd className="mt-1 text-danger-text">{n.risk}</dd>
           </div>
           <div>
             <dt className="text-[11px] uppercase tracking-wide text-subtle">Check</dt>

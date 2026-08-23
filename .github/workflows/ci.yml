@@ -16,6 +16,13 @@ jobs:
   verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    # Exercise the shipped standalone mode consistently at both build time and
+    # preview runtime, regardless of inherited runner configuration.
+    env:
+      VITE_AUTH_ENABLED: "false"
+      DATABASE_URL: ""
+      XAI_API_KEY: ""
+      XAI_REQUIRE_ZERO_DATA_RETENTION: ""
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -37,22 +44,100 @@ jobs:
       - name: Build production bundle and generate route tree
         run: npm run build
 
+      - name: Enforce client entry and eager-graph budgets
+        run: npm run check:client-bundle
+
       - name: Verify emitted server module syntax
         shell: bash
         run: |
-          while IFS= read -r -d '' module; do
+          functions_dir=.vercel/output/functions
+          if [[ ! -d "$functions_dir" ]]; then
+            echo "Production build did not emit a functions directory."
+            exit 1
+          fi
+          modules_file="${RUNNER_TEMP}/server-modules.list"
+          find "$functions_dir" -type f \( -name '*.mjs' -o -name '*.js' \) -print0 > "$modules_file"
+          mapfile -d '' modules < "$modules_file"
+          if [[ "${#modules[@]}" -eq 0 ]]; then
+            echo "Production build did not emit any server modules."
+            exit 1
+          fi
+          for module in "${modules[@]}"; do
             if ! node --check "$module"; then
               sed -n '1,160p' "$module"
               exit 1
             fi
-          done < <(find .vercel/output/functions -type f \( -name '*.mjs' -o -name '*.js' \) -print0)
+          done
 
       - name: Verify production excludes embedded-database artifacts
         shell: bash
         run: |
-          if rg --line-number 'pglite\.(data|wasm)|initdb\.wasm' .vercel/output/functions; then
+          functions_dir=.vercel/output/functions
+          if [[ ! -d "$functions_dir" ]]; then
+            echo "Production build did not emit a functions directory."
+            exit 1
+          fi
+          if grep --recursive --line-number --binary-files=without-match \
+            --extended-regexp --include='*.mjs' --include='*.js' \
+            'pglite\.(data|wasm)|initdb\.wasm' "$functions_dir"; then
             echo "Production server output retained a PGLite WASM/data loader."
             exit 1
+          else
+            scan_status=$?
+            if [[ "$scan_status" -ne 1 ]]; then
+              echo "Production artifact scan failed with status $scan_status."
+              exit "$scan_status"
+            fi
+          fi
+
+      - name: Verify production excludes a baked preview OAuth secret
+        shell: bash
+        run: |
+          # Scan the whole build output, not just the server functions. The
+          # client bundle under .vercel/output/static is the one artifact
+          # actually served to a browser, and it was never scanned: a leak
+          # planted there passed this step while the identical leak in
+          # functions/ was caught. The pattern was always fine; the path was
+          # the hole.
+          output_dir=.vercel/output
+          if [[ ! -d "$output_dir/static" ]]; then
+            echo "Production build did not emit a static client directory."
+            exit 1
+          fi
+          if grep --recursive --line-number --binary-files=without-match \
+            --extended-regexp --include='*.mjs' --include='*.js' \
+            '(grok_preview.{0,512}[[:xdigit:]]{64}|[[:xdigit:]]{64}.{0,512}grok_preview)' \
+            "$output_dir"; then
+            echo "Production output retained a credential-shaped preview OAuth secret."
+            exit 1
+          else
+            scan_status=$?
+            if [[ "$scan_status" -ne 1 ]]; then
+              echo "Preview credential artifact scan failed with status $scan_status."
+              exit "$scan_status"
+            fi
+          fi
+
+      - name: Verify the client bundle names no server-only secret
+        shell: bash
+        run: |
+          # The credential-shaped scan above needs the client id and a 64-hex
+          # value to sit close together. A secret inlined under its own name by
+          # a stray VITE_ definition looks nothing like that, so match the names
+          # directly, case-insensitively, in the browser-served bundle only.
+          static_dir=.vercel/output/static
+          if grep --recursive --line-number --binary-files=without-match \
+            --ignore-case --extended-regexp \
+            'GROK_PREVIEW_CLIENT_SECRET|XAI_API_KEY|GROK_API_KEY' \
+            "$static_dir"; then
+            echo "Client bundle names a server-only secret."
+            exit 1
+          else
+            scan_status=$?
+            if [[ "$scan_status" -ne 1 ]]; then
+              echo "Client secret-name scan failed with status $scan_status."
+              exit "$scan_status"
+            fi
           fi
 
       - name: Upload invalid server-module diagnostics
@@ -98,7 +183,11 @@ jobs:
           sudo chown "$(id -u):$(id -g)" /workspace /workspace/screenshots
           # Runtime NODE_ENV is deliberately hostile: the compiled dev-server
           # boundary, not this mutable variable, must keep PGLite disabled.
-          NODE_ENV=development npm run preview > /workspace/screenshots/production-preview.log 2>&1 &
+          # Keep the browser smoke deterministic and prove the verified
+          # pre-provider failure path without spending quota or sending media.
+          # Pin runtime auth off as well so the preview server cannot drift from
+          # the auth-off client bundle through an inherited runner variable.
+          XAI_API_KEY= XAI_REQUIRE_ZERO_DATA_RETENTION= DATABASE_URL= VITE_AUTH_ENABLED=false NODE_ENV=development npm run preview > /workspace/screenshots/production-preview.log 2>&1 &
           preview_pid=$!
           trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
 
@@ -126,9 +215,23 @@ jobs:
           fi
           curl --silent --show-error --fail http://127.0.0.1:8081/ > /dev/null
 
+          for route in /studio /knowledge /nerves /article/consent-frameworks /emergency; do
+            curl --silent --show-error --fail "http://127.0.0.1:8081${route}" > /dev/null
+          done
+          emergency_html="${RUNNER_TEMP}/emergency.html"
+          curl --silent --show-error --fail http://127.0.0.1:8081/emergency > "$emergency_html"
+          if grep --extended-regexp 'assets/(kb|ties)-[A-Za-z0-9._-]+\.js' "$emergency_html"; then
+            echo "Emergency route eagerly preloaded a knowledge-base chunk."
+            exit 1
+          fi
+
           node scripts/browser-smoke.mjs \
             http://127.0.0.1:8081/ \
             /workspace/screenshots/production-preview.png
+
+          node scripts/camera-preflight-smoke.mjs \
+            http://127.0.0.1:8081/ \
+            /workspace/screenshots/camera-preflight.png
 
       - name: Upload production smoke evidence
         if: always()

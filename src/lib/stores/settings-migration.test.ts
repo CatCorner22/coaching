@@ -23,7 +23,16 @@ test("pre-v4 legacy consent is adopted but normalized to consent, voice, and mic
   localStorage.setItem("musubi-settings", JSON.stringify({ state: legacy, version: 0 }));
 
   const { normalizePersistedSettings, useSettings } = await import("./settings.ts");
-  assert.equal(localStorage.getItem("knotty-settings"), localStorage.getItem("musubi-settings"));
+  const adopted = JSON.parse(String(localStorage.getItem("knotty-settings")));
+  assert.equal(adopted.version, 1);
+  assert.equal(adopted.state.consentVersion, 0);
+  assert.equal(adopted.state.consented, false);
+  assert.equal(adopted.state.voice, false);
+  assert.equal(adopted.state.listen, false);
+  assert.deepEqual(JSON.parse(String(localStorage.getItem("musubi-settings"))), {
+    state: legacy,
+    version: 0,
+  });
   const normalized = normalizePersistedSettings(legacy, useSettings.getState());
   assert.equal(normalized.consentVersion, 0);
   assert.equal(normalized.consented, false);
@@ -56,4 +65,42 @@ test("only complete v4 consent can retain explicit voice and microphone opt-ins"
   assert.equal(incomplete.consented, false);
   assert.equal(incomplete.voice, false);
   assert.equal(incomplete.listen, false);
+});
+
+test("resetConsent drops the consent-bearing voice and mic opt-ins immediately", async () => {
+  const { useSettings } = await import("./settings.ts");
+  useSettings.setState({ consented: true, voice: true, listen: true });
+  useSettings.getState().resetConsent();
+  const s = useSettings.getState();
+  assert.equal(s.consented, false);
+  assert.equal(s.voice, false);
+  assert.equal(s.listen, false);
+});
+
+test("a safeword the microphone could never hear falls back to the default", async () => {
+  const { normalizePersistedSettings } = await import("./settings.ts");
+  // Speech recognition emits words. "!!!", "$$$" and an emoji were all accepted
+  // and all undetectable, with nothing to say the mic would never fire. Digits
+  // are the subtle one: a recognizer transcribes "42" as "forty two", never as
+  // the digits, so it fails just as silently.
+  const base = normalizePersistedSettings({}, {
+    safeword: "red",
+    yellowWord: "yellow",
+    greenWord: "green",
+  } as never);
+  for (const word of ["!!!", "...", "42", "12345", "$$$", "🚨", "x", " "]) {
+    assert.equal(
+      normalizePersistedSettings({ ...base, safeword: word }, base).safeword,
+      base.safeword,
+      `${JSON.stringify(word)} should not be accepted as a safeword`,
+    );
+  }
+  // Real words are kept, including the forms recognizers punctuate inconsistently.
+  for (const word of ["pineapple", "don't", "co-signed", "banana split", "ok"]) {
+    assert.equal(
+      normalizePersistedSettings({ ...base, safeword: word }, base).safeword,
+      word,
+      `${JSON.stringify(word)} should be accepted`,
+    );
+  }
 });

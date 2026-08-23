@@ -1,10 +1,21 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { adoptPersistKey } from "./persist";
+import {
+  adoptPersistKey,
+  negotiationMergingStorage,
+  nextNegotiationStamp,
+  syncPersistedAcrossTabs,
+} from "./persist";
 
 export type Rank = "yes" | "maybe" | "no";
 
-export type NegItem = { id: string; label: string; rank: Rank };
+/**
+ * `updatedAt` versions each decision. zustand persists the WHOLE state blob on
+ * every set(), so without it a tab holding stale state resurrects a rank that
+ * another tab just revoked, simply by saving something unrelated. Reads and
+ * writes both resolve per item by this stamp instead of by write order.
+ */
+export type NegItem = { id: string; label: string; rank: Rank; updatedAt?: number };
 
 export const LOCKED_NO = new Set(["neck", "breath", "suspension", "alone"]);
 
@@ -37,6 +48,15 @@ function clampRank(r: unknown): Rank {
   return r === "yes" || r === "maybe" || r === "no" ? r : "no";
 }
 
+/**
+ * Superseded by `normalizeNegotiationItems`, and kept only because this merge
+ * brought both forward and its tests still cover it.
+ *
+ * Do not call it from production code. It enforces LOCKED_NO, but it does not
+ * carry per-item `updatedAt` stamps, does not collapse a duplicated id to no,
+ * and does not preserve custom rows — all of which the normalizer does, and all
+ * of which matter on the store that records consent decisions.
+ */
 export function lockItems(items: NegItem[]): NegItem[] {
   const mapped = items
     .filter((i): i is NegItem => !!i && typeof i === "object")
@@ -54,10 +74,70 @@ export function lockItems(items: NegItem[]): NegItem[] {
   return mapped;
 }
 
+function parseCandidate(value: unknown): NegItem | null {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Record<string, unknown>;
+  const id = typeof candidate.id === "string" ? candidate.id.trim().slice(0, 80) : "";
+  const label =
+    typeof candidate.label === "string" ? candidate.label.trim().slice(0, 80) : "";
+  // Keep a canonical ID even when its untrusted label is malformed so that a
+  // duplicate cannot disappear during sanitization and preserve a prior yes.
+  if (!id) return null;
+  const updatedAt = Number(candidate.updatedAt);
+  return {
+    id,
+    label,
+    rank: clampRank(candidate.rank),
+    ...(Number.isFinite(updatedAt) && updatedAt > 0 ? { updatedAt } : {}),
+  };
+}
+
+/**
+ * Normalize untrusted persisted negotiation data into one bounded, complete
+ * policy. Missing or duplicated canonical rows revert to no; locked rows can
+ * never be restored as yes. Custom rows are retained once by ID.
+ */
+export function normalizeNegotiationItems(value: unknown): NegItem[] {
+  const candidates = Array.isArray(value)
+    ? value.slice(0, 40).map(parseCandidate).filter((item): item is NegItem => item !== null)
+    : [];
+  const starterIds = new Set(STARTER.map((item) => item.id));
+  const matchesById = new Map<string, NegItem[]>();
+  for (const candidate of candidates) {
+    const matches = matchesById.get(candidate.id) ?? [];
+    matches.push(candidate);
+    matchesById.set(candidate.id, matches);
+  }
+
+  const normalized = STARTER.map((seed) => {
+    const matches = matchesById.get(seed.id) ?? [];
+    const rank =
+      matches.length === 1 && matches[0].label && !LOCKED_NO.has(seed.id)
+        ? matches[0].rank
+        : ("no" as Rank);
+    const stamp = matches.length === 1 ? matches[0].updatedAt : undefined;
+    return { ...seed, rank, ...(stamp ? { updatedAt: stamp } : {}) };
+  });
+
+  const customIds = new Set<string>();
+  for (const candidate of candidates) {
+    if (!candidate.label || starterIds.has(candidate.id) || customIds.has(candidate.id)) continue;
+    const matches = matchesById.get(candidate.id) ?? [];
+    normalized.push({
+      ...candidate,
+      rank: matches.length === 1 ? candidate.rank : "no",
+    });
+    customIds.add(candidate.id);
+    if (normalized.length === 40) break;
+  }
+  return normalized;
+}
+
 type State = {
   negotiationVersion: number;
   items: NegItem[];
   notes: string;
+  notesUpdatedAt?: number;
   setRank: (id: string, rank: Rank) => void;
   setNotes: (n: string) => void;
   add: (label: string) => void;
@@ -69,43 +149,68 @@ export const useNegotiate = create<State>()(
   persist(
     (set, get) => ({
       negotiationVersion: 2,
-      items: STARTER,
+      items: normalizeNegotiationItems(STARTER),
       notes: "",
-      setRank: (id, rank) =>
+      setRank: (id, rank) => {
+        // Monotonic, so a backward clock correction cannot stamp a fresh
+        // decision as older than the one it replaces.
+        const stamp = nextNegotiationStamp(get().items.map((i) => i.updatedAt));
         set({
           items: get().items.map((i) =>
-            i.id === id ? { ...i, rank: LOCKED_NO.has(i.id) ? "no" : clampRank(rank) } : i,
+            i.id === id
+              ? { ...i, rank: LOCKED_NO.has(i.id) ? "no" : clampRank(rank), updatedAt: stamp }
+              : i,
           ),
+        });
+      },
+      setNotes: (notes) =>
+        set({
+          notes: notes.slice(0, 600),
+          notesUpdatedAt: nextNegotiationStamp([get().notesUpdatedAt]),
         }),
-      setNotes: (notes) => set({ notes: notes.slice(0, 600) }),
       add: (label) => {
         const clean = label.trim().slice(0, 80);
         if (!clean) return;
         if (get().items.some((item) => item.label.toLowerCase() === clean.toLowerCase())) return;
         set({
-          items: [
+          items: normalizeNegotiationItems([
             ...get().items,
-            { id: crypto.randomUUID(), label: clean, rank: "no" as Rank },
-          ].slice(0, 40),
+            {
+              id: crypto.randomUUID(),
+              label: clean,
+              rank: "no" as Rank,
+              updatedAt: nextNegotiationStamp(get().items.map((i) => i.updatedAt)),
+            },
+          ]),
         });
       },
     }),
     {
       name: "knotty-negotiate",
+      storage: negotiationMergingStorage<State>("knotty-negotiate"),
+      version: 1,
+      migrate: (persisted) => persisted as State,
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<State>;
         const currentPolicy = p.negotiationVersion === 2;
-        const items = currentPolicy && Array.isArray(p.items) && p.items.length
-          ? lockItems(p.items as NegItem[])
-          : current.items;
+        const items =
+          currentPolicy && Array.isArray(p.items)
+            ? normalizeNegotiationItems(p.items)
+            : current.items;
         return {
           ...current,
-          ...p,
           negotiationVersion: 2,
           items,
           notes: typeof p.notes === "string" ? p.notes.slice(0, 600) : current.notes,
+          notesUpdatedAt: Number(p.notesUpdatedAt) || current.notesUpdatedAt,
         };
       },
     },
   ),
 );
+
+// Propagate a limit revocation (including the media-gating "photos" yes) from
+// another tab instead of letting a stale tab's later write resurrect it.
+syncPersistedAcrossTabs("knotty-negotiate", () => {
+  void useNegotiate.persist.rehydrate();
+});

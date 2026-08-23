@@ -1,3 +1,9 @@
+import {
+  SAFETY_SOURCE_IDS,
+  SOURCE_LEDGER_REVISION,
+  type SafetySourceId,
+} from "@/lib/kb/sources";
+
 export const CANONICAL_IDS = [
   "negotiation_materials_visible",
   "aftercare_materials_visible",
@@ -78,24 +84,13 @@ export type Disposition =
   | "insufficient_view"
   | "lower_consequence_learning_only"
   | "no_visible_concern_not_clearance";
-export type SourceId =
-  | "CONSENT-1"
-  | "CONSENT-2"
-  | "ROPE-1"
-  | "FATAL-1"
-  | "NFS-1"
-  | "FIRSTAID-1"
-  | "VISION-1"
-  | "VISION-2"
-  | "VISION-3"
-  | "PRIVACY-1"
-  | "STRUCTURE-1"
-  | "AI-SAFETY-1";
+export type SourceId = SafetySourceId;
 export type ModelStatus = "not_requested" | "completed" | "refused" | "unavailable" | "failed";
 export type TriageState = "none" | "prompt_medical" | "emergency" | "coercion_or_secret_recording";
 
 export type ObservationReport = {
-  schema_version: "1.1";
+  schema_version: "1.2";
+  source_ledger_revision: typeof SOURCE_LEDGER_REVISION;
   report_type: "readiness" | "activity_recognition" | "urgent_alert" | "post_scene" | "instructor_handoff";
   media_mode: "static_photos" | "selected_video_stills" | "no_media";
   adult_status_confirmed: boolean;
@@ -156,11 +151,11 @@ const META: Record<CanonicalId, CategoryMeta> = {
   negotiation_materials_visible: meta("Negotiation materials", "A checklist, boundary card, or stop-signal aid may be visible.", "Generic notes or props"),
   aftercare_materials_visible: meta("Aftercare materials", "Water, a blanket, a debrief card, or another comfort item may be visible.", "Ordinary household items"),
   roleplay_or_power_exchange_context_possible: meta("Roleplay or power-exchange context", "Role-like symbols or staging may be visible.", "Costume, theater, fashion, or photography"),
-  rope_restraint_unspecified: meta("Unspecified rope restraint", "Rope-like material may encircle or connect visible regions or equipment.", "Clothing trim, cable, hair, or decorative cord"),
+  rope_restraint_unspecified: meta("Unspecified rope restraint", "Rope-like material may encircle or connect visible regions or equipment.", "Clothing trim, lingerie or garment strap, lace or elastic edge, cable, hair, decorative cord, or a skin crease"),
   ground_or_surface_supported_restraint_possible: meta("Surface-supported restraint", "A surface and restraint-like material may appear in the same view.", "Hidden loading, cropped support, or forced perspective"),
   rope_present_no_visible_load_path: meta("Rope with no visible load path", "Rope-like material may be visible without a load path in the supplied crop.", "Unseen attachment, crop, or rear routing"),
-  cuff_strap_or_wrap_restraint: meta("Cuff, strap, or wrap restraint", "A cuff-, strap-, tape-, belt-, or wrap-like item may encircle or connect visible regions.", "Clothing, medical support, or sports equipment"),
-  multiple_restraint_modalities: meta("Multiple restraint modalities", "More than one restraint-medium class may be visible.", "Decorative accessories or one ambiguous class"),
+  cuff_strap_or_wrap_restraint: meta("Cuff, strap, or wrap restraint", "A cuff-, strap-, tape-, belt-, or wrap-like item may encircle or connect visible regions.", "Clothing, lingerie or garter strap, waistband, watch band or jewelry, medical support, or sports equipment"),
+  multiple_restraint_modalities: meta("Multiple restraint modalities", "More than one restraint-medium class may be visible.", "Decorative accessories, lingerie or garment straps, or one ambiguous class"),
   positional_restraint_possible: meta("Positional restraint", "Visible connections may coincide with a maintained body configuration.", "Voluntary pose, exercise, dance, or hidden support"),
   support_or_furniture_connection_possible: meta("Support or furniture connection", "Restraint-like material may connect to a support-like object.", "Exercise, medical, photography, or theatrical equipment"),
   lock_or_key_mechanism_connected_possible: meta("Connected lock or key mechanism", "A lock- or key-like object may connect to restraint-like equipment.", "Jewelry, cosmetic fastener, or prop"),
@@ -176,10 +171,10 @@ const META: Record<CanonicalId, CategoryMeta> = {
   mouth_covering_or_signal_limitation_possible: meta("Possible mouth covering or signal limitation", "An item may visually overlap the mouth region.", "Costume, medical item, or perspective"),
   impact_activity_context_possible: meta("Impact activity context", "An impact-implement-like object may appear in the supplied context.", "Sports, cleaning, costume, or theatrical prop"),
   temperature_source_context_possible: meta("Temperature-source context", "An ice-, wax-, or temperature-device-like object may appear in context.", "Food, spa items, an ordinary candle, or household device"),
-  pressure_device_context_possible: meta("Pressure-device context", "A device-like object may visibly contact a non-intimate region.", "Jewelry, medical clip, or clothing fastener"),
+  pressure_device_context_possible: meta("Pressure-device context", "A device-like object may visibly contact a non-intimate region.", "Jewelry, medical clip, garter or lingerie clasp, or clothing fastener"),
   balance_or_fall_demand_possible: meta("Possible balance or fall demand", "Posture or support may appear position-dependent.", "Yoga, exercise, dance, or staged performance"),
-  neck_or_airway_overlap_possible: meta("Possible neck or airway overlap", "Material or an object may visually overlap a neck, throat, mouth, or nose region.", "Perspective, clothing, jewelry, or medical equipment"),
-  torso_breathing_restriction_possible: meta("Possible torso breathing restriction", "Restraint-like material may cross the chest or abdomen in a concerning pattern.", "Clothing, posture, or two-dimensional overlap"),
+  neck_or_airway_overlap_possible: meta("Possible neck or airway overlap", "Material or an object may visually overlap a neck, throat, mouth, or nose region.", "Perspective, clothing, necklace or choker-style jewelry, or medical equipment"),
+  torso_breathing_restriction_possible: meta("Possible torso breathing restriction", "Restraint-like material may cross the chest or abdomen in a concerning pattern.", "Clothing, bra band or lingerie edge, posture, or two-dimensional overlap"),
   fire_or_heat_edge_context_possible: meta("Fire or active-heat context", "A flame-, heated-tool-, or active-heat-like source may be visible.", "Ordinary candle, cooking, or theatrical prop"),
   electrical_edge_context_possible: meta("Electrical edge context", "Electrode-, lead-, or electrical-device-like equipment may be visible.", "Medical, exercise, audio, or household equipment"),
   needle_cutting_or_blood_context_possible: meta("Needle, cutting, or blood context", "A sharp-tool-, needle-, cutting-, or blood-like feature may be visible.", "Medical care, craft tools, makeup, or prop"),
@@ -285,7 +280,7 @@ export function admitRemoteCategories(
   return {
     matches: critical,
     hardLimit: true,
-    modelStatus: critical.length > 0 ? "completed" : "failed",
+    modelStatus: "failed",
   };
 }
 
@@ -407,9 +402,10 @@ export function buildObservationReport(options: {
     nextStep = "lower_consequence_only";
   }
 
-  const sourceIds = sourcesFor(categories, triage);
+  const sourceIds = sourcesFor(categories, triage, mediaMode);
   const report: ObservationReport = {
-    schema_version: "1.1",
+    schema_version: "1.2",
+    source_ledger_revision: SOURCE_LEDGER_REVISION,
     report_type: urgentStop ? "urgent_alert" : triage === "prompt_medical" ? "post_scene" : "activity_recognition",
     media_mode: mediaMode,
     // This combined stop route includes unclear legal-adult status as well as
@@ -426,7 +422,7 @@ export function buildObservationReport(options: {
     media_quality: mediaQuality,
     recognized_categories: categories,
     observations: triage === "none" ? observationsFor(matches, mediaQuality) : [],
-    nonvisual_checks: nonvisualChecksFor(triage),
+    nonvisual_checks: nonvisualChecksFor(triage, urgentStop),
     limitations: limitationsFor(options.modelStatus, mediaMode, options.hardLimit === true),
     escalation,
     next_step_id: nextStep,
@@ -505,9 +501,9 @@ function normalizeMatches(matches: ModelCategoryMatch[], allowedFrameIds: readon
   for (const [index, match] of matches.slice(0, 12).entries()) {
     if (!isCanonicalId(match?.canonical_id)) continue;
     // The capture flow assigns frame labels but never receives user-attested
-    // chronology. A transition label therefore cannot satisfy its ontology
-    // discriminator and is replaced by a per-frame abstention below.
-    if (match.canonical_id === "transition_across_frames_possible") continue;
+    // chronology, so a transition match keeps its C3 consequence routing while
+    // abstaining on chronology below. Deleting it here would silently degrade
+    // an instructor-route signal to an ordinary insufficient view.
     const frameId = normalizeFrameId(match?.frame_id, index);
     if (!allowed.has(frameId)) continue;
     const key = `${frameId}:${match.canonical_id}`;
@@ -599,7 +595,17 @@ function highestBand(bands: ConsequenceBand[]): ConsequenceBand {
   );
 }
 
-function nonvisualChecksFor(triage: TriageState): string[] {
+/**
+ * The direct checks to run, which an image cannot stand in for.
+ *
+ * This keyed only off `triage`, so a report whose DISPOSITION was stop_now —
+ * a possible neck or airway overlap, torso breathing restriction, mouth
+ * covering, fire, electrical, needle, chemical or weapon context — led its red
+ * action list with "Confirm current, specific, revocable consent directly".
+ * Consent is not the first move when the image may show something over an
+ * airway. The stop steps go first, and the ordinary checks follow them.
+ */
+function nonvisualChecksFor(triage: TriageState, urgentStop: boolean): string[] {
   if (triage === "emergency") {
     return [
       "Release restraint now without creating a fall and call local emergency services.",
@@ -619,10 +625,16 @@ function nonvisualChecksFor(triage: TriageState): string[] {
       "Prioritize immediate personal safety and contact a trusted local resource or emergency service if anyone is in danger.",
     ];
   }
-  return [
+  const ordinary = [
     "Confirm current, specific, revocable consent directly; an image cannot establish it.",
     "Ask directly about sensation, movement, breathing or speech change, pain, distress, and release readiness; release for any concern or uncertainty.",
     "Confirm continuous adult attendance and an immediately accessible, rehearsed release plan outside the image.",
+  ];
+  if (!urgentStop) return ordinary;
+  return [
+    "Stop and release now without creating a fall. The match is unvalidated and may be wrong, which is a reason to release rather than to look again.",
+    "Check the person directly for breathing, speech, and responsiveness before anything else; call local emergency services for any breathing change, unresponsiveness, or symptom following neck pressure.",
+    ...ordinary,
   ];
 }
 
@@ -631,19 +643,31 @@ function limitationsFor(
   mode: ObservationReport["media_mode"],
   hardLimit: boolean,
 ): string[] {
+  if (mode === "no_media") {
+    return [
+      "No media was analyzed; this report reflects only the selected action-first triage path and cannot determine cause, severity, consent, physiology, injury, or future condition.",
+      "Use direct assessment and the stated emergency or consent response. Do not delay care or treat this no-media report as a visual finding or clearance.",
+    ];
+  }
   const limitations = [
     "Images cannot establish legal age, consent, capacity, comfort, pain, sensation, nerve function, circulation, breathing adequacy, pressure, force, load, duration, injury, or future condition.",
     "The report cannot validate an exact knot, tie, harness, placement, construction, material, anchor, rating, technique, instructor qualification, or safety.",
     "Broad category matches are unvalidated and may contain false positives or false negatives; no visible concern is never an all-clear.",
   ];
-  if (mode !== "no_media") {
-    limitations.push("The app resized and re-encoded the selected stills; crop, lighting, perspective, occlusion, and unknown prior edits can change appearance.");
-  }
-  if (status !== "completed") {
-    limitations.push(
-      hardLimit
-        ? "Remote visual classification failed or violated the closed output contract; do not proceed from its output."
-        : "Remote visual classification did not complete; this is an insufficient-view, lower-consequence-only report.",
+  limitations.push("The app resized and re-encoded the selected stills; crop, lighting, perspective, occlusion, and unknown prior edits can change appearance.");
+  if (hardLimit) {
+    limitations.unshift(
+      "Remote visual classification violated the closed output contract. Only any conservative high-consequence match was retained; do not proceed from the remaining output.",
+    );
+  } else if (status !== "completed") {
+    // unshift, not push: every surface that shows limitations renders only
+    // limitations[0] (coach-panel.tsx, journal.tsx). Appended, this sat at
+    // index 4 and was invisible, so a report the model never ran was displayed
+    // and journaled headed by the generic resize caveat — with nothing saying
+    // the classification had not happened. The hardLimit branch above already
+    // unshifts for exactly this reason.
+    limitations.unshift(
+      "Remote visual classification did not complete; this is an insufficient-view, lower-consequence-only report.",
     );
   }
   return limitations;
@@ -652,20 +676,79 @@ function limitationsFor(
 function sourcesFor(
   categories: ObservationReport["recognized_categories"],
   triage: TriageState,
+  mediaMode: ObservationReport["media_mode"],
 ): SourceId[] {
-  const sources = new Set<SourceId>(["CONSENT-2", "VISION-2", "PRIVACY-1", "STRUCTURE-1", "AI-SAFETY-1"]);
-  if (categories.some((category) => category.canonical_id.includes("rope") || category.canonical_id.includes("load"))) {
-    sources.add("ROPE-1");
+  const sources = new Set<SourceId>(["CONSENT-2"]);
+  if (mediaMode !== "no_media") {
+    sources.add("XAI-VISION-1");
+    sources.add("XAI-VISION-2");
+    sources.add("XAI-MODEL-1");
+    sources.add("XAI-STRUCTURE-1");
+    sources.add("XAI-PRIVACY-1");
+    sources.add("XAI-TERMS-1");
   }
-  if (
-    categories.some((category) =>
-      [
-        "neck_or_airway_overlap_possible",
-        "torso_breathing_restriction_possible",
-        "mouth_covering_or_signal_limitation_possible",
-      ].includes(category.canonical_id),
-    )
-  ) {
+  if (mediaMode === "selected_video_stills") sources.add("XAI-VIDEO-1");
+  // Hazard sources are selected by the categories that actually matched. This
+  // used to substring-match "rope"/"load" plus a hardcoded airway trio, which
+  // left six hazard sources in the ledger unreachable by any report — including
+  // the positional-asphyxia bulletin, the suspension-syncope pair and the
+  // handcuff-neuropathy series, each of which exists precisely to be cited when
+  // its category appears.
+  const matched = new Set(categories.map((category) => category.canonical_id));
+  const anyOf = (...ids: CanonicalId[]) => ids.some((id) => matched.has(id));
+
+  // Nerve and circulation injury from restraint of any kind.
+  if (anyOf(
+    "rope_restraint_unspecified",
+    "rope_present_no_visible_load_path",
+    "cuff_strap_or_wrap_restraint",
+    "multiple_restraint_modalities",
+    "ground_or_surface_supported_restraint_possible",
+    "partial_load_bearing_possible",
+    "off_ground_load_bearing_possible",
+    "load_path_component_visible",
+  )) {
+    sources.add("ROPE-1");
+    sources.add("ROPE-2");
+  }
+  // Manufactured restraints have their own compression-injury literature.
+  if (anyOf("cuff_strap_or_wrap_restraint", "lock_or_key_mechanism_connected_possible")) {
+    sources.add("CUFF-1");
+  }
+  // Breathing failure from position alone, with no neck contact.
+  if (anyOf(
+    "positional_restraint_possible",
+    "inverted_orientation",
+    "torso_breathing_restriction_possible",
+  )) {
+    sources.add("ASPHYX-1");
+  }
+  // Fainting and circulatory collapse while upright or suspended.
+  if (anyOf(
+    "off_ground_load_bearing_possible",
+    "partial_load_bearing_possible",
+    "inverted_orientation",
+    "fall_exposure_possible",
+  )) {
+    sources.add("SYNCOPE-1");
+    sources.add("SYNCOPE-2");
+  }
+  // Catastrophic-outcome patterns: the categories this app treats as stop or
+  // instructor-only, plus being left without an attendant.
+  if (anyOf(
+    "neck_or_airway_overlap_possible",
+    "torso_breathing_restriction_possible",
+    "mouth_covering_or_signal_limitation_possible",
+    "off_ground_load_bearing_possible",
+    "attending_adult_not_visible",
+  )) {
+    sources.add("FATAL-1");
+  }
+  if (anyOf(
+    "neck_or_airway_overlap_possible",
+    "torso_breathing_restriction_possible",
+    "mouth_covering_or_signal_limitation_possible",
+  )) {
     sources.add("NFS-1");
   }
   if (triage === "emergency" || triage === "prompt_medical") sources.add("FIRSTAID-1");
@@ -674,6 +757,7 @@ function sourcesFor(
 
 const REQUIRED_KEYS = [
   "schema_version",
+  "source_ledger_revision",
   "report_type",
   "media_mode",
   "adult_status_confirmed",
@@ -706,9 +790,12 @@ export function validateObservationReport(
   const keys = Object.keys(report).sort();
   const expected = [...REQUIRED_KEYS].sort();
   if (keys.length !== expected.length || keys.some((key, index) => key !== expected[index])) {
-    issues.push("top-level keys do not match schema 1.1");
+    issues.push("top-level keys do not match schema 1.2");
   }
-  if (report.schema_version !== "1.1") issues.push("schema_version must be 1.1");
+  if (report.schema_version !== "1.2") issues.push("schema_version must be 1.2");
+  if (report.source_ledger_revision !== SOURCE_LEDGER_REVISION) {
+    issues.push("source_ledger_revision must match the current ledger");
+  }
   if (!REPORT_TYPES.has(report.report_type as ObservationReport["report_type"])) issues.push("invalid report_type");
   if (!MEDIA_MODES.has(report.media_mode as ObservationReport["media_mode"])) issues.push("invalid media_mode");
   for (const key of CONSENT_BOOLEAN_KEYS) {
@@ -793,7 +880,9 @@ export function validateObservationReport(
       }
       if (
         category.canonical_id === "transition_across_frames_possible" &&
-        report.media_quality?.chronology !== "user_labeled"
+        report.media_quality?.chronology !== "user_labeled" &&
+        (category.evidence_state === "observed" ||
+          category.abstain_reason !== "chronology_unknown")
       ) {
         issues.push("transition evidence requires user-labeled chronology");
       }
@@ -1035,7 +1124,7 @@ const EVIDENCE_SOURCES = new Set<EvidenceSource>(["single_frame_visual", "multi_
 const EVIDENCE_STATES = new Set<EvidenceState>(["observed", "possible", "unknown", "not_assessed"]);
 const CONSEQUENCE_BANDS = new Set<ConsequenceBand>(["C1_lower_consequence_learning", "C2_elevated", "C3_high_consequence_instructor_only", "C4_stop_or_decline"]);
 const ABSTAIN_REASONS = new Set<AbstainReason>(["not_applicable", "insufficient_coverage", "perspective_distortion", "two_dimensional_overlap", "chronology_unknown", "ambiguous_object", "nonvisual_fact", "sensitive_view_required", "out_of_scope"]);
-const SOURCE_IDS = new Set<SourceId>(["CONSENT-1", "CONSENT-2", "ROPE-1", "FATAL-1", "NFS-1", "FIRSTAID-1", "VISION-1", "VISION-2", "VISION-3", "PRIVACY-1", "STRUCTURE-1", "AI-SAFETY-1"]);
+const SOURCE_IDS = new Set<SourceId>(SAFETY_SOURCE_IDS);
 const VISIBILITIES = new Set(["clear", "partial", "obscured", "not_shown"]);
 const CONFIDENCES = new Set(["high", "moderate", "low", "abstain"]);
 const CONSENT_BOOLEAN_KEYS = ["adult_status_confirmed", "activity_consent_confirmed", "recording_consent_confirmed", "upload_consent_confirmed", "output_consent_confirmed"] as const;
@@ -1082,13 +1171,15 @@ function validateEscalation(value: unknown, issues: string[]): void {
 }
 
 function requiredSourcesForReport(report: Partial<ObservationReport>): Set<SourceId> {
-  const required = new Set<SourceId>([
-    "CONSENT-2",
-    "VISION-2",
-    "PRIVACY-1",
-    "STRUCTURE-1",
-    "AI-SAFETY-1",
-  ]);
+  const required = new Set<SourceId>(["CONSENT-2"]);
+  if (report.media_mode !== "no_media") {
+    required.add("XAI-VISION-1");
+    required.add("XAI-VISION-2");
+    required.add("XAI-MODEL-1");
+    required.add("XAI-STRUCTURE-1");
+    required.add("XAI-PRIVACY-1");
+    required.add("XAI-TERMS-1");
+  }
   const categories = Array.isArray(report.recognized_categories) ? report.recognized_categories : [];
   if (
     categories.some(
@@ -1110,5 +1201,6 @@ function requiredSourcesForReport(report: Partial<ObservationReport>): Set<Sourc
     report.escalation?.level === "emergency_services" ||
     report.escalation?.level === "prompt_medical_assessment"
   ) required.add("FIRSTAID-1");
+  if (report.media_mode === "selected_video_stills") required.add("XAI-VIDEO-1");
   return required;
 }

@@ -69,3 +69,50 @@ test("tick is a no-op after stop and when the second has not advanced", () => {
   useSession.getState().tick(t0 + 9000);
   assert.equal(useSession.getState().elapsed, 2);
 });
+
+test("tick never stores a negative elapsed under clock skew", () => {
+  fresh();
+  useSession.getState().start();
+  const t0 = useSession.getState().startedAt!;
+  useSession.getState().tick(t0 - 5000);
+  assert.equal(useSession.getState().elapsed, 0);
+});
+
+test("yellow is information, not a stop", () => {
+  // The knowledge base is explicit that red ends the night and yellow changes
+  // it. Yellow used to call stop(), which raised the full red alert including
+  // the call-emergency-services text — and a yellow that ends the scene is a
+  // yellow people stop saying.
+  const s = useSession.getState();
+  s.reset();
+  s.flagYellow();
+  assert.equal(useSession.getState().stopped, false, "yellow must not stop the session");
+  assert.ok(useSession.getState().yellowAt, "yellow must raise its own flag");
+
+  // Re-flagging while one already stands must not restart the clock on a
+  // check-in that has not happened yet.
+  const first = useSession.getState().yellowAt;
+  s.flagYellow();
+  assert.equal(useSession.getState().yellowAt, first);
+
+  // The top clears it after actually checking in.
+  s.clearYellow();
+  assert.equal(useSession.getState().yellowAt, null);
+
+  // Red supersedes an outstanding yellow rather than stacking with it.
+  s.flagYellow();
+  s.stop("safeword");
+  assert.equal(useSession.getState().stopped, true);
+  assert.equal(useSession.getState().yellowAt, null);
+  assert.equal(useSession.getState().stopReason, "safeword");
+
+  // A yellow cannot be raised on top of a stop.
+  s.flagYellow();
+  assert.equal(useSession.getState().yellowAt, null);
+
+  // Reset clears both.
+  s.reset();
+  assert.equal(useSession.getState().stopped, false);
+  assert.equal(useSession.getState().yellowAt, null);
+  assert.equal(useSession.getState().stopReason, undefined);
+});

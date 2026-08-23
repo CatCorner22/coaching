@@ -47,12 +47,53 @@ export function observeFrame(
 
   const sampled = Math.max(1, Math.ceil(width / step) * Math.ceil(height / step));
   const series = smooth(Array.from(rowRope), 7);
-  const wrapBands: WrapBand[] = findPeaks(series, 0.4)
-    .filter((peak) => peak.value > 2)
-    .map((peak) => ({
-      yNorm: peak.index / Math.max(1, height),
-      strength: peak.value,
-    }));
+
+  // Structure gate: rope reads as a few thin horizontal bands. Skin, clothing
+  // and lingerie fabric, furniture, and walls read as tall blobs. Natural-fiber
+  // rope overlaps skin in color space, so geometry — not pixel color — is the
+  // only local separator, and both gates fail toward "no band" on ambiguity.
+  const coverage = ropeN / sampled;
+  // Only a frame that is almost entirely one rope-coloured expanse is treated
+  // as structureless. At 0.5 an ordinary equipment-only photo — a coil, or
+  // three wide wraps filling the frame — was blanked and then described as
+  // possibly being skin or furniture.
+  const saturated = coverage > 0.92;
+  // Wide enough that a close-up wrap filling a fifth of the frame survives;
+  // tight enough that a half-frame expanse of rope-coloured fabric does not.
+  const maxBandRows = Math.max(8, Math.round(height * 0.22));
+  const sampledCols = Math.ceil(width / step);
+  // A band must stand out from its own background rather than cross some fixed
+  // share of the row. A fixed share rejected partial-width wraps — a cuff in a
+  // wide shot, or rope entering frame — which are ordinary framings. Scaling
+  // the floor by the median row instead rejects the case it was added for
+  // (colour-exclusion leakage on noisy skin, where every row leaks similarly)
+  // while keeping a genuine wrap on a clean background.
+  // A low percentile, not the median: with a periodic wrap pattern covering
+  // half the rows the median sits ON the bands, so a median-scaled floor
+  // rejected the pattern outright. The 25th percentile stays in the gaps for a
+  // banded frame while still rising with uniform colour-exclusion leakage.
+  const sortedRows = Array.from(series).sort((a, b) => a - b);
+  const quartileRow = sortedRows[Math.floor(sortedRows.length * 0.25)] ?? 0;
+  const minBandStrength = Math.max(3, quartileRow * 3);
+  const bandIsThin = (peak: { index: number; value: number }) => {
+    const floor = peak.value * 0.6;
+    let rows = 1;
+    for (let j = peak.index - 1; j >= 0 && series[j]! >= floor; j--) rows++;
+    for (let j = peak.index + 1; j < series.length && series[j]! >= floor; j++) rows++;
+    return rows <= maxBandRows;
+  };
+
+  const wrapBands: WrapBand[] = saturated
+    ? []
+    : findPeaks(series, 0.4)
+        .filter((peak) => peak.value > minBandStrength && bandIsThin(peak))
+        .map((peak) => ({
+          yNorm: peak.index / Math.max(1, height),
+          // Normalized to the 0..8 scale the sanitizer and overlay expect:
+          // 8 = the band crosses the full row. Raw sample counts saturated
+          // every band to the maximum stroke width regardless of coverage.
+          strength: Math.max(0.5, Math.min(8, (peak.value / sampledCols) * 8)),
+        }));
 
   return {
     width,

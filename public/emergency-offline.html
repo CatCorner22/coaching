@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b0a09">
+<title>Emergency · Knotty</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0b0a09;
+    --fg: #f1ebe3;
+    --muted: #9a9188;
+    --subtle: #8f877e;
+    --danger: #b4453a;
+    --danger-text: #d97064;
+    --warn: #c4a56a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  main { margin: 0 auto; max-width: 36rem; padding: 2.5rem 1.25rem; }
+  .kicker {
+    margin: 0; font-size: .75rem; text-transform: uppercase;
+    letter-spacing: .22em; color: var(--danger-text);
+  }
+  h1 {
+    margin: .5rem 0 0; font-size: 3rem; line-height: 1.05; font-weight: 400;
+    color: var(--danger-text);
+    font-family: "Iowan Old Style", Baskerville, "Times New Roman", serif;
+  }
+  ol { margin: 2rem 0 0; padding: 0; list-style: none; }
+  li + li { margin-top: 1.25rem; }
+  .label {
+    display: block; font-size: .75rem; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--subtle);
+  }
+  li p { margin: .25rem 0 0; }
+  .call {
+    margin-top: 2rem; padding: 1rem; border-radius: 12px;
+    border: 1px solid var(--danger); background: rgba(180, 69, 58, .1);
+    font-size: .875rem;
+  }
+  .call strong { display: block; color: var(--danger-text); font-weight: 500; }
+  .call p { margin: .25rem 0 0; color: var(--muted); }
+  .offline {
+    margin-top: 1.5rem; padding: .75rem 1rem; border-radius: 12px;
+    border: 1px solid rgba(196, 165, 106, .5); background: rgba(196, 165, 106, .1);
+    color: var(--warn); font-size: .8125rem;
+  }
+  .back {
+    display: inline-flex; align-items: center; min-height: 44px;
+    margin-top: 2rem; color: var(--muted); font-size: .875rem;
+  }
+</style>
+</head>
+<body>
+<main>
+  <p class="kicker">Stop</p>
+  <h1>Release now</h1>
+  <ol>
+      <li>
+        <span class="label">1 · Stop and release</span>
+        <p>Stop the activity. Support the person's position and release restraint without creating a fall or another injury. Use the practiced rapid-release method within your training.</p>
+      </li>
+      <li>
+        <span class="label">2 · Call emergency services</span>
+        <p>Call now for abnormal breathing, unresponsiveness, seizure, chest pain, severe bleeding, a serious fall, stroke-like symptoms, major weakness, or any neck pressure followed by concerning symptoms.</p>
+      </li>
+      <li>
+        <span class="label">3 · Follow the dispatcher</span>
+        <p>Follow dispatcher instructions. Give CPR, AED care, or first aid only within your current training. Do not use this app instead of emergency care.</p>
+      </li>
+      <li>
+        <span class="label">4 · Prompt medical assessment</span>
+        <p>Seek prompt care for persistent or worsening numbness, weakness, pain, swelling, discoloration, temperature change, breathing or swallowing change, voice change, confusion, dizziness, or loss of function.</p>
+      </li>
+      <li>
+        <span class="label">5 · Do not re-tie</span>
+        <p>Do not re-tie, delay care for a photo, or use normal-looking color or an app result to rule out injury.</p>
+      </li>
+  </ol>
+  <div class="call" role="alert">
+    <strong>Call your local emergency-services number now.</strong>
+    <p>Use the device's phone dialer. This emergency card deliberately reads no saved account data and will not guess a number from browser language or location.</p>
+  </div>
+  <p class="offline">You are seeing the saved offline copy of this card because the app could not be reached. Its wording is fixed at the version you last loaded. Call emergency services directly; do not wait for a network.</p>
+  <a class="back" href="/">Back to Knotty</a>
+</main>
+</body>
+</html>

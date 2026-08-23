@@ -1,5 +1,6 @@
 import type { Article } from "./types";
 import { MORE_ARTICLES } from "./more-articles";
+import { EXPANSION_ARTICLES } from "./expansion-articles";
 
 const CORE_ARTICLES: Article[] = [
   {
@@ -78,7 +79,7 @@ const CORE_ARTICLES: Article[] = [
       {
         type: "callout",
         title: "Non-verbal",
-        text: "If a gag is ever in play, agree a drop object or a triple tap before the gag goes in. Knotty's studio can listen for 'red' and 'yellow' when the mic is on. A bound person who cannot speak still needs a channel.",
+        text: "If a gag is ever in play, agree a drop object or a triple tap before the gag goes in. If the studio mic is enabled it may pick up a spoken 'red' or 'yellow', but browser speech detection is unreliable and is never a substitute for a physical stop signal. A bound person who cannot speak still needs a channel that does not depend on being heard.",
       },
       {
         type: "p",
@@ -387,9 +388,11 @@ const CORE_ARTICLES: Article[] = [
       {
         type: "ul",
         items: [
-          "Standard starting kit: six to eight pieces of 6mm jute, 7–8 meters, plus two 4-meter pieces",
-          "Condition jute with a little camellia or jojoba, then bake or tumble — not with wax that turns it into a crayon",
-          "Retire rope that has a crunchy spot, a glossy melted nylon patch, or a memory of a previous cut",
+          "Choose practice material using the maker's documented purpose, care, and retirement guidance; a common label or dimension is not a safety rating.",
+          "Do not heat, oil, wash, or otherwise condition rope from generic app instructions. Follow the specific manufacturer's instructions and fire-safety warnings.",
+          "Retire cut, melted, contaminated, damaged, or uncertain material from body use; do not rely on appearance alone.",
+          "Skin reacts to the fiber itself, not only to pressure. Natural fibers shed fine dust and carry processing oils; some people itch, redden, or come up in a rash from jute or hemp and are fine with cotton, and a first exposure that went well does not settle the second. Anyone with sensitive skin, eczema, or a known fiber or latex sensitivity should know the material before it is on them.",
+          "Friction is the other half of what rope does to skin. A fast pass or a rope dragged under load abrades regardless of how well the tie is tensioned, and broken skin changes what is safe to do next — it is an open wound, not a mark.",
         ],
       },
     ],
@@ -446,7 +449,7 @@ const CORE_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "Coil so it pays out without kinks. Inspect for broken yarns, thin spots, and anything that crunches. Jute does not love a washing machine; spot-clean, air, re-oil lightly. Synthetics can be washed and must be fully dry. Anything that has been cut, melted, or used to actually suspend a human past its working history gets demoted to decorative or trash.",
+        text: "Store, clean, dry, condition, inspect, and retire rope according to the specific manufacturer's instructions. Do not apply generic heat, oil, washing, or strength-restoration advice. Cut, melted, contaminated, damaged, or uncertain material is not cleared for body use by looking normal; retire it conservatively.",
       },
     ],
   },
@@ -549,7 +552,7 @@ const CORE_ARTICLES: Article[] = [
   },
 ];
 
-export const ARTICLES: Article[] = [...CORE_ARTICLES, ...MORE_ARTICLES];
+export const ARTICLES: Article[] = [...CORE_ARTICLES, ...MORE_ARTICLES, ...EXPANSION_ARTICLES];
 
 export function getArticle(slug: string) {
   return ARTICLES.find((a) => a.slug === slug);

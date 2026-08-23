@@ -7,6 +7,7 @@ import {
   consequenceFloor,
   validateObservationReport,
 } from "../src/lib/observation/report.ts";
+import { SAFETY_SOURCE_IDS } from "../src/lib/kb/sources.ts";
 
 const consent = {
   adults: true,
@@ -125,6 +126,7 @@ test("prohibited remote inference keeps high-consequence categories and halts", 
     { nonvisual_inference: false, exact_identification: false, procedural_content: true },
   );
   assert.equal(admitted.hardLimit, true);
+  assert.equal(admitted.modelStatus, "failed");
   assert.deepEqual(admitted.matches, [
     { frame_id: "F01", canonical_id: "neck_or_airway_overlap_possible" },
   ]);
@@ -140,6 +142,7 @@ test("prohibited remote inference keeps high-consequence categories and halts", 
   assert.equal(report.urgent_stop, true);
   assert.equal(report.disposition, "stop_now");
   assert.equal(report.next_step_id, "stop_now");
+  assert.match(report.limitations[0], /violated the closed output contract/i);
 });
 
 test("prohibited remote inference without C3/C4 still refuses continuation", () => {
@@ -482,7 +485,7 @@ test("validator binds sources, evidence multiplicity, and observations to the su
   );
 });
 
-test("transitions are suppressed without user-labeled chronology and validator enforces the boundary", () => {
+test("transitions keep C3 instructor routing while abstaining on chronology", () => {
   const transition = buildObservationReport({
     mediaMode: "selected_video_stills",
     consent,
@@ -494,16 +497,22 @@ test("transitions are suppressed without user-labeled chronology and validator e
     ],
     modelStatus: "completed",
   });
-  assert.equal(
-    transition.recognized_categories.some(
-      (category) => category.canonical_id === "transition_across_frames_possible",
-    ),
-    false,
+  const category = transition.recognized_categories.find(
+    (entry) => entry.canonical_id === "transition_across_frames_possible",
   );
-  assert.ok(transition.observations.every((observation) => observation.confidence === "abstain"));
+  assert.ok(category, "the C3 transition signal must not be silently dropped");
+  assert.equal(category.consequence_band, "C3_high_consequence_instructor_only");
+  assert.equal(category.abstain_reason, "chronology_unknown");
+  assert.notEqual(category.evidence_state, "observed");
+  assert.equal(transition.disposition, "do_not_proceed");
+  assert.equal(transition.next_step_id, "qualified_instructor");
+  assert.equal(validateObservationReport(transition).success, true);
 
   const forgedTransition = clone(transition);
-  forgedTransition.recognized_categories[0].canonical_id = "transition_across_frames_possible";
+  const forged = forgedTransition.recognized_categories.find(
+    (entry) => entry.canonical_id === "transition_across_frames_possible",
+  );
+  forged.abstain_reason = "not_applicable";
   assert.match(
     validateObservationReport(forgedTransition).issues.join(" "),
     /user-labeled chronology/i,
@@ -511,7 +520,6 @@ test("transitions are suppressed without user-labeled chronology and validator e
 });
 
 test("no-media non-triage reports build without visual rows", () => {
-
   const noMedia = buildObservationReport({
     mediaMode: "no_media",
     modelStatus: "not_requested",
@@ -519,7 +527,21 @@ test("no-media non-triage reports build without visual rows", () => {
   });
   assert.deepEqual(noMedia.recognized_categories, []);
   assert.deepEqual(noMedia.observations, []);
+  assert.deepEqual(noMedia.source_ids, ["CONSENT-2"]);
+  assert.doesNotMatch(noMedia.limitations.join(" "), /remote visual classification did not complete/i);
   assert.equal(validateObservationReport(noMedia).success, true);
+
+  for (const triage of ["emergency", "prompt_medical", "coercion_or_secret_recording"]) {
+    const actionFirst = buildObservationReport({
+      mediaMode: "no_media",
+      modelStatus: "not_requested",
+      triage,
+    });
+    assert.equal(actionFirst.media_mode, "no_media", triage);
+    assert.ok(actionFirst.source_ids.every((source) => !source.startsWith("XAI-")), triage);
+    assert.doesNotMatch(actionFirst.limitations.join(" "), /insufficient-view|lower-consequence-only/i, triage);
+    assert.equal(validateObservationReport(actionFirst).success, true, triage);
+  }
 
   const staleMediaDuringTriage = buildObservationReport({
     mediaMode: "static_photos",
@@ -563,4 +585,131 @@ test("sparse source clip labels become distinct bounded report frames", () => {
   });
   assert.deepEqual(report.observations.map((observation) => observation.frame_id), ["F01", "F02"]);
   assert.equal(validateObservationReport(report, { allowedFrameIds: ["F01", "F02"] }).success, true);
+});
+
+test("a stop-level report leads with stopping, not with confirming consent", () => {
+  // nonvisualChecksFor keyed only off triage, so a report whose disposition was
+  // stop_now — a possible neck or airway overlap, torso breathing restriction,
+  // fire, electrical, needle, chemical or weapon context — led its red action
+  // list with "Confirm current, specific, revocable consent directly". Consent
+  // is not the first move when the image may show something over an airway.
+  const base = {
+    mediaMode: "static_photos",
+    consent,
+    quality: { sharpness: 0.8, exposure: 0.8, score: 0.8 },
+    allowedFrameIds: ["F01"],
+    modelStatus: "completed",
+  };
+  for (const id of [
+    "neck_or_airway_overlap_possible",
+    "torso_breathing_restriction_possible",
+    "mouth_covering_or_signal_limitation_possible",
+    "fire_or_heat_edge_context_possible",
+    "electrical_edge_context_possible",
+    "needle_cutting_or_blood_context_possible",
+    "weapon_context_possible",
+    "chemical_or_intoxication_context_possible",
+  ]) {
+    const report = buildObservationReport({
+      ...base,
+      matches: [{ canonical_id: id, confidence: "possible", frame_id: "F01", evidence: "x" }],
+    });
+    assert.equal(report.urgent_stop, true, id);
+    assert.match(report.nonvisual_checks[0], /^Stop and release now/, id);
+    assert.match(report.nonvisual_checks[1], /breathing, speech, and responsiveness/, id);
+    // The ordinary checks still follow rather than being replaced.
+    assert.ok(
+      report.nonvisual_checks.some((c) => /revocable consent/.test(c)),
+      `${id} dropped the consent check`,
+    );
+  }
+
+  // A report that is not a stop keeps the ordinary list, unchanged and unpadded.
+  for (const matches of [
+    [],
+    [{ canonical_id: "rope_restraint_unspecified", confidence: "possible", frame_id: "F01", evidence: "x" }],
+  ]) {
+    const report = buildObservationReport({ ...base, matches });
+    assert.equal(report.urgent_stop, false);
+    assert.equal(report.nonvisual_checks.length, 3);
+    assert.match(report.nonvisual_checks[0], /^Confirm current, specific, revocable consent/);
+  }
+});
+
+test("a report the model never ran says so in the line that is actually rendered", () => {
+  // Both surfaces that show limitations render only limitations[0]
+  // (coach-panel.tsx, journal.tsx). The "did not complete" caveat was appended,
+  // so it sat at index 4 and was invisible: a report where xAI refused, errored
+  // or was never reached was displayed and journaled headed by the generic
+  // resize caveat, with nothing saying the classification had not happened.
+  const base = {
+    mediaMode: "static_photos",
+    consent,
+    quality: { sharpness: 0.8, exposure: 0.8, score: 0.8 },
+    allowedFrameIds: ["F01"],
+  };
+  for (const modelStatus of ["refused", "error", "not_requested"]) {
+    const report = buildObservationReport({ ...base, modelStatus });
+    assert.match(
+      report.limitations[0],
+      /Remote visual classification did not complete/,
+      `${modelStatus} hid the caveat behind another limitation`,
+    );
+  }
+  // A completed report must not claim the classification failed.
+  const completed = buildObservationReport({ ...base, modelStatus: "completed" });
+  assert.ok(!completed.limitations.some((l) => /did not complete/.test(l)));
+});
+
+test("hazard sources are chosen by the categories that actually matched", () => {
+  // sourcesFor substring-matched "rope"/"load" plus a hardcoded airway trio, so
+  // six hazard sources in the ledger could never be emitted by any report — the
+  // positional-asphyxia bulletin, the suspension-syncope pair, the
+  // handcuff-neuropathy series, the fatal-outcome review and the nerve-safety
+  // reference all existed to be cited and never were.
+  const base = {
+    mediaMode: "static_photos",
+    consent,
+    quality: { sharpness: 0.8, exposure: 0.8, score: 0.8 },
+    allowedFrameIds: ["F01"],
+    modelStatus: "completed",
+  };
+  const sourcesFor = (id) =>
+    buildObservationReport({
+      ...base,
+      matches: [{ canonical_id: id, confidence: "possible", frame_id: "F01", evidence: "x" }],
+    }).source_ids;
+
+  // Breathing failure from position alone, with no neck contact.
+  for (const id of ["positional_restraint_possible", "inverted_orientation", "torso_breathing_restriction_possible"]) {
+    assert.ok(sourcesFor(id).includes("ASPHYX-1"), `${id} should cite ASPHYX-1`);
+  }
+  // Fainting and circulatory collapse while upright or suspended.
+  for (const id of ["off_ground_load_bearing_possible", "partial_load_bearing_possible", "fall_exposure_possible"]) {
+    const ids = sourcesFor(id);
+    assert.ok(ids.includes("SYNCOPE-1") && ids.includes("SYNCOPE-2"), `${id} should cite the syncope pair`);
+  }
+  // Manufactured restraints have their own compression-injury literature.
+  for (const id of ["cuff_strap_or_wrap_restraint", "lock_or_key_mechanism_connected_possible"]) {
+    assert.ok(sourcesFor(id).includes("CUFF-1"), `${id} should cite CUFF-1`);
+  }
+  // Nerve-safety guidance accompanies the injury series for any restraint.
+  assert.ok(sourcesFor("rope_restraint_unspecified").includes("ROPE-2"));
+  // Catastrophic-outcome patterns.
+  for (const id of ["neck_or_airway_overlap_possible", "off_ground_load_bearing_possible", "attending_adult_not_visible"]) {
+    assert.ok(sourcesFor(id).includes("FATAL-1"), `${id} should cite FATAL-1`);
+  }
+
+  // A benign category must not drag hazard sources in with it.
+  const benign = sourcesFor("negotiation_materials_visible");
+  for (const id of ["ASPHYX-1", "SYNCOPE-1", "SYNCOPE-2", "CUFF-1", "FATAL-1", "NFS-1", "ROPE-1", "ROPE-2"]) {
+    assert.ok(!benign.includes(id), `a benign category cited ${id}`);
+  }
+
+  // Every emitted id must exist in the ledger.
+  for (const id of CANONICAL_IDS) {
+    for (const source of sourcesFor(id)) {
+      assert.ok(SAFETY_SOURCE_IDS.includes(source), `${id} emitted unknown source ${source}`);
+    }
+  }
 });

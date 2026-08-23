@@ -58,7 +58,7 @@ function LoginPage() {
         ) : capabilities === null ? (
           capabilityError ? (
             <div className="mt-6 rounded-lg border border-danger/40 p-4">
-              <p className="text-sm text-danger" role="alert">
+              <p className="text-sm text-danger-text" role="alert">
                 {capabilityError} Cloud analysis remains unavailable until this check succeeds.
               </p>
               <Button
@@ -105,13 +105,13 @@ function LoginPage() {
           </p>
         )}
         {error && (
-          <p className="mt-4 text-sm text-danger" role="alert">
+          <p className="mt-4 text-sm text-danger-text" role="alert">
             {error}
           </p>
         )}
         <p className="mt-6 text-xs leading-relaxed text-subtle">
           Sign-in does not make an image anonymous or verify consent, age, physiology, technique,
-          or safety. Use only separately consented, clothed, non-explicit, non-identifying media.
+          or safety. Use only separately consented, non-explicit, non-identifying media; clothed or intimate wear is within scope.
           To prevent one account from inheriting another person's notes on a shared device, starting
           or ending an account session clears Knotty's local settings, negotiation, plan, and journal.
         </p>

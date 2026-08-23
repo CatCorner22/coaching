@@ -26,6 +26,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as NegotiateRouteImport } from './routes/negotiate'
 import { Route as NervesRouteImport } from './routes/nerves'
 import { Route as PlanRouteImport } from './routes/plan'
+import { Route as RigRouteImport } from './routes/rig'
 import { Route as SafetyRouteImport } from './routes/safety'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as StudioRouteImport } from './routes/studio'
@@ -119,6 +120,11 @@ const PlanRoute = PlanRouteImport.update({
   path: '/plan',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RigRoute = RigRouteImport.update({
+  id: '/rig',
+  path: '/rig',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SafetyRoute = SafetyRouteImport.update({
   id: '/safety',
   path: '/safety',
@@ -173,6 +179,7 @@ export interface FileRoutesByFullPath {
   '/negotiate': typeof NegotiateRoute
   '/nerves': typeof NervesRoute
   '/plan': typeof PlanRoute
+  '/rig': typeof RigRoute
   '/safety': typeof SafetyRoute
   '/settings': typeof SettingsRoute
   '/studio': typeof StudioRoute
@@ -199,6 +206,7 @@ export interface FileRoutesByTo {
   '/negotiate': typeof NegotiateRoute
   '/nerves': typeof NervesRoute
   '/plan': typeof PlanRoute
+  '/rig': typeof RigRoute
   '/safety': typeof SafetyRoute
   '/settings': typeof SettingsRoute
   '/studio': typeof StudioRoute
@@ -226,6 +234,7 @@ export interface FileRoutesById {
   '/negotiate': typeof NegotiateRoute
   '/nerves': typeof NervesRoute
   '/plan': typeof PlanRoute
+  '/rig': typeof RigRoute
   '/safety': typeof SafetyRoute
   '/settings': typeof SettingsRoute
   '/studio': typeof StudioRoute
@@ -254,6 +263,7 @@ export interface FileRouteTypes {
     | '/negotiate'
     | '/nerves'
     | '/plan'
+    | '/rig'
     | '/safety'
     | '/settings'
     | '/studio'
@@ -280,6 +290,7 @@ export interface FileRouteTypes {
     | '/negotiate'
     | '/nerves'
     | '/plan'
+    | '/rig'
     | '/safety'
     | '/settings'
     | '/studio'
@@ -306,6 +317,7 @@ export interface FileRouteTypes {
     | '/negotiate'
     | '/nerves'
     | '/plan'
+    | '/rig'
     | '/safety'
     | '/settings'
     | '/studio'
@@ -333,6 +345,7 @@ export interface RootRouteChildren {
   NegotiateRoute: typeof NegotiateRoute
   NervesRoute: typeof NervesRoute
   PlanRoute: typeof PlanRoute
+  RigRoute: typeof RigRoute
   SafetyRoute: typeof SafetyRoute
   SettingsRoute: typeof SettingsRoute
   StudioRoute: typeof StudioRoute
@@ -463,6 +476,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlanRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/rig': {
+      id: '/rig'
+      path: '/rig'
+      fullPath: '/rig'
+      preLoaderRoute: typeof RigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/safety': {
       id: '/safety'
       path: '/safety'
@@ -533,6 +553,7 @@ const rootRouteChildren: RootRouteChildren = {
   NegotiateRoute: NegotiateRoute,
   NervesRoute: NervesRoute,
   PlanRoute: PlanRoute,
+  RigRoute: RigRoute,
   SafetyRoute: SafetyRoute,
   SettingsRoute: SettingsRoute,
   StudioRoute: StudioRoute,

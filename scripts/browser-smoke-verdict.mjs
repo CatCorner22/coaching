@@ -117,10 +117,18 @@ export function baselineComparison(current, rawText) {
   }
   return compareToBaseline(current, baseline);
 }
+/**
+ * A rendered page must actually contain text. A blank white page with HTTP 200
+ * and a clean console is the single most common failure this smoke exists to
+ * catch, and it used to pass: only status and errors were gated.
+ */
+export const MIN_RENDERED_BODY_TEXT = 40;
+
 export function exitCodeFor(viewports) {
   const list = Object.values(viewports ?? {});
   if (list.length === 0) return 1;
   if (list.some((v) => (v.status ?? 0) >= 400 || (v.status ?? 0) === 0)) return 1;
+  if (list.some((v) => (v.bodyTextLen ?? 0) < MIN_RENDERED_BODY_TEXT)) return 1;
   if (list.some((v) => (v.consoleErrors?.length ?? 0) > 0 || (v.pageErrors?.length ?? 0) > 0)) {
     return 2;
   }

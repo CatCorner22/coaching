@@ -34,7 +34,7 @@ function Home() {
             Check directly.
           </h1>
           <p className="mt-5 max-w-lg text-base leading-relaxed text-muted">
-            Capture equipment-only or clothed, non-identifying stills. Knotty returns a bounded,
+            Capture equipment-only or non-identifying stills. Knotty returns a bounded,
             evidence-labeled observation report with explicit uncertainty and consequence floors—
             never physiology, exact-tie validation, monitoring, clearance, or next-wrap coaching.
           </p>
@@ -143,8 +143,11 @@ function Home() {
             >
               <MiniTie wraps={t.steps.at(-1)?.wraps ?? []} pose={t.steps.at(-1)?.expected.pose} />
               <div className="min-w-0">
-                <div className="flex min-w-0 items-center gap-2">
-                  <p className="min-w-0 truncate font-display text-2xl">{t.name}</p>
+                {/* Wrapping, not a nested nowrap row: side by side the title's
+                    longest word plus the badge set a min-content wider than a
+                    390px phone, and the whole page scrolled sideways. */}
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <p className="min-w-0 wrap-anywhere font-display text-2xl">{t.name}</p>
                   <Badge className="shrink-0">{t.level}</Badge>
                 </div>
                 <p className="text-xs text-subtle">{t.jp}</p>

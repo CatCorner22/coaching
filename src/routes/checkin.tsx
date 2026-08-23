@@ -70,15 +70,20 @@ function CheckInPage() {
         />
       </div>
 
+      <label htmlFor="checkin-note" className="mt-6 block text-xs uppercase tracking-wide text-subtle">
+        Optional session-only note (240 characters; no identifying details)
+      </label>
       <textarea
-        className="mt-6 h-20 w-full rounded-md border border-border bg-elevated p-3 text-sm"
+        id="checkin-note"
+        maxLength={240}
+        className="mt-1 h-20 w-full rounded-md border border-border bg-elevated p-3 text-sm"
         placeholder="Optional session-only note; do not include identifying details"
         value={note}
         onChange={(event) => setNote(event.target.value.slice(0, 240))}
       />
 
       {concern && (
-        <div className="mt-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">
+        <div className="mt-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger-text" role="alert">
           Release now and do not re-tie. {emergency
             ? "Call local emergency services and follow dispatcher instructions."
             : "Seek prompt medical assessment for persistent or worsening symptoms; use emergency services if an emergency sign develops."}
@@ -88,6 +93,7 @@ function CheckInPage() {
 
       <div className="mt-6 flex flex-wrap gap-2">
         <Button
+          className="h-auto whitespace-normal py-2 text-left"
           disabled={!ready}
           onClick={() => {
             if (!ready) return;
@@ -140,7 +146,7 @@ function ConsentField({ value, onChange }: { value: ConsentChoice; onChange: (va
     <fieldset>
       <legend className="text-xs uppercase tracking-wide text-subtle">Current consent</legend>
       <p className="mt-1 text-xs text-muted">Does the person directly confirm they want the activity to continue right now?</p>
-      <div className="mt-2 flex gap-2">
+      <div className="mt-2 flex flex-wrap gap-2">
         <Choice active={value === "yes"} onClick={() => onChange("yes")}>Yes, directly confirmed</Choice>
         <Choice active={value === "no"} onClick={() => onChange("no")}>No or uncertain</Choice>
       </div>
@@ -163,7 +169,7 @@ function CheckField({
     <fieldset>
       <legend className="text-xs uppercase tracking-wide text-subtle">{legend}</legend>
       <p className="mt-1 text-xs text-muted">{help}</p>
-      <div className="mt-2 flex gap-2">
+      <div className="mt-2 flex flex-wrap gap-2">
         <Choice active={value === "no_concern"} onClick={() => onChange("no_concern")}>No concern reported</Choice>
         <Choice active={value === "concern"} onClick={() => onChange("concern")}>Concern or uncertain</Choice>
       </div>
@@ -172,7 +178,23 @@ function CheckField({
 }
 
 function Choice({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <Button type="button" variant={active ? "default" : "outline"} size="sm" onClick={onClick}>{children}</Button>;
+  // aria-pressed: selection was conveyed only by a visual variant swap, so a
+  // screen reader could not tell which answer was chosen.
+  return (
+    <Button
+      type="button"
+      aria-pressed={active}
+      variant={active ? "default" : "outline"}
+      size="sm"
+      // Buttons are nowrap by default. These labels are sentences, and at a
+      // narrow layout viewport the concern answer — always the longer, second
+      // one — was the half that ran off the edge.
+      className="h-auto whitespace-normal py-2 text-left"
+      onClick={onClick}
+    >
+      {children}
+    </Button>
+  );
 }
 
 function hasConcern(entry: CheckIn): boolean {

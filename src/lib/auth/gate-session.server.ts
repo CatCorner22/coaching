@@ -16,6 +16,10 @@ import {
   gateIdentityFromHeaders,
   sessionBoundToGateIdentity,
 } from "./gate-identity.server";
+import {
+  removeRequestCookieFamily,
+  requestCookieFamilyNames,
+} from "./gate-cookie-core";
 
 export const GATE_PROVIDER_ID = "grok-gate";
 const GATE_ACCOUNT_ISSUER = "https://grok.com";
@@ -69,6 +73,7 @@ async function emitSessionCookie(
   }
 
   // Primary path: TanStack Start's response cookie store (reaches the browser).
+  let delivered = false;
   try {
     const { setCookie } = await import("@tanstack/react-start/server");
     setCookie(sessionTokenName, sessionValue, {
@@ -79,6 +84,7 @@ async function emitSessionCookie(
       maxAge: typeof maxAge === "number" ? maxAge : undefined,
       domain: cookieOptions.domain,
     });
+    delivered = true;
   } catch (err) {
     console.error(`${LOG} TanStack setCookie failed`, err);
   }
@@ -89,6 +95,7 @@ async function emitSessionCookie(
     const responseHeaders = ctx.context.responseHeaders;
     if (responseHeaders) {
       responseHeaders.append("set-cookie", signedCookie);
+      delivered = true;
     } else {
       console.error(`${LOG} ctx.context.responseHeaders is missing`);
     }
@@ -96,7 +103,7 @@ async function emitSessionCookie(
     console.error(`${LOG} responseHeaders.append(set-cookie) failed`, err);
   }
 
-  return sessionValue;
+  return delivered ? sessionValue : null;
 }
 
 /**
@@ -106,50 +113,38 @@ async function emitSessionCookie(
  * Mirrors `emitSessionCookie`'s dual-path delivery: TanStack's response
  * cookie store plus Better Auth's `responseHeaders` bag.
  */
-async function expireSessionDataCookie(
+async function expireSessionDataCookies(
   ctx: Parameters<Parameters<typeof createAuthMiddleware>[0]>[0],
   cookie: { name: string; attributes: { path?: string; secure?: boolean } },
+  names: readonly string[],
 ): Promise<void> {
   const path = cookie.attributes.path ?? "/";
   const secure = cookie.attributes.secure ?? true;
-  try {
-    const { setCookie } = await import("@tanstack/react-start/server");
-    setCookie(cookie.name, "", {
-      path,
-      httpOnly: true,
-      secure,
-      sameSite: "lax",
-      maxAge: 0,
-    });
-  } catch (err) {
-    console.error(`${LOG} TanStack setCookie (expire session_data) failed`, err);
-  }
-  try {
-    ctx.context.responseHeaders?.append(
-      "set-cookie",
-      `${cookie.name}=; Path=${path}; HttpOnly; ` +
-        `${secure ? "Secure; " : ""}SameSite=Lax; Max-Age=0`,
-    );
-  } catch (err) {
-    console.error(
-      `${LOG} responseHeaders.append (expire session_data) failed`,
-      err,
-    );
-  }
-}
-
-/** Drop a cookie from the request `Cookie` header (inverse of `setRequestCookie`). */
-function removeRequestCookie(headers: Headers, name: string): void {
-  const cookieHeader = headers.get("cookie");
-  if (!cookieHeader) return;
-  const kept = cookieHeader
-    .split(";")
-    .map((pair) => pair.trim())
-    .filter((pair) => pair && !pair.startsWith(`${name}=`));
-  if (kept.length > 0) {
-    headers.set("cookie", kept.join("; "));
-  } else {
-    headers.delete("cookie");
+  for (const name of names) {
+    try {
+      const { setCookie } = await import("@tanstack/react-start/server");
+      setCookie(name, "", {
+        path,
+        httpOnly: true,
+        secure,
+        sameSite: "lax",
+        maxAge: 0,
+      });
+    } catch (err) {
+      console.error(`${LOG} TanStack setCookie (expire session_data) failed`, err);
+    }
+    try {
+      ctx.context.responseHeaders?.append(
+        "set-cookie",
+        `${name}=; Path=${path}; HttpOnly; ` +
+          `${secure ? "Secure; " : ""}SameSite=Lax; Max-Age=0`,
+      );
+    } catch (err) {
+      console.error(
+        `${LOG} responseHeaders.append (expire session_data) failed`,
+        err,
+      );
+    }
   }
 }
 
@@ -162,7 +157,9 @@ export function gateIdentitySessions() {
           matcher: (ctx: { path?: string }) => ctx.path === "/get-session",
           handler: createAuthMiddleware(async (ctx) => {
             if (!gateIdentityEnabled()) return;
-            const inbound = ctx.request?.headers ?? ctx.headers;
+            // Prefer headers produced by earlier Better Auth hooks (notably the
+            // bearer-to-cookie translation) over the immutable raw request.
+            const inbound = ctx.headers ?? ctx.request?.headers;
             if (!inbound) {
               console.error(`${LOG} no request headers on /get-session`);
               return;
@@ -179,22 +176,35 @@ export function gateIdentitySessions() {
               });
             }
 
-            // Bearer auth (live-preview popup) already carries a session. Still
-            // validate any present gate assertion first: an attacker or broken
-            // proxy must not be able to smuggle an invalid assertion beside a
-            // valid cookie/bearer and have it silently ignored.
-            if (inbound.get("authorization")) return;
-
             try {
               const sessionCookieName =
                 ctx.context.authCookies.sessionToken.name;
+              const sessionDataCookie = ctx.context.authCookies.sessionData;
+              const sessionDataCookieNames = requestCookieFamilyNames(
+                inbound,
+                sessionDataCookie.name,
+              );
               const cookieHeader = inbound.get("cookie") ?? "";
               if (cookieHeader.includes(`${sessionCookieName}=`)) {
-                // These adapter operations intentionally have no local catch.
-                // If inspection or deletion fails, the outer APIError path
-                // rejects /get-session before handleOAuthUserInfo can mint a
-                // second valid identity alongside the stale session.
-                const existing = await getSessionFromCtx(ctx);
+                // findAccounts and deleteSession below intentionally have no local
+                // catch: if either fails, the outer APIError path rejects
+                // /get-session before handleOAuthUserInfo can mint a second
+                // valid identity alongside the stale session.
+                //
+                // That guarantee does NOT extend to this read. Better Auth's
+                // getSessionFromCtx ends in `.catch(() => null)`
+                // (better-auth/dist/api/routes/session.mjs), so a failed
+                // lookup is indistinguishable here from an expired session:
+                // both return null and both fall through to mint a new
+                // identity. Closing that would mean either throwing — which
+                // breaks the ordinary expired-session sign-in — or resolving
+                // the signed session token against the adapter directly, which
+                // reaches into internals this code should not depend on. The
+                // window is a lookup failure during gate sign-in; the comment
+                // is left honest rather than the behaviour left misdescribed.
+                const existing = await getSessionFromCtx(ctx, {
+                  disableCookieCache: true,
+                });
                 if (existing?.session && existing.user) {
                   const accounts =
                     await ctx.context.internalAdapter.findAccounts(
@@ -212,8 +222,20 @@ export function gateIdentitySessions() {
                       GATE_PROVIDER_ID,
                     )
                   ) {
-                    // Already signed in as this gate identity — nothing to do.
-                    return;
+                    // The token is already bound correctly, but a stale or
+                    // chunked session_data cache could still name a prior user.
+                    // Remove that cache from this request and expire it in the
+                    // response so the endpoint resolves authoritatively.
+                    await expireSessionDataCookies(
+                      ctx,
+                      sessionDataCookie,
+                      sessionDataCookieNames,
+                    );
+                    const headers = new Headers(
+                      Object.fromEntries(inbound.entries()),
+                    );
+                    removeRequestCookieFamily(headers, sessionDataCookie.name);
+                    return { context: { headers } };
                   }
                   await ctx.context.internalAdapter.deleteSession(
                     existing.session.token,
@@ -242,9 +264,8 @@ export function gateIdentitySessions() {
               });
               if (result.error || !result.data) {
                 console.error(`${LOG} handleOAuthUserInfo failed`, {
-                  error: result.error,
+                  errorType: result.error ? "provider-error" : "none",
                   hasData: Boolean(result.data),
-                  sub: identity.sub,
                 });
                 throw new APIError("INTERNAL_SERVER_ERROR", {
                   message: "The hosting identity session could not be created.",
@@ -265,15 +286,17 @@ export function gateIdentitySessions() {
               if (!sessionValue) {
                 console.error(
                   `${LOG} session created in DB but cookie was not emitted`,
-                  { userId: result.data.user.id },
                 );
                 throw new APIError("INTERNAL_SERVER_ERROR", {
                   message: "The hosting identity session cookie could not be issued.",
                 });
               }
 
-              const sessionDataCookie = ctx.context.authCookies.sessionData;
-              await expireSessionDataCookie(ctx, sessionDataCookie);
+              await expireSessionDataCookies(
+                ctx,
+                sessionDataCookie,
+                sessionDataCookieNames,
+              );
 
               // Inject the cookie into this request so the rest of /get-session
               // resolves the newly created session in the same round-trip.
@@ -281,10 +304,13 @@ export function gateIdentitySessions() {
                 Object.fromEntries(inbound.entries()),
               );
               setRequestCookie(headers, sessionCookieName, sessionValue);
-              removeRequestCookie(headers, sessionDataCookie.name);
+              removeRequestCookieFamily(headers, sessionDataCookie.name);
               return { context: { headers } };
             } catch (err) {
-              console.error(`${LOG} gate identity session hook threw`, err);
+              console.error(
+                `${LOG} gate identity session hook threw`,
+                err instanceof Error ? err.name : "unknown error",
+              );
               if (err instanceof APIError) throw err;
               throw new APIError("INTERNAL_SERVER_ERROR", {
                 message:

@@ -41,7 +41,7 @@ test("auth routes, production validation, and provider capability discovery are 
   assert.match(login, /capabilities\.oauthProviders/);
 });
 
-test("the compile-time dev-server boundary owns PGLite and preview credentials", () => {
+test("the compile-time dev-server boundary owns PGLite and server-injected preview credentials", () => {
   const db = read("src/lib/db.ts");
   const auth = read("src/lib/auth/server.ts");
   const aiGuard = read("src/lib/ai/guard.server.ts");
@@ -57,7 +57,13 @@ test("the compile-time dev-server boundary owns PGLite and preview credentials",
   assert.doesNotMatch(db, /__pgBootstrapPromise__/);
   assert.doesNotMatch(auth, /void ensureDbReady\(\)/);
   assert.match(auth, /const production = !viteDevServer/);
+  assert.match(auth, /env\("GROK_PREVIEW_CLIENT_SECRET"\)/);
+  assert.doesNotMatch(
+    read("src/lib/auth/preview.ts"),
+    /export const PREVIEW_CLIENT_SECRET|[a-f0-9]{64}/i,
+  );
   assert.match(auth, /: viteDevServer[\s\S]*?pgliteDialect/);
+  assert.match(auth, /rateLimit: \{ enabled: true, window: 60, max: 100 \}/);
   assert.match(aiGuard, /userId === DEV_USER_ID && !viteDevServer/);
   assert.match(connector, /const envToken = viteDevServer/);
   for (const source of [db, auth, aiGuard, connector]) {
@@ -66,24 +72,40 @@ test("the compile-time dev-server boundary owns PGLite and preview credentials",
   assert.match(vite, /await mod\.ensureDbReady\(\)/);
   assert.match(config, /problems\.push\("DATABASE_URL is required"\)/);
   assert.match(workflow, /pglite\\\.\(data\|wasm\)\|initdb\\\.wasm/);
-  assert.match(workflow, /NODE_ENV=development npm run preview/);
+  assert.match(workflow, /grep --recursive --line-number --binary-files=without-match/);
+  assert.match(workflow, /\[\[ ! -d "\$functions_dir" \]\]/);
+  assert.match(workflow, /"\$\{#modules\[@\]\}" -eq 0/);
+  assert.match(workflow, /scan_status=\$\?/);
+  assert.match(workflow, /"\$scan_status" -ne 1/);
+  assert.match(
+    workflow,
+    /env:\s+VITE_AUTH_ENABLED: "false"\s+DATABASE_URL: ""\s+XAI_API_KEY: ""\s+XAI_REQUIRE_ZERO_DATA_RETENTION: ""/,
+  );
+  assert.match(
+    workflow,
+    /XAI_API_KEY=\s+XAI_REQUIRE_ZERO_DATA_RETENTION=\s+DATABASE_URL=\s+VITE_AUTH_ENABLED=false\s+NODE_ENV=development npm run preview/,
+  );
+  assert.match(read("src/lib/ai/grok.ts"), /cache: "no-store",\s+redirect: "error"/);
+  assert.match(read("src/lib/ai/voice-provider.ts"), /cache: "no-store",\s+redirect: "error"/);
   assert.match(workflow, /api\/auth\/get-session/);
 });
 
 test("hosting-gate session rotation rejects invalid identity and adapter failures", () => {
   const source = read("src/lib/auth/gate-session.server.ts");
+  const auth = read("src/lib/auth/server.ts");
   assert.match(source, /APIError,[\s\S]*?from "better-auth\/api"/);
   assert.match(source, /if \(!inbound\.has\(GATE_IDENTITY_HEADER\)\) return/);
 
   const verify = source.indexOf("const identity = await gateIdentityFromHeaders(inbound)");
   const invalid = source.indexOf('throw new APIError("UNAUTHORIZED"', verify);
-  const bearerFastPath = source.indexOf(
-    'if (inbound.get("authorization")) return;',
-    verify,
+  assert.ok(verify >= 0 && verify < invalid);
+  assert.doesNotMatch(source, /if \(inbound\.get\("authorization"\)\) return/);
+  assert.ok(
+    auth.indexOf("bearer(),") < auth.indexOf("gateIdentitySessions(),"),
+    "bearer translation must run before authoritative gate binding",
   );
-  assert.ok(verify >= 0 && verify < invalid && invalid < bearerFastPath);
 
-  const inspect = source.indexOf("const existing = await getSessionFromCtx(ctx)");
+  const inspect = source.indexOf("const existing = await getSessionFromCtx(ctx, {");
   const accounts = source.indexOf("await ctx.context.internalAdapter.findAccounts", inspect);
   const remove = source.indexOf("await ctx.context.internalAdapter.deleteSession", accounts);
   const mint = source.indexOf("const result = await handleOAuthUserInfo", remove);
@@ -95,7 +117,34 @@ test("hosting-gate session rotation rejects invalid identity and adapter failure
   );
   assert.match(source, /if \(err instanceof APIError\) throw err/);
   assert.match(source, /throw new APIError\("INTERNAL_SERVER_ERROR"/);
-  assert.match(source, /Already signed in as this gate identity[\s\S]*?return;/);
+  assert.match(
+    source,
+    /sessionBoundToGateIdentity\([\s\S]*?await expireSessionDataCookies\([\s\S]*?removeRequestCookieFamily\([\s\S]*?return \{ context: \{ headers \} \};/,
+  );
+  assert.match(source, /disableCookieCache: true/);
+  assert.match(source, /removeRequestCookieFamily/);
+  assert.match(source, /from "\.\/gate-cookie-core"/);
+  assert.match(source, /ctx\.headers \?\? ctx\.request\?\.headers/);
+});
+
+test("session cookie delivery and chunk cleanup fail closed", () => {
+  const source = read("src/lib/auth/gate-session.server.ts");
+  assert.match(source, /let delivered = false/);
+  assert.match(source, /return delivered \? sessionValue : null/);
+  assert.match(source, /expireSessionDataCookies/);
+  assert.match(source, /sessionDataCookieNames/);
+  assert.doesNotMatch(source, /\{ userId: result\.data\.user\.id \}/);
+
+  const pkg = JSON.parse(read("package.json"));
+  assert.match(pkg.scripts["test:typed-core"], /gate-cookie-core\.test\.ts/);
+});
+
+test("ordinary builds are side-effect-free and migrations are explicit", () => {
+  const pkg = JSON.parse(read("package.json"));
+  const migrate = read("scripts/migrate.mjs");
+  assert.doesNotMatch(pkg.scripts.build, /migrate/);
+  assert.match(pkg.scripts["db:migrate"], /scripts\/migrate\.mjs/);
+  assert.match(migrate, /only when explicitly invoked/i);
 });
 
 test("preview popup completion is bound to its opener and a one-time nonce", () => {
@@ -114,7 +163,10 @@ test("preview OAuth stays inert until confirmed session and local-data preparati
   const popup = read("src/lib/auth/popup.server.ts");
   assert.match(client, /pending=1/);
   assert.match(client, /window\.open\(pendingUrl/);
-  assert.match(popup, /Static holding page: no OAuth, cookies, script, opener message, or redirect/);
+  assert.match(
+    popup,
+    /Static holding page: no OAuth, cookies, script, opener message, or redirect/,
+  );
   assert.match(client, /requestSignOut: requestConfirmedSignOut/);
   assert.match(client, /popupAttempt\?\.popup\.close\(\)/);
   const prepare = client.indexOf("await runPreSignInSignOut(");
@@ -123,7 +175,10 @@ test("preview OAuth stays inert until confirmed session and local-data preparati
   assert.ok(prepare >= 0 && prepare < erase && erase < activate);
   const failureCatch = client.indexOf("} catch (cause) {", activate);
   const finalErase = client.indexOf("await clearPriorAccountLocalData();", failureCatch);
-  const invalidate = client.indexOf('writeAccountMarker(JSON.stringify([1, "erase-unconfirmed"]))', finalErase);
+  const invalidate = client.indexOf(
+    'writeAccountMarker(JSON.stringify([1, "erase-unconfirmed"]))',
+    finalErase,
+  );
   const reload = client.indexOf("window.location.reload();", invalidate);
   assert.ok(
     failureCatch >= 0 &&
@@ -237,8 +292,10 @@ test("session cookie parse failures never log credential previews", () => {
 test("provider requests receive the originating request cancellation signal", () => {
   const analyze = read("src/lib/ai/analyze.ts");
   const voice = read("src/lib/ai/voice.ts");
+  const voiceProvider = read("src/lib/ai/voice-provider.ts");
   assert.match(analyze, /signal: authorization\.signal/);
-  assert.match(voice, /authorization\.signal\.addEventListener\("abort"/);
+  assert.match(voice, /signal: authorization\.signal/);
+  assert.match(voiceProvider, /options\.signal\?\.addEventListener\("abort"/);
 });
 
 test("vision input bounds frame labels and the deterministic hint structure", () => {
@@ -255,5 +312,8 @@ test("late or excessive voice requests cannot repopulate the cleared cache", () 
   assert.match(source, /MAX_INFLIGHT_VOICES = 2/);
   assert.match(source, /inflight\.size >= MAX_INFLIGHT_VOICES/);
   assert.match(source, /generation !== playbackGeneration/);
-  assert.ok(source.indexOf("generation !== playbackGeneration") < source.indexOf("cache.set(cacheKey, entry)"));
+  assert.ok(
+    source.indexOf("generation !== playbackGeneration") <
+      source.indexOf("cache.set(cacheKey, entry)"),
+  );
 });

@@ -12,7 +12,9 @@ import {
 } from "../src/lib/media.ts";
 import {
   applyFocus,
+  inspectCameraCapabilities,
   openRopeCamera,
+  playCameraPreview,
   setTorch,
   startClip,
   torchAvailable,
@@ -125,6 +127,15 @@ test("validateMediaSignature accepts a common 24 MP phone still", async () => {
   await assert.doesNotReject(validateMediaSignature(new Blob([bytes]), "photo"));
 });
 
+test("validateMediaSignature accepts a modern 48 MP phone still", async () => {
+  const bytes = new Uint8Array(24);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  bytes.set([0x49, 0x48, 0x44, 0x52], 12);
+  new DataView(bytes.buffer).setUint32(16, 8064);
+  new DataView(bytes.buffer).setUint32(20, 6048);
+  await assert.doesNotReject(validateMediaSignature(new Blob([bytes]), "photo"));
+});
+
 test("validateMediaSignature rejects pathological single-edge image dimensions", async () => {
   const bytes = new Uint8Array(24);
   bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
@@ -210,6 +221,145 @@ test("HEIC dimensions must be associated with the primary item", async () => {
   );
 });
 
+test("camera preflight reports only browser layers and never opens or enumerates a camera", async (t) => {
+  const originals = ["isSecureContext", "navigator", "document", "MediaRecorder"].map((name) => [
+    name,
+    Object.getOwnPropertyDescriptor(globalThis, name),
+  ]);
+  t.after(() => {
+    for (const [name, descriptor] of originals) restoreGlobal(name, descriptor);
+  });
+
+  let getUserMediaCalls = 0;
+  let enumerateDevicesCalls = 0;
+  let recorderConstructions = 0;
+  let permissionState = "granted";
+  Object.defineProperties(globalThis, {
+    isSecureContext: { configurable: true, value: true },
+    navigator: {
+      configurable: true,
+      value: {
+        mediaDevices: {
+          getUserMedia: () => {
+            getUserMediaCalls += 1;
+            throw new Error("preflight must not open a camera");
+          },
+          enumerateDevices: () => {
+            enumerateDevicesCalls += 1;
+            throw new Error("preflight must not enumerate devices");
+          },
+        },
+        permissions: { query: async () => ({ state: permissionState }) },
+      },
+    },
+    document: {
+      configurable: true,
+      value: { permissionsPolicy: { allowsFeature: (name) => name === "camera" } },
+    },
+    MediaRecorder: {
+      configurable: true,
+      value: class {
+        constructor() {
+          recorderConstructions += 1;
+        }
+      },
+    },
+  });
+
+  for (const state of ["granted", "prompt", "denied"]) {
+    permissionState = state;
+    const report = await inspectCameraCapabilities({ permissionTimeoutMs: 20 });
+    assert.deepEqual(report, {
+      secureContext: "secure",
+      cameraPolicy: "allowed",
+      liveCameraApi: "detected",
+      clipRecordingApi: "detected",
+      permission: state,
+      cameraOpened: false,
+    });
+  }
+  assert.equal(getUserMediaCalls, 0);
+  assert.equal(enumerateDevicesCalls, 0);
+  assert.equal(recorderConstructions, 0);
+});
+
+test("camera preflight distinguishes known blockers without attempting fallbacks", async (t) => {
+  const originals = ["isSecureContext", "navigator", "document", "MediaRecorder"].map((name) => [
+    name,
+    Object.getOwnPropertyDescriptor(globalThis, name),
+  ]);
+  t.after(() => {
+    for (const [name, descriptor] of originals) restoreGlobal(name, descriptor);
+  });
+
+  Object.defineProperties(globalThis, {
+    isSecureContext: { configurable: true, value: false },
+    navigator: {
+      configurable: true,
+      value: { permissions: { query: async () => { throw new Error("unsupported"); } } },
+    },
+    document: {
+      configurable: true,
+      value: { permissionsPolicy: { allowsFeature: () => false } },
+    },
+    MediaRecorder: { configurable: true, value: undefined },
+  });
+
+  assert.deepEqual(await inspectCameraCapabilities({ permissionTimeoutMs: 20 }), {
+    secureContext: "insecure",
+    cameraPolicy: "blocked",
+    liveCameraApi: "unavailable",
+    clipRecordingApi: "unavailable",
+    permission: "unknown",
+    cameraOpened: false,
+  });
+});
+
+test("camera preflight fails indeterminate and bounds stalled or malformed permission queries", async (t) => {
+  const originals = ["isSecureContext", "navigator", "document", "MediaRecorder"].map((name) => [
+    name,
+    Object.getOwnPropertyDescriptor(globalThis, name),
+  ]);
+  t.after(() => {
+    for (const [name, descriptor] of originals) restoreGlobal(name, descriptor);
+  });
+
+  let permissionResult = new Promise(() => undefined);
+  Object.defineProperties(globalThis, {
+    isSecureContext: { configurable: true, value: undefined },
+    navigator: {
+      configurable: true,
+      value: {
+        mediaDevices: { getUserMedia: () => Promise.reject(new Error("must not run")) },
+        permissions: { query: () => permissionResult },
+      },
+    },
+    document: {
+      configurable: true,
+      value: {
+        permissionsPolicy: { allowsFeature: () => { throw new Error("not exposed"); } },
+      },
+    },
+    MediaRecorder: { configurable: true, value: class {} },
+  });
+
+  const stalled = await inspectCameraCapabilities({ permissionTimeoutMs: 5 });
+  assert.deepEqual(stalled, {
+    secureContext: "unknown",
+    cameraPolicy: "unknown",
+    liveCameraApi: "detected",
+    clipRecordingApi: "detected",
+    permission: "unknown",
+    cameraOpened: false,
+  });
+
+  permissionResult = Promise.resolve({ state: "surprising" });
+  assert.equal(
+    (await inspectCameraCapabilities({ permissionTimeoutMs: 20 })).permission,
+    "unknown",
+  );
+});
+
 test("openRopeCamera retries constraint failures but not permission denials", async (t) => {
   const original = Object.getOwnPropertyDescriptor(globalThis, "navigator");
   t.after(() => restoreGlobal("navigator", original));
@@ -237,8 +387,8 @@ test("openRopeCamera retries constraint failures but not permission denials", as
 
   assert.equal(await openRopeCamera("environment"), stream);
   assert.equal(calls, 2);
-  assert.deepEqual(constraints[0].video.width, { ideal: 1280 });
-  assert.deepEqual(constraints[0].video.height, { ideal: 720 });
+  assert.deepEqual(constraints[0].video.width, { ideal: 1920 });
+  assert.deepEqual(constraints[0].video.height, { ideal: 1080 });
 
   calls = 0;
   globalThis.navigator.mediaDevices.getUserMedia = async () => {
@@ -308,6 +458,72 @@ test("openRopeCamera stops every acquired stream when post-acquisition setup thr
   await assert.rejects(openRopeCamera("environment"), /track race/);
   assert.equal(opened, 3);
   assert.equal(stopped, 3);
+});
+
+test("openRopeCamera aborts a pending acquisition, stops a late stream, and does not retry", async (t) => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  t.after(() => restoreGlobal("navigator", original));
+  let resolveAcquisition;
+  let calls = 0;
+  let stopped = 0;
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: {
+      mediaDevices: {
+        getUserMedia: () => {
+          calls += 1;
+          return new Promise((resolve) => {
+            resolveAcquisition = resolve;
+          });
+        },
+      },
+    },
+  });
+  const controller = new AbortController();
+  const pending = openRopeCamera("environment", { signal: controller.signal, timeoutMs: 1_000 });
+  controller.abort();
+  await assert.rejects(pending, (error) => error?.name === "AbortError");
+  assert.equal(calls, 1);
+  resolveAcquisition({
+    getTracks: () => [{ stop: () => { stopped += 1; } }],
+    getVideoTracks: () => [],
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(stopped, 1);
+  assert.equal(calls, 1);
+});
+
+test("openRopeCamera bounds a stalled permission prompt without starting fallback requests", async (t) => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  t.after(() => restoreGlobal("navigator", original));
+  let calls = 0;
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: {
+      mediaDevices: {
+        getUserMedia: () => {
+          calls += 1;
+          return new Promise(() => undefined);
+        },
+      },
+    },
+  });
+  await assert.rejects(
+    openRopeCamera("environment", { timeoutMs: 5 }),
+    /timed out/i,
+  );
+  assert.equal(calls, 1);
+});
+
+test("playCameraPreview is abortable when HTMLMediaElement.play never settles", async () => {
+  const controller = new AbortController();
+  const pending = playCameraPreview(
+    { play: () => new Promise(() => undefined) },
+    controller.signal,
+    1_000,
+  );
+  controller.abort();
+  await assert.rejects(pending, (error) => error?.name === "AbortError");
 });
 
 test("applyFocus is bounded when a device never settles constraints", async (t) => {
@@ -579,7 +795,7 @@ test("a bitmap that resolves after its decode timeout is still closed", async (t
     window: {
       configurable: true,
       value: {
-        setTimeout: (callback) => realSetTimeout(callback, 0),
+        setTimeout: (callback, ms) => realSetTimeout(callback, ms === 30_000 ? 50 : 0),
         clearTimeout: realClearTimeout,
       },
     },
@@ -604,6 +820,46 @@ test("a bitmap that resolves after its decode timeout is still closed", async (t
   assert.equal(decodeCalls, 1);
   await new Promise((resolve) => realSetTimeout(resolve, 35));
   assert.equal(closes, 1);
+});
+
+test("a native bitmap decode that never settles cannot wedge later imports forever", async (t) => {
+  const names = ["window", "HTMLVideoElement", "HTMLImageElement", "createImageBitmap"];
+  const originals = new Map(
+    names.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]),
+  );
+  const realSetTimeout = globalThis.setTimeout;
+  const realClearTimeout = globalThis.clearTimeout;
+  t.after(() => {
+    for (const [name, descriptor] of originals) restoreGlobal(name, descriptor);
+  });
+
+  let decodeCalls = 0;
+  Object.defineProperties(globalThis, {
+    window: {
+      configurable: true,
+      value: {
+        setTimeout: (callback, ms) => realSetTimeout(callback, ms === 30_000 ? 10 : 0),
+        clearTimeout: realClearTimeout,
+      },
+    },
+    HTMLVideoElement: { configurable: true, value: class {} },
+    HTMLImageElement: { configurable: true, value: class {} },
+    createImageBitmap: {
+      configurable: true,
+      value: () => {
+        decodeCalls += 1;
+        if (decodeCalls === 1) return new Promise(() => undefined);
+        throw new Error("decoder retry reached");
+      },
+    },
+  });
+
+  await assert.rejects(processMediaFrame(new Blob(["image"])), /decode timed out/i);
+  await assert.rejects(processMediaFrame(new Blob(["image"])), /previous image decode/i);
+  assert.equal(decodeCalls, 1);
+  await new Promise((resolve) => realSetTimeout(resolve, 15));
+  await assert.rejects(processMediaFrame(new Blob(["image"])), /decoder retry reached/i);
+  assert.equal(decodeCalls, 2);
 });
 
 test("extractVideoFrames handles a zero-duration recording and always revokes its URL", async (t) => {

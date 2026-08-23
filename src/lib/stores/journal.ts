@@ -1,7 +1,14 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Disposition, SourceId } from "@/lib/observation/report";
-import { adoptPersistKey } from "./persist";
+import { SAFETY_SOURCE_IDS } from "@/lib/kb/sources";
+import { summarizeImport, type ImportSummary } from "@/lib/journal-backup";
+import {
+  adoptPersistKey,
+  journalMergingStorage,
+  mergeJournalEntriesById,
+  syncPersistedAcrossTabs,
+} from "./persist";
 
 export type JournalEntry = {
   id: string;
@@ -17,10 +24,17 @@ export type JournalEntry = {
 
 type JournalState = {
   entries: JournalEntry[];
+  /**
+   * Ids of deleted entries, so a stale tab's older copy cannot resurrect them
+   * when the two are unioned. Bounded; the union keeps both sides' tombstones.
+   */
+  removedIds: string[];
   nerveHits: number;
   add: (e: Omit<JournalEntry, "id" | "at">) => string;
   remove: (id: string) => void;
   clear: () => void;
+  /** Merge a decrypted backup in, never replacing what is already here. */
+  importEntries: (entries: readonly unknown[], removedIds: readonly string[]) => ImportSummary;
 };
 
 const DISPOSITIONS = new Set<Disposition>([
@@ -31,20 +45,7 @@ const DISPOSITIONS = new Set<Disposition>([
   "lower_consequence_learning_only",
   "no_visible_concern_not_clearance",
 ]);
-const SOURCE_IDS = new Set<SourceId>([
-  "CONSENT-1",
-  "CONSENT-2",
-  "ROPE-1",
-  "FATAL-1",
-  "NFS-1",
-  "FIRSTAID-1",
-  "VISION-1",
-  "VISION-2",
-  "VISION-3",
-  "PRIVACY-1",
-  "STRUCTURE-1",
-  "AI-SAFETY-1",
-]);
+const SOURCE_IDS = new Set<SourceId>(SAFETY_SOURCE_IDS);
 
 function normalizeJournalEntry(value: unknown, index: number): JournalEntry | null {
   if (!value || typeof value !== "object") return null;
@@ -79,6 +80,7 @@ export const useJournal = create<JournalState>()(
   persist(
     (set, get) => ({
       entries: [],
+      removedIds: [],
       nerveHits: 0,
       add: (e) => {
         const id = crypto.randomUUID();
@@ -90,12 +92,59 @@ export const useJournal = create<JournalState>()(
         return id;
       },
       remove: (id) => {
-        set({ entries: get().entries.filter((x) => x.id !== id) });
+        set({
+          entries: get().entries.filter((x) => x.id !== id),
+          removedIds: [...get().removedIds, id].slice(-200),
+        });
       },
-      clear: () => set({ entries: [], nerveHits: 0 }),
+      clear: () =>
+        set({
+          entries: [],
+          // Tombstone what was there, or another tab restores all of it.
+          removedIds: [...get().removedIds, ...get().entries.map((x) => x.id)].slice(-200),
+          nerveHits: 0,
+        }),
+      /**
+       * Restore is a union, not a replace: an old backup must never delete
+       * entries written since it was taken. Every incoming row goes through the
+       * same normalizer as a rehydrate, and tombstones from either side win —
+       * so restoring a backup cannot bring back something already deleted.
+       */
+      importEntries: (incoming, incomingRemoved) => {
+        const existing = get().entries;
+        const existingRemoved = get().removedIds;
+        const summary = summarizeImport(
+          incoming as readonly { id?: unknown }[],
+          existing,
+          existingRemoved,
+          incomingRemoved,
+        );
+        const normalized = incoming
+          .map(normalizeJournalEntry)
+          .filter((entry): entry is JournalEntry => entry !== null);
+        const merged = mergeJournalEntriesById(
+          normalized,
+          existing,
+          incomingRemoved,
+          existingRemoved,
+        );
+        if (!merged) return { added: 0, alreadyPresent: 0, skippedDeleted: 0 };
+        const entries = merged.entries as JournalEntry[];
+        set({
+          entries,
+          removedIds: merged.removedIds,
+          nerveHits: entries.reduce(
+            (count, entry) =>
+              count + (entry.flags.some((flag) => /nerve|radial|numb/i.test(flag)) ? 1 : 0),
+            0,
+          ),
+        });
+        return summary;
+      },
     }),
     {
       name: "knotty-journal",
+      storage: journalMergingStorage<JournalState>("knotty-journal"),
       merge: (persisted, current) => {
         const snapshot = (persisted ?? {}) as Partial<JournalState>;
         const entries = Array.isArray(snapshot.entries)
@@ -107,6 +156,9 @@ export const useJournal = create<JournalState>()(
         return {
           ...current,
           entries,
+          removedIds: Array.isArray(snapshot.removedIds)
+            ? snapshot.removedIds.filter((id): id is string => typeof id === "string").slice(-200)
+            : current.removedIds,
           nerveHits: entries.reduce(
             (count, entry) => count + (entry.flags.some((flag) => /nerve|radial|numb/i.test(flag)) ? 1 : 0),
             0,
@@ -128,3 +180,10 @@ export function purgeLegacyStills(): Promise<void> {
     request.onblocked = () => reject(new Error("Close other Knotty tabs, then try again."));
   });
 }
+
+// The journal was the only persisted store without this, so a report saved in
+// one tab was invisible in the other until reload — and the stale tab's next
+// write erased it.
+syncPersistedAcrossTabs("knotty-journal", () => {
+  void useJournal.persist.rehydrate();
+});

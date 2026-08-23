@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { SEQUENCES } from "@/lib/kb";
-import { adoptPersistKey } from "./persist";
+import { adoptPersistKey, safeJsonStorage } from "./persist";
 
 type PlannerState = {
   slugs: string[];
@@ -14,11 +14,24 @@ type PlannerState = {
 
 adoptPersistKey("knotty-plan", "musubi-plan");
 
+/** Coerce a possibly corrupt or legacy slug array into a bounded, unique slug list. */
 export function normalizePlannerSlugs(persisted: unknown, fallback: string[]): string[] {
-  if (!Array.isArray(persisted)) return fallback;
-  return persisted
-    .filter((slug): slug is string => typeof slug === "string" && slug.trim().length > 0)
-    .slice(0, 40);
+  if (!Array.isArray(persisted)) return [...fallback];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of persisted) {
+    if (typeof value !== "string") continue;
+    const slug = value.trim();
+    if (!slug || seen.has(slug) || out.length >= 40) continue;
+    seen.add(slug);
+    out.push(slug);
+  }
+  return out;
+}
+
+/** Coerce a persisted (possibly corrupt or legacy) blob into a valid slug list. */
+export function normalizePersistedSlugs(persisted: unknown, fallback: string[]): string[] {
+  return normalizePlannerSlugs((persisted as { slugs?: unknown } | null)?.slugs, fallback);
 }
 
 export const usePlanner = create<PlannerState>()(
@@ -42,10 +55,13 @@ export const usePlanner = create<PlannerState>()(
     }),
     {
       name: "knotty-plan",
-      merge: (persisted, current) => {
-        const p = (persisted ?? {}) as Partial<PlannerState>;
-        return { ...current, slugs: normalizePlannerSlugs(p.slugs, current.slugs) };
-      },
+      storage: safeJsonStorage<PlannerState>(),
+      version: 1,
+      migrate: (persisted) => persisted as PlannerState,
+      merge: (persisted, current) => ({
+        ...current,
+        slugs: normalizePersistedSlugs(persisted, current.slugs),
+      }),
     },
   ),
 );
