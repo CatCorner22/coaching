@@ -1439,3 +1439,85 @@ test("an instructor route names its own nerves rather than a generic warning", a
   }
   assert.ok(checked > 0, "no instructor route listed a nerve, so this test proved nothing");
 });
+
+// An earlier version of the learning-science entries appealed to research
+// throughout their prose while registering no anchors at all, so the evidence
+// panel rendered "no claim-level source anchors are published for this entry"
+// directly beneath a paragraph describing a review's findings. The status field
+// was internally consistent — no anchors, so editorial_only — which is exactly
+// why the existing evidence test passed and this went unnoticed.
+//
+// The first version of this test looked for surname-and-year citations, which
+// these entries deliberately do not use: they describe findings in plain prose
+// instead. It therefore matched nothing and asserted nothing. Match the appeal,
+// not the citation format.
+const EVIDENTIAL_APPEAL =
+  /\b(?:reviewers? (?:graded|rated)|commissioned review|a review of the evidence|the evidence (?:actually )?supports?|studies with|was (?:actually )?tested on|did not survive (?:proper )?testing|failed testing|rated moderate|best-supported|well[- ]supported|instructional research|standard instructional)/iu;
+
+function articleProse(article: (typeof ARTICLES)[number]): string {
+  return article.blocks
+    .flatMap((block) => {
+      if (block.type === "ul") return block.items;
+      if (block.type === "callout") return [block.title, block.text];
+      return [block.text];
+    })
+    .concat(article.summary, article.title)
+    .join(" ");
+}
+
+test("an article that appeals to research carries source anchors", () => {
+  const offenders = ARTICLES.filter(
+    (article) =>
+      EVIDENTIAL_APPEAL.test(articleProse(article)) &&
+      getArticleEvidence(article.slug).sourceIds.length === 0,
+  ).map((article) => article.slug);
+
+  assert.deepEqual(
+    offenders,
+    [],
+    `these entries appeal to research but publish no source anchors: ${offenders.join(", ")}`,
+  );
+
+  // Guards the guard: if a rewrite stops matching the detector entirely, the
+  // assertion above passes for the wrong reason. The learning set is where
+  // these claims live, so at least those must still be seen.
+  const seen = ARTICLES.filter((article) => EVIDENTIAL_APPEAL.test(articleProse(article)));
+  assert.ok(seen.length >= 5, `detector matched only ${seen.length} entries; it has gone stale`);
+});
+
+// The learning entries make a specific claim — that matching teaching to a
+// preferred modality does not hold up — and the whole set is written against
+// it. A future edit reintroducing "auditory learner" framing would contradict
+// the entry sitting next to it, so the phrasing is pinned. rope-basics and
+// knot-foundations are craft and carry no anchors on purpose; pinning that
+// split here means adding an evidence claim to one of them fails the test
+// above rather than passing unnoticed.
+test("the learning entries do not reintroduce the learning-styles myth", () => {
+  const STYLE_CLAIM = /\b(?:auditory|visual|kinesthetic|kinaesthetic)\s+learners?/iu;
+  const ANCHORED = ["learning-modalities", "learning-pacing", "spaced-learning", "evidence-based-teaching", "learning-disabilities-rope"];
+  const CRAFT = ["rope-basics", "knot-foundations"];
+
+  for (const slug of [...ANCHORED, ...CRAFT]) {
+    const article = ARTICLES.find((entry) => entry.slug === slug);
+    assert.ok(article, `missing learning entry ${slug}`);
+    const expected = ANCHORED.includes(slug);
+    assert.equal(
+      getArticleEvidence(slug).sourceIds.length > 0,
+      expected,
+      `${slug} should be ${expected ? "source_anchored" : "editorial_only"}`,
+    );
+
+    const prose = articleProse(article);
+    if (slug === "learning-modalities" || slug === "evidence-based-teaching") {
+      // These two name the myth in order to reject it, so the phrase is
+      // expected — but only alongside the rejection.
+      assert.match(
+        prose,
+        /did not (?:hold up|survive)|contradict|failed testing/iu,
+        `${slug} should name the meshing hypothesis only to reject it`,
+      );
+      continue;
+    }
+    assert.doesNotMatch(prose, STYLE_CLAIM, `${slug} reintroduces learning-styles framing`);
+  }
+});

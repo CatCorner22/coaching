@@ -1,7 +1,35 @@
 # Visual Model Implementation Plan
 
+> **Status: plan only. Nothing has been generated.** No image or video exists in
+> the repo, and nothing here has been built. This file records a specification
+> and the research case for it so the work can be picked up deliberately.
+
 ## Overview
-Add AI-generated female model visuals demonstrating knot tying for educational accessibility. Models serve as learning tools for visual learners who benefit from seeing rope work on an actual person (vs. on props or diagrams only).
+Add AI-generated female model visuals demonstrating knot tying. This is not a
+nice-to-have for one kind of learner — it is the format with the best evidence
+behind it for this specific task.
+
+### Why: the human movement effect
+
+The general finding in instructional research is that moving displays teach
+*worse* than static ones, because the information is transient — it is gone
+before a novice has finished processing it. Hand-manipulation tasks are the
+documented exception, and knot tying is one of the tasks the exception was
+actually tested on: watching a demonstrator's hands beat static graphics
+(Ayres, Marcus, Chan & Qian 2009; Marcus et al. 2013; Garland & Sánchez 2013).
+The proposed mechanism is that observing and copying human movement is
+biologically primary — it costs working memory very little (Paas & Sweller
+2012).
+
+**Design consequence, and it is a hard requirement:** the benefit belongs to
+*segmented, user-paced* demonstration. The segmenting principle is strongest
+exactly where this app's readers are — complex material, fast presentation,
+inexperienced learner. A single continuous ten-minute model video reproduces
+the failure mode this app exists to fix. Build short clips, one per step,
+replayable, with no autoplay chain into the next step.
+
+This is registered in the source ledger as `LEARN-3` and `LEARN-4`; see
+`src/lib/kb/sources.ts`.
 
 ## Model Specification
 
@@ -107,10 +135,10 @@ Back to prop-based practice with diagram
 
 ## Accessibility Benefits
 
-1. **Visual Learning**
-   - Real human demonstrates rope work
+1. **The best-supported format for this task**
+   - Watching hands move outperformed static graphics for knot tying specifically
+   - Not "better for visual learners" — better for people in general, on this task
    - Body proportions and movement are realistic
-   - Better than stick figures or diagrams for some learners
 
 2. **Kinesthetic Bridge**
    - Model movements show hand mechanics
@@ -122,11 +150,11 @@ Back to prop-based practice with diagram
    - No fast-paced viral rope videos
    - Matches app philosophy of learner-controlled speed
 
-4. **Neurodivergent Friendly**
+4. **Lower sensory and cognitive load than a fast tutorial**
    - Professional, not sexualized presentation
    - Clear educational context
-   - Reduces sensory overwhelm compared to fast video tutorials
-   - Model's calm demeanor can reduce anxiety
+   - Short segmented clips avoid the transience that makes continuous tutorials fail
+   - Claims about anxiety and demeanour are design intent, not measured findings
 
 5. **Representation**
    - "Thick" body type rarely shown in rope education

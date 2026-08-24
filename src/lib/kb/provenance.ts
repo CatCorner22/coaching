@@ -126,6 +126,26 @@ const ARTICLE_SOURCE_IDS: Readonly<Record<string, readonly SafetySourceId[]>> = 
   // compression — which is the entire point of the entry.
   "the-check-that-works": ["ROPE-1", "ROPE-2", "FIRSTAID-1"],
   "getting-rope-off": ["FIRSTAID-1"],
+
+  // ── Learning science ────────────────────────────────────────────────────
+  // These entries name studies in their body text, so they have to carry the
+  // anchors: an evidence panel reading "no claim-level source anchors are
+  // published" directly beneath a paragraph citing a review is the panel
+  // contradicting the page. The LEARN sources anchor how a skill is learned
+  // and nothing else — no rope claim in these entries is anchored, because
+  // none of these studies is about rope.
+  "learning-modalities": ["LEARN-1", "LEARN-3", "LEARN-4"],
+  "learning-pacing": ["LEARN-4", "LEARN-5"],
+  "spaced-learning": ["LEARN-2"],
+  "evidence-based-teaching": ["LEARN-1", "LEARN-2", "LEARN-3", "LEARN-4"],
+  // Anchors the two general claims the entry leans on — that style-matching
+  // failed testing, and that the retrieve/space advice is the same for every
+  // reader. The specific accommodations are practitioner knowledge, and the
+  // entry says which parts those are rather than implying a citation.
+  "learning-disabilities-rope": ["LEARN-1", "LEARN-2"],
+  // rope-basics and knot-foundations stay editorial_only on purpose: handling
+  // rope and the choice of which six knots to teach first are craft, and craft
+  // has no citation here.
 };
 
 export function getArticleEvidence(slug: string): ArticleEvidence {

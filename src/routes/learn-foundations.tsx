@@ -7,10 +7,15 @@ export const Route = createFileRoute("/learn-foundations")({
 });
 
 function LearnFoundationsPage() {
+  // Ordered as a reading path, not by topic: the two that explain why previous
+  // attempts failed come before the ones that ask the reader to do anything.
+  // `evidence-based-teaching` was written and then left off this list, so the
+  // only entry that ranks the techniques was reachable through search alone.
   const pedagogyArticles = [
+    "learning-pacing",
     "learning-modalities",
     "rope-basics",
-    "learning-pacing",
+    "evidence-based-teaching",
     "spaced-learning",
     "learning-disabilities-rope",
     "knot-foundations",
@@ -28,37 +33,39 @@ function LearnFoundationsPage() {
         </div>
         <div>
           <p className="text-sm uppercase tracking-wide text-muted">Learning Foundations</p>
-          <h1 className="mt-2 font-display text-4xl sm:text-5xl">Learn how you actually learn</h1>
+          <h1 className="mt-2 font-display text-4xl sm:text-5xl">Why the videos didn&rsquo;t work</h1>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted">
-            Everyone's brain works differently. These guides explain how to learn rope tying when you struggle with
-            fast videos, have a learning disability, or just need things explained clearly. Start here if online rope
-            tutorials have never worked for you.
+            There is a documented reason a fast, continuous tutorial teaches a complex manual skill badly, and it
+            describes the format rather than the person watching it. These guides cover what the evidence actually
+            supports, what it does not, and how to use that here. Start here if online rope tutorials have never
+            worked for you.
           </p>
         </div>
       </div>
 
       <section className="mt-8 grid gap-3 sm:grid-cols-3">
         <InfoCard
-          icon={<Volume2 className="size-5 text-accent" />}
-          title="Multi-modal learning"
-          text="Audio, visual, and hands-on — use the mix that works for you"
+          icon={<Lightbulb className="size-5 text-accent" />}
+          title="You set the segments"
+          text="Short pieces you start and stop yourself beat the same demonstration run straight through"
         />
         <InfoCard
-          icon={<Lightbulb className="size-5 text-accent" />}
-          title="Go at your pace"
-          text="No timer. No rush. One step at a time. You control the speed"
+          icon={<Volume2 className="size-5 text-accent" />}
+          title="Words and pictures together"
+          text="Both channels at once beats either alone — for everyone, not for a personality type"
         />
         <InfoCard
           icon={<Users className="size-5 text-accent" />}
-          title="For all learners"
-          text="If you have ADHD, dyslexia, autism, or just learn differently — you belong here"
+          title="Graded, not asserted"
+          text="Techniques are ranked by how strong the evidence is, including one popular idea that failed"
         />
       </section>
 
       <section className="mt-12">
         <h2 className="font-display text-2xl">Start with these guides</h2>
         <p className="mt-2 text-base text-muted">
-          Read these in order if you have never tied a knot before. Each one takes about 5-8 minutes.
+          Written to be read in this order. The first two explain why earlier attempts went wrong; the rest ask you to
+          do something. Each takes about 5&ndash;11 minutes.
         </p>
         <div className="mt-4 space-y-3">
           {articles.map((article) => (

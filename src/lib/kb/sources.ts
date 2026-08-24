@@ -157,6 +157,40 @@ export const SAFETY_SOURCES = [
     href: "https://ropestudy.com/topic/a-brief-overview-of-types-of-rope/",
     note: "Community education comparing rope fibers and handling traits; material descriptions do not establish strength ratings, load safety, or suitability for any specific use.",
   },
+
+  // ── Learning science ────────────────────────────────────────────────────
+  // These anchor claims about how a skill is learned. None of them is about
+  // rope safety, and none of them clears a tie, a technique, or a body.
+  {
+    id: "LEARN-1",
+    title: "Pashler et al. · Learning Styles: Concepts and Evidence",
+    href: "https://journals.sagepub.com/doi/full/10.1111/j.1539-6053.2009.01038.x",
+    note: "Commissioned review finding no adequate evidence for the meshing hypothesis — that matching instruction to a learner's preferred modality improves outcomes. It reports an absence of support for style-matching; it does not claim that people are identical or that accommodations for a disability are ineffective.",
+  },
+  {
+    id: "LEARN-2",
+    title: "Dunlosky et al. · Improving Students' Learning With Effective Learning Techniques",
+    href: "https://journals.sagepub.com/doi/abs/10.1177/1529100612453266",
+    note: "Review rating ten study techniques by utility: practice testing and distributed practice high; elaborative interrogation, self-explanation and interleaving moderate; rereading, highlighting and summarization low. The evidence base is largely verbal and classroom material, not motor skills, and no rating is a claim about rope.",
+  },
+  {
+    id: "LEARN-3",
+    title: "Ayres, Marcus, Chan & Qian · Instructional animations can be superior to static when learning human motor skills",
+    href: "https://www.researchgate.net/publication/220495654_Instructional_animations_can_be_superior_to_static_when_learning_human_motor_skills",
+    note: "Experimental work finding that for hand-manipulation tasks — knot tying and paper folding among them — animation of a demonstrator's hands outperformed static graphics, attributed to observing human movement being biologically primary. It compares presentation formats for a manual task; it says nothing about what is safe to tie or on whom.",
+  },
+  {
+    id: "LEARN-4",
+    title: "Mayer · Segmenting principle (Multimedia Learning)",
+    href: "https://www.cambridge.org/core/books/abs/multimedia-learning/segmenting-principle/37240877DDA0362355ADB39936027982",
+    note: "People learn better from a multimedia message broken into user-paced segments than from a continuous one, most strongly when the material is complex, the presentation is fast, and the learner is inexperienced. It is a finding about presentation pacing, not about any individual's capability or diagnosis.",
+  },
+  {
+    id: "LEARN-5",
+    title: "Sweller · Cognitive Load Theory and instructional design, 20 years later",
+    href: "https://link.springer.com/article/10.1007/s10648-019-09465-5",
+    note: "Review of cognitive load theory, including the transient information effect and the human movement exception to it. It describes limits on working memory during instruction; it does not measure any particular learner and prescribes no rope practice.",
+  },
 ] as const;
 
 export type SafetySourceId = (typeof SAFETY_SOURCES)[number]["id"];
