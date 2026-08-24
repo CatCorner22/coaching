@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Menu } from "lucide-react";
+import { GraduationCap, Menu } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ConsentGate } from "@/components/consent-gate";
 import { subscribeToLocalDataErase } from "@/lib/privacy/local-data";
@@ -9,6 +9,17 @@ import { authEnabled } from "@/lib/auth/client";
 import { SignedIn, SignedOut, UserButton } from "@/lib/auth/gates";
 import { isActive, MORE, NAV, routeTitle } from "@/lib/nav";
 import { cn } from "@/lib/utils";
+
+// The nav lists moved into @/lib/nav, which is now the single source for every
+// destination's label and title. The Academy (/learn) landed here after that
+// move, so its primary-bar entry is spliced in rather than dropped — it keeps
+// the second slot, right after Home, that it had before the merge. Every other
+// destination this branch listed is already in NAV or MORE.
+const PRIMARY_NAV = [
+  ...NAV.slice(0, 1),
+  { to: "/learn", label: "Learn", icon: GraduationCap } as const,
+  ...NAV.slice(1),
+];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -79,7 +90,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
   return (
     <ConsentGate>
-      <div className="min-h-dvh bg-bg text-fg">
+      <div className="min-h-dvh overflow-x-hidden bg-bg text-fg">
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-elevated focus:px-3 focus:py-2 focus:text-sm focus:text-fg"
@@ -92,7 +103,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <p className="font-display text-3xl leading-none">Knotty</p>
           </Link>
           <nav aria-label="Main" className="mt-8 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
-            {NAV.map((item) => {
+            {PRIMARY_NAV.map((item) => {
               const active = isActive(pathname, item.to);
               return (
                 <Link
@@ -216,9 +227,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         <nav
           aria-label="Primary"
-          className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-border bg-surface/95 px-1 py-1 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+          className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-7 border-t border-border bg-surface/95 px-1 py-1 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
         >
-          {NAV.map((item) => {
+          {PRIMARY_NAV.map((item) => {
             const active = isActive(pathname, item.to);
             return (
               <Link

@@ -55,13 +55,13 @@ function LibraryPage() {
         return (
           <section key={lv} className="mt-10">
             <h2 className="font-display text-2xl capitalize">{lv}</h2>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
               {group.map((t) => (
                 <Link
                   key={t.slug}
                   to="/tie/$slug"
                   params={{ slug: t.slug }}
-                  className="flex gap-4 rounded-lg border border-border bg-surface p-3 hover:border-border-strong"
+                  className="flex min-w-0 max-w-full gap-4 overflow-hidden rounded-lg border border-border bg-surface p-3 hover:border-border-strong"
                 >
                   <MiniTie
                     wraps={t.steps.at(-1)?.wraps ?? []}

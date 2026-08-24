@@ -35,6 +35,7 @@ export function RopeFigure({
   wraps = [],
   nerves = [],
   activeNerve,
+  highlightIndex,
   compact = false,
   className,
 }: {
@@ -43,6 +44,8 @@ export function RopeFigure({
   wraps?: WrapSpec[];
   nerves?: string[];
   activeNerve?: string;
+  /** Which wrap band to accent; defaults to the last wrap. */
+  highlightIndex?: number;
   compact?: boolean;
   className?: string;
 }) {
@@ -64,7 +67,13 @@ export function RopeFigure({
         <UprightBody pose={pose} gote={gote} sw={body} ink={ink} />
       )}
       {wraps.map((w, i) => (
-        <Wrap key={i} spec={w} last={i === wraps.length - 1} pose={pose} compact={compact} />
+        <Wrap
+          key={i}
+          spec={w}
+          highlight={highlightIndex !== undefined ? i === highlightIndex : i === wraps.length - 1}
+          pose={pose}
+          compact={compact}
+        />
       ))}
       {NERVES.filter((n) => nerves.includes(n.slug) || n.slug === activeNerve).map((n) => {
         const hot = n.slug === activeNerve || nerves.includes(n.slug);
@@ -155,22 +164,25 @@ function FloorBody({ pose, sw, ink }: { pose: Pose; sw: number; ink: string }) {
 
 function Wrap({
   spec,
-  last,
+  highlight,
   pose,
   compact,
 }: {
   spec: WrapSpec;
-  last: boolean;
+  highlight: boolean;
   pose: Pose;
   compact: boolean;
 }) {
-  const stroke = last ? "var(--color-accent)" : "var(--color-rope)";
-  const sw = compact ? (last ? 4.2 : 3.2) : last ? 3.2 : 2.4;
+  const stroke = highlight ? "var(--color-accent)" : "var(--color-rope)";
+  const sw = compact ? (highlight ? 4.2 : 3.2) : highlight ? 3.2 : 2.4;
   const floor = pose === "prone" || pose === "supine";
+  const cls = highlight ? "learn-wrap-highlight" : undefined;
+
   if (spec.kind === "band") {
     const y = spec.y < 2 ? spec.y * (floor ? 280 : 420) : spec.y;
     return (
       <ellipse
+        className={cls}
         cx={floor ? 200 : 100}
         cy={y}
         rx={spec.w ? spec.w * (floor ? 140 : 80) : floor ? 90 : 44}
@@ -184,6 +196,7 @@ function Wrap({
   if (spec.kind === "stem") {
     return (
       <path
+        className={cls}
         d={`M${spec.x ?? (floor ? 200 : 100)} ${spec.y1 < 2 ? spec.y1 * 420 : spec.y1} L${spec.x ?? (floor ? 200 : 100)} ${spec.y2 < 2 ? spec.y2 * 420 : spec.y2}`}
         stroke={stroke}
         strokeWidth={sw}
@@ -193,12 +206,23 @@ function Wrap({
   }
   if (spec.kind === "cuff") {
     const p = cuffPos(spec.at, pose);
-    return <circle cx={p.cx} cy={p.cy} r={compact ? 14 : 12} fill="none" stroke={stroke} strokeWidth={sw} />;
+    return (
+      <circle
+        className={cls}
+        cx={p.cx}
+        cy={p.cy}
+        r={compact ? 14 : 12}
+        fill="none"
+        stroke={stroke}
+        strokeWidth={sw}
+      />
+    );
   }
   if (spec.kind === "diamond") {
     const cy = spec.cy < 2 ? spec.cy * 420 : spec.cy;
     return (
       <path
+        className={cls}
         d={`M100 ${cy - 18} L124 ${cy} L100 ${cy + 18} L76 ${cy} Z`}
         fill="none"
         stroke={stroke}
@@ -210,6 +234,7 @@ function Wrap({
     const y = spec.y < 2 ? spec.y * 420 : spec.y;
     return (
       <path
+        className={cls}
         d={`M68 ${y - 22} L132 ${y + 22} M132 ${y - 22} L68 ${y + 22}`}
         fill="none"
         stroke={stroke}
@@ -219,30 +244,53 @@ function Wrap({
   }
   if (spec.kind === "chest") {
     return (
-      <g fill="none" stroke={stroke} strokeWidth={sw}>
+      <g className={cls} fill="none" stroke={stroke} strokeWidth={sw}>
         <ellipse cx="100" cy="128" rx="42" ry="8" />
         <ellipse cx="100" cy="156" rx="44" ry="8" />
       </g>
     );
   }
   if (spec.kind === "hip") {
-    return <ellipse cx="100" cy="208" rx="48" ry="10" fill="none" stroke={stroke} strokeWidth={sw} />;
+    return (
+      <ellipse
+        className={cls}
+        cx="100"
+        cy="208"
+        rx="48"
+        ry="10"
+        fill="none"
+        stroke={stroke}
+        strokeWidth={sw}
+      />
+    );
   }
   if (spec.kind === "futomomo") {
     if (spec.side === "both") {
       return (
-        <g fill="none" stroke={stroke} strokeWidth={sw}>
+        <g className={cls} fill="none" stroke={stroke} strokeWidth={sw}>
           <ellipse cx="78" cy="300" rx="18" ry="30" />
           <ellipse cx="122" cy="300" rx="18" ry="30" />
         </g>
       );
     }
     const x = spec.side === "l" ? 78 : 122;
-    return <ellipse cx={x} cy="300" rx="18" ry="30" fill="none" stroke={stroke} strokeWidth={sw} />;
+    return (
+      <ellipse
+        className={cls}
+        cx={x}
+        cy="300"
+        rx="18"
+        ry="30"
+        fill="none"
+        stroke={stroke}
+        strokeWidth={sw}
+      />
+    );
   }
   if (spec.kind === "gote") {
     return (
       <path
+        className={cls}
         d="M74 168 C90 188, 110 188, 126 168 M80 188 C94 206, 106 206, 120 188"
         fill="none"
         stroke={stroke}

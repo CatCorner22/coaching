@@ -21,7 +21,7 @@ test("cloud voice is fail-closed and route controls pass the saved opt-in", () =
     const route = read(path);
     assert.match(route, /useSettings\(\(settings\) => settings\.voice\)/, path);
     assert.match(route, /playCoachVoice\([^\n]+, cloudVoice\)/, path);
-    assert.match(route, /Browser voice · no xAI/, path);
+    assert.match(route, /coachVoiceLabel\(cloudVoice\)/, path);
   }
 
   const settings = read("src/routes/settings.tsx");
@@ -289,10 +289,24 @@ test("instructor-only entries cannot route into Studio", () => {
 
   const studio = read("src/routes/studio.tsx");
   assert.match(studio, /disabled=\{t\.minutes\[1\] === 0 \|\| negotiationPolicy\.isTieBlocked/);
+  // All four gates on the ?tie= deep link, in order. Accepts `requestedTie &&`
+  // or `requestedTie != null &&`: the guard was extracted into a named const so
+  // the ?step= deep link could be gated by the SAME value, and pinning the
+  // literal token blocked that improvement rather than protecting the invariant.
   assert.match(
     studio,
-    /requestedTie &&[\s\S]*?requestedTie\.minutes\[1\] > 0 &&[\s\S]*?!negotiationPolicy\.isTieBlocked\(search\.tie\)/,
+    /negotiationReady &&[\s\S]{0,120}?requestedTie(?: != null)? &&[\s\S]*?requestedTie\.minutes\[1\] > 0 &&[\s\S]*?!negotiationPolicy\.isTieBlocked\(search\.tie\)/,
   );
+  // A ?step= deep link must be gated by that same computed permission. Without
+  // it a blocked or instructor-only tie could still have its step index set
+  // from the URL, which is the deep-link hole this whole assertion exists for.
+  if (/setStep\(search\.step\)/.test(studio)) {
+    assert.match(
+      studio,
+      /requestedTieAllowed &&[\s\S]{0,240}?setStep\(search\.step\)/,
+      "a ?step= deep link must reuse the ?tie= permission",
+    );
+  }
 });
 
 test("a rejected file import cannot destroy the pending clip-still selection", () => {

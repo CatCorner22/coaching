@@ -14,6 +14,7 @@ export type VoiceProviderResult =
 export async function requestGrokVoice(options: {
   apiKey: string | undefined;
   text: string;
+  voiceId?: string;
   signal?: AbortSignal;
 }): Promise<VoiceProviderResult> {
   const apiKey = options.apiKey?.trim();
@@ -45,7 +46,11 @@ export async function requestGrokVoice(options: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({ text: options.text, voice_id: "eve", language: "en" }),
+      body: JSON.stringify({
+        text: options.text,
+        voice_id: options.voiceId ?? "eve",
+        language: "en",
+      }),
       signal: controller.signal,
     });
     if (response.headers.get("x-zero-data-retention") !== "true") {

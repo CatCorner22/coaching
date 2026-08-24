@@ -81,7 +81,8 @@ function SettingsPage() {
               s.set({ voice: event.target.checked });
             }}
           />
-          Enable cloud voice; send each reviewed spoken line to xAI TTS after a privacy preflight
+          Enable sultry female cloud voice; send each reviewed spoken line to xAI TTS after a
+          privacy preflight
         </label>
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -109,12 +110,14 @@ function SettingsPage() {
             Names and titles, safewords, negotiation choices and notes, plans, kit state, and journal
             summaries are stored unencrypted in this browser profile until erased. The app holds
             current captures in page memory; pressing Analyze sends selected compressed stills and
-            generic labels through the app server to xAI. Each selected-media analysis and reviewed
-            cloud-voice line is sent only after a non-sensitive request confirms the deployment's
-            zero-data-retention setting; every media or audio response must confirm it again before
-            the app reads the body. A missing confirmation is discarded, but a request already
-            initiated cannot be recalled. Browser speech recognition may use a browser-vendor
-            service. This remains unsuitable for a shared or monitored device.
+            generic labels through the app server to xAI. Cloud voice uses a warm female coach
+            voice via xAI TTS. Each selected-media analysis and reviewed cloud-voice line is sent
+            only after a non-sensitive request confirms the deployment's zero-data-retention
+            setting; every media or audio response must confirm it again before the app reads the
+            body. A missing confirmation is discarded, but a request already initiated cannot be
+            recalled. Providers may log or retain transmitted data according to their service and
+            workspace settings. Browser speech recognition may use a browser-vendor service. This
+            remains unsuitable for a shared or monitored device.
           </p>
           <p className="mt-2 text-xs leading-relaxed text-muted">
             Erase attempts to remove Knotty's named site-storage records, clear this tab's voice
