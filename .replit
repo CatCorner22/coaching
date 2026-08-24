@@ -1,0 +1,10 @@
+run = "npm run dev"
+modules = ["nodejs-22"]
+hidden = ["node_modules", ".vercel", ".tanstack", "dist", ".output"]
+
+[nix]
+channel = "stable-24_11"
+
+[[ports]]
+localPort = 8080
+externalPort = 80
