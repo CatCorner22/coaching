@@ -1,142 +1,10 @@
 import type { Tie } from "./types";
+import { instructorRoute, unoccupiedPractice } from "./tie-factories";
 import { MORE_TIES } from "./more-ties";
-
-type PracticeInput = Pick<Tie, "slug" | "name" | "jp" | "summary" | "level" | "knots" | "nerves" | "intent"> & {
-  purpose: string;
-  bands?: number;
-};
-
-function unoccupiedPractice(input: PracticeInput): Tie {
-  return {
-    slug: input.slug,
-    name: input.name,
-    jp: input.jp,
-    summary: input.summary,
-    level: input.level,
-    minutes: [3, 12],
-    ropes: [{ lengthM: 8, count: 1 }],
-    position: "theory",
-    prereqs: [],
-    knots: input.knots,
-    nerves: input.nerves,
-    intent: [...input.intent, "unoccupied-practice"],
-    why: `${input.purpose} This drill is for an unoccupied prop or dress form and does not validate body placement, pressure, duration, loading, or release competence.`,
-    stop: [
-      "Stop before applying this app drill to a person",
-      "Never add body loading, attachment, neck contact, or an intimate pass",
-    ],
-    steps: [
-      {
-        title: "Unoccupied handling drill",
-        rigger:
-          "Use a smooth, stable, unoccupied practice form. Rehearse identifying the rope path, dressing the pattern, finding both ends, and removing it promptly without any body or structural loading.",
-        bottom:
-          "No participant is placed in rope for this app drill. Body application requires separate, current adult consent and qualified hands-on instruction.",
-        check:
-          "The form is unoccupied, stable, easy to access from every side, and the rope can be removed immediately.",
-        speak: "Unoccupied practice only. No person-bearing or body-placement instruction.",
-        expected: {
-          wrapBands: input.bands ?? 1,
-          pose: "stand",
-          view: "front",
-          handsVisible: true,
-          neckClear: true,
-        },
-        wraps: [],
-      },
-    ],
-    mistakes: [
-      {
-        title: "Treating appearance as validation",
-        body: "A tidy pattern, successful prop drill, photograph, or model response does not establish safe use on a person.",
-      },
-    ],
-    aftercare: "No participant is restrained in this drill. Inspect and store the practice rope after use.",
-    variations: [],
-  };
-}
-
-type InstructorInput = Pick<Tie, "slug" | "name" | "jp" | "summary" | "nerves" | "intent"> & {
-  risks: string;
-  alternative: string;
-};
-
-function instructorRoute(input: InstructorInput): Tie {
-  return {
-    slug: input.slug,
-    name: `${input.name}: Instructor Route`,
-    jp: input.jp,
-    summary: input.summary,
-    level: "advanced",
-    minutes: [0, 0],
-    ropes: [],
-    position: "theory",
-    prereqs: [],
-    knots: [],
-    nerves: input.nerves,
-    intent: [...input.intent, "instructor-only", "risk-awareness"],
-    why: `${input.risks} This app cannot establish anatomy, fit, pressure, tolerance, consent, loading, or release competence.`,
-    stop: [
-      "Do not construct or modify this tie from app instructions",
-      "Release for any symptom, distress, communication change, withdrawn consent, or uncertainty",
-    ],
-    steps: [
-      {
-        title: "Recognition, negotiation, and qualified instruction",
-        rigger:
-          "Use this entry to recognize the category and prepare questions. Learn construction, person-specific fit, monitoring, and rapid release hands-on from a qualified, consent-centered adult instructor.",
-        bottom:
-          "A role, prior scene, normal appearance, movement check, timer, or camera result never replaces current consent or your right to stop.",
-        check: input.alternative,
-        speak: "Instructor-only. This app does not coach, modify, or clear this restraint.",
-        expected: {
-          wrapBands: 0,
-          pose: "stand",
-          view: "front",
-          handsVisible: true,
-          neckClear: true,
-        },
-        wraps: [],
-      },
-    ],
-    mistakes: [
-      {
-        title: "Remote clearance",
-        body: "A photo, timer, symptom-free moment, or model response cannot validate construction, physiology, or safety.",
-      },
-    ],
-    aftercare:
-      "For an incident, stop and release. Call emergency services for emergency signs; seek prompt medical assessment for persistent or worsening symptoms. Do not re-tie to test recovery.",
-    variations: [],
-  };
-}
+import { GUIDED_TIES } from "./guided-ties";
+import { SHIBARI_TIES } from "./shibari-ties";
 
 const CORE_TIES: Tie[] = [
-  unoccupiedPractice({
-    slug: "single-column",
-    name: "Single Column: Unoccupied Practice",
-    jp: "一本縛り",
-    summary:
-      "Learn to recognize and dress a non-cinching single-column structure on a smooth prop. This app does not teach wrist, ankle, limb, attachment, or loaded use.",
-    level: "foundation",
-    knots: ["somerville-bowline"],
-    nerves: ["ulnar", "radial"],
-    intent: ["foundation", "craft"],
-    purpose: "The drill builds rope-handling vocabulary and makes a cinching error easier to see on an object.",
-  }),
-  unoccupiedPractice({
-    slug: "double-column",
-    name: "Double Column: Unoccupied Practice",
-    jp: "二本縛り",
-    summary:
-      "Recognize a two-column structure on paired props. This app does not teach binding limbs or using a gap, color, warmth, or movement as clearance.",
-    level: "foundation",
-    knots: ["wrap-cinch", "somerville-bowline"],
-    nerves: ["ulnar", "radial"],
-    intent: ["foundation", "craft"],
-    purpose: "The drill shows how two columns and a cinch differ from a single constricting bundle.",
-    bands: 2,
-  }),
   unoccupiedPractice({
     slug: "larks-head-cuff",
     name: "Lark's Head: Object-Only",
@@ -159,19 +27,6 @@ const CORE_TIES: Tie[] = [
     intent: ["legs", "floor"],
     risks: "A folded limb can develop concerning symptoms and may be difficult to release quickly.",
     alternative: "Practice the rope pattern on an unoccupied bolster or choose an unrestrained, self-selected position.",
-  }),
-  unoccupiedPractice({
-    slug: "karada",
-    name: "Karada Pattern: Unoccupied Practice",
-    jp: "体",
-    summary:
-      "A diamond-pattern vocabulary drill for an unoccupied dress form. This app excludes neck contact, intimate passes, restraint, and loaded use.",
-    level: "foundation",
-    knots: ["larks-head", "reverse-tension", "square"],
-    nerves: [],
-    intent: ["decorative", "craft"],
-    purpose: "The drill develops even patterning and reversible rope handling without placing rope on a person.",
-    bands: 3,
   }),
   instructorRoute({
     slug: "shinju",
@@ -324,7 +179,8 @@ const CORE_TIES: Tie[] = [
   }),
 ];
 
-export const TIES: Tie[] = [...CORE_TIES, ...MORE_TIES];
+// Guided first: these are the ones a reader can actually act on.
+export const TIES: Tie[] = [...GUIDED_TIES, ...CORE_TIES, ...MORE_TIES, ...SHIBARI_TIES];
 
 export function getTie(slug: string) {
   if (!slug) return undefined;

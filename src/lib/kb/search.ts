@@ -20,6 +20,14 @@ export type SearchHit = {
   href: string;
   summary: string;
   score: number;
+  /**
+   * Tiebreak only, never a ranking of importance: 0 for an entry the reader can
+   * act on tonight, 1 for one that routes them to an instructor. Equal-scoring
+   * hits were ordered alphabetically, so as the catalog grew a generic query
+   * like "shibari" filled its first page with recognition-only categories and
+   * pushed the foundation drill off it.
+   */
+  tier?: 0 | 1;
 };
 
 const MAX_QUERY_CODE_POINTS = 600;
@@ -1067,6 +1075,7 @@ export function searchKnowledge(query: string, limit = 12): SearchHit[] {
         href: `/tie/${t.slug}`,
         summary: t.summary,
         score,
+        tier: t.intent.includes("instructor-only") ? 1 : 0,
       });
     }
   }
@@ -1200,6 +1209,12 @@ export function searchKnowledge(query: string, limit = 12): SearchHit[] {
   const ranked = hits.sort((a, b) => {
     if (a.score !== b.score) return b.score - a.score;
     if (kindOrder[a.kind] !== kindOrder[b.kind]) return kindOrder[a.kind] - kindOrder[b.kind];
+    // Among equally relevant entries of the same kind, something the reader can
+    // do tonight beats something that says "ask an instructor". This only
+    // reorders ties in score; it never promotes a weaker match.
+    const tierA = a.tier ?? 0;
+    const tierB = b.tier ?? 0;
+    if (tierA !== tierB) return tierA - tierB;
     if (a.slug === b.slug) return 0;
     return a.slug < b.slug ? -1 : 1;
   });

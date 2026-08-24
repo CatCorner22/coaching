@@ -2,6 +2,7 @@ import type { Knot, KnotStep, Tie, TieStep } from "./types";
 import { getKnot } from "./knots";
 import { getTie } from "./ties";
 import { defaultKnotStepMedia, defaultTieStepMedia } from "./media-registry";
+import { toBullets } from "@/lib/learn/plain-language";
 
 export const FOUNDATION_KNOT_SLUGS = [
   "somerville-bowline",
@@ -607,10 +608,30 @@ export function getAcademyTie(slug: string): Tie | undefined {
   if (!base) return undefined;
   const academy = TIE_ACADEMY[slug];
   if (!academy) return { ...base, goal: base.why.split(".")[0] + "." };
-  const steps = academy.steps.map((step, i) => {
-    const cumulative = academy.steps.slice(0, i + 1).flatMap((x) => x.wraps);
+
+  // TIE_ACADEMY enriches; it does not replace. It was written when every tie in
+  // the catalog carried exactly one step, so replacing `base.steps` with it was
+  // free. The catalog now teaches several ties in full — single-column in ten
+  // steps, karada in nine, double-column in seven — and a wholesale replace
+  // silently threw all of that away, rendering four steps, three, and two. The
+  // page looked fine, which is what made it dangerous: the missing steps
+  // included rehearsing the release and the next-morning symptom check.
+  //
+  // So the richer source wins, and the academy table supplies the parts it is
+  // actually for: the goal line, and per-step media where a step has none.
+  const source = base.steps.length > academy.steps.length ? base.steps : academy.steps;
+  const steps = source.map((step, i) => {
+    const cumulative = source.slice(0, i + 1).flatMap((x) => x.wraps);
     return {
       ...step,
+      // Catalog steps carry authored prose but none of the Academy's easy-read
+      // fields, so derive them rather than invent them: `speak` is already the
+      // one-line summary of the step, and the rest split on sentence
+      // boundaries. `??` means an academy-authored step keeps its own wording.
+      goal: step.goal ?? step.speak,
+      riggerBullets: step.riggerBullets ?? toBullets(step.rigger),
+      bottomBullets: step.bottomBullets ?? toBullets(step.bottom),
+      checkBullets: step.checkBullets ?? toBullets(step.check),
       media: step.media ?? defaultTieStepMedia(cumulative, slug, i),
     };
   });

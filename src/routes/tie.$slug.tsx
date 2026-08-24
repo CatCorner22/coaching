@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,11 +12,13 @@ import {
   StepNav,
   StepProgress,
   StopStrip,
+  TieStepFigure,
   emptyStepConfirm,
   type StepConfirm,
 } from "@/components/learn";
 import { bulletsOrFallback } from "@/lib/learn/plain-language";
 import { getAcademyTie, getKnot, isFoundationTie, isInstructorRoute } from "@/lib/kb";
+import { tieShape, tieShapeBlurb, tieShapeLabel } from "@/lib/kb/tie-factories";
 import { coachVoiceLabel } from "@/lib/voice/coach-profile";
 import { useLearnProgress } from "@/lib/stores/learn-progress";
 import { useSettings } from "@/lib/stores/settings";
@@ -26,7 +28,12 @@ export const Route = createFileRoute("/tie/$slug")({ component: TiePage });
 
 function TiePage() {
   const { slug } = Route.useParams();
-  const tie = getAcademyTie(slug);
+  // Step reconciliation lives in `getAcademyTie`, not here: it enriches the
+  // catalog's steps rather than replacing them, so a guided tie keeps all of its
+  // authored steps AND gains the Academy's per-step media and easy-read bullets.
+  // Overriding again at this layer would hand back the raw catalog steps and
+  // throw that enrichment away.
+  const tie = useMemo(() => getAcademyTie(slug), [slug]);
   const cloudVoice = useSettings((settings) => settings.voice);
   const markStepComplete = useLearnProgress((s) => s.markStepComplete);
   const setLast = useLearnProgress((s) => s.setLast);
@@ -36,6 +43,15 @@ function TiePage() {
   useEffect(() => {
     setConfirm(emptyStepConfirm());
   }, [step]);
+
+  // The route component is reused across slugs, so a step index survives the
+  // navigation. Ten-step guided lessons sit next to one-step instructor routes;
+  // carrying index 9 onto one of those indexes past the end of `tie.steps` and
+  // takes the whole page down — including the stop conditions — so start every
+  // entry at its first step.
+  useEffect(() => {
+    setStep(0);
+  }, [slug]);
 
   useEffect(() => {
     if (tie) setLast({ kind: "tie", slug, step });
@@ -53,6 +69,20 @@ function TiePage() {
   const wraps = tie.steps.slice(0, step + 1).flatMap((x) => x.wraps);
   const instructor = isInstructorRoute(tie);
   const foundation = isFoundationTie(slug);
+  // Which of the three catalog shapes this entry is — a prop drill, a tie
+  // taught step by step, or a named instructor route. Derived once so the
+  // badge and the sentence under it can never disagree.
+  const shape = tieShape(tie);
+  // The dress-form subtitle is only true of a prop drill. A foundation slug can
+  // also be an instructor route (shinju, hip-harness, chair), which must not
+  // invite practice on an entry the app refuses to teach, or a guided tie
+  // (single-column, karada), whose own steps put rope on a person once its
+  // negotiated limit is agreed — telling that reader to work on a dress form
+  // while step four says to watch her face is not caution, it is a page
+  // contradicting itself. Only the practice foundations get the lesson
+  // subtitle; the rest show their summary. The unconditional "not permission to
+  // tie a person" banner below still applies to every entry either way.
+  const dressFormPractice = foundation && shape === "practice";
   const voiceLabel = coachVoiceLabel(cloudVoice);
   const bottomLines = bulletsOrFallback(s.bottomBullets, s.bottom);
   const voiceStep = {
@@ -90,40 +120,79 @@ function TiePage() {
     />
   );
 
+  // The coach panel only draws a figure for steps that carry media, and only
+  // the three academy ties get media synthesised. Every other entry still gets
+  // the rope diagram this page has always shown — inline in the step card, so
+  // it never appears twice alongside the panel's copy.
+  const stepFigure =
+    (s.media?.length ?? 0) > 0 ? undefined : (
+      <figure className="px-4 py-4">
+        <TieStepFigure
+          pose={s.expected.pose}
+          view={s.expected.view}
+          wraps={wraps}
+          nerves={tie.nerves}
+          className="mx-auto aspect-[4/5] w-full max-w-[16rem] text-rope"
+        />
+        <figcaption className="mt-2 text-center text-[11px] uppercase tracking-wide text-subtle">
+          {s.expected.view} · {s.expected.wrapBands} bands
+        </figcaption>
+      </figure>
+    );
+
   return (
     <AcademyShell
       backTo={foundation ? "/learn" : "/library"}
       backLabel={foundation ? "Knotty Academy" : "Library"}
       eyebrow={tie.jp}
       title={tie.name}
-      subtitle={foundation ? "Practice on an empty dress form — one step at a time." : tie.summary}
+      subtitle={
+        dressFormPractice ? "Practice on an empty dress form — one step at a time." : tie.summary
+      }
       goal={tie.goal}
       badges={
         <>
+          {/* Shape first: it is the one badge that says what kind of entry this
+              is, and it carries "Instructor route", so the duration badge below
+              stays a duration and never stands in for the label. */}
+          <Badge variant={shape === "guided" ? "accent" : "default"}>{tieShapeLabel(shape)}</Badge>
           {foundation && <Badge className="border-accent/30 bg-accent/10 text-accent">Easy-read lesson</Badge>}
           <Badge>{tie.level}</Badge>
-          <Badge>
-            {tie.minutes[1] === 0 ? "Instructor route" : `${tie.minutes[0]}–${tie.minutes[1]} min study`}
-          </Badge>
+          {tie.minutes[1] > 0 && <Badge>{`${tie.minutes[0]}–${tie.minutes[1]} min study`}</Badge>}
         </>
       }
       sidebar={
-        <div className="space-y-4">
+        <div className="hidden space-y-4 lg:block">
           <BeforeYouStart />
           {coachPanel}
           {instructor && <InstructorPrepCard tieName={tie.name} />}
         </div>
       }
     >
+      <section className="rounded-lg border border-border bg-surface px-4 py-4 sm:px-5">
+        {/* Says up front what the reader may actually do with this entry,
+            rather than leaving it to be inferred from a duration badge. */}
+        <p className="text-base leading-relaxed text-fg">{tieShapeBlurb(shape)}</p>
+        {/* The lesson subtitle displaced the summary on these pages; keep it. */}
+        {dressFormPractice && <p className="mt-3 text-base leading-relaxed text-muted">{tie.summary}</p>}
+        <p className="mt-3 text-base leading-relaxed text-muted">{tie.why}</p>
+      </section>
+
       {instructor && <InstructorPrepCard tieName={tie.name} className="lg:hidden" />}
 
       <BeforeYouStart className="lg:hidden" />
 
       <div className="lg:hidden">{coachPanel}</div>
 
-      <p className="rounded-lg border border-warn/30 bg-warn/10 px-4 py-3 text-base leading-relaxed text-warn">
-        These steps teach words and patterns. They are not permission to tie a person. Stop any time you feel unsure.
-      </p>
+      <div className="rounded-lg border border-warn/30 bg-warn/10 px-4 py-3 text-base leading-relaxed text-warn">
+        <p>
+          These steps teach words and patterns. They are not permission to tie a person. Stop any time you feel unsure.
+        </p>
+        <p className="mt-2">
+          Planning estimates, fit rules, diagrams, and checklists are not safety clearance. Consent
+          and symptoms can change at any moment; pause and release for concern or uncertainty.
+        </p>
+      </div>
 
       <StepProgress step={step} total={tie.steps.length} />
 
@@ -143,6 +212,7 @@ function TiePage() {
         confirm={confirm}
         onConfirmChange={setConfirm}
         requireConfirm={foundation}
+        media={stepFigure}
         onSpeak={() => void playCoachVoice(s.speak, cloudVoice)}
       />
 
@@ -167,7 +237,7 @@ function TiePage() {
         canAdvance={!foundation || (confirm.didDo && confirm.didCheck)}
       />
 
-      <StopStrip items={tie.stop} className="mt-4" />
+      <StopStrip items={tie.stop} className="mt-4 rounded-xl border border-danger/20 bg-danger/5 p-5" />
 
       {tie.mistakes.length > 0 && (
         <section className="mt-8">
@@ -182,6 +252,11 @@ function TiePage() {
           </ul>
         </section>
       )}
+
+      <section className="mt-8">
+        <h3 className="font-display text-2xl">Aftercare</h3>
+        <p className="mt-3 text-base leading-relaxed text-muted">{tie.aftercare}</p>
+      </section>
 
       {tie.knots.length > 0 && (
         <section className="mt-8">

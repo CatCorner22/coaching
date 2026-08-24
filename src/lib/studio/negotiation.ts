@@ -12,6 +12,53 @@ const TIE_LIMIT_IDS: Readonly<Record<string, readonly string[]>> = {
   hishi: ["torso"],
   kikkou: ["torso"],
   "partial-suspension": ["suspension"],
+  // These twelve were selectable in Studio with every limit set to no: the map
+  // had only ever covered the categories that happened to have an obviously
+  // matching row, and the rest fell through it silently. `arms` and `legs`
+  // exist as negotiable rows because most of them had no limit to map to.
+  futomomo: ["legs"],
+  "frog-tie": ["legs"],
+  mermaid: ["legs"],
+  agura: ["legs", "predicament"],
+  tengu: ["arms"],
+  tesuji: ["arms"],
+  bunny: ["arms"],
+  "hip-harness": ["torso"],
+  chair: ["bench"],
+  starfish: ["bench"],
+  "pole-cuffs": ["pole"],
+  "bench-drape": ["bench"],
+  // Expanded catalog. A tie maps to every limit its category actually touches,
+  // so an unresolved maybe on any one of them blocks it — an entry that maps to
+  // nothing is open by default, which is only ever right for a prop drill.
+  "kata-te-kote": ["gote"],
+  "yoko-gote": ["gote"],
+  teppou: ["arms"],
+  strappado: ["arms"],
+  "reverse-prayer": ["arms"],
+  armbinder: ["arms"],
+  "ushiro-te-shibari": ["arms"],
+  "waki-shibari": ["arms", "torso"],
+  munenawa: ["torso"],
+  "rope-corset": ["torso"],
+  "kubi-nawa": ["neck"],
+  "nawa-kutsuwa": ["gag"],
+  "m-ji-kaikyaku": ["crotch", "legs"],
+  kani: ["predicament", "legs"],
+  daruma: ["predicament", "legs", "arms"],
+  sakura: ["predicament", "legs"],
+  predicament: ["predicament"],
+  "hashira-shibari": ["pole"],
+  "mae-te-shibari": ["arms"],
+  "ashi-shibari": ["legs"],
+  "spread-eagle": ["bench"],
+  tsurikomi: ["suspension"],
+  "kata-ashi-zuri": ["suspension"],
+  "yoko-zuri": ["suspension"],
+  "tate-zuri": ["suspension"],
+  "sakasa-zuri": ["suspension"],
+  "ebi-zuri": ["suspension", "predicament"],
+  "hogtie-suspended": ["suspension", "predicament"],
 };
 
 const FURNITURE_LIMIT_IDS: Readonly<Record<string, readonly string[]>> = {

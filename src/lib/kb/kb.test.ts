@@ -1032,8 +1032,26 @@ test("academy foundation bundles resolve enriched content", async () => {
     );
   }
 
+  // Enrichment must never DISCARD catalog content. This asserted a literal 4,
+  // which was the count TIE_ACADEMY supplied back when single-column had one
+  // catalog step. The catalog now teaches it in ten, and a wholesale replace
+  // silently rendered four — dropping, among others, rehearsing the release and
+  // the next-morning symptom check. The invariant is the relationship, not the
+  // number.
+  const { getTie } = await import("./ties.ts");
+  for (const slug of FOUNDATION_TIE_SLUGS) {
+    const base = getTie(slug);
+    const enriched = getAcademyTie(slug);
+    assert.ok(base && enriched, slug);
+    assert.ok(
+      enriched.steps.length >= base.steps.length,
+      `${slug}: enrichment dropped ${base.steps.length - enriched.steps.length} catalog step(s)`,
+    );
+  }
   const single = getAcademyTie("single-column");
-  assert.equal(single?.steps.length, 4);
+  assert.equal(single?.steps.length, getTie("single-column")?.steps.length);
+  assert.ok((single?.steps.length ?? 0) >= 4, "single-column lost its academy floor");
+
   const instructor = getAcademyTie("takate-kote");
   assert.ok(instructor && instructor.minutes[1] === 0);
 });

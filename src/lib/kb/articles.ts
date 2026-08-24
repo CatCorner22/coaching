@@ -1,6 +1,8 @@
 import type { Article } from "./types";
 import { MORE_ARTICLES } from "./more-articles";
 import { EXPANSION_ARTICLES } from "./expansion-articles";
+import { BDSM_ARTICLES } from "./bdsm-articles";
+import { TECHNIQUE_ARTICLES } from "./technique-articles";
 
 const CORE_ARTICLES: Article[] = [
   {
@@ -552,7 +554,13 @@ const CORE_ARTICLES: Article[] = [
   },
 ];
 
-export const ARTICLES: Article[] = [...CORE_ARTICLES, ...MORE_ARTICLES, ...EXPANSION_ARTICLES];
+export const ARTICLES: Article[] = [
+  ...CORE_ARTICLES,
+  ...MORE_ARTICLES,
+  ...EXPANSION_ARTICLES,
+  ...BDSM_ARTICLES,
+  ...TECHNIQUE_ARTICLES,
+];
 
 export function getArticle(slug: string) {
   return ARTICLES.find((a) => a.slug === slug);

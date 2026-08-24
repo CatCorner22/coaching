@@ -107,7 +107,11 @@ test("persisted negotiation normalization restores and locks the canonical polic
     { id: "", label: "invalid", rank: "yes" },
   ]);
 
-  assert.equal(normalized.length, 23);
+  // The whole canonical list survives, plus exactly one row for the deduplicated
+  // custom entry. Asserted against the list itself rather than a literal, which
+  // was a stand-in for this and broke the moment the list grew.
+  assert.equal(normalized.length, normalizeNegotiationItems([]).length + 1);
+  assert.equal(normalized.filter((entry) => entry.id === "custom").length, 1);
   assert.deepEqual(normalized.find((entry) => entry.id === "photos")?.rank, "no");
   assert.deepEqual(normalized.find((entry) => entry.id === "voice")?.rank, "yes");
   assert.deepEqual(normalized.find((entry) => entry.id === "neck")?.rank, "no");
