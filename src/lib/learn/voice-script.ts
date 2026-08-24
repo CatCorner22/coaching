@@ -1,4 +1,4 @@
-import { bulletsOrFallback } from "./plain-language";
+import { bulletsOrFallback, isSayableAloud } from "./plain-language";
 
 export type VoiceStepInput = {
   stepIndex: number;
@@ -24,7 +24,10 @@ export function buildAcademyVoiceScript(input: VoiceStepInput): string {
   doLines.forEach((line, i) => parts.push(`${i + 1}. ${line}`));
   parts.push("Look and check.");
   checkLines.forEach((line, i) => parts.push(`${i + 1}. ${line}`));
-  parts.push(`Say out loud: ${input.speak}`);
+  // A scope notice is read as a statement. Prefixing it with "Say out loud"
+  // told the listener to recite the sentence explaining that this app will not
+  // teach them the thing they are looking at.
+  parts.push(isSayableAloud(input.speak) ? `Say out loud: ${input.speak}` : input.speak);
   return parts.join(" ");
 }
 

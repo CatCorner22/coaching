@@ -20,6 +20,8 @@ import {
   searchKnowledge,
 } from "./index.ts";
 import { SAFETY_SOURCE_IDS, SAFETY_SOURCES, SOURCE_LEDGER_REVISION } from "./sources.ts";
+import { isSayableAloud } from "../learn/plain-language.ts";
+import { buildAcademyVoiceScript } from "../learn/voice-script.ts";
 
 test("tie slugs are unique and getTie round-trips", () => {
   const slugs = TIES.map((t) => t.slug);
@@ -1520,4 +1522,73 @@ test("the learning entries do not reintroduce the learning-styles myth", () => {
     }
     assert.doesNotMatch(prose, STYLE_CLAIM, `${slug} reintroduces learning-styles framing`);
   }
+});
+
+// The lesson format promises three fixed parts, and part three is "say out
+// loud". 52 of 198 steps were filling that slot with a scope notice — 48 ties
+// and 4 knots reading "Instructor-only. This app does not coach, modify, or
+// clear this restraint." The card printed it under a "Say out loud" heading and
+// the coach voice read "Say out loud: Instructor-only. This app does not
+// coach...", which is incoherent as speech and turns a boundary into something
+// to recite to a partner.
+//
+// `isSayableAloud` decides this from the line itself, so the classification is
+// pinned here over the whole catalog: a reworded notice that stops matching
+// would silently return to being announced as a line to say.
+test("every step's say-aloud line is speech, or is classified as a scope notice", () => {
+  const steps = [
+    ...KNOTS.flatMap((knot) => knot.steps.map((step, i) => ({ ref: `knot/${knot.slug}#${i}`, speak: step.speak }))),
+    ...TIES.flatMap((tie) => tie.steps.map((step, i) => ({ ref: `tie/${tie.slug}#${i}`, speak: step.speak }))),
+  ];
+
+  const notices = steps.filter((step) => !isSayableAloud(step.speak));
+  const sayable = steps.filter((step) => isSayableAloud(step.speak));
+
+  // Both branches must stay populated. If every line classified one way the
+  // renderers would have a dead branch and this test would assert nothing.
+  assert.ok(notices.length > 0, "no scope notices found — the classifier has gone stale");
+  assert.ok(sayable.length > 0, "no sayable lines found — the classifier is over-matching");
+
+  // A notice addresses the reader about the app. A sayable line must not: an
+  // entry that says "this app does not clear this" is not something a person
+  // announces mid-scene, whichever wording it arrives in.
+  for (const step of sayable) {
+    assert.doesNotMatch(
+      step.speak,
+      /\bthis app\b|\binstructor[- ]only\b|\brecognition only\b/i,
+      `${step.ref} is announced as a line to say but reads as a scope notice: ${step.speak}`,
+    );
+  }
+
+  // And every notice must actually be one, rather than a real instruction the
+  // classifier swallowed — which would hide a step's spoken line behind a
+  // warning panel.
+  for (const step of notices) {
+    assert.match(
+      step.speak,
+      /\bthis (?:app|entry)\b|\binstructor[- ]only\b|\brecognition only\b|\bdo not load a person\b/i,
+      `${step.ref} was classified as a scope notice but reads as speech: ${step.speak}`,
+    );
+  }
+});
+
+// The voice and the card must agree about which frame a line gets. They read
+// the same classifier, and this proves the wiring rather than the intent.
+test("the coach voice does not tell the listener to recite a scope notice", () => {
+  const spoken = (speak: string) =>
+    buildAcademyVoiceScript({
+      stepIndex: 0,
+      totalSteps: 1,
+      title: "Step",
+      doText: "Do the thing.",
+      checkText: "Check the thing.",
+      speak,
+    });
+
+  const notice = "Instructor-only. This app does not coach, modify, or clear this restraint.";
+  assert.ok(spoken(notice).includes(notice), "the notice must still be read");
+  assert.doesNotMatch(spoken(notice), /Say out loud: Instructor-only/u);
+
+  const line = "Around, through, snug.";
+  assert.match(spoken(line), /Say out loud: Around, through, snug\./u);
 });
