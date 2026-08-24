@@ -998,3 +998,60 @@ test("the knowledge base covers the top being incapacitated mid-scene", () => {
     );
   }
 });
+
+test("academy foundation bundles resolve enriched content", async () => {
+  const {
+    FOUNDATION_KNOT_SLUGS,
+    FOUNDATION_TIE_SLUGS,
+    getAcademyKnot,
+    getAcademyTie,
+    isFoundationKnot,
+    isFoundationTie,
+  } = await import("./academy.ts");
+
+  for (const slug of FOUNDATION_KNOT_SLUGS) {
+    assert.ok(isFoundationKnot(slug), slug);
+    const knot = getAcademyKnot(slug);
+    assert.ok(knot?.goal, `${slug} missing goal`);
+    assert.ok(knot.steps.every((s) => s.do && s.check && s.diagramId), `${slug} missing step enrichment`);
+    assert.ok(
+      knot.steps.every((s) => (s.doBullets?.length ?? 0) >= 1),
+      `${slug} missing easy-read bullet steps`,
+    );
+  }
+
+  for (const slug of FOUNDATION_TIE_SLUGS) {
+    assert.ok(isFoundationTie(slug), slug);
+    const tie = getAcademyTie(slug);
+    assert.ok(tie?.goal, `${slug} missing goal`);
+    assert.ok(tie.steps.length >= 1, `${slug} missing steps`);
+    assert.ok(tie.steps.every((s) => s.goal && s.check), `${slug} missing academy step fields`);
+    assert.ok(
+      tie.steps.every((s) => (s.riggerBullets?.length ?? 0) >= 1),
+      `${slug} missing easy-read bullet steps`,
+    );
+  }
+
+  // Enrichment must never DISCARD catalog content. This asserted a literal 4,
+  // which was the count TIE_ACADEMY supplied back when single-column had one
+  // catalog step. The catalog now teaches it in ten, and a wholesale replace
+  // silently rendered four — dropping, among others, rehearsing the release and
+  // the next-morning symptom check. The invariant is the relationship, not the
+  // number.
+  const { getTie } = await import("./ties.ts");
+  for (const slug of FOUNDATION_TIE_SLUGS) {
+    const base = getTie(slug);
+    const enriched = getAcademyTie(slug);
+    assert.ok(base && enriched, slug);
+    assert.ok(
+      enriched.steps.length >= base.steps.length,
+      `${slug}: enrichment dropped ${base.steps.length - enriched.steps.length} catalog step(s)`,
+    );
+  }
+  const single = getAcademyTie("single-column");
+  assert.equal(single?.steps.length, getTie("single-column")?.steps.length);
+  assert.ok((single?.steps.length ?? 0) >= 4, "single-column lost its academy floor");
+
+  const instructor = getAcademyTie("takate-kote");
+  assert.ok(instructor && instructor.minutes[1] === 0);
+});

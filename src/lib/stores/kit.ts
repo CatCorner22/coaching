@@ -23,6 +23,18 @@ export function clampRopeCount(value: unknown, fallback: number): number {
   return Math.max(0, Math.min(MAX_ROPE_COUNT, Math.floor(n)));
 }
 
+/**
+ * Superseded by `clampRopeCount`, and kept only because this merge brought both
+ * forward and its tests still cover it. The store uses `clampRopeCount`, which
+ * additionally treats a null or absent field as "keep the default" rather than
+ * letting `Number(null) === 0` silently reset a persisted count to zero.
+ */
+export function clampCount(n: unknown, fallback: number) {
+  const value = typeof n === "number" ? n : Number(n);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(0, Math.min(40, Math.floor(value)));
+}
+
 export const useKit = create<Kit>()(
   persist(
     (set) => ({

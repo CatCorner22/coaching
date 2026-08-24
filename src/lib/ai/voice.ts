@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { scrubBannedAnswer, textIsBanned } from "@/lib/ml/audit";
+import { COACH_CLOUD_VOICE_ID } from "@/lib/voice/coach-profile";
 import { authorizeAiRequest } from "./guard.server";
 import { RateLimitError } from "./rate-limit-core";
 import { requestGrokVoice, type VoiceProviderResult } from "./voice-provider";
@@ -34,6 +35,7 @@ export const speakCoach = createServerFn({ method: "POST" })
     return requestGrokVoice({
       apiKey: process.env.XAI_API_KEY,
       text: data.text,
+      voiceId: COACH_CLOUD_VOICE_ID,
       signal: authorization.signal,
     });
   });

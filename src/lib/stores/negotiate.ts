@@ -74,6 +74,32 @@ function clampRank(r: unknown): Rank {
   return r === "yes" || r === "maybe" || r === "no" ? r : "no";
 }
 
+/**
+ * Superseded by `normalizeNegotiationItems`, and kept only because this merge
+ * brought both forward and its tests still cover it.
+ *
+ * Do not call it from production code. It enforces LOCKED_NO, but it does not
+ * carry per-item `updatedAt` stamps, does not collapse a duplicated id to no,
+ * and does not preserve custom rows — all of which the normalizer does, and all
+ * of which matter on the store that records consent decisions.
+ */
+export function lockItems(items: NegItem[]): NegItem[] {
+  const mapped = items
+    .filter((i): i is NegItem => !!i && typeof i === "object")
+    .slice(0, 40)
+    .map((i) => ({
+      id: String(i.id ?? "").slice(0, 80),
+      label: String(i.label ?? "").slice(0, 80),
+      rank: LOCKED_NO.has(String(i.id)) ? ("no" as Rank) : clampRank(i.rank),
+    }))
+    .filter((i) => i.id && i.label);
+  const have = new Set(mapped.map((i) => i.id));
+  for (const seed of STARTER) {
+    if (LOCKED_NO.has(seed.id) && !have.has(seed.id)) mapped.push({ ...seed, rank: "no" });
+  }
+  return mapped;
+}
+
 function parseCandidate(value: unknown): NegItem | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Record<string, unknown>;

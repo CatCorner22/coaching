@@ -14,13 +14,12 @@ type PlannerState = {
 
 adoptPersistKey("knotty-plan", "musubi-plan");
 
-/** Coerce a persisted (possibly corrupt or legacy) blob into a valid slug list. */
-export function normalizePersistedSlugs(persisted: unknown, fallback: string[]): string[] {
-  const raw = (persisted as { slugs?: unknown } | null)?.slugs;
-  if (!Array.isArray(raw)) return [...fallback];
+/** Coerce a possibly corrupt or legacy slug array into a bounded, unique slug list. */
+export function normalizePlannerSlugs(persisted: unknown, fallback: string[]): string[] {
+  if (!Array.isArray(persisted)) return [...fallback];
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const value of raw) {
+  for (const value of persisted) {
     if (typeof value !== "string") continue;
     const slug = value.trim();
     if (!slug || seen.has(slug) || out.length >= 40) continue;
@@ -30,15 +29,20 @@ export function normalizePersistedSlugs(persisted: unknown, fallback: string[]):
   return out;
 }
 
+/** Coerce a persisted (possibly corrupt or legacy) blob into a valid slug list. */
+export function normalizePersistedSlugs(persisted: unknown, fallback: string[]): string[] {
+  return normalizePlannerSlugs((persisted as { slugs?: unknown } | null)?.slugs, fallback);
+}
+
 export const usePlanner = create<PlannerState>()(
   persist(
     (set, get) => ({
       slugs: [...SEQUENCES[0].steps],
-      setSlugs: (slugs) => set({ slugs }),
+      setSlugs: (slugs) => set({ slugs: normalizePlannerSlugs(slugs, []) }),
       add: (slug) => {
         const next = slug.trim();
         if (!next) return;
-        const slugs = get().slugs;
+        const slugs = Array.isArray(get().slugs) ? get().slugs : [];
         if (slugs.includes(next)) return;
         set({ slugs: [...slugs, next] });
       },

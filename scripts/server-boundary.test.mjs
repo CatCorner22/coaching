@@ -313,6 +313,7 @@ test("late or excessive voice requests cannot repopulate the cleared cache", () 
   assert.match(source, /inflight\.size >= MAX_INFLIGHT_VOICES/);
   assert.match(source, /generation !== playbackGeneration/);
   assert.ok(
-    source.indexOf("generation !== playbackGeneration") < source.indexOf("cache.set(key, entry)"),
+    source.indexOf("generation !== playbackGeneration") <
+      source.indexOf("cache.set(cacheKey, entry)"),
   );
 });
