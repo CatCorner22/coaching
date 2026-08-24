@@ -100,7 +100,9 @@ function LearnPage() {
                 <div className="min-w-0">
                   <p className="truncate font-display text-lg">{knot.name}</p>
                   <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted">{academy.goal}</p>
-                  <p className="mt-2 text-sm text-subtle">{knot.steps.length} steps</p>
+                  <p className="mt-2 text-sm text-subtle">
+                    {knot.steps.length} step{knot.steps.length === 1 ? "" : "s"}
+                  </p>
                 </div>
               </Link>
             );
@@ -154,7 +156,9 @@ function LearnPage() {
                   {/* What the reader may actually do with this entry, in the
                       same words the lesson itself uses. */}
                   <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-subtle">{tieShapeBlurb(shape)}</p>
-                  <p className="mt-2 text-sm text-subtle">{academy.steps.length} sections</p>
+                  <p className="mt-2 text-sm text-subtle">
+                    {academy.steps.length} section{academy.steps.length === 1 ? "" : "s"}
+                  </p>
                 </div>
               </Link>
             );

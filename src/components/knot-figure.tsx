@@ -49,12 +49,49 @@ export function KnotFigure({ diagramId, className, animate = true }: KnotFigureP
       {diagramId.startsWith("figure-eight") && (
         <FigureEight rope={rope} accent={accent} ink={ink} animate={animate} />
       )}
+      {diagramId.startsWith("wrap-cinch") && (
+        <WrapCinch step={Number(diagramId.split("-").pop())} rope={rope} accent={accent} ink={ink} animate={animate} />
+      )}
+      {diagramId.startsWith("reverse-tension") && (
+        <ReverseTension step={Number(diagramId.split("-").pop())} rope={rope} accent={accent} ink={ink} animate={animate} />
+      )}
+      {diagramId.startsWith("sheet-bend") && (
+        <SheetBend step={Number(diagramId.split("-").pop())} rope={rope} accent={accent} ink={ink} animate={animate} />
+      )}
+      {diagramId.startsWith("surgeon") && (
+        <Surgeon step={Number(diagramId.split("-").pop())} rope={rope} accent={accent} ink={ink} animate={animate} />
+      )}
+      {diagramId.startsWith("daisy-chain") && (
+        <DaisyChain step={Number(diagramId.split("-").pop())} rope={rope} accent={accent} ink={ink} animate={animate} />
+      )}
+      {diagramId.startsWith("truckers-hitch") && (
+        <TruckersHitch step={Number(diagramId.split("-").pop())} rope={rope} accent={accent} ink={ink} animate={animate} />
+      )}
+      {isInstructorOnlyDiagram(diagramId) && <InstructorOnlyDiagram ink={ink} />}
       {!isKnownDiagram(diagramId) && (
         <text x="100" y="80" textAnchor="middle" fill={ink} fontSize="11" fontFamily="system-ui">
           Diagram
         </text>
       )}
     </svg>
+  );
+}
+
+/**
+ * Knots this app names for recognition only — friction hitches and loop
+ * knots used in loaded, suspension-adjacent rigging. Their construction is
+ * never drawn, on the same rule that keeps it out of the prose: a diagram
+ * showing how to tie one would teach the thing the entry exists to withhold.
+ * Distinguishing this from a missing diagram matters — the bare fallback
+ * below reads as a bug (something nobody got round to), while this reads as
+ * the deliberate choice it is.
+ */
+function isInstructorOnlyDiagram(id: string) {
+  return (
+    id.startsWith("munter") ||
+    id.startsWith("portuguese-bowline") ||
+    id.startsWith("prusik") ||
+    id.startsWith("alpine-butterfly")
   );
 }
 
@@ -66,7 +103,14 @@ function isKnownDiagram(id: string) {
     id.startsWith("square") ||
     id.startsWith("half-hitch") ||
     id.startsWith("overhand-on-bight") ||
-    id.startsWith("figure-eight")
+    id.startsWith("figure-eight") ||
+    id.startsWith("wrap-cinch") ||
+    id.startsWith("reverse-tension") ||
+    id.startsWith("sheet-bend") ||
+    id.startsWith("surgeon") ||
+    id.startsWith("daisy-chain") ||
+    id.startsWith("truckers-hitch") ||
+    isInstructorOnlyDiagram(id)
   );
 }
 
@@ -306,6 +350,249 @@ function FigureEight({ rope, accent, ink, animate }: { rope: string; accent: str
       />
       <PulseDot cx={100} cy={100} accent={accent} />
       <Label x={36} y={40} ink={ink} text="8 shape" />
+    </g>
+  );
+}
+
+function WrapCinch({
+  step,
+  rope,
+  accent,
+  ink,
+  animate,
+}: {
+  step: number;
+  rope: string;
+  accent: string;
+  ink: string;
+  animate: boolean;
+}) {
+  const bands = [64, 78, 92].map((y) => `M 60 ${y} Q 100 ${y - 6} 140 ${y}`);
+  return (
+    <g>
+      {bands.map((d) => (
+        <RopePath key={d} d={d} rope={rope} animate={animate} />
+      ))}
+      {step === 0 && <Label x={36} y={40} ink={ink} text="parallel wraps" />}
+      {step >= 1 && (
+        <g>
+          <RopePath d="M 148 56 Q 108 60 108 78 Q 108 96 148 100" rope={rope} animate={animate} />
+          <PulseDot cx={108} cy={78} accent={accent} />
+          <Label x={36} y={40} ink={ink} text="cinch draws tight" />
+        </g>
+      )}
+    </g>
+  );
+}
+
+function ReverseTension({
+  step,
+  rope,
+  accent,
+  ink,
+  animate,
+}: {
+  step: number;
+  rope: string;
+  accent: string;
+  ink: string;
+  animate: boolean;
+}) {
+  const wrap = "M 60 78 Q 100 66 140 78";
+  return (
+    <g>
+      <RopePath d={wrap} rope={rope} animate={animate} />
+      {step === 0 && (
+        <g>
+          <PulseDot cx={100} cy={71} accent={accent} />
+          <Label x={36} y={40} ink={ink} text="turning point" />
+        </g>
+      )}
+      {step >= 1 && (
+        <RopePath d="M 92 100 Q 100 84 108 100" rope={rope} animate={animate} dash={step === 1} />
+      )}
+      {step === 1 && (
+        <g>
+          <PulseDot cx={100} cy={97} accent={accent} />
+          <Label x={36} y={40} ink={ink} text="under the wrap" />
+        </g>
+      )}
+      {step >= 2 && (
+        <RopePath d="M 92 100 L 92 70 Q 100 62 108 70 L 108 100" rope={rope} animate={animate} />
+      )}
+      {step === 2 && <Label x={36} y={40} ink={ink} text="fold back 180°" />}
+      {step >= 3 && (
+        <g>
+          <RopePath d="M 108 100 L 108 122" rope={rope} animate={animate} dash />
+          <path d="M 108 122 L 104 114 M 108 122 L 112 114" stroke={accent} strokeWidth="2" fill="none" />
+          <Label x={36} y={40} ink={ink} text="pull to test" />
+        </g>
+      )}
+    </g>
+  );
+}
+
+function SheetBend({
+  step,
+  rope,
+  accent,
+  ink,
+  animate,
+}: {
+  step: number;
+  rope: string;
+  accent: string;
+  ink: string;
+  animate: boolean;
+}) {
+  return (
+    <g>
+      <RopePath d="M 100 60 Q 60 60 60 82 Q 60 104 100 104" rope={rope} animate={animate} />
+      {step === 0 && (
+        <g>
+          <PulseDot cx={60} cy={82} accent={accent} />
+          <Label x={104} y={56} ink={ink} text="bight" />
+        </g>
+      )}
+      {step >= 1 && (
+        <g>
+          <RopePath
+            d="M 140 96 Q 100 96 100 82 Q 100 68 60 68 Q 44 68 44 82 Q 44 92 60 96"
+            rope={rope}
+            animate={animate}
+            dash
+          />
+          <PulseDot cx={60} cy={96} accent={accent} />
+          <Label x={104} y={56} ink={ink} text="through, around, under" />
+        </g>
+      )}
+    </g>
+  );
+}
+
+function Surgeon({
+  step,
+  rope,
+  accent,
+  ink,
+  animate,
+}: {
+  step: number;
+  rope: string;
+  accent: string;
+  ink: string;
+  animate: boolean;
+}) {
+  return (
+    <g>
+      <RopePath d="M 48 84 Q 100 68 152 108" rope={rope} animate={animate} />
+      <RopePath d="M 152 84 Q 100 100 48 108" rope={rope} animate={animate} />
+      {step === 0 && (
+        <g>
+          <RopePath d="M 48 92 Q 100 76 152 116" rope={rope} animate={animate} dash />
+          <PulseDot cx={100} cy={96} accent={accent} />
+          <Label x={36} y={40} ink={ink} text="doubled first throw" />
+        </g>
+      )}
+      {step >= 1 && (
+        <g>
+          <RopePath d="M 48 116 Q 100 132 152 92" rope={rope} animate={animate} />
+          <PulseDot cx={100} cy={110} accent={accent} />
+          <Label x={36} y={40} ink={ink} text="single finishing throw" />
+        </g>
+      )}
+    </g>
+  );
+}
+
+function DaisyChain({
+  step,
+  rope,
+  accent,
+  ink,
+  animate,
+}: {
+  step: number;
+  rope: string;
+  accent: string;
+  ink: string;
+  animate: boolean;
+}) {
+  const link = (cy: number) => `M 100 ${cy - 12} Q 116 ${cy - 12} 116 ${cy} Q 116 ${cy + 12} 100 ${cy + 12} Q 84 ${cy + 12} 84 ${cy} Q 84 ${cy - 12} 100 ${cy - 12}`;
+  return (
+    <g>
+      <RopePath d={link(52)} rope={rope} animate={animate} />
+      <RopePath d={link(76)} rope={rope} animate={animate} />
+      {step === 0 && <Label x={36} y={40} ink={ink} text="bight through bight" />}
+      {step >= 1 && (
+        <g>
+          <RopePath d={link(100)} rope={rope} animate={animate} />
+          <RopePath d="M 100 112 L 100 128" rope={rope} animate={animate} />
+          <PulseDot cx={100} cy={124} accent={accent} />
+          <Label x={36} y={40} ink={ink} text="lock the last loop" />
+        </g>
+      )}
+    </g>
+  );
+}
+
+function TruckersHitch({
+  step,
+  rope,
+  accent,
+  ink,
+  animate,
+}: {
+  step: number;
+  rope: string;
+  accent: string;
+  ink: string;
+  animate: boolean;
+}) {
+  return (
+    <g>
+      <RopePath d="M 60 60 Q 76 48 92 60 Q 76 72 60 60" rope={rope} animate={animate} />
+      {step === 0 && (
+        <g>
+          <PulseDot cx={76} cy={60} accent={accent} />
+          <Label x={36} y={40} ink={ink} text="fixed mid-line loop" />
+        </g>
+      )}
+      {step >= 1 && (
+        <g>
+          <RopePath d="M 60 60 L 60 128 Q 60 138 70 138 L 132 138 Q 142 138 142 128 L 142 60 L 76 60" rope={rope} animate={animate} />
+          {step === 1 && <Label x={36} y={40} ink={ink} text="reeved and pulled" />}
+        </g>
+      )}
+      {step >= 2 && (
+        <g>
+          <RopePath d="M 142 60 Q 158 52 152 40 Q 146 30 138 40" rope={rope} animate={animate} />
+          <PulseDot cx={148} cy={44} accent={accent} />
+          <Label x={36} y={40} ink={ink} text="locked off" />
+        </g>
+      )}
+    </g>
+  );
+}
+
+/**
+ * The deliberate stand-in for an instructor-route knot: the practice column
+ * with nothing tied on it, and a lock glyph in place of rope. Recognisable at
+ * a glance as "not shown on purpose" rather than "diagram missing" — the two
+ * read identically if both are just an empty column.
+ */
+function InstructorOnlyDiagram({ ink }: { ink: string }) {
+  return (
+    <g opacity="0.85">
+      <rect x="86" y="70" width="28" height="22" rx="3" fill="none" stroke={ink} strokeWidth="2" />
+      <path d="M 92 70 L 92 60 Q 92 48 100 48 Q 108 48 108 60 L 108 70" fill="none" stroke={ink} strokeWidth="2" />
+      <circle cx="100" cy="81" r="2.4" fill={ink} />
+      <text x="100" y="112" textAnchor="middle" fill={ink} fontSize="9" fontFamily="system-ui" opacity="0.8">
+        Recognition only
+      </text>
+      <text x="100" y="123" textAnchor="middle" fill={ink} fontSize="8" fontFamily="system-ui" opacity="0.6">
+        not shown here
+      </text>
     </g>
   );
 }

@@ -86,7 +86,7 @@ function KnotPage() {
         </>
       }
       sidebar={
-        <div className="space-y-4">
+        <div className="hidden space-y-4 lg:block">
           <BeforeYouStart />
           <AcademyCoachPanel
             voice={voiceStep}
@@ -158,6 +158,20 @@ function KnotPage() {
       />
 
       <StopStrip items={knot.watch} className="mt-4 rounded-xl border border-danger/20 bg-danger/5 p-5" />
+
+      {knot.mistakes.length > 0 && (
+        <section className="mt-8">
+          <h3 className="font-display text-2xl">Common mistakes</h3>
+          <ul className="mt-3 space-y-3">
+            {knot.mistakes.map((m) => (
+              <li key={m.title} className="rounded-lg border border-border bg-surface px-4 py-3">
+                <p className="text-base font-medium">{m.title}</p>
+                <p className="mt-1 text-base leading-relaxed text-muted">{m.body}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </AcademyShell>
   );
 }
