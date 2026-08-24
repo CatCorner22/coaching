@@ -1,4 +1,5 @@
 import type { Article } from "./types";
+import { TEACHING_TECHNIQUES_ARTICLE } from "./teaching-techniques-article";
 
 /**
  * Learning science and accessibility articles focused on how to learn knot tying
@@ -6,6 +7,7 @@ import type { Article } from "./types";
  * or who struggle with fast-paced visual instruction.
  */
 export const LEARNING_PEDAGOGY_ARTICLES: Article[] = [
+  TEACHING_TECHNIQUES_ARTICLE,
   {
     slug: "learning-modalities",
     title: "How You Learn Best",
