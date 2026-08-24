@@ -1,10 +1,32 @@
-run = "npm run dev"
+# Replit workspace config. The Run button starts the dev server; see the
+# README under "Run it on Replit". Deployments are refused on purpose —
+# scripts/replit-deploy-guard.mjs explains why.
+
+# A fresh GitHub import has no node_modules, and `npm run dev` there fails with
+# "vite: not found", which reads as a broken repo rather than a missing install
+# step. The guard checks for the binary rather than the directory: a partial or
+# interrupted install leaves node_modules present but vite absent, and the
+# directory check would skip the repair it needs.
+run = "[ -x node_modules/.bin/vite ] || npm ci --no-audit --no-fund; npm run dev"
+
+# Must stay inside package.json's "engines": { "node": ">=22 <23" }.
 modules = ["nodejs-22"]
 hidden = ["node_modules", ".vercel", ".tanstack", "dist", ".output"]
 
 [nix]
 channel = "stable-24_11"
 
+# The dev server binds 8080 (vite.config.ts pins it with strictPort). Replit's
+# proxy serves externalPort 80 over HTTPS, which is also what makes live camera
+# capture work in a Repl — getUserMedia needs a secure context, so a plain-HTTP
+# LAN address cannot do it.
 [[ports]]
 localPort = 8080
 externalPort = 80
+
+# Without this section a Deployment falls back to the `run` command above and
+# publishes the dev server: shared development identity on the AI endpoints,
+# auth in development mode, and an in-memory database discarded on restart.
+[deployment]
+run = ["node", "scripts/replit-deploy-guard.mjs"]
+build = ["node", "scripts/replit-deploy-guard.mjs"]

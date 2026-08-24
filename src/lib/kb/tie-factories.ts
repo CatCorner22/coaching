@@ -198,6 +198,66 @@ export type InstructorInput = Pick<
   alternative: string;
 };
 
+/** "radial, ulnar, and median", from the catalog's hyphenated nerve slugs. */
+function nervePhrase(nerves: string[]): string {
+  const names = nerves.map((nerve) => nerve.replace(/-/g, " "));
+  if (names.length === 1) return names[0]!;
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`;
+}
+
+/**
+ * The judgment errors that actually apply to a category this app names but
+ * does not teach.
+ *
+ * These used to be one shared 118-character line — "Remote clearance" — on all
+ * forty-eight instructor routes, which is three quarters of the tie catalog
+ * carrying a single sentence as its entire troubleshooting section. The five
+ * instructor-route *knots* had already shown the boundary holds up under real
+ * content: they each carry four or five mistakes about how the reader's
+ * thinking goes wrong, and not one of them describes how to tie anything.
+ * There was no reason ties could not have the same, and one good reason they
+ * should — a reader who opens a takate-kote page and a hogtie page deserves
+ * more than the same sentence twice.
+ *
+ * They are composed rather than written out per tie so they cannot drift from
+ * the entry they sit on: the nerve list, the named alternative, and the tie's
+ * own name all come from the same input the rest of the entry is built from.
+ * That is also what keeps them from being boilerplate — the nerve sets differ
+ * across thirty-two distinct combinations and every alternative is unique, so
+ * no two routes read alike where it matters.
+ *
+ * The hard rule, same as the knots: every entry here is a recognition or
+ * judgment error. None of them says how to build, dress, or adjust anything —
+ * a mistake that teaches construction would hand over exactly what the entry
+ * exists to withhold.
+ */
+function instructorMistakes(input: InstructorInput): Tie["mistakes"] {
+  const nerves = input.nerves.length > 0 ? nervePhrase(input.nerves) : null;
+  const plural = input.nerves.length === 1 ? "nerve" : "nerves";
+
+  return [
+    {
+      title: "Remote clearance",
+      body: `A photo, a timer, a symptom-free moment, or a model's reply cannot validate construction, physiology, or safety. For ${input.name} in particular, the things that decide whether it is sound are the things none of them can see: how deep the rope sits, what it crosses underneath, and how this specific body responds to it. A picture flattens all three into something that either looks tidy or does not, and looking tidy is not the same as being sound. Stopping at that comparison is the most common way this goes wrong.`,
+    },
+    {
+      title: "Reading a comfortable moment as an all-clear",
+      body: nerves
+        ? `Compression in this category can pass the point of injury while the person in the rope still reports feeling fine. The ${nerves} ${plural} this category loads can be pressed without producing pain, and the numbness, weakness, or lost function often appears on release or the next morning rather than during the scene. Asking "does that hurt?" and hearing "no" therefore establishes less than it feels like it does. Recovery from a real nerve injury is measured in weeks to months, which is why this app sends the category to in-person teaching rather than listing signs to watch for.`
+        : `Harm in this category can pass the point of injury while the person still reports feeling fine, and the sign that something went wrong often appears on release or afterward rather than during the scene. Asking "does that hurt?" and hearing "no" therefore establishes less than it feels like it does. A reassuring answer in the moment is evidence about the moment, not about whether the arrangement is sound — which is why this app sends the category to in-person teaching rather than listing signs to watch for.`,
+    },
+    {
+      title: "Treating the entry as permission",
+      body: `This page exists so you can put a name to ${input.name}, recognise its risk family, and bring specific questions to a qualified instructor. Because it has a name, a summary, and a stated risk, it can read as pre-approved — as though the app looked at this category and decided it was reasonable to attempt. It did not, and it cannot: naming a category is not clearing it. That gap matters most for the reader who already feels ready, because feeling ready is exactly the state in which people stop asking.`,
+    },
+    {
+      title: "Substituting extra care for the step this entry names",
+      body: `This entry names something specific to do instead: ${input.alternative} That is the actual next step, not a softer suggestion to fall back on if nothing better turns up. The usual substitution is to keep the original plan and add caution — go slower, check more often, agree a signal. Care is worth having, and it does not supply what is missing here, which is a person who can look at your rope and correct it. Deciding to be careful is a decision you can make alone; the thing it is standing in for is not.`,
+    },
+  ];
+}
+
 /** A category the app will name and describe the risk of, and nothing more. */
 export function instructorRoute(input: InstructorInput): Tie {
   return {
@@ -237,12 +297,7 @@ export function instructorRoute(input: InstructorInput): Tie {
         wraps: [],
       },
     ],
-    mistakes: [
-      {
-        title: "Remote clearance",
-        body: "A photo, timer, symptom-free moment, or model response cannot validate construction, physiology, or safety.",
-      },
-    ],
+    mistakes: instructorMistakes(input),
     aftercare:
       "For an incident, stop and release. Call emergency services for emergency signs; seek prompt medical assessment for persistent or worsening symptoms. Do not re-tie to test recovery.",
     variations: [],
