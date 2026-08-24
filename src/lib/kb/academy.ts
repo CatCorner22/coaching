@@ -258,7 +258,14 @@ const KNOT_ENRICHMENTS: Record<string, KnotEnrichment> = {
   },
 };
 
-const TIE_ACADEMY: Record<string, { goal: string; steps: TieStep[] }> = {
+/**
+ * Exported for tests only. A step in here can be rendered or bypassed depending
+ * on how many steps the catalog entry has, so a test that only inspects the
+ * reconciled result stops seeing this table the moment the catalog grows past
+ * it — and a bad step sits here unnoticed until some later edit makes it win
+ * again. Safety invariants are asserted against both layers.
+ */
+export const TIE_ACADEMY: Record<string, { goal: string; steps: TieStep[] }> = {
   "single-column": {
     goal: "Practice a wrap on a post that does not squeeze shut.",
     steps: [
@@ -460,7 +467,11 @@ const TIE_ACADEMY: Record<string, { goal: string; steps: TieStep[] }> = {
           "No person is at the form.",
         ],
         speak: "Lay the tasuki line on an empty form.",
-        expected: { wrapBands: 1, pose: "stand", view: "back", handsVisible: true, neckClear: true },
+        // Front, not back. `view: "back"` makes the figure component draw the
+        // gote silhouette — a torso with the arms folded behind it — which is
+        // the box-tie shape this app refuses to teach. Rendering it beside the
+        // words "practice on the form only" is the page contradicting itself.
+        expected: { wrapBands: 1, pose: "stand", view: "front", handsVisible: true, neckClear: true },
         wraps: [{ kind: "stem", y1: 0.2, y2: 0.55 }],
       },
     ],

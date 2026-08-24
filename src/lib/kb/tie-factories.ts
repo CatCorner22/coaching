@@ -1,4 +1,4 @@
-import type { Tie } from "./types";
+import type { Tie, TieStep } from "./types";
 
 /**
  * The three shapes a catalog tie takes, in one place.
@@ -40,56 +40,144 @@ export type PracticeInput = Pick<
   /** What handling skill the drill actually builds. */
   purpose: string;
   bands?: number;
+  /**
+   * The one-sentence goal shown above the steps: what the finished pattern is
+   * and what handling it teaches. Authored beside the steps so it cannot drift
+   * from them.
+   */
+  goal?: string;
+  /**
+   * The drill itself, worked step by step, framed by the factory's setup and
+   * strip-down steps.
+   *
+   * This exists because for a long time it did not, and the result was eleven
+   * pages that claimed to teach eleven different patterns while carrying one
+   * identical paragraph between them. A reader who opened the diamond drill and
+   * the hexagon drill side by side saw the same 189 characters twice — "rehearse
+   * identifying the rope path, dressing the pattern, finding both ends" — which
+   * names no diamond, no hexagon, and no way to tell whether the thing in front
+   * of you is either. Saying nothing specific is not a safe default: it teaches
+   * the reader that this app has nothing to say, and the place they go next is
+   * a video with no stop conditions in it at all.
+   */
+  steps?: TieStep[];
+  mistakes?: { title: string; body: string }[];
+  variations?: { name: string; body: string }[];
+  ropes?: { lengthM: number; count: number }[];
+  minutes?: [number, number];
+};
+
+/**
+ * Opens every prop drill.
+ *
+ * The point of the setup step is not the rope, it is the sentence about who is
+ * not in the room. A drill that starts by putting rope on something has already
+ * skipped the decision that makes it a drill.
+ */
+const PROP_SETUP: TieStep = {
+  title: "Set up the form, and check that this is a drill",
+  goal: "Get a stable, unoccupied form and a rope you can work with before any pattern starts.",
+  rigger:
+    "Stand up something that will hold still: a dress form, a bolster, a chair back, a rolled duvet, a length of pipe. It wants to be stable enough that you can pull against it without it walking across the floor, and open enough that you can reach all the way round without moving it. Shake your rope out and check it end to end for stiff spots, frayed patches and hard-set kinks — a rope you have to fight halfway through a pattern is a rope that teaches you to yank. Then say out loud what this is: a pattern drill on an object, with nobody in it. That sentence is the whole difference between practising a craft and rehearsing something on a person who is not there yet.",
+  bottom:
+    "Nobody is placed in rope for this drill. If your partner is in the room, she is watching or handing you rope, not standing in for the form — the moment a person is inside the pattern this stops being the exercise on this page and becomes something this app does not teach.",
+  check:
+    "The form is unoccupied, stays put when you pull on it, and can be reached from every side. The rope runs freely through your hands with no snags you would have to yank through.",
+  speak: "Unoccupied form, rope checked, nobody in the pattern.",
+  expected: { wrapBands: 0, pose: "stand", view: "front", handsVisible: true, neckClear: true },
+  wraps: [],
+};
+
+/**
+ * Closes every prop drill.
+ *
+ * Taking it off is the half of rope handling that never gets practised, because
+ * on a prop there is no reason to hurry — which is exactly why rehearsing it
+ * here is worth anything at all. The skill being drilled is finding the end
+ * that unmakes the pattern, and it is the same skill in the dark, on a person,
+ * when it matters.
+ */
+const PROP_STRIPDOWN: TieStep = {
+  title: "Take it off, and time yourself doing it",
+  goal: "Reverse the pattern from its working end and find out how long that actually takes you.",
+  rigger:
+    "Do not cut it and do not pull it off over the top. Find the working end, follow it back to the last thing you did, and undo the pattern in the order you built it. Notice which parts fight you: a pass you have to hunt for, a crossing you cannot tell the direction of, a knot that has set. Those are the parts of the pattern you do not yet understand, and they are worth more attention than the parts that came out cleanly. Time the whole strip-down. On a prop that number is a curiosity; the reason to know it is that a pattern which takes you four minutes to reverse on an object you can walk round freely is not a pattern you know how to reverse at all.",
+  bottom:
+    "Nothing here was on a person, so nothing here needed removing in a hurry. That is the point of doing it on the form: the first time you find out a pattern is hard to undo should never be while someone is waiting inside it.",
+  check:
+    "The pattern came off by reversing it rather than by cutting or forcing it, the rope is back in one piece with both ends findable, and you can say which parts of the path you had to hunt for.",
+  speak: "Reverse it from the working end. Notice what fights you.",
+  expected: { wrapBands: 0, pose: "stand", view: "front", handsVisible: true, neckClear: true },
+  wraps: [],
+};
+
+/**
+ * The step a drill gets when nobody has authored one for it.
+ *
+ * Deliberately kept, and deliberately generic: a new pattern added in a hurry
+ * still renders something honest rather than an empty page. It is not a target
+ * to leave things at — a drill sitting on this alone is a drill nobody has
+ * written yet, and the catalog test says so by name.
+ */
+const UNAUTHORED_DRILL: TieStep = {
+  title: "Unoccupied handling drill",
+  rigger:
+    "Use a smooth, stable, unoccupied practice form. Rehearse identifying the rope path, dressing the pattern, finding both ends, and removing it promptly without any body or structural loading.",
+  bottom:
+    "No participant is placed in rope for this app drill. Body application requires separate, current adult consent and qualified hands-on instruction.",
+  check:
+    "The form is unoccupied, stable, easy to access from every side, and the rope can be removed immediately.",
+  speak: "Unoccupied practice only. No person-bearing or body-placement instruction.",
+  expected: { wrapBands: 1, pose: "stand", view: "front", handsVisible: true, neckClear: true },
+  wraps: [],
 };
 
 /** A craft drill on an unoccupied form. Never a person, never a load. */
 export function unoccupiedPractice(input: PracticeInput): Tie {
+  const authored = input.steps ?? [
+    { ...UNAUTHORED_DRILL, expected: { ...UNAUTHORED_DRILL.expected, wrapBands: input.bands ?? 1 } },
+  ];
   return {
     slug: input.slug,
     name: input.name,
     jp: input.jp,
     summary: input.summary,
     level: input.level,
-    minutes: [3, 12],
-    ropes: [{ lengthM: 8, count: 1 }],
+    minutes: input.minutes ?? [3, 12],
+    ropes: input.ropes ?? [{ lengthM: 8, count: 1 }],
     position: "theory",
     prereqs: [],
     knots: input.knots,
     nerves: input.nerves,
     intent: [...input.intent, "unoccupied-practice"],
+    goal: input.goal,
     why: `${input.purpose} This drill is for an unoccupied prop or dress form and does not validate body placement, pressure, duration, loading, or release competence.`,
     stop: [
       "Stop before applying this app drill to a person",
       "Never add body loading, attachment, neck contact, or an intimate pass",
     ],
-    steps: [
-      {
-        title: "Unoccupied handling drill",
-        rigger:
-          "Use a smooth, stable, unoccupied practice form. Rehearse identifying the rope path, dressing the pattern, finding both ends, and removing it promptly without any body or structural loading.",
-        bottom:
-          "No participant is placed in rope for this app drill. Body application requires separate, current adult consent and qualified hands-on instruction.",
-        check:
-          "The form is unoccupied, stable, easy to access from every side, and the rope can be removed immediately.",
-        speak: "Unoccupied practice only. No person-bearing or body-placement instruction.",
-        expected: {
-          wrapBands: input.bands ?? 1,
-          pose: "stand",
-          view: "front",
-          handsVisible: true,
-          neckClear: true,
-        },
-        wraps: [],
-      },
-    ],
+    // Setup and strip-down are appended here rather than authored per drill so
+    // that no pattern can ever be published without the sentence about who is
+    // not in it, or without rehearsing how it comes apart.
+    steps: [PROP_SETUP, ...authored, PROP_STRIPDOWN],
     mistakes: [
+      ...(input.mistakes ?? []),
       {
         title: "Treating appearance as validation",
         body: "A tidy pattern, successful prop drill, photograph, or model response does not establish safe use on a person.",
       },
+      {
+        // Appended by the factory because it is the specific misreading these
+        // pages invite: a dress form has no nerves, does not go numb, and never
+        // says anything, so every signal that would stop you on a person is
+        // simply absent here. Getting good at the pattern is getting good at the
+        // pattern, and nothing else.
+        title: "Mistaking a form for a rehearsal",
+        body: "A dress form has no nerves to compress, no circulation to change, and nothing to say when something is wrong. Every warning that would stop you on a person is missing here, which means a pattern you can lay perfectly on a form has been tested against none of the things that actually go wrong. What transfers from this page is rope handling — tension, spacing, rope management, taking it off. Placement, pressure, duration and fit do not transfer, and no amount of repetition here turns into permission there.",
+      },
     ],
     aftercare: "No participant is restrained in this drill. Inspect and store the practice rope after use.",
-    variations: [],
+    variations: input.variations ?? [],
   };
 }
 

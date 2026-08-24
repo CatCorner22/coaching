@@ -278,3 +278,185 @@ test("a generic vocabulary search still surfaces something the reader can do", (
     assert.ok(actionable.length > 0, `"${query}" returned only instructor routes`);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Prop drills teach their own pattern
+// ---------------------------------------------------------------------------
+//
+// These four tests exist because of a defect that every other test in this file
+// was blind to. Eleven of the twelve prop drills carried the *same* step —
+// byte-for-byte the same 189-character paragraph about "identifying the rope
+// path, dressing the pattern, finding both ends". The diamond drill and the
+// hexagon drill and the net drill and the ladder drill all rendered it. Each
+// page had a distinct title, a distinct summary, a distinct band count, and no
+// instruction whatsoever that distinguished it from the other ten.
+//
+// Nothing caught that, because every assertion here was about *shape* — does the
+// tie carry a marker, is its position theory, does its `why` mention a prop —
+// and on all of those it passed perfectly. Shape was never the problem. The
+// problem was that the pages did not say anything.
+
+const practiceTies = () => TIES.filter((tie) => tie.intent.includes("unoccupied-practice"));
+
+/** The steps a drill authored for itself, minus the two the factory frames it with. */
+const authoredSteps = (tie: (typeof TIES)[number]) => tie.steps.slice(1, -1);
+
+test("every prop drill is framed by setup and strip-down, whatever it authored", () => {
+  // The two framing steps carry the only sentences on the page that say who is
+  // not in the pattern and that it has to come off by being reversed. They are
+  // appended by the factory precisely so a drill cannot be published without
+  // them, and this asserts the factory is still doing it.
+  for (const tie of practiceTies()) {
+    const first = tie.steps[0]!;
+    const last = tie.steps[tie.steps.length - 1]!;
+    assert.match(first.bottom, /Nobody is placed in rope/i, `${tie.slug} lost its setup framing`);
+    assert.match(
+      JSON.stringify(last),
+      /revers|working end/i,
+      `${tie.slug} never rehearses taking the pattern off`,
+    );
+    assert.ok(
+      tie.steps.length >= 3,
+      `${tie.slug} has ${tie.steps.length} steps, so it authored nothing between the framing`,
+    );
+  }
+});
+
+test("no two prop drills teach with the same words", () => {
+  // The regression, stated as the relationship it broke rather than as a count.
+  // Two drills sharing an instruction is two drills where at least one of them
+  // is not about its own pattern.
+  const seen = new Map<string, string>();
+  for (const tie of practiceTies()) {
+    for (const step of authoredSteps(tie)) {
+      for (const [field, text] of [
+        ["rigger", step.rigger],
+        ["check", step.check],
+        ["speak", step.speak],
+      ] as const) {
+        const key = text.trim();
+        const owner = seen.get(key);
+        assert.equal(
+          owner,
+          undefined,
+          `${tie.slug} and ${owner} share a ${field}: ${key.slice(0, 90)}…`,
+        );
+        seen.set(key, tie.slug);
+      }
+    }
+  }
+});
+
+test("every prop drill names the pattern it is a drill for", () => {
+  // Specificity, checked the only way a test can check it: the drill's own
+  // vocabulary has to appear in its own instruction. A page about diamonds that
+  // never says "diamond" is a page about nothing, and that is exactly the state
+  // all eleven were in.
+  const vocabulary: Record<string, RegExp> = {
+    hishi: /diamond/i,
+    kikkou: /hexagon|six[- ]sided|tortoise/i,
+    amime: /net|mesh|lattice|cell/i,
+    hashigo: /ladder|rung/i,
+    tasuki: /diagonal|cross/i,
+    "rope-corset": /lac(?:e|ing)|panel/i,
+    "hana-musubi": /petal|flower|ornament/i,
+    "sennin-pattern": /repeat|motif|flat/i,
+    "rope-dress": /section|working end|join/i,
+    "cuff-pattern": /rigid|dowel|bottle|object/i,
+    "shime-pattern": /tighten|constrict|clos(?:e|ing)/i,
+    "larks-head-cuff": /lark|hitch|cinch/i,
+  };
+
+  for (const tie of practiceTies()) {
+    const authored = authoredSteps(tie);
+    assert.ok(authored.length > 0, `${tie.slug} authored no steps of its own`);
+
+    // Written, not left on the factory's placeholder.
+    const placeholder = authored.some((step) => /^Unoccupied handling drill$/.test(step.title));
+    assert.equal(placeholder, false, `${tie.slug} is still on the unauthored placeholder step`);
+
+    // And written at a depth someone can actually follow.
+    for (const step of authored) {
+      assert.ok(step.rigger.length > 250, `${tie.slug}/${step.title}: rigger too thin to follow`);
+      assert.ok(step.check.length > 60, `${tie.slug}/${step.title}: check too thin`);
+    }
+
+    const pattern = vocabulary[tie.slug];
+    if (!pattern) continue;
+    assert.match(
+      authored.map((step) => `${step.title} ${step.rigger} ${step.check}`).join(" "),
+      pattern,
+      `${tie.slug} never names what it is teaching`,
+    );
+  }
+});
+
+test("a prop drill never puts a person in the pattern, and never clears anything", () => {
+  // Two failure modes, one test, because they are the two ways this content can
+  // become dangerous rather than merely useless. The first is a drill drifting
+  // into body placement — the whole reason these are prop drills. The second is
+  // a check written as permission, which is the failure the guided ties are
+  // already tested against and which applies identically here.
+  const bodyPlacement = [
+    /\b(?:on|around|about) (?:her|his|their|the) (?:wrist|ankle|arm|forearm|leg|calf|thigh|chest|torso|waist|neck|shoulder)\b/i,
+    /\bwhen you (?:do|try|tie) this on a (?:person|partner|body)\b/i,
+    /\bplace (?:the )?rope on (?:her|him|them)\b/i,
+    /\bhave (?:her|him|them) (?:stand|sit|kneel|hold still)\b/i,
+  ];
+  const clearance =
+    /(?:safe to (?:continue|proceed|carry on)|good to go|then it is fine|cleared|means it is safe|you can continue)/i;
+
+  for (const tie of practiceTies()) {
+    const prose = tie.steps
+      .flatMap((step) => [step.title, step.goal ?? "", step.rigger, step.bottom, step.check, step.speak])
+      .concat(tie.mistakes.flatMap((m) => [m.title, m.body]))
+      .concat(tie.variations.flatMap((v) => [v.name, v.body]))
+      .concat([tie.goal ?? "", tie.why, tie.summary])
+      .join("\n");
+
+    for (const pattern of bodyPlacement) {
+      assert.doesNotMatch(prose, pattern, `${tie.slug} puts the drill on a person`);
+    }
+    for (const step of tie.steps) {
+      assert.doesNotMatch(step.check, clearance, `${tie.slug}/${step.title} reads as a clearance`);
+      assert.doesNotMatch(step.rigger, clearance, `${tie.slug}/${step.title} reads as a clearance`);
+    }
+  }
+});
+
+test("no prop drill ever draws the restraint silhouette", async () => {
+  // The figure component derives its body drawing from the step, and one of the
+  // inputs is not obviously a body decision: `view: "back"` sets the same `gote`
+  // flag as `pose: "gote"` or a `gote` wrap, and that flag swaps the upright
+  // figure's arms for a torso with them folded behind it — the box-tie shape.
+  //
+  // The tasuki drill shipped exactly that. Its page said "Unoccupied Practice",
+  // "No person-bearing use in this app" and "Practice on the form only", and
+  // drew a bound-arms silhouette beside those words. Nothing failed, because no
+  // test connected a rendering flag to the safety claim printed next to it.
+  //
+  // Checked on the enriched tie, not the catalog one, because the step that was
+  // actually rendering came from the Academy table rather than the catalog.
+  const { getAcademyTie } = await import("./index.ts");
+  const { TIE_ACADEMY } = await import("./academy.ts");
+
+  // Both layers, because only one of them renders at a time and which one wins
+  // is decided by step counts. A back-view step parked in the Academy table is
+  // invisible while the catalog is longer, and draws the moment it is not.
+  for (const tie of practiceTies()) {
+    const rendered = getAcademyTie(tie.slug) ?? tie;
+    const layers = [...rendered.steps, ...(TIE_ACADEMY[tie.slug]?.steps ?? [])];
+    for (const step of layers) {
+      assert.notEqual(
+        step.expected.view,
+        "back",
+        `${tie.slug}/${step.title}: back view draws the arms-behind-back figure`,
+      );
+      assert.notEqual(step.expected.pose, "gote", `${tie.slug}/${step.title}`);
+      assert.ok(
+        !step.wraps.some((wrap) => wrap.kind === "gote"),
+        `${tie.slug}/${step.title}: a prop drill carries a gote wrap`,
+      );
+    }
+  }
+});
