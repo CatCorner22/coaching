@@ -1,5 +1,6 @@
 import type { Tie } from "./types";
 import { instructorRoute, unoccupiedPractice } from "./tie-factories";
+import { propDrill } from "./prop-drills";
 import { MORE_TIES } from "./more-ties";
 import { GUIDED_TIES } from "./guided-ties";
 import { SHIBARI_TIES } from "./shibari-ties";
@@ -16,6 +17,7 @@ const CORE_TIES: Tie[] = [
     nerves: [],
     intent: ["foundation", "object-only"],
     purpose: "The drill teaches recognition of a hitch whose constricting behavior matters.",
+    ...propDrill("larks-head-cuff"),
   }),
   instructorRoute({
     slug: "futomomo",
@@ -62,6 +64,7 @@ const CORE_TIES: Tie[] = [
     intent: ["decorative", "craft"],
     purpose: "The drill develops diagonal pattern recognition while keeping body placement out of scope.",
     bands: 2,
+    ...propDrill("tasuki"),
   }),
   instructorRoute({
     slug: "hip-harness",
@@ -119,6 +122,7 @@ const CORE_TIES: Tie[] = [
     intent: ["decorative", "craft"],
     purpose: "The drill builds visual spacing and reversible handling on a dress form.",
     bands: 5,
+    ...propDrill("hishi"),
   }),
   unoccupiedPractice({
     slug: "kikkou",
@@ -132,6 +136,7 @@ const CORE_TIES: Tie[] = [
     intent: ["decorative", "craft"],
     purpose: "The drill develops patient, reversible pattern construction on a stable prop.",
     bands: 6,
+    ...propDrill("kikkou"),
   }),
   instructorRoute({
     slug: "matanawa",

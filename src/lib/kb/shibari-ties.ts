@@ -1,5 +1,6 @@
 import type { Tie } from "./types";
 import { instructorRoute, unoccupiedPractice } from "./tie-factories";
+import { propDrill } from "./prop-drills";
 
 /**
  * The wider shibari and kinbaku vocabulary.
@@ -39,6 +40,7 @@ const DECORATIVE_PATTERNS: Tie[] = [
     purpose:
       "The drill trains consistent spacing across a long rope path, where errors accumulate visibly rather than hiding in a single band.",
     bands: 6,
+    ...propDrill("amime"),
   }),
   unoccupiedPractice({
     slug: "hashigo",
@@ -53,6 +55,7 @@ const DECORATIVE_PATTERNS: Tie[] = [
     purpose:
       "Repeated parallel bands are the clearest drill for even tension, because an uneven one is obvious against its neighbours.",
     bands: 5,
+    ...propDrill("hashigo"),
   }),
   unoccupiedPractice({
     slug: "rope-corset",
@@ -67,6 +70,7 @@ const DECORATIVE_PATTERNS: Tie[] = [
     purpose:
       "The drill develops symmetrical lacing and a rope path that can be reversed from either end without hunting for a start.",
     bands: 4,
+    ...propDrill("rope-corset"),
   }),
   unoccupiedPractice({
     slug: "hana-musubi",
@@ -80,6 +84,7 @@ const DECORATIVE_PATTERNS: Tie[] = [
     intent: ["decorative", "craft"],
     purpose:
       "Ornamental knotwork is a low-stakes way to build rope memory and finger habits away from anything that has to hold.",
+    ...propDrill("hana-musubi"),
   }),
   unoccupiedPractice({
     slug: "sennin-pattern",
@@ -94,6 +99,7 @@ const DECORATIVE_PATTERNS: Tie[] = [
     purpose:
       "Working a repeat on a flat surface isolates spacing and tension from the distortion a curved form introduces.",
     bands: 4,
+    ...propDrill("sennin-pattern"),
   }),
   unoccupiedPractice({
     slug: "rope-dress",
@@ -108,6 +114,7 @@ const DECORATIVE_PATTERNS: Tie[] = [
     purpose:
       "A long pattern is the drill for rope management — keeping a working end untangled and reachable over many minutes.",
     bands: 7,
+    ...propDrill("rope-dress"),
   }),
   unoccupiedPractice({
     slug: "cuff-pattern",
@@ -122,6 +129,7 @@ const DECORATIVE_PATTERNS: Tie[] = [
     purpose:
       "A rigid object shows a cinch closing in a way a forgiving limb does not, which is exactly why the drill stays on the object.",
     bands: 2,
+    ...propDrill("cuff-pattern"),
   }),
   unoccupiedPractice({
     slug: "shime-pattern",
@@ -136,6 +144,7 @@ const DECORATIVE_PATTERNS: Tie[] = [
     purpose:
       "Watching a pattern tighten on a prop is the cheapest way to learn which structures constrict and which hold their shape.",
     bands: 3,
+    ...propDrill("shime-pattern"),
   }),
 ];
 

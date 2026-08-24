@@ -1157,3 +1157,59 @@ test("the step acknowledgement is required by every tie taught in full", async (
     "a foundation tie is missing from the shape buckets or counted twice",
   );
 });
+
+test("knot enrichment fills gaps and never overrides what a step authored", async () => {
+  // `KnotStep` lets a catalog author write `do`, `check`, `doBullets` and
+  // `checkBullets`. `enrichKnotStep` used to read none of them: for any knot
+  // without an enrichment patch it substituted `step.body` for `do`, the knot's
+  // generic `watch` line for `check`, and nothing at all for either bullet list.
+  //
+  // So authored content could be committed, pass every test, and never reach the
+  // page. The reverse tension — cited by nine ties — was rewritten with four
+  // distinct checks and twelve bullets, and rendered the same generic warning on
+  // every step with no bullets. The commit claimed the work; the app showed the
+  // old text.
+  //
+  // Asserted as the precedence relationship rather than against one knot, so it
+  // holds for every knot that ever authors these fields.
+  const { KNOTS, getAcademyKnot } = await import("./index.ts");
+
+  let authoredSomewhere = 0;
+  for (const knot of KNOTS) {
+    const enriched = getAcademyKnot(knot.slug);
+    assert.ok(enriched, `${knot.slug} did not enrich`);
+    assert.equal(
+      enriched.steps.length,
+      knot.steps.length,
+      `${knot.slug}: enrichment changed the step count`,
+    );
+
+    knot.steps.forEach((base, i) => {
+      const out = enriched.steps[i]!;
+      if (base.check) {
+        authoredSomewhere++;
+        assert.equal(out.check, base.check, `${knot.slug}/${i}: authored check was replaced`);
+      }
+      if (base.do) {
+        assert.equal(out.do, base.do, `${knot.slug}/${i}: authored do was replaced`);
+      }
+      if (base.doBullets?.length) {
+        assert.deepEqual(out.doBullets, base.doBullets, `${knot.slug}/${i}: authored doBullets dropped`);
+      }
+      if (base.checkBullets?.length) {
+        assert.deepEqual(
+          out.checkBullets,
+          base.checkBullets,
+          `${knot.slug}/${i}: authored checkBullets dropped`,
+        );
+      }
+      // Whatever the source, a step always ends up with something to check
+      // against — that is what the fallback chain is for.
+      assert.ok(out.check && out.check.length > 0, `${knot.slug}/${i}: no check at all`);
+    });
+  }
+
+  // Guards the guard: if no knot authors these fields the loop above passes
+  // vacuously, which is exactly how the original defect stayed invisible.
+  assert.ok(authoredSomewhere > 0, "no knot authors its own checks, so this test proved nothing");
+});

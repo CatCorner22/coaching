@@ -151,19 +151,88 @@ const CORE_KNOTS: Knot[] = [
     cinches: false,
     loadBearing: false,
     usedIn: ["karada", "shinju", "hishi", "tasuki", "kikkou"],
+    // Written out properly because five catalog entries send the reader here —
+    // karada, shinju, hishi, tasuki and kikkou all say "turn it with a reverse
+    // tension" and then stop. Before this, the page they arrived at described
+    // the whole technique in one sentence ("reverse 180 degrees so the working
+    // pair lies over the standing pair") with no account of which way the fold
+    // goes, what dressing it means, or how to tell a good one from one that
+    // will creep. A pattern drill that cites a knot entry is only as followable
+    // as the entry it cites.
     steps: [
       {
-        title: "Lay the line",
-        body: "Bring the doubled rope to a marked turning point on an unoccupied practice form.",
-        speak: "Bring the doubled rope to the turning point.",
+        title: "1 · Understand what you are about to make",
+        body: "A reverse tension is a direction change, not a knot. You bring the doubled rope up to the point where you want the line to turn, fold it back on itself, and let the friction of rope lying against rope hold the turn while the standing part stays under tension. Nothing is tied. That is the entire point: a knot at every turn would leave a hard lump at every turn, and a harness is mostly turns.",
+        do: "Look at where your rope is going and decide where it should turn. Say the direction out loud before you fold anything — this is the step people skip, and a fold made in the wrong direction has to be undone rather than adjusted.",
+        doBullets: [
+          "Find the point where you want the line to change direction.",
+          "Say out loud which way it is going to turn.",
+          "Keep the standing pair — the rope behind you — under steady tension.",
+        ],
+        check: "You can point at the turning point and say which direction the rope leaves it. Nothing is tied yet.",
+        checkBullets: [
+          "You know where the turn happens.",
+          "You know which way the rope leaves it.",
+          "No knot has been made.",
+        ],
+        speak: "This is a direction change, not a knot. Decide which way it turns.",
       },
       {
-        title: "Fold back",
-        body: "Reverse 180 degrees so the working pair lies over the standing pair. Tension the standing pair while you dress the fold. Friction, not a knot, holds it.",
-        speak: "Fold one hundred eighty degrees. Friction holds the line.",
+        title: "2 · Take the working pair under the wraps",
+        body: "Pass the working pair — the two strands you are travelling with — underneath the wrap already lying at the turning point, and bring it out the other side. Go under the wrap, not over it: the wrap is what the fold will press against, and a fold sitting on top of a wrap has nothing holding it down. On a prop you can lift the wrap with a finger to make room. If the rope will not pass without force, the wrap is too tight to work with rather than the pass being wrong.",
+        do: "Slide the working pair under the existing wrap and out the far side, keeping the two strands flat and side by side as they go.",
+        doBullets: [
+          "Pass the working pair under the wrap, not over it.",
+          "Keep the two strands flat and parallel — do not let them twist.",
+          "If it will not pass without forcing, loosen the wrap instead of pulling harder.",
+        ],
+        check: "The working pair comes out the far side of the wrap, both strands flat and lying beside each other rather than crossed.",
+        checkBullets: [
+          "It went under the wrap.",
+          "Both strands are flat, not twisted around each other.",
+          "You did not have to force it.",
+        ],
+        speak: "Under the wrap, not over it. Both strands flat.",
+      },
+      {
+        title: "3 · Fold it back on itself, one hundred and eighty degrees",
+        body: "Now turn the working pair back the way it came, folding it hard over the wrap so it lies against its own standing part. That fold is the whole mechanism: rope pressed against rope, held there by the tension you keep on the standing pair. Fold it fully — a lazy fold of ninety or a hundred and twenty degrees has far less rope in contact and will creep as soon as the pull changes direction. Keep tension on the standing pair the entire time you are folding; the moment it goes slack the fold opens.",
+        do: "Fold the working pair back over the wrap until it lies alongside the rope it came from, holding steady tension on the standing pair throughout.",
+        doBullets: [
+          "Fold it all the way back, not part-way.",
+          "Keep the standing pair under tension while you fold.",
+          "Let the fold sit on the wrap, so the wrap is pressed between rope and form.",
+        ],
+        check: "The working pair now runs back alongside its own standing part, and the fold sits on the wrap rather than beside it.",
+        checkBullets: [
+          "The fold is a full turn back, not a gentle bend.",
+          "The fold is sitting on the wrap.",
+          "The standing pair never went slack.",
+        ],
+        speak: "Fold it all the way back. Keep the standing pair tight.",
+      },
+      {
+        title: "4 · Dress it, then test it by pulling the wrong way",
+        body: "Dressing means laying the strands so they sit flat and parallel where they cross, with no strand riding on top of another. An undressed fold has less rope in contact and concentrates the load onto whichever strand ended up on top. Once it is dressed, pull the working pair in the direction the line is about to travel and watch the fold: a good one stays where it is, and a poor one slides along the wrap or opens out. This is the useful part of the drill — the failure is visible on a prop, quietly, with nobody waiting on you.",
+        do: "Lay the strands flat where they cross, then pull the working pair along its new direction and watch whether the fold moves.",
+        doBullets: [
+          "Lay the crossing strands flat and parallel — no strand riding on another.",
+          "Pull the working pair the way the line is about to go.",
+          "Watch the fold, not your hands.",
+        ],
+        check: "The strands lie flat where they cross, and you have seen for yourself whether the fold stays put or creeps when pulled. A fold that moves is one to lay again, not one to tighten.",
+        checkBullets: [
+          "Strands flat where they cross.",
+          "You pulled it and watched what happened.",
+          "If it crept, you laid it again rather than pulling harder.",
+        ],
+        speak: "Dress it flat, then pull and watch whether it moves.",
       },
     ],
-    watch: ["If the practice fold slips, reset the unoccupied drill. This entry does not validate a body harness or loaded use."],
+    watch: [
+      "If the practice fold slips, reset the unoccupied drill. This entry does not validate a body harness or loaded use.",
+      "A reverse tension holds by friction alone, so it can creep when the direction of pull changes. Seeing one hold in a drill says nothing about how it behaves under a pull it has not met.",
+    ],
   },
   {
     slug: "sheet-bend",

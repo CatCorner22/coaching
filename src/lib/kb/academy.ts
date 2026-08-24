@@ -258,7 +258,14 @@ const KNOT_ENRICHMENTS: Record<string, KnotEnrichment> = {
   },
 };
 
-const TIE_ACADEMY: Record<string, { goal: string; steps: TieStep[] }> = {
+/**
+ * Exported for tests only. A step in here can be rendered or bypassed depending
+ * on how many steps the catalog entry has, so a test that only inspects the
+ * reconciled result stops seeing this table the moment the catalog grows past
+ * it — and a bad step sits here unnoticed until some later edit makes it win
+ * again. Safety invariants are asserted against both layers.
+ */
+export const TIE_ACADEMY: Record<string, { goal: string; steps: TieStep[] }> = {
   "single-column": {
     goal: "Practice a wrap on a post that does not squeeze shut.",
     steps: [
@@ -460,7 +467,11 @@ const TIE_ACADEMY: Record<string, { goal: string; steps: TieStep[] }> = {
           "No person is at the form.",
         ],
         speak: "Lay the tasuki line on an empty form.",
-        expected: { wrapBands: 1, pose: "stand", view: "back", handsVisible: true, neckClear: true },
+        // Front, not back. `view: "back"` makes the figure component draw the
+        // gote silhouette — a torso with the arms folded behind it — which is
+        // the box-tie shape this app refuses to teach. Rendering it beside the
+        // words "practice on the form only" is the page contradicting itself.
+        expected: { wrapBands: 1, pose: "stand", view: "front", handsVisible: true, neckClear: true },
         wraps: [{ kind: "stem", y1: 0.2, y2: 0.55 }],
       },
     ],
@@ -597,12 +608,27 @@ export function enrichKnotStep(
 ): KnotStep {
   const patch = KNOT_ENRICHMENTS[slug]?.steps[index];
   const diagramId = patch?.diagramId ?? `${slug}-${index}`;
+  // Precedence: the enrichment patch, then whatever the catalog step authored
+  // for itself, then a derived fallback. That middle term was missing, and
+  // `KnotStep` declares `do`, `check`, `doBullets` and `checkBullets` as fields
+  // a catalog author may write — so all four were being written and silently
+  // thrown away for any knot without a patch.
+  //
+  // It was not a hypothetical. The reverse tension is cited by nine ties; its
+  // four steps were rewritten with their own checks and bullets, and the page
+  // rendered none of them — every step showed the same generic `watch` line in
+  // place of the check that belonged to it, and no bullets at all. The commit
+  // that wrote them reported success, the tests passed, and the app showed the
+  // old text. Same shape as the tie bug above: an enrichment layer that was
+  // built to fill gaps quietly overriding content instead.
+  //
+  // Patched knots are unaffected — the patch still wins where one exists.
   return {
     ...step,
-    do: patch?.do ?? step.body,
-    check: patch?.check ?? fallbackCheck ?? "It looks like the diagram.",
-    doBullets: patch?.doBullets,
-    checkBullets: patch?.checkBullets,
+    do: patch?.do ?? step.do ?? step.body,
+    check: patch?.check ?? step.check ?? fallbackCheck ?? "It looks like the diagram.",
+    doBullets: patch?.doBullets ?? step.doBullets,
+    checkBullets: patch?.checkBullets ?? step.checkBullets,
     diagramId,
     media: patch?.media ?? defaultKnotStepMedia(slug, index, diagramId),
   };
