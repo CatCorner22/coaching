@@ -1345,3 +1345,97 @@ test("no knot's diagram falls through to the bare placeholder", () => {
   }
   assert.ok(checked > 0, "no knot step produced a diagramId, so this test proved nothing");
 });
+
+// ---------------------------------------------------------------------------
+// Instructor-route tie troubleshooting
+// ---------------------------------------------------------------------------
+//
+// The five instructor-route *knots* each carry four or five real mistakes
+// about how the reader's judgment goes wrong. The forty-eight instructor-route
+// *ties* — three quarters of the tie catalog — carried one shared
+// 118-character line between them, so a reader who opened a takate-kote page
+// and a hogtie page got the same sentence twice and nothing else. The knots
+// had already proved the recognition-only boundary survives real content, so
+// the ties now compose theirs from the same per-tie inputs the rest of the
+// entry is built from (see `instructorMistakes` in tie-factories.ts).
+
+test("an instructor-route tie carries real troubleshooting, not one shared line", async () => {
+  const { tieShape } = await import("./tie-factories.ts");
+  const routes = TIES.filter((tie) => tieShape(tie) === "instructor");
+  assert.ok(routes.length > 0, "no instructor routes found, so this test proved nothing");
+  for (const tie of routes) {
+    assert.ok(
+      tie.mistakes.length >= 3,
+      `${tie.slug} has only ${tie.mistakes.length} mistake(s) — the bar the knots already meet`,
+    );
+    for (const m of tie.mistakes) {
+      assert.ok(
+        m.body.length > 100,
+        `${tie.slug}/"${m.title}": too thin to say anything specific`,
+      );
+    }
+  }
+});
+
+test("instructor-route tie mistakes are judgment errors, never construction", async () => {
+  // Same rule and same deliberately-narrow regex as the instructor-only knots
+  // above: this category gets recognition and risk, never a way to tie, dress,
+  // load, or release the thing. Adding troubleshooting must not become a back
+  // door for handing over exactly what the entry withholds.
+  const { tieShape } = await import("./tie-factories.ts");
+  const constructionWords = /\b(?:wrap|thread|snug|dress|fold|cinch|tuck)\s+(?:it|the\s+\w+)\b/i;
+  for (const tie of TIES.filter((t) => tieShape(t) === "instructor")) {
+    for (const m of tie.mistakes) {
+      assert.doesNotMatch(
+        m.body,
+        constructionWords,
+        `${tie.slug}/"${m.title}" reads like a construction step, not a judgment error`,
+      );
+    }
+  }
+});
+
+test("instructor-route troubleshooting is about this tie, not the same text 48 times", async () => {
+  // The failure mode the tie factory's own header warns about: pages that
+  // claim to cover different categories while carrying one identical
+  // paragraph. Composed text is only an improvement over the shared line if it
+  // actually differs — so require that the great majority of bodies are
+  // distinct, and that no single body is repeated across most of the catalog.
+  const { tieShape } = await import("./tie-factories.ts");
+  const routes = TIES.filter((tie) => tieShape(tie) === "instructor");
+  const bodies = routes.flatMap((tie) => tie.mistakes.map((m) => m.body));
+  const distinct = new Set(bodies).size;
+  assert.ok(
+    distinct / bodies.length > 0.8,
+    `only ${distinct}/${bodies.length} instructor-route mistake bodies are distinct`,
+  );
+
+  const counts = new Map<string, number>();
+  for (const body of bodies) counts.set(body, (counts.get(body) ?? 0) + 1);
+  const worst = Math.max(...counts.values());
+  assert.ok(
+    worst < routes.length / 2,
+    `one mistake body is repeated on ${worst} of ${routes.length} instructor routes`,
+  );
+});
+
+test("an instructor route names its own nerves rather than a generic warning", async () => {
+  // The nerve-specific mistake is the one that carries the consequence — how
+  // long a real injury takes to recover from — so it has to be about the
+  // nerves this category actually loads. A tie with nerves listed and no
+  // mention of them has silently fallen back to the no-nerve wording.
+  const { tieShape } = await import("./tie-factories.ts");
+  let checked = 0;
+  for (const tie of TIES.filter((t) => tieShape(t) === "instructor")) {
+    if (tie.nerves.length === 0) continue;
+    const joined = tie.mistakes.map((m) => m.body).join(" ");
+    for (const nerve of tie.nerves) {
+      checked++;
+      assert.ok(
+        joined.includes(nerve.replace(/-/g, " ")),
+        `${tie.slug}: troubleshooting never names its "${nerve}" nerve`,
+      );
+    }
+  }
+  assert.ok(checked > 0, "no instructor route listed a nerve, so this test proved nothing");
+});
