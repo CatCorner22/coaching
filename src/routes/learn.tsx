@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { GraduationCap, Sparkles } from "lucide-react";
+import { GraduationCap, Sparkles, BookOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { HowToLearn } from "@/components/learn";
 import { KnotFigure } from "@/components/knot-figure";
@@ -44,8 +44,23 @@ function LearnPage() {
         </div>
       </div>
 
-      <div className="mt-8">
+      <div className="mt-8 space-y-6">
         <HowToLearn />
+        <section className="rounded-lg border border-accent/25 bg-accent/5 p-5 sm:p-6">
+          <h2 className="font-display text-2xl">New to rope or struggle with fast videos?</h2>
+          <p className="mt-2 max-w-2xl text-base leading-relaxed text-muted">
+            Read our learning foundations first. They explain how your brain learns, why pacing matters, and how to make
+            rope tying accessible for you — whether you have a learning disability or just learn differently than online
+            tutorials assume.
+          </p>
+          <Link
+            to="/learn-foundations"
+            className="mt-4 inline-flex items-center gap-2 rounded-lg border border-accent/50 bg-accent/10 px-4 py-2 font-medium text-accent transition-colors hover:border-accent"
+          >
+            Read learning foundations
+            <span>→</span>
+          </Link>
+        </section>
       </div>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">

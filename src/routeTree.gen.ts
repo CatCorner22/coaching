@@ -21,6 +21,7 @@ import { Route as JournalRouteImport } from './routes/journal'
 import { Route as KnotsRouteImport } from './routes/knots'
 import { Route as KnowledgeRouteImport } from './routes/knowledge'
 import { Route as LearnRouteImport } from './routes/learn'
+import { Route as LearnFoundationsRouteImport } from './routes/learn-foundations'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as NegotiateRouteImport } from './routes/negotiate'
@@ -93,6 +94,11 @@ const KnowledgeRoute = KnowledgeRouteImport.update({
 const LearnRoute = LearnRouteImport.update({
   id: '/learn',
   path: '/learn',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LearnFoundationsRoute = LearnFoundationsRouteImport.update({
+  id: '/learn-foundations',
+  path: '/learn-foundations',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LibraryRoute = LibraryRouteImport.update({
@@ -174,6 +180,7 @@ export interface FileRoutesByFullPath {
   '/knots': typeof KnotsRoute
   '/knowledge': typeof KnowledgeRoute
   '/learn': typeof LearnRoute
+  '/learn-foundations': typeof LearnFoundationsRoute
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
   '/negotiate': typeof NegotiateRoute
@@ -201,6 +208,7 @@ export interface FileRoutesByTo {
   '/knots': typeof KnotsRoute
   '/knowledge': typeof KnowledgeRoute
   '/learn': typeof LearnRoute
+  '/learn-foundations': typeof LearnFoundationsRoute
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
   '/negotiate': typeof NegotiateRoute
@@ -229,6 +237,7 @@ export interface FileRoutesById {
   '/knots': typeof KnotsRoute
   '/knowledge': typeof KnowledgeRoute
   '/learn': typeof LearnRoute
+  '/learn-foundations': typeof LearnFoundationsRoute
   '/library': typeof LibraryRoute
   '/login': typeof LoginRoute
   '/negotiate': typeof NegotiateRoute
@@ -258,6 +267,7 @@ export interface FileRouteTypes {
     | '/knots'
     | '/knowledge'
     | '/learn'
+    | '/learn-foundations'
     | '/library'
     | '/login'
     | '/negotiate'
@@ -285,6 +295,7 @@ export interface FileRouteTypes {
     | '/knots'
     | '/knowledge'
     | '/learn'
+    | '/learn-foundations'
     | '/library'
     | '/login'
     | '/negotiate'
@@ -312,6 +323,7 @@ export interface FileRouteTypes {
     | '/knots'
     | '/knowledge'
     | '/learn'
+    | '/learn-foundations'
     | '/library'
     | '/login'
     | '/negotiate'
@@ -340,6 +352,7 @@ export interface RootRouteChildren {
   KnotsRoute: typeof KnotsRoute
   KnowledgeRoute: typeof KnowledgeRoute
   LearnRoute: typeof LearnRoute
+  LearnFoundationsRoute: typeof LearnFoundationsRoute
   LibraryRoute: typeof LibraryRoute
   LoginRoute: typeof LoginRoute
   NegotiateRoute: typeof NegotiateRoute
@@ -439,6 +452,13 @@ declare module '@tanstack/react-router' {
       path: '/learn'
       fullPath: '/learn'
       preLoaderRoute: typeof LearnRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/learn-foundations': {
+      id: '/learn-foundations'
+      path: '/learn-foundations'
+      fullPath: '/learn-foundations'
+      preLoaderRoute: typeof LearnFoundationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/library': {
@@ -548,6 +568,7 @@ const rootRouteChildren: RootRouteChildren = {
   KnotsRoute: KnotsRoute,
   KnowledgeRoute: KnowledgeRoute,
   LearnRoute: LearnRoute,
+  LearnFoundationsRoute: LearnFoundationsRoute,
   LibraryRoute: LibraryRoute,
   LoginRoute: LoginRoute,
   NegotiateRoute: NegotiateRoute,
