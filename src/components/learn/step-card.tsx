@@ -1,7 +1,7 @@
-import { Volume2 } from "lucide-react";
+import { ShieldAlert, Volume2 } from "lucide-react";
 import { useId } from "react";
 import { Button } from "@/components/ui/button";
-import { bulletsOrFallback } from "@/lib/learn/plain-language";
+import { bulletsOrFallback, isSayableAloud } from "@/lib/learn/plain-language";
 import { cn } from "@/lib/utils";
 import type { StepConfirm } from "./step-confirm";
 
@@ -46,6 +46,7 @@ export function StepCard({
 }: StepCardProps) {
   const doLines = bulletsOrFallback(doBullets, doText);
   const checkLines = bulletsOrFallback(checkBullets, checkText);
+  const sayable = isSayableAloud(speak);
   const doGroupId = useId();
   const checkGroupId = useId();
 
@@ -93,17 +94,32 @@ export function StepCard({
           requireConfirm={requireConfirm}
         />
 
+        {/* Part three is "say out loud" only when there is something to say.
+            On an instructor route the line is a scope notice, and printing it
+            under this heading told the reader to recite the sentence that says
+            this app will not teach them the entry. The Listen button stays
+            either way — it reads the whole step, not just this line. */}
         <section className="rounded-lg border border-border/40 px-4 py-4 sm:px-5 sm:py-5" aria-labelledby={`${doGroupId}-say`}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-center gap-3">
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-elevated text-sm font-semibold text-fg">
-                3
+              <span
+                className={
+                  sayable
+                    ? "flex size-9 shrink-0 items-center justify-center rounded-full bg-elevated text-sm font-semibold text-fg"
+                    : "flex size-9 shrink-0 items-center justify-center rounded-full bg-warn/15 text-sm font-semibold text-warn"
+                }
+              >
+                {sayable ? "3" : <ShieldAlert className="size-4" aria-hidden />}
               </span>
               <div>
                 <h3 id={`${doGroupId}-say`} className="text-base font-medium text-fg">
-                  Say out loud
+                  {sayable ? "Say out loud" : "What this entry is"}
                 </h3>
-                <p className="text-sm text-muted">Optional — tap Listen if reading is hard.</p>
+                <p className="text-sm text-muted">
+                  {sayable
+                    ? "Optional — tap Listen if reading is hard."
+                    : "Scope, not a line to say. Tap Listen to hear the step."}
+                </p>
               </div>
             </div>
             <Button variant="secondary" size="lg" onClick={onSpeak} className="shrink-0">
@@ -111,7 +127,15 @@ export function StepCard({
               {voiceLabel}
             </Button>
           </div>
-          <p className="mt-4 rounded-md bg-elevated/50 px-4 py-3 text-base leading-relaxed text-fg">{speak}</p>
+          <p
+            className={
+              sayable
+                ? "mt-4 rounded-md bg-elevated/50 px-4 py-3 text-base leading-relaxed text-fg"
+                : "mt-4 rounded-md border border-warn/25 bg-warn/8 px-4 py-3 text-base leading-relaxed text-fg"
+            }
+          >
+            {speak}
+          </p>
         </section>
       </div>
 

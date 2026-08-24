@@ -20,6 +20,8 @@ import {
   searchKnowledge,
 } from "./index.ts";
 import { SAFETY_SOURCE_IDS, SAFETY_SOURCES, SOURCE_LEDGER_REVISION } from "./sources.ts";
+import { isSayableAloud } from "../learn/plain-language.ts";
+import { buildAcademyVoiceScript } from "../learn/voice-script.ts";
 
 test("tie slugs are unique and getTie round-trips", () => {
   const slugs = TIES.map((t) => t.slug);
@@ -1438,4 +1440,155 @@ test("an instructor route names its own nerves rather than a generic warning", a
     }
   }
   assert.ok(checked > 0, "no instructor route listed a nerve, so this test proved nothing");
+});
+
+// An earlier version of the learning-science entries appealed to research
+// throughout their prose while registering no anchors at all, so the evidence
+// panel rendered "no claim-level source anchors are published for this entry"
+// directly beneath a paragraph describing a review's findings. The status field
+// was internally consistent — no anchors, so editorial_only — which is exactly
+// why the existing evidence test passed and this went unnoticed.
+//
+// The first version of this test looked for surname-and-year citations, which
+// these entries deliberately do not use: they describe findings in plain prose
+// instead. It therefore matched nothing and asserted nothing. Match the appeal,
+// not the citation format.
+const EVIDENTIAL_APPEAL =
+  /\b(?:reviewers? (?:graded|rated)|commissioned review|a review of the evidence|the evidence (?:actually )?supports?|studies with|was (?:actually )?tested on|did not survive (?:proper )?testing|failed testing|rated moderate|best-supported|well[- ]supported|instructional research|standard instructional)/iu;
+
+function articleProse(article: (typeof ARTICLES)[number]): string {
+  return article.blocks
+    .flatMap((block) => {
+      if (block.type === "ul") return block.items;
+      if (block.type === "callout") return [block.title, block.text];
+      return [block.text];
+    })
+    .concat(article.summary, article.title)
+    .join(" ");
+}
+
+test("an article that appeals to research carries source anchors", () => {
+  const offenders = ARTICLES.filter(
+    (article) =>
+      EVIDENTIAL_APPEAL.test(articleProse(article)) &&
+      getArticleEvidence(article.slug).sourceIds.length === 0,
+  ).map((article) => article.slug);
+
+  assert.deepEqual(
+    offenders,
+    [],
+    `these entries appeal to research but publish no source anchors: ${offenders.join(", ")}`,
+  );
+
+  // Guards the guard: if a rewrite stops matching the detector entirely, the
+  // assertion above passes for the wrong reason. The learning set is where
+  // these claims live, so at least those must still be seen.
+  const seen = ARTICLES.filter((article) => EVIDENTIAL_APPEAL.test(articleProse(article)));
+  assert.ok(seen.length >= 5, `detector matched only ${seen.length} entries; it has gone stale`);
+});
+
+// The learning entries make a specific claim — that matching teaching to a
+// preferred modality does not hold up — and the whole set is written against
+// it. A future edit reintroducing "auditory learner" framing would contradict
+// the entry sitting next to it, so the phrasing is pinned. rope-basics and
+// knot-foundations are craft and carry no anchors on purpose; pinning that
+// split here means adding an evidence claim to one of them fails the test
+// above rather than passing unnoticed.
+test("the learning entries do not reintroduce the learning-styles myth", () => {
+  const STYLE_CLAIM = /\b(?:auditory|visual|kinesthetic|kinaesthetic)\s+learners?/iu;
+  const ANCHORED = ["learning-modalities", "learning-pacing", "spaced-learning", "evidence-based-teaching", "learning-disabilities-rope"];
+  const CRAFT = ["rope-basics", "knot-foundations"];
+
+  for (const slug of [...ANCHORED, ...CRAFT]) {
+    const article = ARTICLES.find((entry) => entry.slug === slug);
+    assert.ok(article, `missing learning entry ${slug}`);
+    const expected = ANCHORED.includes(slug);
+    assert.equal(
+      getArticleEvidence(slug).sourceIds.length > 0,
+      expected,
+      `${slug} should be ${expected ? "source_anchored" : "editorial_only"}`,
+    );
+
+    const prose = articleProse(article);
+    if (slug === "learning-modalities" || slug === "evidence-based-teaching") {
+      // These two name the myth in order to reject it, so the phrase is
+      // expected — but only alongside the rejection.
+      assert.match(
+        prose,
+        /did not (?:hold up|survive)|contradict|failed testing/iu,
+        `${slug} should name the meshing hypothesis only to reject it`,
+      );
+      continue;
+    }
+    assert.doesNotMatch(prose, STYLE_CLAIM, `${slug} reintroduces learning-styles framing`);
+  }
+});
+
+// The lesson format promises three fixed parts, and part three is "say out
+// loud". 52 of 198 steps were filling that slot with a scope notice — 48 ties
+// and 4 knots reading "Instructor-only. This app does not coach, modify, or
+// clear this restraint." The card printed it under a "Say out loud" heading and
+// the coach voice read "Say out loud: Instructor-only. This app does not
+// coach...", which is incoherent as speech and turns a boundary into something
+// to recite to a partner.
+//
+// `isSayableAloud` decides this from the line itself, so the classification is
+// pinned here over the whole catalog: a reworded notice that stops matching
+// would silently return to being announced as a line to say.
+test("every step's say-aloud line is speech, or is classified as a scope notice", () => {
+  const steps = [
+    ...KNOTS.flatMap((knot) => knot.steps.map((step, i) => ({ ref: `knot/${knot.slug}#${i}`, speak: step.speak }))),
+    ...TIES.flatMap((tie) => tie.steps.map((step, i) => ({ ref: `tie/${tie.slug}#${i}`, speak: step.speak }))),
+  ];
+
+  const notices = steps.filter((step) => !isSayableAloud(step.speak));
+  const sayable = steps.filter((step) => isSayableAloud(step.speak));
+
+  // Both branches must stay populated. If every line classified one way the
+  // renderers would have a dead branch and this test would assert nothing.
+  assert.ok(notices.length > 0, "no scope notices found — the classifier has gone stale");
+  assert.ok(sayable.length > 0, "no sayable lines found — the classifier is over-matching");
+
+  // A notice addresses the reader about the app. A sayable line must not: an
+  // entry that says "this app does not clear this" is not something a person
+  // announces mid-scene, whichever wording it arrives in.
+  for (const step of sayable) {
+    assert.doesNotMatch(
+      step.speak,
+      /\bthis app\b|\binstructor[- ]only\b|\brecognition only\b/i,
+      `${step.ref} is announced as a line to say but reads as a scope notice: ${step.speak}`,
+    );
+  }
+
+  // And every notice must actually be one, rather than a real instruction the
+  // classifier swallowed — which would hide a step's spoken line behind a
+  // warning panel.
+  for (const step of notices) {
+    assert.match(
+      step.speak,
+      /\bthis (?:app|entry)\b|\binstructor[- ]only\b|\brecognition only\b|\bdo not load a person\b/i,
+      `${step.ref} was classified as a scope notice but reads as speech: ${step.speak}`,
+    );
+  }
+});
+
+// The voice and the card must agree about which frame a line gets. They read
+// the same classifier, and this proves the wiring rather than the intent.
+test("the coach voice does not tell the listener to recite a scope notice", () => {
+  const spoken = (speak: string) =>
+    buildAcademyVoiceScript({
+      stepIndex: 0,
+      totalSteps: 1,
+      title: "Step",
+      doText: "Do the thing.",
+      checkText: "Check the thing.",
+      speak,
+    });
+
+  const notice = "Instructor-only. This app does not coach, modify, or clear this restraint.";
+  assert.ok(spoken(notice).includes(notice), "the notice must still be read");
+  assert.doesNotMatch(spoken(notice), /Say out loud: Instructor-only/u);
+
+  const line = "Around, through, snug.";
+  assert.match(spoken(line), /Say out loud: Around, through, snug\./u);
 });

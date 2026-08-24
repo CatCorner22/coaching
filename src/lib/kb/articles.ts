@@ -3,6 +3,7 @@ import { MORE_ARTICLES } from "./more-articles";
 import { EXPANSION_ARTICLES } from "./expansion-articles";
 import { BDSM_ARTICLES } from "./bdsm-articles";
 import { TECHNIQUE_ARTICLES } from "./technique-articles";
+import { LEARNING_PEDAGOGY_ARTICLES } from "./learning-pedagogy";
 
 const CORE_ARTICLES: Article[] = [
   {
@@ -560,6 +561,7 @@ export const ARTICLES: Article[] = [
   ...EXPANSION_ARTICLES,
   ...BDSM_ARTICLES,
   ...TECHNIQUE_ARTICLES,
+  ...LEARNING_PEDAGOGY_ARTICLES,
 ];
 
 export function getArticle(slug: string) {

@@ -14,6 +14,35 @@ export function bulletsOrFallback(explicit: string[] | undefined, fallback: stri
   return toBullets(fallback);
 }
 
+/**
+ * Whether a step's `speak` line is something a person actually says in the
+ * room, or a scope notice addressed to the reader about what this app does.
+ *
+ * The lesson format promises three fixed parts, and part three is "say out
+ * loud". On instructor-route entries that slot was carrying "Instructor-only.
+ * This app does not coach, modify, or clear this restraint." — so the card
+ * printed it under a "Say out loud" heading and the coach voice read the words
+ * "Say out loud: Instructor-only. This app does not coach...". Two things go
+ * wrong at once. It is incoherent as speech, and framing a boundary as a line
+ * to recite to a partner turns it into scene patter, which is the opposite of
+ * what it is for.
+ *
+ * On those entries there is genuinely nothing to say, because you are not
+ * doing the tie. The honest shape is an absent third part, not a filled one.
+ *
+ * Classified from the line rather than threaded down from the catalog because
+ * the question is about this sentence, not about the entry: a guided tie may
+ * still carry a notice on one step. Both renderers ask here so the card and
+ * the voice can never disagree, and `speakLineKinds` pins every line in the
+ * catalog so a reworded notice cannot quietly drift back into part three.
+ */
+export function isSayableAloud(speak: string): boolean {
+  // Addresses the reader about the app or the entry, rather than the room.
+  return !/\bthis (?:app|entry) (?:does not|cannot|is)\b|\binstructor[- ]only\b|\brecognition only\b|\bdo not load a person from this\b/i.test(
+    speak,
+  );
+}
+
 export const LESSON_FORMAT = [
   {
     num: 1,
