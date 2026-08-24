@@ -109,6 +109,13 @@ const PROP_STRIPDOWN: TieStep = {
   speak: "Reverse it from the working end. Notice what fights you.",
   expected: { wrapBands: 0, pose: "stand", view: "front", handsVisible: true, neckClear: true },
   wraps: [],
+  // An empty `wraps` does not clear the diagram. The route draws the figure
+  // from `steps.slice(0, step + 1).flatMap(x => x.wraps)`, so contributing
+  // nothing leaves every earlier wrap on screen: the step that says the pattern
+  // is off rendered the finished pattern, captioned "0 bands" underneath it.
+  // Declaring the media explicitly overrides the cumulative figure with an
+  // empty form, which is what "you have taken it off" should look like.
+  media: [{ kind: "wraps", wraps: [] }],
 };
 
 /**

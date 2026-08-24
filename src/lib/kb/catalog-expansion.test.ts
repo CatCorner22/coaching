@@ -460,3 +460,85 @@ test("no prop drill ever draws the restraint silhouette", async () => {
     }
   }
 });
+
+test("a prop drill declares the knots and the rope its own steps call for", () => {
+  // Both halves of this were wrong the moment the drills were written, and
+  // neither was visible on the page as an error — only as a page quietly
+  // pointing somewhere useless.
+  //
+  // `knots` drives the "Knots to learn first" links. Every drill still carried
+  // whatever it had been given when its only step was the shared placeholder,
+  // so the hexagon drill linked a reverse tension and said nothing about the
+  // lark's head, the overhand knots on a bight, or the half hitches its
+  // sequence is actually built from.
+  //
+  // `ropes` feeds the planner's length and count arithmetic. Four drills bring
+  // in a second or third rope mid-sequence while declaring the single default
+  // length, so any plan containing them under-counted the rope needed.
+  const NAMED_KNOT = [
+    [/lark'?s head/i, "larks-head"],
+    [/overhand (?:knot )?on (?:a |the )?bight|overhand loop|overhand stopper|plain overhand/i, "overhand-on-bight"],
+    [/two half hitches|double half hitch/i, "double-half-hitch"],
+    [/half hitch|half-hitch/i, "half-hitch"],
+    [/square knot/i, "square"],
+    [/reverse tension/i, "reverse-tension"],
+    [/somerville|bowline/i, "somerville-bowline"],
+    [/figure of eight|figure-eight/i, "figure-eight"],
+  ] as const;
+
+  let checkedKnot = 0;
+  let checkedRope = 0;
+  for (const tie of practiceTies()) {
+    const prose = authoredSteps(tie)
+      .map((step) => [step.title, step.goal ?? "", step.rigger, step.check].join(" "))
+      .join(" ");
+
+    for (const [pattern, slug] of NAMED_KNOT) {
+      if (!pattern.test(prose)) continue;
+      checkedKnot++;
+      assert.ok(
+        tie.knots.includes(slug),
+        `${tie.slug} builds with ${slug} but does not list it under knots to learn first`,
+      );
+    }
+
+    // The reverse does not hold: a drill can use a technique without writing its
+    // name — tasuki folds the rope back over itself at every corner, which is a
+    // reverse tension whether or not the words appear. So an unnamed declaration
+    // is not an error, and this test never asserts one away.
+
+    if (/second rope|fresh rope|another rope/i.test(prose)) {
+      checkedRope++;
+      const count = tie.ropes.reduce((n, r) => n + r.count, 0);
+      assert.ok(
+        count >= 2,
+        `${tie.slug} brings in another rope mid-sequence but declares ${count}`,
+      );
+    }
+  }
+
+  // Guards the guard. If the detectors stop matching, the loops above pass
+  // while proving nothing — which is how the stale metadata survived writing
+  // twelve drills in the first place.
+  assert.ok(checkedKnot > 0, "no drill named a knot, so the knot half proved nothing");
+  assert.ok(checkedRope > 0, "no drill named a second rope, so the rope half proved nothing");
+});
+
+test("the strip-down step clears the figure instead of showing the finished pattern", () => {
+  // The route draws each step's figure from the cumulative wraps of every step
+  // up to it, so a step contributing an empty `wraps` array does not reset the
+  // drawing — it adds nothing to it. The step that tells the reader the pattern
+  // is off was rendering the completed pattern with a "0 bands" caption under
+  // it. Explicit media overrides the cumulative figure with an empty form.
+  for (const tie of practiceTies()) {
+    const last = tie.steps[tie.steps.length - 1]!;
+    const wrapsMedia = last.media?.find((m) => m.kind === "wraps");
+    assert.ok(wrapsMedia, `${tie.slug}: strip-down step has no explicit media to clear the figure`);
+    assert.equal(
+      wrapsMedia.kind === "wraps" ? wrapsMedia.wraps.length : -1,
+      0,
+      `${tie.slug}: strip-down media still draws rope`,
+    );
+    assert.equal(last.expected.wrapBands, 0, `${tie.slug}: strip-down still claims bands`);
+  }
+});

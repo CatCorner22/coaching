@@ -26,6 +26,25 @@ import type { Tie, TieStep } from "./types";
  */
 export type PropDrillContent = {
   goal: string;
+  /**
+   * The knots this drill's own steps actually name.
+   *
+   * It lives here rather than at the call site because the two drifted apart
+   * the moment the steps were written: every drill still declared whatever it
+   * had been given when its only step was the shared placeholder, so the
+   * hexagon drill sent readers to a reverse tension and said nothing about the
+   * lark's head, overhand knots and half hitches its sequence is built from.
+   * Declared beside the steps, it cannot go stale without the steps changing.
+   *
+   * The list is a union with what the call site already declared, never a
+   * replacement. A drill can use a technique without ever writing its name —
+   * tasuki folds the rope back over itself at every corner, which is a reverse
+   * tension whether or not the words appear — so dropping a declaration merely
+   * because a keyword search missed it would trade one wrong link for another.
+   */
+  knots?: string[];
+  /** Rope inventory, when the drill needs more than the single default length. */
+  ropes?: Tie["ropes"];
   steps: TieStep[];
   mistakes: Tie["mistakes"];
   variations: Tie["variations"];
@@ -34,6 +53,7 @@ export type PropDrillContent = {
 const PROP_DRILLS: Record<string, PropDrillContent> = {
   "amime": {
     goal: "A six-cell-round open lattice hung off a measured header on one continuous line: a drill in even spacing, cumulative drift and rope management.",
+    knots: ["half-hitch","reverse-tension","square"],
     steps: [
       {
         title: "1 · Lay the header and mark six points on the form",
@@ -117,6 +137,7 @@ const PROP_DRILLS: Record<string, PropDrillContent> = {
   },
   "cuff-pattern": {
     goal: "A two-wrap band locked across its own wraps on a dowel or bottle: a drill in laying wraps side by side and in seeing whether a structure holds its size.",
+    knots: ["somerville-bowline","wrap-cinch"],
     steps: [
       {
         title: "1 · Pin the bight and lay the first wrap",
@@ -213,6 +234,7 @@ const PROP_DRILLS: Record<string, PropDrillContent> = {
   },
   "hana-musubi": {
     goal: "A flat four-petal flower knot in a spare length of rope: it holds nothing, and the skill is weaving the ring, dressing the petals and closing it evenly.",
+    knots: ["overhand-on-bight","square"],
     steps: [
       {
         title: "1 · Pin the centre and lay the first petal",
@@ -296,6 +318,7 @@ const PROP_DRILLS: Record<string, PropDrillContent> = {
   },
   "hashigo": {
     goal: "Five parallel bands stacked down one locked spine, gauged not guessed: the drill where a rung tied tighter or spaced wider than its neighbours cannot hide.",
+    knots: ["double-half-hitch","half-hitch","reverse-tension"],
     steps: [
       {
         title: "1 · Fold a rope gauge, then pin the bight at the top-rung height",
@@ -392,6 +415,7 @@ const PROP_DRILLS: Record<string, PropDrillContent> = {
   },
   "hishi": {
     goal: "A single column of even diamonds worked down an unoccupied prop from one doubled rope, drilling gauged spacing, plumb joins and matched tension in both hands.",
+    knots: ["larks-head","reverse-tension","square"],
     steps: [
       {
         title: "1 · Lark's head band, then join zero",
@@ -475,6 +499,8 @@ const PROP_DRILLS: Record<string, PropDrillContent> = {
   },
   "kikkou": {
     goal: "A column of six-sided cells opened out of a knotted rope ladder by paired encircling passes. It drills knot spacing, matched widths and even tension.",
+    knots: ["double-half-hitch","half-hitch","larks-head","overhand-on-bight","reverse-tension"],
+    ropes: [{"lengthM":8,"count":2}],
     steps: [
       {
         title: "1 · Tie the knot ladder off the form",
@@ -571,6 +597,8 @@ const PROP_DRILLS: Record<string, PropDrillContent> = {
   },
   "larks-head-cuff": {
     goal: "A lark's head tied on a dowel or bottle, dressed and then pulled twice, so its cinching stops being a claim and becomes a distance you can measure.",
+    knots: ["figure-eight","larks-head","somerville-bowline"],
+    ropes: [{"lengthM":8,"count":2}],
     steps: [
       {
         title: "1 · Find the middle, fold the bight, mark both parts",
@@ -654,6 +682,8 @@ const PROP_DRILLS: Record<string, PropDrillContent> = {
   },
   "rope-corset": {
     goal: "Four slack bands with a second rope laced up through them in matched crossings; the drill is symmetrical lacing and a path that opens from either end.",
+    knots: ["half-hitch","reverse-tension","square"],
+    ropes: [{"lengthM":8,"count":2}],
     steps: [
       {
         title: "1 · Mark the lines and lay the top band",
@@ -750,6 +780,8 @@ const PROP_DRILLS: Record<string, PropDrillContent> = {
   },
   "rope-dress": {
     goal: "A knotted stem and a lattice of four-sided cells worked down a form from ropes joined end to end, drilling working-end management and knowing your place.",
+    knots: ["double-half-hitch","half-hitch","larks-head","overhand-on-bight","reverse-tension","square"],
+    ropes: [{"lengthM":8,"count":3}],
     steps: [
       {
         title: "1 · Set the reference band and name the five sections",
@@ -846,6 +878,7 @@ const PROP_DRILLS: Record<string, PropDrillContent> = {
   },
   "sennin-pattern": {
     goal: "Eight identical rope diamonds in a row between two measured frame lines on a flat board. It teaches spacing, repeatability and honest measurement.",
+    knots: ["half-hitch","larks-head","reverse-tension"],
     steps: [
       {
         title: "1 · Lark's head the datum line across the board",
@@ -942,6 +975,7 @@ const PROP_DRILLS: Record<string, PropDrillContent> = {
   },
   "shime-pattern": {
     goal: "Three look-alike bands on a rigid prop: one runs closed under a pull, one cannot move, one closes then stops — and how to tell which is which.",
+    knots: ["double-half-hitch","half-hitch","larks-head","overhand-on-bight","square","wrap-cinch"],
     steps: [
       {
         title: "1 · Build the band that can run closed",
@@ -1025,6 +1059,7 @@ const PROP_DRILLS: Record<string, PropDrillContent> = {
   },
   "tasuki": {
     goal: "Two level bands and four diagonal runs that cross in a flat X on the front and a matching X on the back: a drill in symmetry and holding a crossing point.",
+    knots: ["reverse-tension"],
     steps: [
       {
         title: "1 · Lay the lower band and mark all four targets",
