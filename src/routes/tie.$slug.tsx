@@ -17,7 +17,13 @@ import {
   type StepConfirm,
 } from "@/components/learn";
 import { bulletsOrFallback } from "@/lib/learn/plain-language";
-import { getAcademyTie, getKnot, isFoundationTie, isInstructorRoute } from "@/lib/kb";
+import {
+  getAcademyTie,
+  getKnot,
+  isFoundationTie,
+  isInstructorRoute,
+  requiresStepConfirmation,
+} from "@/lib/kb";
 import { tieShape, tieShapeBlurb, tieShapeLabel } from "@/lib/kb/tie-factories";
 import { coachVoiceLabel } from "@/lib/voice/coach-profile";
 import { useLearnProgress } from "@/lib/stores/learn-progress";
@@ -83,6 +89,12 @@ function TiePage() {
   // subtitle; the rest show their summary. The unconditional "not permission to
   // tie a person" banner below still applies to every entry either way.
   const dressFormPractice = foundation && shape === "practice";
+  // Whether the reader must acknowledge Do and Check before advancing. Derived
+  // from the tie itself, not from the Academy's slug list: double-column is a
+  // guided tie the list never learned about, so keying the gate on membership
+  // let it page past the cinch step — the step its own title calls "the step
+  // that makes this safe" — without confirming anything.
+  const mustConfirm = requiresStepConfirmation(tie);
   const voiceLabel = coachVoiceLabel(cloudVoice);
   const bottomLines = bulletsOrFallback(s.bottomBullets, s.bottom);
   const voiceStep = {
@@ -163,7 +175,7 @@ function TiePage() {
       }
       sidebar={
         <div className="hidden space-y-4 lg:block">
-          <BeforeYouStart />
+          <BeforeYouStart propOnly={shape !== "guided"} />
           {coachPanel}
           {instructor && <InstructorPrepCard tieName={tie.name} />}
         </div>
@@ -180,7 +192,7 @@ function TiePage() {
 
       {instructor && <InstructorPrepCard tieName={tie.name} className="lg:hidden" />}
 
-      <BeforeYouStart className="lg:hidden" />
+      <BeforeYouStart propOnly={shape !== "guided"} className="lg:hidden" />
 
       <div className="lg:hidden">{coachPanel}</div>
 
@@ -211,7 +223,7 @@ function TiePage() {
         voiceLabel={voiceLabel}
         confirm={confirm}
         onConfirmChange={setConfirm}
-        requireConfirm={foundation}
+        requireConfirm={mustConfirm}
         media={stepFigure}
         onSpeak={() => void playCoachVoice(s.speak, cloudVoice)}
       />
@@ -234,7 +246,7 @@ function TiePage() {
         onBack={() => setStep((n) => n - 1)}
         onNext={goNext}
         nextLabel="Next section"
-        canAdvance={!foundation || (confirm.didDo && confirm.didCheck)}
+        canAdvance={!mustConfirm || (confirm.didDo && confirm.didCheck)}
       />
 
       <StopStrip items={tie.stop} className="mt-4 rounded-xl border border-danger/20 bg-danger/5 p-5" />

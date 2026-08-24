@@ -32,8 +32,32 @@ export const LESSON_FORMAT = [
   },
 ] as const;
 
-export const BEFORE_YOU_START = [
-  "Use a chair leg, PVC pipe, or dress-form post — not a person.",
+/**
+ * The two lines that are true of every lesson, whatever it teaches.
+ */
+const BEFORE_YOU_START_ALWAYS = [
   "Have one length of rope and trauma shears within reach.",
   "Go slow. One step at a time. It is OK to repeat a step.",
+] as const;
+
+/**
+ * For a knot lesson, a prop drill, or an instructor route: nobody is placed in
+ * rope, so the first thing to settle is what the rope goes on.
+ */
+export const BEFORE_YOU_START = [
+  "Use a chair leg, PVC pipe, or dress-form post — not a person.",
+  ...BEFORE_YOU_START_ALWAYS,
+] as const;
+
+/**
+ * For a tie taught in full, which may go on a consenting adult once its
+ * negotiated limit is agreed. Telling that reader "not a person" here, a few
+ * inches above steps that say to watch her face and to check again the next
+ * morning, is not caution — it is the page contradicting itself, and it teaches
+ * the reader to discount the warnings that do apply.
+ */
+export const BEFORE_YOU_START_GUIDED = [
+  "Agree the limit before any rope: what this is for, how long, and what ends it.",
+  "Trauma shears within reach, and both of you have rehearsed the cut — that is step one of this lesson.",
+  ...BEFORE_YOU_START_ALWAYS,
 ] as const;

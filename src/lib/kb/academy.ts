@@ -2,6 +2,7 @@ import type { Knot, KnotStep, Tie, TieStep } from "./types";
 import { getKnot } from "./knots";
 import { getTie } from "./ties";
 import { defaultKnotStepMedia, defaultTieStepMedia } from "./media-registry";
+import { tieShape } from "./tie-factories";
 import { toBullets } from "@/lib/learn/plain-language";
 
 export const FOUNDATION_KNOT_SLUGS = [
@@ -22,17 +23,20 @@ export const FOUNDATION_TIE_SLUGS = [
   "chair",
 ] as const;
 
-export const FOUNDATION_PRACTICE_TIE_SLUGS = [
-  "single-column",
-  "karada",
-  "tasuki",
-] as const;
+// Derived, never hand-listed. These were written when single-column and karada
+// were one-step prop drills; the catalog has since rewritten both as ties that
+// go on a person, and a hand-maintained copy of that answer cannot notice.
+// `tieShape` reads the tie's own markers and is the single source for the
+// question everywhere it is asked.
+const foundationTiesByShape = (shape: ReturnType<typeof tieShape>): string[] =>
+  FOUNDATION_TIE_SLUGS.filter((slug) => {
+    const tie = getTie(slug);
+    return tie ? tieShape(tie) === shape : false;
+  });
 
-export const FOUNDATION_INSTRUCTOR_TIE_SLUGS = [
-  "shinju",
-  "hip-harness",
-  "chair",
-] as const;
+export const FOUNDATION_PRACTICE_TIE_SLUGS: readonly string[] = foundationTiesByShape("practice");
+
+export const FOUNDATION_INSTRUCTOR_TIE_SLUGS: readonly string[] = foundationTiesByShape("instructor");
 
 type KnotEnrichment = {
   goal: string;
@@ -156,47 +160,59 @@ const KNOT_ENRICHMENTS: Record<string, KnotEnrichment> = {
       },
     ],
   },
+  // Easy-read wording only. The catalog entry says in as many words that
+  // visual flatness establishes nothing about security or load capacity, and
+  // the stop strip on this very page repeats it — so no `check` here may treat
+  // a neat-looking knot as proof the knot is right. That claim, and the
+  // granny-versus-square framing built on it, is what the catalog removed.
   square: {
-    goal: "Join two rope ends with a square knot — not a granny knot.",
+    goal: "Recognise a square knot on loose practice cord. Not for use on a person.",
     steps: [
       {
-        do: "Right end over left. Tuck under. Pull snug.",
+        do: "On loose, unoccupied practice cord, cross the right end over the left and tuck it under. Do not pull it tight.",
         doBullets: [
-          "Take the right end over the left end.",
-          "Tuck the right end under and pull snug.",
+          "Use loose cord that is not on anyone.",
+          "Cross the right end over the left and tuck it under.",
+          "Leave it loose — do not load it.",
         ],
-        check: "The first half looks flat and even.",
-        checkBullets: ["No loose crossing loops.", "Both parts lie flat."],
+        check: "The cord is loose and unoccupied. Nothing is under load.",
+        checkBullets: [
+          "No person and no weight is on the cord.",
+          "You have not tightened it down.",
+        ],
         diagramId: "square-0",
       },
       {
-        do: "Left over right. Tuck under. Each tail exits beside its own standing part.",
+        do: "Cross the left end over the right and tuck it under. Dress the sample only so you can recognise the shape, then untie it — appearance does not validate strength, security, or body use.",
         doBullets: [
-          "Take the left end over the right end.",
-          "Tuck under and pull snug.",
-          "Each tail should sit next to its own long rope.",
+          "Cross the left end over the right and tuck it under.",
+          "Dress it only enough to recognise the shape.",
+          "Untie it before you finish.",
         ],
-        check: "It is a square knot, not a granny. Both sides lie flat.",
+        check: "You can name the shape, and you untied it. Looking right proves nothing about security.",
         checkBullets: [
-          "The knot does not slide apart.",
-          "Both rope parts lie flat.",
+          "You untied the sample.",
+          "You are not treating a neat appearance as proof the knot is safe.",
         ],
         diagramId: "square-1",
       },
     ],
   },
   "half-hitch": {
-    goal: "Tie one half hitch on practice rope.",
+    goal: "Recognise one half hitch on an unoccupied object.",
     steps: [
       {
-        do: "Wrap the working end around the standing rope. Pass it through its own loop.",
+        do: "On an unoccupied object, take the working end around the standing part and through its own loop, then dress it for inspection only.",
         doBullets: [
-          "Wrap the working end around the standing part.",
-          "Pass the end through the loop.",
-          "Dress it flat with no load on the rope.",
+          "Use an unoccupied object — no person.",
+          "Take the working end around the standing part and through its loop.",
+          "Dress it for inspection; do not load it.",
         ],
-        check: "The hitch is flat and neat.",
-        checkBullets: ["No twists.", "Nothing is pulling on the rope yet."],
+        check: "It is on an unoccupied object and carries no load. A familiar-looking hitch can still move or release.",
+        checkBullets: [
+          "Nothing is pulling on the cord.",
+          "You are not using this to select or build a loaded lock or a body-restraint component.",
+        ],
         diagramId: "half-hitch-0",
       },
     ],
@@ -221,20 +237,20 @@ const KNOT_ENRICHMENTS: Record<string, KnotEnrichment> = {
     ],
   },
   "overhand-on-bight": {
-    goal: "Make a simple loop (overhand on a bight) — for stoppers, not cuffs.",
+    goal: "Recognise an overhand on a bight on loose practice material. Not a cuff, not a loaded connection.",
     steps: [
       {
-        do: "Fold the rope at the middle. Wrap the standing pair. Pull the bight through.",
+        do: "On loose, unoccupied practice material, fold a bight, pass it through the sample loop, and dress it only for recognition. Untie it before any loading.",
         doBullets: [
-          "Find the middle of the rope and fold it into a bight.",
-          "Wrap the bight around the two standing rope parts.",
-          "Pull the bight through the loop you made.",
-          "Dress the knot flat.",
+          "Fold a bight in loose, unoccupied cord.",
+          "Pass it through the sample loop.",
+          "Dress it only for recognition.",
+          "Untie it before anything is loaded.",
         ],
-        check: "You see a simple overhand loop. Remember: it jams under load.",
+        check: "You untied it. It can jam, and it is not a rapid-release method.",
         checkBullets: [
-          "The knot looks like a simple overhand on doubled rope.",
-          "You are not using this as a cuff on a person.",
+          "The sample is untied.",
+          "You are not loading it or putting it on a body.",
         ],
         diagramId: "overhand-on-bight-0",
       },
@@ -619,7 +635,8 @@ export function getAcademyTie(slug: string): Tie | undefined {
   //
   // So the richer source wins, and the academy table supplies the parts it is
   // actually for: the goal line, and per-step media where a step has none.
-  const source = base.steps.length > academy.steps.length ? base.steps : academy.steps;
+  const catalogWins = base.steps.length > academy.steps.length;
+  const source = catalogWins ? base.steps : academy.steps;
   const steps = source.map((step, i) => {
     const cumulative = source.slice(0, i + 1).flatMap((x) => x.wraps);
     return {
@@ -637,7 +654,14 @@ export function getAcademyTie(slug: string): Tie | undefined {
   });
   return {
     ...base,
-    goal: academy.goal,
+    // The goal line is a caption for the steps directly beneath it, so it has to
+    // come from whichever source won above. `academy.goal` describes the
+    // Academy's own steps — for single-column, karada and double-column it says
+    // "on a post" / "on an empty dress form" while the catalog steps now on the
+    // page choose a spot on the forearm, say to watch her face, and end on a
+    // next-morning symptom check. That is the same stale-shadow bug the step
+    // reconciliation above was written to end, two lines further down.
+    goal: catalogWins ? (base.goal ?? base.why.split(".")[0] + ".") : academy.goal,
     steps,
   };
 }
@@ -651,5 +675,19 @@ export function isFoundationTie(slug: string) {
 }
 
 export function isInstructorRoute(tie: Tie) {
-  return tie.minutes[1] === 0;
+  return tieShape(tie) === "instructor";
+}
+
+/**
+ * Whether a lesson's Do/Check acknowledgement is mandatory before advancing.
+ *
+ * Keyed on the tie's own shape rather than on FOUNDATION_TIE_SLUGS. That list
+ * was frozen while double-column was a one-step prop drill; the catalog then
+ * rewrote it as a seven-step lesson that goes on a person, and the list did not
+ * learn — so the one guided tie missing from it rendered "rehearse getting it
+ * off", the cinch step, and the twenty-four hour check with no acknowledgement
+ * at all, while its two identically-worded siblings required one.
+ */
+export function requiresStepConfirmation(tie: Tie): boolean {
+  return tieShape(tie) === "guided" || isFoundationTie(tie.slug);
 }
