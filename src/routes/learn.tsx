@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { GraduationCap, Sparkles, BookOpen } from "lucide-react";
+import { GraduationCap, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { HowToLearn } from "@/components/learn";
 import { KnotFigure } from "@/components/knot-figure";
