@@ -81,10 +81,24 @@ export type Knot = {
   goal?: string;
   cinches: boolean;
   loadBearing: boolean;
+  /**
+   * Which ties actually cite this knot. Always derived from `Tie.knots` at
+   * catalog-build time (see `knots.ts`) rather than authored — a hand-kept
+   * mirror of that field went stale on 14 of 17 knots, in both directions:
+   * knots pointing at ties that no longer needed them, and ties that had
+   * started citing a knot with no link back. `KnotSource` (the type a raw
+   * catalog entry actually satisfies) omits this field entirely, so there is
+   * nowhere left for a new entry to write a stale copy.
+   */
   usedIn: string[];
   steps: KnotStep[];
+  /** Real, specific ways this goes wrong, and what actually causes it — the same bar `Tie.mistakes` sets. */
+  mistakes: { title: string; body: string }[];
   watch: string[];
 };
+
+/** What a catalog file actually authors: everything on `Knot` except the derived `usedIn`. */
+export type KnotSource = Omit<Knot, "usedIn">;
 
 export type ArticleBlock =
   | { type: "p"; text: string }

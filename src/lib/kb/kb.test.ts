@@ -10,6 +10,7 @@ import {
   SEQUENCES,
   TIES,
   articleExcerpts,
+  getAcademyKnot,
   getKnot,
   getTie,
   getArticleEvidence,
@@ -1212,4 +1213,135 @@ test("knot enrichment fills gaps and never overrides what a step authored", asyn
   // Guards the guard: if no knot authors these fields the loop above passes
   // vacuously, which is exactly how the original defect stayed invisible.
   assert.ok(authoredSomewhere > 0, "no knot authors its own checks, so this test proved nothing");
+});
+
+// ---------------------------------------------------------------------------
+// Knot troubleshooting, usedIn derivation, and diagram coverage
+// ---------------------------------------------------------------------------
+//
+// Knots had none of this: no `mistakes` field existed on the type at all, so
+// a knot page had nowhere to say what actually goes wrong — the one thing
+// the tie pages already did well. `usedIn` was hand-copied onto each knot
+// and had gone stale on 14 of 17: knots pointing at ties that no longer used
+// them, and ties that had started citing a knot with no link back. And ten
+// of seventeen knots fell through to a bare "Diagram" placeholder — some
+// (reverse-tension) with no diagram despite having the richest steps in the
+// catalog.
+
+// Knots this app names for recognition only — friction hitches and loop
+// knots used in loaded, suspension-adjacent rigging. Unlike ties, knots
+// carry no `intent` marker for this, so the set is maintained here by hand;
+// keep it in sync with `isInstructorOnlyDiagram` in knot-figure.tsx and with
+// the construction-language rule below.
+const INSTRUCTOR_ONLY_KNOTS = new Set(["munter", "portuguese-bowline", "figure-eight", "prusik", "alpine-butterfly"]);
+
+test("every knot names real, specific ways it goes wrong", () => {
+  for (const knot of KNOTS) {
+    assert.ok(knot.mistakes.length >= 3, `${knot.slug} has only ${knot.mistakes.length} mistake(s)`);
+    for (const m of knot.mistakes) {
+      assert.ok(m.body.length > 100, `${knot.slug}/"${m.title}": mistake too thin to be specific`);
+    }
+  }
+});
+
+test("an instructor-only knot's mistakes are judgment errors, never construction", () => {
+  // The same rule the app already applies to instructor-route ties: this
+  // category gets recognition and risk, never a way to tie, dress, load, or
+  // release the thing. A "mistake" here has to stay on the reader's side of
+  // that line — assuming a photo proves something, not describing a step.
+  // Deliberately narrow: bare trigger words like "load" or "tied" are
+  // unavoidable in legitimate judgment-error prose here ("the load path",
+  // "how it was tied", "a person-bearing load") — a first version of this
+  // regex flagged exactly that kind of sentence in munter's real, safe
+  // content. What actually distinguishes a construction step is a hands-on
+  // verb bound tightly to its object, the way an instruction reads and a
+  // description of one never does.
+  const constructionWords = /\b(?:wrap|thread|snug|dress|fold|cinch|tuck)\s+(?:it|the\s+\w+)\b/i;
+  for (const knot of KNOTS) {
+    if (!INSTRUCTOR_ONLY_KNOTS.has(knot.slug)) continue;
+    for (const m of knot.mistakes) {
+      assert.doesNotMatch(
+        m.body,
+        constructionWords,
+        `${knot.slug}/"${m.title}" reads like a construction step, not a judgment error`,
+      );
+    }
+  }
+});
+
+test("a craft knot with more than one step is never thin on any of them", () => {
+  for (const knot of KNOTS) {
+    if (INSTRUCTOR_ONLY_KNOTS.has(knot.slug)) continue;
+    const enriched = getAcademyKnot(knot.slug)!;
+    if (enriched.steps.length <= 1) continue;
+    for (const [i, step] of enriched.steps.entries()) {
+      assert.ok((step.doBullets?.length ?? 0) > 0, `${knot.slug}/${i}: no doBullets`);
+      assert.ok((step.checkBullets?.length ?? 0) > 0, `${knot.slug}/${i}: no checkBullets`);
+    }
+  }
+});
+
+test("usedIn is always the ties that actually cite this knot, never a stale hand-kept copy", () => {
+  // The regression itself, stated as the relationship it broke: usedIn is
+  // derived in knots.ts from Tie.knots, so it cannot drift from that graph
+  // without the graph itself changing. Recomputed here independently rather
+  // than trusting the derivation to have run.
+  const actual = new Map<string, string[]>();
+  for (const tie of TIES) {
+    for (const slug of tie.knots) {
+      if (!actual.has(slug)) actual.set(slug, []);
+      actual.get(slug)!.push(tie.slug);
+    }
+  }
+  let checked = 0;
+  for (const knot of KNOTS) {
+    const expected = (actual.get(knot.slug) ?? []).slice().sort();
+    const got = knot.usedIn.slice().sort();
+    checked += expected.length;
+    assert.deepEqual(got, expected, `${knot.slug}: usedIn does not match the tie graph`);
+  }
+  assert.ok(checked > 0, "no tie cites any knot, so this test proved nothing");
+});
+
+// Mirrors `isKnownDiagram` in knot-figure.tsx. Not imported directly: that
+// file is JSX, and this test suite's plain-TypeScript loader (register-ts.mjs
+// strips types only, via node's own --experimental-strip-types) cannot load
+// a .tsx module at all — the runtime fails at "unknown file extension"
+// before it ever gets to the JSX inside. Keep this prefix list in sync with
+// the component by hand; a mismatch here means one of the two silently
+// stopped covering a slug the other still does.
+const DRAWABLE_DIAGRAM_PREFIXES = [
+  "somerville-bowline",
+  "larks-head",
+  "double-half-hitch",
+  "square",
+  "half-hitch",
+  "overhand-on-bight",
+  "figure-eight",
+  "wrap-cinch",
+  "reverse-tension",
+  "sheet-bend",
+  "surgeon",
+  "daisy-chain",
+  "truckers-hitch",
+  "munter",
+  "portuguese-bowline",
+  "prusik",
+  "alpine-butterfly",
+];
+
+test("no knot's diagram falls through to the bare placeholder", () => {
+  let checked = 0;
+  for (const knot of KNOTS) {
+    const enriched = getAcademyKnot(knot.slug)!;
+    for (const [i, step] of enriched.steps.entries()) {
+      const diagramId = step.diagramId ?? `${knot.slug}-${i}`;
+      checked++;
+      assert.ok(
+        DRAWABLE_DIAGRAM_PREFIXES.some((p) => diagramId.startsWith(p)),
+        `${knot.slug}/${i}: "${diagramId}" has no diagram — shows the bare placeholder`,
+      );
+    }
+  }
+  assert.ok(checked > 0, "no knot step produced a diagramId, so this test proved nothing");
 });
