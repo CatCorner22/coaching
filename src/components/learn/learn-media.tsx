@@ -23,7 +23,7 @@ export function LearnMediaPanel({
 }: LearnMediaPanelProps) {
   const diagram = media.find((m) => m.kind === "diagram");
   const wraps = media.find((m) => m.kind === "wraps");
-  const video = media.find((m) => m.kind === "video");
+  const videos = media.filter((m) => m.kind === "video");
 
   return (
     <div className={className}>
@@ -40,9 +40,18 @@ export function LearnMediaPanel({
           className="aspect-[4/5] w-full text-rope"
         />
       )}
-      {video && (
-        <LearnVideo src={video.src} poster={video.poster} className={diagram || wraps ? "mt-3" : undefined} />
-      )}
+      {/* Every declared clip, each in its own mode — an ambient prop loop and a
+          controllable hands-on demonstration are different things and a step
+          may carry both. Each one hides itself until its file exists. */}
+      {videos.map((video) => (
+        <LearnVideo
+          key={video.src}
+          src={video.src}
+          poster={video.poster}
+          mode={video.mode}
+          className={diagram || wraps ? "mt-3" : undefined}
+        />
+      ))}
     </div>
   );
 }

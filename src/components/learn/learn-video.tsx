@@ -1,16 +1,32 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
+/**
+ * `loop` is an ambient prop clip: muted, autoplaying, endless, no chrome.
+ *
+ * `demo` is a demonstration of a person's hands working the rope, and it must
+ * not behave that way. Watching hands is the strongest format there is for a
+ * knot — hand-manipulation tasks are the documented exception to the rule that
+ * moving displays teach worse than stills — but that result belongs to
+ * segmented, user-paced playback. An autoplaying loop is precisely the
+ * uncontrolled presentation the pacing article tells the reader was the
+ * problem with every tutorial they gave up on, so shipping one here would
+ * contradict the lesson sitting next to it.
+ */
+export type LearnVideoMode = "loop" | "demo";
+
 type LearnVideoProps = {
   src: string;
   poster?: string;
   className?: string;
   label?: string;
+  mode?: LearnVideoMode;
 };
 
-/** Muted, looping prop-only clip. Hidden when the file is missing (procedural fallback). */
-export function LearnVideo({ src, poster, className, label = "Silent practice loop" }: LearnVideoProps) {
+/** Practice clip. Hidden when the file is missing (procedural fallback). */
+export function LearnVideo({ src, poster, className, label, mode = "loop" }: LearnVideoProps) {
   const [available, setAvailable] = useState<boolean | null>(null);
+  const isDemo = mode === "demo";
 
   useEffect(() => {
     let cancelled = false;
@@ -29,20 +45,23 @@ export function LearnVideo({ src, poster, className, label = "Silent practice lo
 
   if (available === false || available === null) return null;
 
+  const caption = label ?? (isDemo ? "Demonstration — replay as often as you like" : "Silent practice loop · prop only");
+
   return (
     <figure className={cn("learn-video overflow-hidden rounded-lg border border-border bg-elevated", className)}>
       <video
         src={src}
         poster={poster}
         muted
-        loop
+        loop={!isDemo}
         playsInline
-        autoPlay
+        autoPlay={!isDemo}
+        controls={isDemo}
         preload="metadata"
         className="aspect-[5/4] w-full object-cover"
-        aria-label={label}
+        aria-label={caption}
       />
-      <figcaption className="px-3 py-2 text-center text-xs text-muted">{label} · prop only</figcaption>
+      <figcaption className="px-3 py-2 text-center text-xs text-muted">{caption}</figcaption>
     </figure>
   );
 }
