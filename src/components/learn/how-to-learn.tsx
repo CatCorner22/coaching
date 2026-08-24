@@ -1,5 +1,6 @@
 import { Camera, CheckCircle2, Eye, Hand, Volume2 } from "lucide-react";
 import { LESSON_FORMAT } from "@/lib/learn/plain-language";
+import { COACH_VOICE_NAME } from "@/lib/voice/coach-profile";
 
 export function HowToLearn() {
   return (
@@ -12,8 +13,8 @@ export function HowToLearn() {
       </h2>
       <p className="mt-2 max-w-2xl text-base leading-relaxed text-muted">
         Every lesson uses the same three parts. You never have to guess what comes next. Turn on{" "}
-        <strong className="font-medium text-fg">auto-read</strong> to hear each step spoken aloud, or use the practice
-        cam for probabilistic hints — never safety clearance.
+        <strong className="font-medium text-fg">auto-read</strong> to hear {COACH_VOICE_NAME} speak each step aloud,
+        or use the practice cam for probabilistic hints — never safety clearance.
       </p>
       <ol className="mt-5 grid gap-3 sm:grid-cols-3">
         {LESSON_FORMAT.map((part, i) => (
@@ -40,7 +41,7 @@ export function HowToLearn() {
           <div>
             <p className="text-base font-medium text-fg">Listen</p>
             <p className="mt-1 text-sm leading-relaxed text-muted">
-              Auto-read walks through do, check, and say in a warm female coach voice. Tap &ldquo;Read full step aloud&rdquo; any time.
+              Auto-read walks through do, check, and say in {COACH_VOICE_NAME}&rsquo;s voice. Tap &ldquo;Read full step aloud&rdquo; any time.
             </p>
           </div>
         </li>

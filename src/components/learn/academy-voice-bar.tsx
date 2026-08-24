@@ -2,7 +2,7 @@ import { Mic, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { readAcademyStep, useAcademyAutoVoice, useAutoReadEnabled } from "@/components/learn/use-academy-voice";
 import type { VoiceStepInput } from "@/lib/learn/voice-script";
-import { coachVoiceLabel } from "@/lib/voice/coach-profile";
+import { COACH_VOICE_NAME, coachVoiceLabel } from "@/lib/voice/coach-profile";
 import { playCoachVoice } from "@/lib/voice/play";
 import { cn } from "@/lib/utils";
 
@@ -33,8 +33,8 @@ export function AcademyVoiceBar({ step, cloudVoice, className }: AcademyVoiceBar
             <h3 className="text-base font-medium text-fg">Listen to this step</h3>
           </div>
           <p className="mt-1 text-sm text-muted">
-            Full verbal walkthrough in a warm, lower-register female coach voice: what to do, what to check, and
-            what to say. {voiceLabel}.
+            {COACH_VOICE_NAME} reads the full walkthrough — what to do, what to check, and what to say.{" "}
+            {voiceLabel}.
           </p>
         </div>
         <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">

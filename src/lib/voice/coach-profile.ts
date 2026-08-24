@@ -1,3 +1,6 @@
+/** Display name for the Academy verbal coach persona. */
+export const COACH_VOICE_NAME = "Hannah";
+
 /** Warm, lower-register female coach delivery for Academy verbal instructions. */
 export const COACH_CLOUD_VOICE_ID = "ara";
 
@@ -10,6 +13,7 @@ export const COACH_BROWSER_VOICE = {
 const FEMALE_VOICE_HINTS = [
   "female",
   "woman",
+  "hannah",
   "samantha",
   "victoria",
   "karen",
@@ -28,6 +32,7 @@ const FEMALE_VOICE_HINTS = [
 ];
 
 const PREFERRED_FEMALE_NAMES = [
+  "Hannah",
   "Samantha",
   "Victoria",
   "Karen",
@@ -91,5 +96,5 @@ export function coachVoiceCacheKey(text: string) {
 }
 
 export function coachVoiceLabel(cloudEnabled: boolean) {
-  return cloudEnabled ? "Sultry female voice · cloud" : "Sultry female voice · browser";
+  return cloudEnabled ? `${COACH_VOICE_NAME} · cloud` : `${COACH_VOICE_NAME} · browser`;
 }
