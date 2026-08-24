@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { existsSync, readdirSync } from "node:fs";
 import { test } from "node:test";
 import { isActive, MORE, NAV, routeTitle } from "./nav.ts";
 
@@ -48,4 +49,32 @@ test("the emergency card is the first item behind the More sheet", () => {
   // meaningful if the bottom bar ever gains the route.
   const navRoutes: readonly { to: string }[] = NAV;
   assert.equal(navRoutes.filter((item) => item.to === "/emergency").length, 0);
+});
+
+test("every static route is a registered destination", () => {
+  // The uniqueness assertions above can only see routes that are in NAV or
+  // MORE, so a route added to the shell without being registered here inherits
+  // the bare "Knotty" title and is invisible to the very test written to stop
+  // that. `/learn` did exactly this. Derive the expected set from the route
+  // files instead, so the next one fails loudly.
+  const dir = new URL("../routes/", import.meta.url);
+  const registered = new Set<string>([...NAV, ...MORE].map((item) => item.to));
+  const missing = readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".tsx"))
+    .map((entry) => entry.name.replace(/\.tsx$/, ""))
+    // `__root` is the layout, `$` routes and `/login` are covered by
+    // routeTitle's prefix branches rather than by a list entry.
+    .filter((name) => !name.startsWith("__") && !name.includes("$") && name !== "login")
+    .map((name) => (name === "index" ? "/" : `/${name}`))
+    .filter((path) => !registered.has(path));
+  assert.deepEqual(missing, [], `route(s) missing from NAV/MORE, so routeTitle falls back to "Knotty"`);
+});
+
+test("the prefix-covered routes routeTitle names still exist", () => {
+  // routeTitle's fallbacks are only correct while these files are the detail
+  // routes. If one is renamed, the branch quietly stops matching and the route
+  // rejoins the untitled default.
+  for (const file of ["tie.$slug.tsx", "article.$slug.tsx", "knot.$slug.tsx", "login.tsx"]) {
+    assert.ok(existsSync(new URL(`../routes/${file}`, import.meta.url)), `${file} moved`);
+  }
 });

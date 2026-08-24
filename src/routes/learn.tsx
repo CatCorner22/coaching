@@ -12,12 +12,20 @@ import {
   getKnot,
   getTie,
 } from "@/lib/kb";
+import { tieShape, tieShapeBlurb, tieShapeLabel } from "@/lib/kb/tie-factories";
 
 export const Route = createFileRoute("/learn")({ component: LearnPage });
 
 function LearnPage() {
-  const knots = FOUNDATION_KNOT_SLUGS.map((slug) => getAcademyKnot(slug)).filter(Boolean);
-  const ties = FOUNDATION_TIE_SLUGS.map((slug) => getAcademyTie(slug)).filter(Boolean);
+  const knots = FOUNDATION_KNOT_SLUGS.map((slug) => getAcademyKnot(slug)).filter((knot) => knot !== undefined);
+  const ties = FOUNDATION_TIE_SLUGS.map((slug) => getAcademyTie(slug)).filter((tie) => tie !== undefined);
+  // Counted, not asserted. This card used to read "On an empty dress form" over
+  // every tie lesson, which stopped being true the moment the catalog started
+  // teaching some of them in full.
+  const shapes = ties.map((tie) => tieShape(tie));
+  const drills = shapes.filter((shape) => shape === "practice").length;
+  const guided = shapes.filter((shape) => shape === "guided").length;
+  const tieHint = `${drills} prop drill${drills === 1 ? "" : "s"} · ${guided} taught step by step`;
 
   return (
     <div className="academy-hub easy-read mx-auto max-w-5xl px-5 py-10">
@@ -29,8 +37,9 @@ function LearnPage() {
           <p className="text-sm uppercase tracking-wide text-muted">Knotty Academy</p>
           <h1 className="mt-2 font-display text-4xl sm:text-5xl">Easy-read lessons</h1>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted">
-            Short steps. Plain words. Pictures on every step. Listen aloud or use the practice cam for hints. Practice
-            on a post or dress form only — never on a person from these lessons.
+            Short steps. Plain words. Pictures on every step. Listen aloud or use the practice cam for hints. Every knot
+            lesson here stays on a post or chair leg. The tie lessons differ from each other, so each one says on its own
+            card what it is — a prop drill, a tie taught in full, or a route this app only names.
           </p>
         </div>
       </div>
@@ -41,7 +50,7 @@ function LearnPage() {
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         <StatCard label="Knot lessons" value={knots.length} hint="On a post or chair leg" />
-        <StatCard label="Tie lessons" value={ties.length} hint="On an empty dress form" />
+        <StatCard label="Tie lessons" value={ties.length} hint={tieHint} />
         <StatCard label="Every step has" value="3 parts" hint="Do · Check · Say" />
       </div>
 
@@ -101,13 +110,20 @@ function LearnPage() {
 
       <section className="mt-12">
         <h2 className="font-display text-2xl">Tie lessons</h2>
-        <p className="mt-2 text-base text-muted">Pattern practice on an empty dress form.</p>
+        <p className="mt-2 text-base text-muted">
+          Some of these are pattern drills for an empty prop. Some are taught in full and may go on a consenting adult
+          once the limit is agreed. Some this app only names. Every card says which.
+        </p>
         <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
           {FOUNDATION_TIE_SLUGS.map((slug) => {
             const tie = getTie(slug);
             const academy = getAcademyTie(slug);
             if (!tie || !academy) return null;
-            const instructor = tie.minutes[1] === 0;
+            // The hub asks the same question the tie page asks, of the same
+            // source. It used to sniff `minutes[1] === 0`, which only told
+            // instructor routes apart from everything else — so a guided tie
+            // and a dress-form drill were presented identically.
+            const shape = tieShape(tie);
             return (
               <Link
                 key={slug}
@@ -127,13 +143,17 @@ function LearnPage() {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate font-display text-lg">{tie.name}</p>
-                    {instructor && (
-                      <Badge variant="warn" className="text-[10px]">
-                        Instructor
-                      </Badge>
-                    )}
+                    <Badge
+                      variant={shape === "guided" ? "accent" : shape === "instructor" ? "warn" : "default"}
+                      className="text-[10px]"
+                    >
+                      {tieShapeLabel(shape)}
+                    </Badge>
                   </div>
                   <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted">{academy.goal}</p>
+                  {/* What the reader may actually do with this entry, in the
+                      same words the lesson itself uses. */}
+                  <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-subtle">{tieShapeBlurb(shape)}</p>
                   <p className="mt-2 text-sm text-subtle">{academy.steps.length} sections</p>
                 </div>
               </Link>

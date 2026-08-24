@@ -71,7 +71,13 @@ function KnotPage() {
       backLabel={foundation ? "Knotty Academy" : "All knots"}
       eyebrow={knot.jp}
       title={knot.name}
-      subtitle={foundation ? "Practice on a post or chair leg — one step at a time." : knot.summary}
+      subtitle={
+        // The catalog summary carries the entry's scope — "not a lock, backup,
+        // or component for body restraint" — and the foundation lesson used to
+        // replace it wholesale, so the six knots the app actually teaches were
+        // the six whose framing the reader never saw. Keep both.
+        foundation ? `${knot.summary} Practice on a post or chair leg — one step at a time.` : knot.summary
+      }
       goal={knot.goal}
       badges={
         <>

@@ -1055,3 +1055,105 @@ test("academy foundation bundles resolve enriched content", async () => {
   const instructor = getAcademyTie("takate-kote");
   assert.ok(instructor && instructor.minutes[1] === 0);
 });
+
+test("academy enrichment never contradicts the catalog it enriches", async () => {
+  const { FOUNDATION_KNOT_SLUGS, FOUNDATION_TIE_SLUGS, getAcademyKnot, getAcademyTie } =
+    await import("./academy.ts");
+  const { tieShape } = await import("./tie-factories.ts");
+
+  // The knot catalog was hardened to stop presenting appearance as validation:
+  // the square knot's own watch line now says "visual flatness does not
+  // establish security, compatibility, or load capacity". The Academy's
+  // easy-read patch supplies `do` and `check` for every foundation step, so it
+  // can restore that claim on the very page that disclaims it — which is what
+  // it did ("It is a square knot, not a granny. Both sides lie flat.") while
+  // the stop strip underneath said the opposite. Enrichment may simplify the
+  // wording; it may not re-assert what the entry denies.
+  const APPEARANCE_AS_PROOF = /not a granny|granny knot|\blie flat\b|looks flat and|flat and (?:even|neat)/i;
+  for (const slug of FOUNDATION_KNOT_SLUGS) {
+    const base = getKnot(slug);
+    const enriched = getAcademyKnot(slug);
+    assert.ok(base && enriched, slug);
+    assert.equal(
+      enriched.steps.length,
+      base.steps.length,
+      `${slug}: enrichment changed the catalog step count`,
+    );
+    const scanned = [
+      enriched.goal ?? "",
+      ...enriched.steps.flatMap((s) => [s.check ?? "", ...(s.checkBullets ?? [])]),
+    ].join(" ");
+    assert.doesNotMatch(
+      scanned,
+      APPEARANCE_AS_PROOF,
+      `${slug}: an enriched check treats appearance as proof the knot is right, which ${slug}'s own watch denies`,
+    );
+  }
+
+  // The goal line captions the steps directly beneath it, so it has to come
+  // from whatever authored those steps. TIE_ACADEMY's goals were written for
+  // one-step prop drills and kept overriding the page long after the catalog
+  // rewrote these ties to go on a person — "Practice a wrap on a post" sat
+  // above ten steps that pick a spot on the forearm and check again the next
+  // morning. For a tie taught in full, the catalog owns the goal.
+  for (const slug of FOUNDATION_TIE_SLUGS) {
+    const base = getTie(slug);
+    const enriched = getAcademyTie(slug);
+    assert.ok(base && enriched, slug);
+    if (tieShape(base) !== "guided") continue;
+    assert.ok(base.goal, `${slug}: a guided tie must author its own goal beside its steps`);
+    assert.equal(
+      enriched.goal,
+      base.goal,
+      `${slug}: the academy goal is overriding the goal authored with these steps`,
+    );
+  }
+
+  // Same rule, applied to every guided tie in the catalog rather than only the
+  // ones the Academy happens to list — double-column is guided and is not on
+  // that list.
+  for (const tie of TIES.filter((t) => tieShape(t) === "guided")) {
+    assert.ok(tie.goal, `${tie.slug}: guided tie has no goal`);
+    assert.doesNotMatch(
+      tie.goal,
+      /dress form|on a post|empty form/i,
+      `${tie.slug}: its goal describes a prop drill, but its steps go on a person`,
+    );
+  }
+});
+
+test("the step acknowledgement is required by every tie taught in full", async () => {
+  const {
+    FOUNDATION_TIE_SLUGS,
+    FOUNDATION_INSTRUCTOR_TIE_SLUGS,
+    FOUNDATION_PRACTICE_TIE_SLUGS,
+    requiresStepConfirmation,
+  } = await import("./academy.ts");
+  const { tieShape } = await import("./tie-factories.ts");
+
+  // /tie/$slug reads this to decide whether Do and Check must be ticked before
+  // Next unlocks. Keying that on FOUNDATION_TIE_SLUGS meant double-column —
+  // promoted from a one-step prop drill to a seven-step lesson that goes on a
+  // person, and never added to the list — rendered "rehearse getting it off",
+  // the cinch step, and the twenty-four hour check with no acknowledgement at
+  // all, while single-column and karada required one for the same words.
+  for (const tie of TIES.filter((t) => tieShape(t) === "guided")) {
+    assert.ok(
+      requiresStepConfirmation(tie),
+      `${tie.slug}: a tie taught in full must gate its steps behind the acknowledgement`,
+    );
+  }
+  for (const slug of FOUNDATION_TIE_SLUGS) {
+    const tie = getTie(slug);
+    assert.ok(tie && requiresStepConfirmation(tie), `${slug}: Academy lessons keep their gate`);
+  }
+
+  // The shape lists are derived from the catalog, so they cannot drift from it:
+  // every foundation tie is in exactly one bucket.
+  const guided = FOUNDATION_TIE_SLUGS.filter((slug) => tieShape(getTie(slug)!) === "guided");
+  assert.deepEqual(
+    [...guided, ...FOUNDATION_PRACTICE_TIE_SLUGS, ...FOUNDATION_INSTRUCTOR_TIE_SLUGS].sort(),
+    [...FOUNDATION_TIE_SLUGS].sort(),
+    "a foundation tie is missing from the shape buckets or counted twice",
+  );
+});

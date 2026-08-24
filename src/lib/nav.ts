@@ -1,7 +1,14 @@
-import { BookOpen, Camera, House, Library, Shield } from "lucide-react";
+import { BookOpen, Camera, GraduationCap, House, Library, Shield } from "lucide-react";
 
 export const NAV = [
   { to: "/", label: "Home", icon: House },
+  // The Academy is a destination like any other, so it is registered here
+  // rather than spliced into the shell's own array. Everything downstream of
+  // this list — the sidebar, the bottom bar, `routeTitle` and the <main>
+  // landmark's accessible name — reads from it, and a route that reaches the
+  // shell without passing through here silently inherits the bare "Knotty"
+  // title this module exists to replace.
+  { to: "/learn", label: "Learn", icon: GraduationCap },
   { to: "/library", label: "Library", icon: BookOpen },
   { to: "/studio", label: "Studio", icon: Camera },
   { to: "/knowledge", label: "Guide", icon: Library },

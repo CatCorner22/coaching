@@ -170,6 +170,13 @@ export type GuidedInput = Pick<
 > & {
   /** What this structure is for, and what makes it the one to learn first. */
   why: string;
+  /**
+   * The one-sentence goal shown above the steps. Authored here, next to the
+   * steps it captions, so it cannot drift from them — the Academy's own goal
+   * table was written for prop drills and kept describing them long after these
+   * ties were rewritten to go on a person.
+   */
+  goal: string;
   minutes: [number, number];
   ropes: { lengthM: number; count: number }[];
   prereqs?: string[];
@@ -200,6 +207,7 @@ export function guidedPractice(input: GuidedInput): Tie {
     knots: input.knots,
     nerves: input.nerves,
     intent: [...input.intent, "guided-practice"],
+    goal: input.goal,
     why: input.why,
     stop: [
       // Universal, first, and identical everywhere. A symptom is not a thing to

@@ -283,7 +283,7 @@ The source-owned camera, report, safety, privacy, and server boundaries remain s
 - Integration: cloud TTS is explicit and fail-closed, browser speech bypasses xAI, opt-out stops playback and invalidates late cache writes, captured batches retain their permission ledger and expiry controls, only a rolled-back pre-provider quota denial reopens a batch, unclear-adult triage clears adult confirmation, instructor-only content cannot route into Studio, and capture/model results are synchronously bound to their tie/step/surface/limit context.
 - Concurrent-main merge: useful hydration, planner, journal-export, dark-fiber, and timer improvements were retained without importing main's stale-step report reuse, unlocalized paleness weighting, uniform-dark rope assumption, always-on voice/mic defaults, or unversioned consent acceptance. Canonical `knotty-*` storage adopts legacy data once, normalizes journal records, and erases both key families.
 - Operations: Node 22 declaration, focused source-owned CI suite, deployment/device matrix, committed `package-lock.json`, and a durable review record.
-- Deep-review hardening (2026-08-21): script test loader fixed (`--experimental-strip-types` + `register-ts.mjs`), brand assets completed (`type: x:game`, `public/x-banner.jpg`), dead code removed (`ask.ts`, `multiplayer/p2p`), SSR-safe account isolation gate, and production build fail-fast when `DATABASE_URL` is set without `VITE_AUTH_ENABLED=true`.
+- Deep-review hardening (2026-08-21): script test loader fixed (`--experimental-strip-types` + `register-ts.mjs`), brand assets completed (`public/x-banner.jpg`), dead code removed (`ask.ts`, `multiplayer/p2p`), SSR-safe account isolation gate, and production build fail-fast when `DATABASE_URL` is set without `VITE_AUTH_ENABLED=true`.
 
 ### Verification
 
@@ -295,7 +295,7 @@ The source-owned camera, report, safety, privacy, and server boundaries remain s
 - Consented deep walkthrough of 26 routes (library, ties, knots, studio, tools, emergency, unknown slugs): **pass** — no console or page errors; home mobile scroll width no longer overflows after featured-card and decorative-SVG clipping.
 - Production preview smoke (`127.0.0.1:8081`, baseline compared to dev): **pass** — no divergence, clean console.
 - Isolated platform PWA fixture (`scripts/grok-pwa-plugin.test.mjs` in temp cwd): **47/47 passed**.
-- Brand assets: `public/og.jpg`, `public/x-banner.jpg`, `public/__grok/icon-180.png`, and `src/lib/og/site.json` with `"card": "custom"` and `"type": "x:game"` — all present.
+- Brand assets: `public/og.jpg`, `public/x-banner.jpg`, `public/__grok/icon-180.png`, and `src/lib/og/site.json` with `"card": "custom"` — all present. `"type": "x:game"` was deliberately removed in `dc60d95` (this is an adult rope-education app, not a game) and its absence is asserted by `scripts/brand-check.test.mjs` ("the shipped education app keeps its custom card without game-only metadata") — do not reinstate it.
 - The independent `bdsm-shibari-camera` observation-report validator: **6/6 representative C2/C3/C4/emergency/coercion reports passed** (from prior review pass).
 - Store and migration suite: **9/9 passed** on Node 22, including same-second timer behavior, planner idempotency, legacy-key adoption, versioned consent, and voice/microphone fail-closed migration.
 - Authenticated production smoke in the provider environment and real-device camera matrix remain pending.

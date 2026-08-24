@@ -51,6 +51,7 @@ export const GUIDED_TIES: Tie[] = [
     knots: ["somerville-bowline"],
     nerves: ["ulnar", "radial", "median"],
     intent: ["foundation", "craft", "limb"],
+    goal: "Tie a cuff on one limb that will not tighten when the rope is pulled, and be able to take it off fast.",
     why: "Every other tie in the vocabulary is single columns and double columns joined together, so this is not a beginner tie you graduate from — it is the thing you will still be doing in ten years. The whole skill is one idea: a cuff that stays the size you made it, no matter which direction the rope is pulled afterwards. A cuff that closes when pulled is the single most common way beginners injure someone, and the difference between the two is entirely in how the rope turns at the end.",
     stop: [
       "The cuff got smaller when you pulled on the standing rope — untie it completely and start again rather than loosening it",
@@ -213,6 +214,7 @@ export const GUIDED_TIES: Tie[] = [
     nerves: ["ulnar", "radial", "median"],
     intent: ["foundation", "craft", "limb"],
     prereqs: ["single-column"],
+    goal: "Hold two limbs side by side with a cinch between them, so neither column closes, and take it off fast.",
     why: "A single column holds one limb; a double column holds two together, which is the first thing in this catalog that genuinely restrains rather than decorates. The extra idea is the cinch: a turn of rope passed between the two limbs and pulled snug, which stops the wraps sliding into a single closing loop. Without a cinch, two limbs in one set of wraps is not a double column at all — it is a noose with two things in it, and it closes on both of them at once.",
     stop: [
       "The wraps have slid so both limbs are in one closing loop with nothing between them",
@@ -336,6 +338,7 @@ export const GUIDED_TIES: Tie[] = [
     nerves: [],
     intent: ["decorative", "craft", "torso"],
     prereqs: ["single-column"],
+    goal: "Lay an even diamond harness over a torso that hangs from the shoulders, restrains nothing, and comes off fast.",
     why: "A karada is the answer to \"I want rope on her but I do not want to restrain her yet\". It is a row of knots down the front joined into diamonds, worn like a garment: her arms stay free, she can stand, walk, sit and lie down in it, and nothing about it depends on tension. That combination makes it the standard first body tie almost everywhere, because it lets you practise the two things that actually take time to learn — even spacing and comfortable tension over a torso — with the restraint question removed entirely.",
     stop: [
       "Any rope has ridden up towards the throat — this pattern hangs from the shoulders and must never be adjusted upward",
