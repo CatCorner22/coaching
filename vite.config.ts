@@ -157,6 +157,11 @@ export default defineConfig(({ command, isPreview }) => ({
     host: "0.0.0.0",
     port: 8080,
     strictPort: true,
+    // Replit proxies this port through a public *.replit.dev (or legacy
+    // *.repl.co) hostname. Vite's Host-header allowlist rejects anything
+    // it doesn't recognize by default, which 403s every request through
+    // that proxy even though the port itself is reachable.
+    allowedHosts: [".replit.dev", ".repl.co"],
   },
   preview: {
     host: "127.0.0.1",
