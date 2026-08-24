@@ -46,9 +46,6 @@ export function KnotFigure({ diagramId, className, animate = true }: KnotFigureP
       {diagramId.startsWith("overhand-on-bight") && (
         <OverhandOnBight rope={rope} accent={accent} ink={ink} animate={animate} />
       )}
-      {diagramId.startsWith("figure-eight") && (
-        <FigureEight rope={rope} accent={accent} ink={ink} animate={animate} />
-      )}
       {diagramId.startsWith("wrap-cinch") && (
         <WrapCinch step={Number(diagramId.split("-").pop())} rope={rope} accent={accent} ink={ink} animate={animate} />
       )}
@@ -91,7 +88,8 @@ function isInstructorOnlyDiagram(id: string) {
     id.startsWith("munter") ||
     id.startsWith("portuguese-bowline") ||
     id.startsWith("prusik") ||
-    id.startsWith("alpine-butterfly")
+    id.startsWith("alpine-butterfly") ||
+    id.startsWith("figure-eight")
   );
 }
 
@@ -103,7 +101,6 @@ function isKnownDiagram(id: string) {
     id.startsWith("square") ||
     id.startsWith("half-hitch") ||
     id.startsWith("overhand-on-bight") ||
-    id.startsWith("figure-eight") ||
     id.startsWith("wrap-cinch") ||
     id.startsWith("reverse-tension") ||
     id.startsWith("sheet-bend") ||
@@ -340,20 +337,6 @@ function OverhandOnBight({
   );
 }
 
-function FigureEight({ rope, accent, ink, animate }: { rope: string; accent: string; ink: string; animate: boolean }) {
-  return (
-    <g>
-      <RopePath
-        d="M 60 100 Q 60 60 100 60 Q 140 60 140 100 Q 140 140 100 140 Q 60 140 60 100 Q 60 80 100 80 Q 140 80 140 100"
-        rope={rope}
-        animate={animate}
-      />
-      <PulseDot cx={100} cy={100} accent={accent} />
-      <Label x={36} y={40} ink={ink} text="8 shape" />
-    </g>
-  );
-}
-
 function WrapCinch({
   step,
   rope,
@@ -524,9 +507,10 @@ function DaisyChain({
       <RopePath d={link(52)} rope={rope} animate={animate} />
       <RopePath d={link(76)} rope={rope} animate={animate} />
       {step === 0 && <Label x={36} y={40} ink={ink} text="bight through bight" />}
-      {step >= 1 && (
+      {step >= 1 && <RopePath d={link(100)} rope={rope} animate={animate} />}
+      {step === 1 && <Label x={36} y={40} ink={ink} text="repeat the same pull" />}
+      {step >= 2 && (
         <g>
-          <RopePath d={link(100)} rope={rope} animate={animate} />
           <RopePath d="M 100 112 L 100 128" rope={rope} animate={animate} />
           <PulseDot cx={100} cy={124} accent={accent} />
           <Label x={36} y={40} ink={ink} text="lock the last loop" />
