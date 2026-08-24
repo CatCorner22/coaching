@@ -608,12 +608,27 @@ export function enrichKnotStep(
 ): KnotStep {
   const patch = KNOT_ENRICHMENTS[slug]?.steps[index];
   const diagramId = patch?.diagramId ?? `${slug}-${index}`;
+  // Precedence: the enrichment patch, then whatever the catalog step authored
+  // for itself, then a derived fallback. That middle term was missing, and
+  // `KnotStep` declares `do`, `check`, `doBullets` and `checkBullets` as fields
+  // a catalog author may write — so all four were being written and silently
+  // thrown away for any knot without a patch.
+  //
+  // It was not a hypothetical. The reverse tension is cited by nine ties; its
+  // four steps were rewritten with their own checks and bullets, and the page
+  // rendered none of them — every step showed the same generic `watch` line in
+  // place of the check that belonged to it, and no bullets at all. The commit
+  // that wrote them reported success, the tests passed, and the app showed the
+  // old text. Same shape as the tie bug above: an enrichment layer that was
+  // built to fill gaps quietly overriding content instead.
+  //
+  // Patched knots are unaffected — the patch still wins where one exists.
   return {
     ...step,
-    do: patch?.do ?? step.body,
-    check: patch?.check ?? fallbackCheck ?? "It looks like the diagram.",
-    doBullets: patch?.doBullets,
-    checkBullets: patch?.checkBullets,
+    do: patch?.do ?? step.do ?? step.body,
+    check: patch?.check ?? step.check ?? fallbackCheck ?? "It looks like the diagram.",
+    doBullets: patch?.doBullets ?? step.doBullets,
+    checkBullets: patch?.checkBullets ?? step.checkBullets,
     diagramId,
     media: patch?.media ?? defaultKnotStepMedia(slug, index, diagramId),
   };
