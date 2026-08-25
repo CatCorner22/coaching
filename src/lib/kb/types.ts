@@ -15,7 +15,7 @@ export type WrapSpec =
 
 export type LearnMedia =
   | { kind: "diagram"; diagramId: string }
-  | { kind: "video"; src: string; poster?: string }
+  | { kind: "video"; src: string; poster?: string; mode?: "loop" | "demo" }
   | { kind: "wraps"; wraps: WrapSpec[] };
 
 export type KnotStep = {

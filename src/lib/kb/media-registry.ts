@@ -41,6 +41,20 @@ export function tieVideoSrc(slug: string, kind: "overview" | `step-${number}` = 
   return `/learn/ties/${slug}/${kind}.webm`;
 }
 
+/**
+ * Demonstration of a person's hands working the step, kept on its own path so
+ * it cannot collide with the ambient prop loop above. Nothing exists at these
+ * paths yet; `LearnVideo` HEAD-checks and stays hidden until a file lands, so
+ * the slot is declared on every step and costs nothing until it is filled.
+ */
+export function knotDemoSrc(slug: string, stepIndex: number) {
+  return `/learn/knots/${slug}/demo-${stepIndex}.webm`;
+}
+
+export function tieDemoSrc(slug: string, stepIndex: number) {
+  return `/learn/ties/${slug}/demo-${stepIndex}.webm`;
+}
+
 export function knotPoster(slug: string) {
   return LEARN_VIDEO_POSTERS[slug] ?? `/learn/knots/${slug}/poster.svg`;
 }
@@ -55,6 +69,7 @@ export function defaultKnotStepMedia(slug: string, stepIndex: number, diagramId:
   return [
     { kind: "diagram", diagramId },
     { kind: "video", src: knotVideoSrc(slug, stepIndex), poster: knotPoster(slug) },
+    { kind: "video", src: knotDemoSrc(slug, stepIndex), poster: knotPoster(slug), mode: "demo" },
   ];
 }
 
@@ -63,6 +78,7 @@ export function defaultTieStepMedia(wraps: WrapSpec[], slug: string, stepIndex: 
   return [
     { kind: "wraps", wraps },
     { kind: "video", src: tieVideoSrc(slug, `step-${stepIndex}`), poster: tiePoster(slug) },
+    { kind: "video", src: tieDemoSrc(slug, stepIndex), poster: tiePoster(slug), mode: "demo" },
   ];
 }
 

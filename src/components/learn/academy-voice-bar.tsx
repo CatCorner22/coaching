@@ -1,9 +1,14 @@
 import { Mic, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { readAcademyStep, useAcademyAutoVoice, useAutoReadEnabled } from "@/components/learn/use-academy-voice";
+import {
+  academyStepSegments,
+  readAcademySegment,
+  readAcademyStep,
+  useAcademyAutoVoice,
+  useAutoReadEnabled,
+} from "@/components/learn/use-academy-voice";
 import type { VoiceStepInput } from "@/lib/learn/voice-script";
 import { coachVoiceLabel } from "@/lib/voice/coach-profile";
-import { playCoachVoice } from "@/lib/voice/play";
 import { cn } from "@/lib/utils";
 
 type AcademyVoiceBarProps = {
@@ -17,6 +22,7 @@ export function AcademyVoiceBar({ step, cloudVoice, className }: AcademyVoiceBar
   useAcademyAutoVoice(step, cloudVoice, autoRead);
 
   const voiceLabel = coachVoiceLabel(cloudVoice);
+  const segments = academyStepSegments(step);
 
   return (
     <section
@@ -34,7 +40,7 @@ export function AcademyVoiceBar({ step, cloudVoice, className }: AcademyVoiceBar
           </div>
           <p className="mt-1 text-sm text-muted">
             Full verbal walkthrough in a warm, lower-register female coach voice: what to do, what to check, and
-            what to say. {voiceLabel}.
+            what to say. Or play one part on its own. {voiceLabel}.
           </p>
         </div>
         <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
@@ -56,15 +62,33 @@ export function AcademyVoiceBar({ step, cloudVoice, className }: AcademyVoiceBar
           <Mic className="size-4" aria-hidden />
           Read full step aloud
         </Button>
-        <Button variant="outline" size="lg" onClick={() => void playCoachVoice(step.speak, cloudVoice)}>
-          Say line only
-        </Button>
         {autoRead && (
           <Button variant="ghost" size="lg" onClick={() => setAutoRead(false)}>
             <VolumeX className="size-4" aria-hidden />
             Mute auto-read
           </Button>
         )}
+      </div>
+
+      {/* A whole step averages about a minute spoken and the longest runs near
+          three. Replaying just the check meant sitting through every do-bullet
+          to reach it, so in practice you stop asking. One button per section
+          makes that a two-second action. */}
+      <div className="mt-4 border-t border-border/60 pt-4">
+        <p className="text-sm text-muted">Or play one part</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {segments.map((segment) => (
+            <Button
+              key={segment.id}
+              variant="outline"
+              size="sm"
+              onClick={() => void readAcademySegment(segment, cloudVoice)}
+            >
+              <Volume2 className="size-3.5" aria-hidden />
+              {segment.label}
+            </Button>
+          ))}
+        </div>
       </div>
     </section>
   );

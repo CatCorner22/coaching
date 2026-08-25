@@ -1,5 +1,10 @@
 import { useEffect, useRef } from "react";
-import { buildAcademyVoiceScript, type VoiceStepInput } from "@/lib/learn/voice-script";
+import {
+  buildAcademyVoiceScript,
+  buildAcademyVoiceSegments,
+  type VoiceSegment,
+  type VoiceStepInput,
+} from "@/lib/learn/voice-script";
 import { playCoachVoice, stopCoachVoice } from "@/lib/voice/play";
 import { useLearnProgress } from "@/lib/stores/learn-progress";
 
@@ -23,6 +28,15 @@ export function useAcademyAutoVoice(
 
 export function readAcademyStep(input: VoiceStepInput, cloudVoice: boolean) {
   return playCoachVoice(buildAcademyVoiceScript(input), cloudVoice);
+}
+
+/** Read one section of the step — the check on its own, for instance. */
+export function readAcademySegment(segment: VoiceSegment, cloudVoice: boolean) {
+  return playCoachVoice(segment.text, cloudVoice);
+}
+
+export function academyStepSegments(input: VoiceStepInput): VoiceSegment[] {
+  return buildAcademyVoiceSegments(input);
 }
 
 export function useAutoReadEnabled() {

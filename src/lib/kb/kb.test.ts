@@ -21,7 +21,8 @@ import {
 } from "./index.ts";
 import { SAFETY_SOURCE_IDS, SAFETY_SOURCES, SOURCE_LEDGER_REVISION } from "./sources.ts";
 import { isSayableAloud } from "../learn/plain-language.ts";
-import { buildAcademyVoiceScript } from "../learn/voice-script.ts";
+import { buildAcademyVoiceScript, buildAcademyVoiceSegments } from "../learn/voice-script.ts";
+import { defaultKnotStepMedia, defaultTieStepMedia } from "./media-registry.ts";
 
 test("tie slugs are unique and getTie round-trips", () => {
   const slugs = TIES.map((t) => t.slug);
@@ -1591,4 +1592,75 @@ test("the coach voice does not tell the listener to recite a scope notice", () =
 
   const line = "Around, through, snug.";
   assert.match(spoken(line), /Say out loud: Around, through, snug\./u);
+});
+
+// Median step audio is ~65s and the longest in the catalog ~172s. That is
+// user-started and replayable, so it does not breach the segmenting principle
+// on its own — but it made the commonest request a struggling listener has
+// ("what was the check again?") cost ninety seconds of do-bullets to reach.
+// Sections are separately playable now, and the whole-step script is joined
+// from the same segments so the two can never say different things.
+test("voice segments cover the step exactly and stay separately playable", () => {
+  const input = {
+    stepIndex: 2,
+    totalSteps: 5,
+    title: "Around the standing pair",
+    stepGoal: "One line about this step.",
+    doText: "Do one. Do two.",
+    checkText: "Check one.",
+    speak: "Around, through, snug.",
+  };
+  const segments = buildAcademyVoiceSegments(input);
+
+  // Joined segments are the full script, character for character. A separate
+  // builder for each would let "read the whole step" drift from "read the
+  // check" without anything noticing.
+  assert.equal(segments.map((s) => s.text).join(" "), buildAcademyVoiceScript(input));
+
+  assert.deepEqual(
+    segments.map((s) => s.id),
+    ["intro", "goal", "do", "check", "say"],
+  );
+  // Each is independently useful: a segment that needs a neighbour to make
+  // sense is not a segment the listener can start from.
+  assert.match(segments.find((s) => s.id === "do")!.text, /^What to do\. 1\. Do one\. 2\. Do two\.$/u);
+  assert.match(segments.find((s) => s.id === "check")!.text, /^Look and check\. 1\. Check one\.$/u);
+  for (const segment of segments) {
+    assert.ok(segment.text.trim().length > 0, `${segment.id} is empty`);
+    assert.ok(segment.label.trim().length > 0, `${segment.id} has no button label`);
+  }
+
+  // The optional goal is genuinely optional, and its absence must not shift
+  // any other section's identity.
+  const noGoal = buildAcademyVoiceSegments({ ...input, stepGoal: undefined });
+  assert.deepEqual(noGoal.map((s) => s.id), ["intro", "do", "check", "say"]);
+
+  // A scope notice keeps its reframing at segment level too, so playing that
+  // section alone does not reintroduce the recite-the-disclaimer bug.
+  const notice = buildAcademyVoiceSegments({
+    ...input,
+    speak: "Instructor-only. This app does not coach, modify, or clear this restraint.",
+  }).find((s) => s.id === "say")!;
+  assert.doesNotMatch(notice.text, /^Say out loud:/u);
+  assert.equal(notice.label, "What this entry is");
+});
+
+// Watching hands is the best-supported format for a knot, but that result
+// belongs to user-paced playback. An autoplaying loop is the uncontrolled
+// presentation the pacing article blames for the tutorials the reader gave up
+// on, so a demonstration clip must arrive with controls and without autoplay.
+test("every step declares a controllable demonstration slot, not an autoplay loop", () => {
+  const knotMedia = defaultKnotStepMedia("somerville-bowline", 0, "somerville-bowline-0");
+  const tieMedia = defaultTieStepMedia([], "single-column", 0);
+
+  for (const [label, media] of [["knot", knotMedia], ["tie", tieMedia]] as const) {
+    const videos = media.filter((m) => m.kind === "video");
+    const demos = videos.filter((m) => m.mode === "demo");
+    const loops = videos.filter((m) => m.mode !== "demo");
+    assert.equal(demos.length, 1, `${label} step should declare exactly one demonstration slot`);
+    assert.equal(loops.length, 1, `${label} step should still declare its ambient loop`);
+    // Distinct paths, or one clip would silently serve both modes.
+    assert.notEqual(demos[0]!.src, loops[0]!.src, `${label} demo and loop must not share a path`);
+    assert.match(demos[0]!.src, /\/demo-\d+\.webm$/u, `${label} demo path is not on the demo namespace`);
+  }
 });
