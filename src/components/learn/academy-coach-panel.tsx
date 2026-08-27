@@ -4,7 +4,7 @@ import { LearnMediaPanel } from "./learn-media";
 import { NyxModelPanel } from "./nyx-model-panel";
 import type { LearnMedia } from "@/lib/kb/types";
 import type { Tie } from "@/lib/kb/types";
-import { nyxPoseForKnotStep, nyxPoseForTieStep, type NyxShibariPose } from "@/lib/learn/nyx-model";
+import { nyxPoseForTieStep, type NyxShibariPose } from "@/lib/learn/nyx-model";
 import type { VoiceStepInput } from "@/lib/learn/voice-script";
 
 type AcademyCoachPanelProps = {
