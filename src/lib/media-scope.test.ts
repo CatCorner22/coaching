@@ -6,6 +6,9 @@ import {
   MEDIA_UPLOAD_SCOPES,
   parseMediaUploadScope,
   uploadScopeAttestation,
+  uploadScopeCapturePreference,
+  uploadScopeIntroLine,
+  uploadScopeQualityFraming,
   uploadScopeSummary,
 } from "./media-scope.ts";
 import { knowledgeDisposition } from "./kb/search.ts";
@@ -49,6 +52,18 @@ test("the copy states which setting is in force rather than a fixed rule", () =>
   }
   assert.match(uploadScopeSummary("non_explicit"), /full nudity and sexual activity cannot/i);
   assert.match(uploadScopeSummary("adult_nudity"), /nude views of consenting adults can be uploaded/i);
+});
+
+test("scope-aware UI helpers differ between settings", () => {
+  assert.match(uploadScopeIntroLine("adult_nudity"), /nude views/i);
+  assert.match(uploadScopeIntroLine("non_explicit"), /equipment-only/i);
+  assert.match(uploadScopeCapturePreference("adult_nudity"), /nude views/i);
+  assert.match(uploadScopeCapturePreference("non_explicit"), /equipment-only/i);
+  assert.notEqual(
+    uploadScopeQualityFraming("adult_nudity"),
+    uploadScopeQualityFraming("non_explicit"),
+  );
+  assert.doesNotMatch(uploadScopeQualityFraming("adult_nudity"), /equipment-only/i);
 });
 
 test("only the nudity line moves with the setting", () => {

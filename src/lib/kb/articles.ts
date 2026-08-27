@@ -372,7 +372,7 @@ const CORE_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "For every batch, directly confirm legal-adult status, clothed/non-explicit scope, and four separate current permissions: the depicted activity, recording, one upload of selected stills with generic frame labels, and the generated output's recipient, use, sharing, and deletion plan. Prefer equipment-only, non-identifying frames; exclude faces, intimate contact, tattoos, screens, mail, and room details. New journal entries store text, not captures. xAI may retain inputs and outputs under workspace settings, and withdrawal cannot recall a request already transmitted. If any attestation is absent or withdrawn, keep the camera off and delete the local batch.",
+        text: "For every batch, directly confirm legal-adult status, the deployment's upload scope (see Settings), and four separate current permissions: the depicted activity, recording, one upload of selected stills with generic frame labels, and the generated output's recipient, use, sharing, and deletion plan. Prefer non-identifying frames; exclude faces, intimate contact, tattoos, screens, mail, and room details unless your attested upload scope explicitly includes more. New journal entries store text, not captures. xAI may retain inputs and outputs under workspace settings, and withdrawal cannot recall a request already transmitted. If any attestation is absent or withdrawn, keep the camera off and delete the local batch.",
       },
     ],
   },

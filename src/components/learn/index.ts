@@ -1,3 +1,4 @@
+export { NyxModelPanel } from "./nyx-model-panel";
 export { AcademyCoachPanel } from "./academy-coach-panel";
 export { AcademyObservePanel } from "./academy-observe-panel";
 export { AcademyShell } from "./academy-shell";

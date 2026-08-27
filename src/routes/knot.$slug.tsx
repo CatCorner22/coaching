@@ -14,6 +14,7 @@ import {
   type StepConfirm,
 } from "@/components/learn";
 import { getAcademyKnot, isFoundationKnot } from "@/lib/kb";
+import { nyxPoseForKnotStep } from "@/lib/learn/nyx-model";
 import { coachVoiceLabel } from "@/lib/voice/coach-profile";
 import { useLearnProgress } from "@/lib/stores/learn-progress";
 import { useSettings } from "@/lib/stores/settings";
@@ -94,6 +95,7 @@ function KnotPage() {
             media={s.media}
             stepIndex={step}
             showCamera={foundation}
+            nyxPose={nyxPoseForKnotStep(slug, step)}
           />
         </div>
       }
@@ -126,6 +128,7 @@ function KnotPage() {
           media={s.media}
           stepIndex={step}
           showCamera={foundation}
+          nyxPose={nyxPoseForKnotStep(slug, step)}
         />
       </div>
 

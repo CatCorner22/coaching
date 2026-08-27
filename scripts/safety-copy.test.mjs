@@ -154,16 +154,16 @@ test("camera reports and saved journal entries retain visible source provenance"
 });
 
 test("the vision prompt keeps its garment/skin discrimination contract", async () => {
-  const analyze = await readFile("src/lib/ai/analyze.ts", "utf8");
-  assert.match(analyze, /Garment components are not restraints/);
-  assert.match(analyze, /bra or lingerie straps/i);
-  assert.match(analyze, /skin creases, compression folds/i);
-  assert.match(analyze, /restraint discriminator is visible/i);
-  assert.match(analyze, /twisted or braided fiber texture/i);
+  const analyzeConsent = await readFile("src/lib/ai/analyze-consent.ts", "utf8");
+  assert.match(analyzeConsent, /Garment components are not restraints/);
+  assert.match(analyzeConsent, /bra or lingerie straps/i);
+  assert.match(analyzeConsent, /skin creases, compression folds/i);
+  assert.match(analyzeConsent, /restraint discriminator is visible/i);
+  assert.match(analyzeConsent, /twisted or braided fiber texture/i);
   // Fail-closed carve-out: the garment rule must never downgrade the
   // C4-sensitive airway/breathing categories.
-  assert.match(analyze, /Exception, fail-closed/);
-  assert.match(analyze, /never downgrades these regions/i);
+  assert.match(analyzeConsent, /Exception, fail-closed/);
+  assert.match(analyzeConsent, /never downgrades these regions/i);
 
   const report = await readFile("src/lib/observation/report.ts", "utf8");
   assert.match(report, /lingerie or garment strap/i);

@@ -78,16 +78,31 @@ test("batch quality keeps the worst independent axis instead of masking a weak f
 });
 
 test("quality hints never request a more intimate or identifying view", () => {
-  const hint = privacySafeQualityHint({
-    sharpness: 0.2,
-    exposure: 0.9,
-    ropeHint: 0.9,
-    score: 0.6,
-    notes: [],
-  });
-  assert.match(hint, /equipment-only|clothed/i);
-  assert.match(hint, /non-identifying/i);
-  assert.doesNotMatch(hint, /nudity|intimate view|whole room/i);
+  const conservative = privacySafeQualityHint(
+    {
+      sharpness: 0.2,
+      exposure: 0.9,
+      ropeHint: 0.9,
+      score: 0.6,
+      notes: [],
+    },
+    "non_explicit",
+  );
+  assert.match(conservative, /equipment-only|non-identifying/i);
+  assert.doesNotMatch(conservative, /nudity|intimate view|whole room/i);
+
+  const adultNudity = privacySafeQualityHint(
+    {
+      sharpness: 0.2,
+      exposure: 0.9,
+      ropeHint: 0.9,
+      score: 0.6,
+      notes: [],
+    },
+    "adult_nudity",
+  );
+  assert.match(adultNudity, /non-identifying/i);
+  assert.doesNotMatch(adultNudity, /nudity|intimate view|whole room|equipment-only/i);
 });
 
 test("an equipment-only rope close-up outranks a bare-skin frame", () => {

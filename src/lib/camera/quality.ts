@@ -1,5 +1,6 @@
 /** Camera skill: score stills so the coach sees rope, not blur. */
 
+import { mediaUploadScope, uploadScopeQualityFraming, type MediaUploadScope } from "../media-scope";
 import { isDarkFiber, isHandTone, isRope, isSkin } from "../ml/color";
 
 export type FrameQuality = {
@@ -147,19 +148,20 @@ export function ropeHint(data: ImageData): number {
  *   back to `data` when absent, which understates blur — a downscale is a
  *   low-pass filter, so it removes the very frequencies shake destroys.
  */
-export function scoreFrame(data: ImageData, detail?: ImageData): FrameQuality {
+export function scoreFrame(data: ImageData, detail?: ImageData, scope?: MediaUploadScope): FrameQuality {
+  const framing = uploadScopeQualityFraming(scope ?? mediaUploadScope());
   const sharpness = Math.min(1, Math.log1p(laplacianVar(detail ?? data)) / Math.log1p(900));
   const exposure = exposureScore(data);
   const rope = Math.min(1, ropeHint(data) / 0.12);
   const notes: string[] = [];
   if (sharpness < 0.45) {
-    notes.push("Hold the camera steady and retake an equipment-only or non-identifying view.");
+    notes.push(`Hold the camera steady and retake ${framing}.`);
   }
   if (exposure < 0.45) {
     notes.push("Add neutral light without revealing faces, identifiers, or more of the room.");
   }
   if (rope < 0.2) {
-    notes.push("Keep the relevant equipment visible in an equipment-only or non-identifying view.");
+    notes.push(`Keep the relevant equipment visible in ${framing}.`);
   }
   const score = sharpness * 0.45 + exposure * 0.25 + rope * 0.3;
   return { sharpness, exposure, ropeHint: rope, score, notes };
@@ -182,15 +184,16 @@ export function worstFrameQuality(qualities: readonly FrameQuality[]): FrameQual
 }
 
 /** A privacy-minimizing UI hint; quality never justifies a more intimate view. */
-export function privacySafeQualityHint(quality: FrameQuality): string {
+export function privacySafeQualityHint(quality: FrameQuality, scope?: MediaUploadScope): string {
+  const framing = uploadScopeQualityFraming(scope ?? mediaUploadScope());
   if (quality.sharpness < 0.55) {
-    return "One or more selected frames are soft. Retake an equipment-only or non-identifying view while holding the camera steady.";
+    return `One or more selected frames are soft. Retake ${framing} while holding the camera steady.`;
   }
   if (quality.exposure < 0.55) {
     return "One or more selected frames need neutral light. Avoid faces, identifiers, intimate areas, and extra room detail.";
   }
   if (quality.ropeHint < 0.2) {
-    return "Use an equipment-only or non-identifying view with only the relevant equipment in frame.";
+    return `Use ${framing}.`;
   }
   return "The selected stills passed a limited image-quality check; this is not safety clearance.";
 }

@@ -7,6 +7,7 @@ import {
 } from "@/lib/auth/capabilities";
 import { authEnabled, GROK_PROVIDERS, signIn } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { mediaUploadScope, uploadScopeLoginLine } from "@/lib/media-scope";
 
 export const Route = createFileRoute("/login")({ component: LoginPage });
 
@@ -111,7 +112,7 @@ function LoginPage() {
         )}
         <p className="mt-6 text-xs leading-relaxed text-subtle">
           Sign-in does not make an image anonymous or verify consent, age, physiology, technique,
-          or safety. Use only separately consented, non-explicit, non-identifying media; clothed or intimate wear is within scope.
+          or safety. {uploadScopeLoginLine(mediaUploadScope())}
           To prevent one account from inheriting another person's notes on a shared device, starting
           or ending an account session clears Knotty's local settings, negotiation, plan, and journal.
         </p>

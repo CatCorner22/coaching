@@ -29,6 +29,7 @@ import {
 import {
   mediaUploadScope,
   uploadScopeAttestation,
+  uploadScopeCapturePreference,
   uploadScopeSummary,
 } from "@/lib/media-scope";
 import { observeFrame } from "@/lib/ml/detect";
@@ -48,7 +49,7 @@ export type CaptureResult = {
 
 export type MediaConsent = {
   adults: true;
-  nonExplicit: true;
+  withinUploadScope: true;
   /** Which upload-scope attestation wording this batch confirmed. */
   scope: "non_explicit" | "adult_nudity";
   nonSecret: true;
@@ -64,7 +65,7 @@ export type MediaConsent = {
 
 type PermissionKey =
   | "adults"
-  | "nonExplicit"
+  | "withinUploadScope"
   | "nonSecret"
   | "nonCoerced"
   | "allPeopleConsented"
@@ -81,7 +82,7 @@ type PendingVideoFrame = {
 
 const EMPTY_PERMISSIONS: Record<PermissionKey, boolean> = {
   adults: false,
-  nonExplicit: false,
+  withinUploadScope: false,
   nonSecret: false,
   nonCoerced: false,
   allPeopleConsented: false,
@@ -524,7 +525,7 @@ export const CameraCapture = memo(function CameraCapture({
       quality,
       consent: {
         adults: true,
-        nonExplicit: true,
+        withinUploadScope: true,
         // The scope this build's attestation checkbox actually described; the
         // server rejects a batch whose scope does not match the deployment's.
         scope,
@@ -911,8 +912,7 @@ export const CameraCapture = memo(function CameraCapture({
         </legend>
         <p className="mb-2 text-xs leading-relaxed text-muted">
           Confirm legal-adult status, upload scope, and all four permissions separately for each
-          batch. Prefer equipment-only, non-identifying stills, and exclude faces, tattoos, screens,
-          mail, and room details. {uploadScopeSummary(scope)} That limit is on what this app sends
+          batch. {uploadScopeCapturePreference(scope)} {uploadScopeSummary(scope)} That limit is on what this app sends
           to the analysis provider, and is configured for this deployment by whoever read that
           provider's policy — it is not a rule about what you photograph, keep, or share
           yourselves, and this app has no visibility into any of that. Ambiguous age and
@@ -926,8 +926,8 @@ export const CameraCapture = memo(function CameraCapture({
             label="I confirm every depicted person is a legal adult. The app cannot infer age from media."
           />
           <PermissionCheck
-            checked={permissions.nonExplicit}
-            onChange={(checked) => updatePermission("nonExplicit", checked)}
+            checked={permissions.withinUploadScope}
+            onChange={(checked) => updatePermission("withinUploadScope", checked)}
             label={uploadScopeAttestation(scope)}
           />
           <PermissionCheck

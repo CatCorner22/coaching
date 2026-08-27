@@ -30,6 +30,20 @@ test("technical media usability does not depend on a rope-content ranking score"
   assert.equal(validateObservationReport(report).success, true);
 });
 
+test("observation reports record the attested upload scope in limitations", () => {
+  const report = buildObservationReport({
+    mediaMode: "static_photos",
+    consent: { ...consent, scope: "adult_nudity" },
+    quality,
+    matches: [{ frame_id: "F01", canonical_id: "rope_restraint_unspecified" }],
+    allowedFrameIds: ["F01"],
+    modelStatus: "completed",
+  });
+  assert.ok(report.limitations.some((line) => /Upload scope attested/i.test(line)));
+  assert.ok(report.limitations.some((line) => /nude views/i.test(line)));
+  assert.equal(validateObservationReport(report).success, true);
+});
+
 function reportFor(canonicalId, modelStatus = "completed") {
   const transition = canonicalId === "transition_across_frames_possible";
   return buildObservationReport({

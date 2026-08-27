@@ -26,6 +26,7 @@ test("cloud voice is fail-closed and route controls pass the saved opt-in", () =
 
   const settings = read("src/routes/settings.tsx");
   assert.match(settings, /if \(!event\.target\.checked\) clearCoachVoiceCache\(\)/);
+  assert.match(settings, /uploadScopeLabel\(uploadScope\)/);
 });
 
 test("accepting a capture preserves the committed permission ledger", () => {
@@ -561,7 +562,8 @@ test("the media upload scope is an operator setting with a conservative default"
   const camera = read("src/components/camera-capture.tsx");
   assert.match(camera, /const scope = mediaUploadScope\(\);/);
   assert.match(camera, /label=\{uploadScopeAttestation\(scope\)\}/);
-  assert.match(camera, /\{uploadScopeSummary\(scope\)\}/);
+  assert.match(camera, /\{uploadScopeCapturePreference\(scope\)\}/);
+  assert.match(camera, /withinUploadScope: true/);
   // The batch carries which wording was attested, not a single bit that
   // meant the same thing under both settings.
   assert.match(camera, /scope,/);
@@ -573,14 +575,20 @@ test("the media upload scope is an operator setting with a conservative default"
   // The server knows which attestation was made and builds the prompt from
   // the deployment's actual scope. A stale client or a widened request fails.
   const analyze = read("src/lib/ai/analyze.ts");
+  const analyzeConsent = read("src/lib/ai/analyze-consent.ts");
   assert.match(analyze, /scope: z\.enum\(\["non_explicit", "adult_nudity"\]\)/);
-  assert.match(analyze, /parsed\.consent\.scope !== mediaUploadScope\(\)/);
-  assert.match(analyze, /function buildSystemPrompt\(scope: MediaUploadScope\)/);
+  assert.match(analyze, /verifyBatchConsentScope\(parsed\.consent\.scope\)/);
+  assert.match(analyze, /withinUploadScope: z\.literal\(true\)/);
+  assert.match(analyzeConsent, /function buildSystemPrompt\(scope: MediaUploadScope\)/);
   assert.match(analyze, /content: buildSystemPrompt\(mediaUploadScope\(\)\)/);
   assert.match(
-    analyze,
+    analyzeConsent,
     /The media may include nudity of consenting adults; explicit sexual activity is out of scope/,
   );
+
+  const nyx = read("src/lib/learn/nyx-model.ts");
+  assert.match(nyx, /NYX_SHIBARI/);
+  assert.match(read("src/components/learn/academy-coach-panel.tsx"), /NyxModelPanel/);
 });
 
 test("the tie-page practice cam stays local and waits for the photos limit", () => {

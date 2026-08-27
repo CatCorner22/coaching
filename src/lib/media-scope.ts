@@ -96,3 +96,57 @@ export function uploadScopeSummary(scope: MediaUploadScope): string {
     ? "Clothed, intimate-wear and nude views of consenting adults can be uploaded; sexual activity cannot."
     : "Clothed and intimate-wear views of consenting adults can be uploaded; full nudity and sexual activity cannot.";
 }
+
+/** Preferred framing for capture panels — privacy-minimizing and scope-aware. */
+export function uploadScopeCapturePreference(scope: MediaUploadScope): string {
+  return allowsAdultNudity(scope)
+    ? "Prefer non-identifying stills; nude views of consenting adults are in upload scope when attested. Exclude faces, tattoos, screens, mail, and room details."
+    : "Prefer equipment-only, non-identifying stills, and exclude faces, tattoos, screens, mail, and room details.";
+}
+
+/** Home hero line describing what may be sent for analysis. */
+export function uploadScopeIntroLine(scope: MediaUploadScope): string {
+  return allowsAdultNudity(scope)
+    ? "Capture non-identifying stills within this deployment's upload scope (including nude views of consenting adults when attested)."
+    : "Capture equipment-only or non-identifying stills within this deployment's upload scope.";
+}
+
+/** Consent-gate media preference line. */
+export function uploadScopeGateLine(scope: MediaUploadScope): string {
+  return allowsAdultNudity(scope)
+    ? "Prefer non-identifying media. Nude views of consenting adults are in upload scope when each batch is attested; sexual activity is never in scope."
+    : "Prefer equipment-only or non-identifying media within the clothed and intimate-wear upload scope.";
+}
+
+/** Settings readout for operators. */
+export function uploadScopeSettingsDescription(scope: MediaUploadScope): string {
+  return allowsAdultNudity(scope)
+    ? "Adult nudity is in upload scope for confirmed adults. Sexual activity, ambiguous age, and secret or coerced media remain refused at every setting."
+    : "Clothed and intimate-wear views only. Full nudity, sexual activity, ambiguous age, and secret or coerced media remain refused at every setting.";
+}
+
+/** Pre-scene checklist media line. */
+export function uploadScopeChecklistLine(scope: MediaUploadScope): string {
+  return allowsAdultNudity(scope)
+    ? "If using media, adult/activity/recording/upload/output permissions and the attested upload scope (including nudity when confirmed) are current."
+    : "If using media, adult/activity/recording/upload/output permissions and the non-explicit, non-secret upload scope are current.";
+}
+
+/** Login footer media line. */
+export function uploadScopeLoginLine(scope: MediaUploadScope): string {
+  return allowsAdultNudity(scope)
+    ? "Use only separately consented, non-identifying media within this deployment's upload scope (nude views of confirmed adults when attested; sexual activity never in scope)."
+    : "Use only separately consented, non-explicit, non-identifying media; clothed or intimate wear is within scope.";
+}
+
+/** Short label for settings and status surfaces. */
+export function uploadScopeLabel(scope: MediaUploadScope): string {
+  return allowsAdultNudity(scope) ? "Adult nudity" : "Non-explicit (clothed & intimate wear)";
+}
+
+/** Quality-hint framing noun phrase — never asks for a more intimate view. */
+export function uploadScopeQualityFraming(scope: MediaUploadScope): string {
+  return allowsAdultNudity(scope)
+    ? "a non-identifying view with the relevant rope or restraint visible"
+    : "an equipment-only or non-identifying view";
+}

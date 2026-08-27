@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { mediaUploadScope, uploadScopeChecklistLine } from "@/lib/media-scope";
 import { useKit } from "@/lib/stores/kit";
 import { useSettings } from "@/lib/stores/settings";
 
@@ -14,7 +15,7 @@ const ITEMS = [
   { id: "water", label: "Water and a blanket are within reach." },
   { id: "furniture", label: "Furniture is stable and remains non-load-bearing; no household anchor is assumed rated." },
   { id: "machine", label: "Any machine is off, and its emergency stop is unobstructed and directly tested." },
-  { id: "camera", label: "If using media, adult/activity/recording/upload/output permissions and the non-explicit, non-secret scope are current." },
+  { id: "camera", label: uploadScopeChecklistLine(mediaUploadScope()) },
   { id: "clock", label: "Any reminder is only a prompt to check directly, never a safe-duration guarantee." },
   { id: "exit", label: "The release plan was practiced unrestrained; emergency actions stay within your training and dispatcher instructions." },
 ] as const;

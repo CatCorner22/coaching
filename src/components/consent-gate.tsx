@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { mediaUploadScope, uploadScopeGateLine } from "@/lib/media-scope";
 import { useSettings } from "@/lib/stores/settings";
 
 export function ConsentGate({ children }: { children: React.ReactNode }) {
@@ -14,6 +15,7 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   const [shears, setShears] = useState(false);
   const [photos, setPhotos] = useState(false);
   const [consent, setConsent] = useState(false);
+  const uploadScope = mediaUploadScope();
 
   useEffect(() => {
     const finish = () => setMounted(true);
@@ -45,8 +47,8 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
         <h1 className="mt-3 font-display text-4xl leading-none text-fg">Enter the studio</h1>
         <p className="mt-4 text-sm leading-relaxed text-muted">
           This adult-only app provides general education and limited image observations, never
-          consent verification, medical assessment, live monitoring, or safety clearance. Prefer
-          equipment-only or non-identifying media.
+          consent verification, medical assessment, live monitoring, or safety clearance.{" "}
+          {uploadScopeGateLine(uploadScope)}
         </p>
         <ul className="mt-6 space-y-3 text-sm text-fg">
           <Check checked={adults} onChange={setAdults} label="Everyone involved is 18 or older." />
