@@ -241,7 +241,10 @@ function StudioPage() {
   useEffect(() => {
     if (!settings.listen || !micArmed) return;
     return listenForWords(
-      [settings.safeword, settings.yellowWord, "red"],
+      // The plain words "red" and "yellow" are always armed alongside the
+      // configured words: with a custom yellow word set, leaving "yellow" out
+      // made the t === "yellow" branch below unreachable.
+      [settings.safeword, settings.yellowWord, "red", "yellow"],
       (w) => {
         const t = w.toLowerCase();
         if (t === settings.safeword.toLowerCase() || t === "red") stopSession("safeword");

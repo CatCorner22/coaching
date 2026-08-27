@@ -23,6 +23,31 @@ type LearnVideoProps = {
   mode?: LearnVideoMode;
 };
 
+/**
+ * One fetch per session instead of one HEAD probe per clip per page.
+ *
+ * `public/learn/manifest.json` lists every learn-media file that actually
+ * exists (add new clips there when adding the files). Probing each src
+ * individually meant every taught page fired a burst of 404s for
+ * never-generated demonstration clips — benign, but indistinguishable from
+ * real asset breakage in the console. When the manifest itself is missing,
+ * fall back to the old per-src probe rather than hiding media that exists.
+ */
+let manifestPromise: Promise<ReadonlySet<string> | null> | null = null;
+function loadLearnMediaManifest(): Promise<ReadonlySet<string> | null> {
+  manifestPromise ??= fetch("/learn/manifest.json")
+    .then(async (res) => {
+      if (!res.ok) return null;
+      const parsed: unknown = await res.json();
+      const files = (parsed as { files?: unknown })?.files;
+      return Array.isArray(files)
+        ? new Set(files.filter((f): f is string => typeof f === "string"))
+        : null;
+    })
+    .catch(() => null);
+  return manifestPromise;
+}
+
 /** Practice clip. Hidden when the file is missing (procedural fallback). */
 export function LearnVideo({ src, poster, className, label, mode = "loop" }: LearnVideoProps) {
   const [available, setAvailable] = useState<boolean | null>(null);
@@ -31,9 +56,16 @@ export function LearnVideo({ src, poster, className, label, mode = "loop" }: Lea
   useEffect(() => {
     let cancelled = false;
     setAvailable(null);
-    fetch(src, { method: "HEAD" })
-      .then((res) => {
-        if (!cancelled) setAvailable(res.ok);
+    loadLearnMediaManifest()
+      .then((manifest) => {
+        if (cancelled) return;
+        if (manifest) {
+          setAvailable(manifest.has(src));
+          return;
+        }
+        return fetch(src, { method: "HEAD" }).then((res) => {
+          if (!cancelled) setAvailable(res.ok);
+        });
       })
       .catch(() => {
         if (!cancelled) setAvailable(false);

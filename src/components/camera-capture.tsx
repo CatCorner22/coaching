@@ -49,6 +49,8 @@ export type CaptureResult = {
 export type MediaConsent = {
   adults: true;
   nonExplicit: true;
+  /** Which upload-scope attestation wording this batch confirmed. */
+  scope: "non_explicit" | "adult_nudity";
   nonSecret: true;
   nonCoerced: true;
   allPeopleConsented: true;
@@ -523,6 +525,9 @@ export const CameraCapture = memo(function CameraCapture({
       consent: {
         adults: true,
         nonExplicit: true,
+        // The scope this build's attestation checkbox actually described; the
+        // server rejects a batch whose scope does not match the deployment's.
+        scope,
         nonSecret: true,
         nonCoerced: true,
         allPeopleConsented: true,
@@ -763,11 +768,15 @@ export const CameraCapture = memo(function CameraCapture({
       if (actualKind === "video") {
         await ingestVideo(file, operation);
       } else {
-        const { jpeg, imageData } = await processMediaFrame(file, 1600, 240, 0.82, dimensions);
+        const { jpeg, imageData, detailData } = await processMediaFrame(file, 1600, 240, 0.82, dimensions);
         signal.throwIfAborted();
         if (!ownsMediaOperation(operation.id) || disabledRef.current) return;
         const observation = observeFrame(imageData);
-        const quality = scoreFrame(imageData);
+        // The detail crop matters most here: an imported phone photo judged
+        // only on the 240px downscale scored blurred frames as adequate,
+        // because a downscale is a low-pass filter. Live capture and video
+        // stills already pass it.
+        const quality = scoreFrame(imageData, detailData);
         signal.throwIfAborted();
         if (!ownsMediaOperation(operation.id) || disabledRef.current) return;
         await emitFromMedia("photo", [jpeg], [observation], [quality]);

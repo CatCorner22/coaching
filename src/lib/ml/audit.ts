@@ -548,35 +548,6 @@ export function fallbackDraft(opts: {
   };
 }
 
-export function applyModelSelfAudit(
-  draft: LlmDraft,
-  flags: { contradictsDet: boolean; hardLimit: boolean; invented: boolean },
-): LlmDraft {
-  const clean = sanitizeDraft(draft) ?? draft;
-  if (!flags.hardLimit && !flags.contradictsDet && !flags.invented) return clean;
-  if (flags.hardLimit) {
-    return {
-      ...clean,
-      quality: "unsafe",
-      coaching:
-        "I cannot coach neck restraint, breath restriction, suspension, or another high-consequence setup from an image. Stop and fully release it.",
-      next: "Do not proceed from camera feedback. If symptoms or immediate danger are present, follow the emergency guidance; otherwise use a qualified in-person instructor.",
-      speak: "Stop and fully release the setup. Camera feedback cannot clear this activity.",
-      circulation: true,
-    };
-  }
-  if (flags.contradictsDet) {
-    return {
-      ...clean,
-      quality: "unsafe",
-      coaching: STOP_COACH,
-      next: "Stop and fully release the setup. Use direct, nonvisual checks and escalate based on symptoms, not an image grade.",
-      speak: "Stop and release. Treat the conflicting image grade as unreliable.",
-      circulation: true,
-    };
-  }
-  return {
-    ...clean,
-    quality: "adjust",
-  };
-}
+// applyModelSelfAudit was removed: nothing called it since the analyze path
+// moved to the closed observation-report contract, and a dead free-form
+// draft-rewriting hook implied a coaching path that no longer exists.

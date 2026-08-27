@@ -17,6 +17,8 @@ export type AnalyzeInput = {
   consent: {
     adults: true;
     nonExplicit: true;
+    /** Which upload-scope attestation wording this batch confirmed. */
+    scope: "non_explicit" | "adult_nudity";
     nonSecret: true;
     nonCoerced: true;
     allPeopleConsented: true;

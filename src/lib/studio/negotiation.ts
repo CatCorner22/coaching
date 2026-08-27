@@ -1,6 +1,13 @@
 import { normalizeNegotiationItems, type NegItem } from "@/lib/stores/negotiate";
 
 const TIE_LIMIT_IDS: Readonly<Record<string, readonly string[]>> = {
+  // The two guided restraint ties. Their cards promise "may go on a consenting
+  // adult once its negotiated limit is agreed", but neither mapped to a limit,
+  // so both were selectable in Studio — and taught in full on their own pages —
+  // with every limit at no. A wrist or ankle cuff is exactly what the "cuffs"
+  // row negotiates.
+  "single-column": ["cuffs"],
+  "double-column": ["cuffs"],
   "takate-kote": ["gote"],
   ebi: ["gote", "predicament"],
   "gyaku-ebi": ["gote", "predicament"],
@@ -78,6 +85,15 @@ function blockedByIds(
   approvedIds: ReadonlySet<string>,
 ) {
   return !!slug && (table[slug] ?? []).some((id) => !approvedIds.has(id));
+}
+
+/**
+ * The negotiation rows a tie's category touches. The tie page uses this to
+ * gate a guided tie's taught steps behind the same limits Studio enforces,
+ * and to say which rows are missing rather than just refusing.
+ */
+export function tieLimitIds(slug: string | undefined): readonly string[] {
+  return slug ? (TIE_LIMIT_IDS[slug] ?? []) : [];
 }
 
 /**

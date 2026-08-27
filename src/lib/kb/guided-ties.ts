@@ -334,7 +334,11 @@ export const GUIDED_TIES: Tie[] = [
     level: "building",
     minutes: [20, 40],
     ropes: [{ lengthM: 8, count: 1 }],
-    knots: ["larks-head", "square", "reverse-tension"],
+    // Only the knot the steps actually use: the chain down the front is a
+    // series of overhand knots in the doubled rope — overhands on a bight.
+    // The previously declared lark's head, square knot and reverse tension
+    // appear nowhere in the sequence.
+    knots: ["overhand-on-bight"],
     nerves: [],
     intent: ["decorative", "craft", "torso"],
     prereqs: ["single-column"],

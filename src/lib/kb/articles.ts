@@ -436,9 +436,28 @@ const CORE_ARTICLES: Article[] = [
     summary: "Shoulders, hips, wrists, and a few minutes of ordinary touching before the first cuff.",
     related: ["takate-kote", "futomomo"],
     blocks: [
+      { type: "h", text: "Warm up as a person, not as a position" },
       {
         type: "p",
-        text: "Warm up voluntarily and unrestrained within an ordinary, pain-free range. Do not force flexibility or use a fixed routine, massage, photograph, or range-of-motion snapshot as clearance for a restrictive position. High-consequence forms require qualified hands-on instruction.",
+        text: "Warm up voluntarily and unrestrained, inside an ordinary pain-free range, before anyone is placed in rope. The point is to notice today's shoulders, wrists, hips and knees — the joints that spend the evening doing the most work — not to earn a more ambitious tie. A body that moved easily last week can be stiff, swollen, or sore today, and that is information, not an inconvenience.",
+      },
+      {
+        type: "p",
+        text: "Do not force flexibility. A stretch that hurts, a joint that will not go where a tutorial photo went, or a side that is simply less willing than the other is a reason to change the plan, not a reason to push through. Massage, a favourite routine, a photograph of last time, or a range-of-motion snapshot cannot clear a restrictive position. They describe how the body felt while it was free.",
+      },
+      {
+        type: "ul",
+        items: [
+          "Keep the warm-up unrestrained. Adding rope to a stretch turns it into the activity you were supposed to be preparing for.",
+          "Spend a minute on the joints that will actually work: shoulders if arms will be behind the back, hips and knees if anyone will kneel or sit, wrists if cuffs are coming.",
+          "A few minutes of ordinary touching — a hand on a shoulder, asking how that side feels — finds more than a ritual sequence does.",
+          "Stop any movement that produces pins and needles, a sharp catch, or a joint that feels unstable, and do not start the scene on that side.",
+        ],
+      },
+      {
+        type: "callout",
+        title: "This is not clearance",
+        text: "A comfortable warm-up says the body moved freely just now. It does not say a restrictive position will stay comfortable, and it does not substitute for qualified hands-on instruction on high-consequence forms.",
       },
     ],
   },
@@ -450,9 +469,28 @@ const CORE_ARTICLES: Article[] = [
     summary: "Coil, inspect, wash when you must, retire when you should.",
     related: ["rope-materials"],
     blocks: [
+      { type: "h", text: "The maker's instructions beat every generic tip" },
       {
         type: "p",
-        text: "Store, clean, dry, condition, inspect, and retire rope according to the specific manufacturer's instructions. Do not apply generic heat, oil, washing, or strength-restoration advice. Cut, melted, contaminated, damaged, or uncertain material is not cleared for body use by looking normal; retire it conservatively.",
+        text: "Store, clean, dry, condition, inspect, and retire rope according to the specific manufacturer's instructions for that fibre and that product. Jute, hemp, cotton and the various synthetics do not share a care ritual, and a blog post that worked for someone else's bundle is not a substitute. Do not apply generic heat, oil, washing, or strength-restoration advice from this app or anywhere else.",
+      },
+      {
+        type: "ul",
+        items: [
+          "Inspect before each use: run the length through your hands looking for cuts, melted spots, thinning, contamination, or a section that feels different from the rest.",
+          "Coil so the rope can be flaked out without a knot in the working length. A tangle you fight mid-tie is how circuits get yanked crooked.",
+          "Dry thoroughly before storage if it has been washed or worn against damp skin; a sealed damp bundle mildews.",
+          "Keep rope away from oils, solvents, and anything you cannot name. What soaked in is often invisible.",
+        ],
+      },
+      {
+        type: "p",
+        text: "Cut, melted, contaminated, damaged, or uncertain material is not cleared for body use by looking normal, smelling fine, or having survived last time. Retire it conservatively. Appearance is not a strength test, and this app cannot grade a rope from a photograph.",
+      },
+      {
+        type: "callout",
+        title: "Retirement is a decision, not a feeling",
+        text: "If you are arguing with yourself about whether a length is still fine, it is already the length you should not put on a person. Use it for unoccupied prop practice or throw it out.",
       },
     ],
   },
@@ -462,11 +500,29 @@ const CORE_ARTICLES: Article[] = [
     section: "craft",
     minutes: 5,
     summary: "The room is part of the tie. Most bedroom furniture is not a rigging point.",
-    related: ["chair", "partial-suspension"],
+    related: ["chair", "partial-suspension", "furniture-not-hardpoints"],
     blocks: [
+      { type: "h", text: "The room participates. It is not a rigging system." },
       {
         type: "p",
-        text: "Furniture and household fixtures are not established load paths. This app cannot assess structure, installation, capacity, redundancy, or condition from a description or image. Keep app-guided practice ground-level and non-loaded; route any anchor or load-bearing question to qualified in-person instruction and appropriate structural expertise.",
+        text: "A bed, a chair, a door frame, a radiator, a ceiling hook of unknown vintage — the room is part of every scene, and most of what is in it was built to be sat on, slept in, or walked through, not to hold a person who cannot get up. Furniture and household fixtures are not established load paths. This app cannot assess structure, installation, capacity, redundancy, or condition from a description or image.",
+      },
+      {
+        type: "p",
+        text: "Keep app-guided practice ground-level and non-loaded. A chair used as somewhere to sit while you work is furniture doing its job. A chair used as something to take weight, or a bed frame used as something to pull against, is a different activity this catalog does not teach. The longer article on that distinction is furniture-not-hardpoints.",
+      },
+      {
+        type: "ul",
+        items: [
+          "A mattress and a clear floor are the most useful pieces of furniture in this app: they are where someone lies down, sits up, and gets out of rope.",
+          "Wobbly, wheeled, folding, or antique pieces move when leaned on. That is a fall risk even when nothing is loaded.",
+          "Shared hardware — a closet rail, a curtain pole, a light fitting — was specified for clothes or a lamp, not for a person.",
+          "Any proposed person-bearing use of a room or a piece of furniture belongs with a qualified in-person instructor and appropriate structural expertise, not with a photograph of the room.",
+        ],
+      },
+      {
+        type: "warn",
+        text: "Knotty does not coach attachment, loading, anchors, or emergency release from furniture or household fixtures. The camera cannot establish that a piece is rated, installed, or intact.",
       },
     ],
   },
@@ -492,9 +548,28 @@ const CORE_ARTICLES: Article[] = [
     summary: "Every tie has a clock. Ambition is a budget you spend on one peak, not on the whole night.",
     related: ["scene-architecture", "takate-kote"],
     blocks: [
+      { type: "h", text: "A clock is a reminder, not a permit" },
       {
         type: "p",
-        text: "Time ranges in this library are planning estimates, never safe-duration guarantees. Risk can change immediately with position, movement, construction, health, communication, or equipment. A reminder prompts a direct check; it is not permission to wait, continue, or escalate.",
+        text: "Time ranges in this library are planning estimates, never safe-duration guarantees. A twenty-to-forty-minute study range says how long the lesson takes to read and walk through on a prop, not how long a body can stay in the finished structure. Risk can change immediately with position, movement, construction, health, communication, or equipment — including in the first minute.",
+      },
+      {
+        type: "p",
+        text: "The Studio countdown and the Rig-mode pulse exist to interrupt you. When they fire, do the direct check they asked for: sensation, movement, ordinary breathing and speech, current consent. They are not permission to wait until the next pulse, to continue because nothing has gone wrong yet, or to escalate because there is time left on the clock.",
+      },
+      {
+        type: "ul",
+        items: [
+          "Ambition is a budget. Spend it on one peak in the evening, not on stacking every tie you know until someone is exhausted.",
+          "Tying takes longer than the catalog's study range, and untying takes longer than you think once hands are tired or someone wants out now.",
+          "A scene that has already used its energy on the first structure does not get safer by adding a second.",
+          "Stopwatches and phone timers fail the same way any other reminder fails: they fire after the thing you needed them for, or they do not fire at all. They do not watch the person.",
+        ],
+      },
+      {
+        type: "callout",
+        title: "Elapsed time is not a finding",
+        text: "Nothing about how long a tie has been on can tell you it is fine to leave it. The next check is due when something changes or when someone is unsure — which may be now.",
       },
     ],
   },

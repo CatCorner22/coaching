@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getTie } from "@/lib/kb";
+import { allowsAdultNudity, mediaUploadScope, type MediaUploadScope } from "@/lib/media-scope";
 import { MAX_HARD_NOS } from "@/lib/negotiation-bounds";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { fuseCoach } from "@/lib/ml/fuse";
@@ -20,7 +21,19 @@ import { MediaBatchReplayError, MediaBatchReservationError } from "./media-repla
 import { RateLimitError } from "./rate-limit-core";
 import type { AnalyzeResult } from "./schema";
 
-const SYSTEM = `You are a constrained visual classifier for non-explicit media supplied by consenting legal adults. Return broad visible categories only. You do not provide coaching, instructions, clearance, medical assessment, consent or age verification, exact tie identification, or physiology inference.
+/**
+ * The system prompt states the deployment's actual upload scope. It used to
+ * say "non-explicit media" unconditionally, which contradicted an
+ * `adult_nudity` deployment: the model was being told the media in front of
+ * it could not exist. Both variants keep the same closed contract; the
+ * adult-nudity variant additionally instructs the model to refuse sexual
+ * activity, which is out of scope at every setting.
+ */
+function buildSystemPrompt(scope: MediaUploadScope): string {
+  const scopeLine = allowsAdultNudity(scope)
+    ? `You are a constrained visual classifier for media supplied by consenting legal adults. The media may include nudity of consenting adults; explicit sexual activity is out of scope, and you must refuse to classify any still depicting it. Return broad visible categories only. You do not provide coaching, instructions, clearance, medical assessment, consent or age verification, exact tie identification, or physiology inference.`
+    : `You are a constrained visual classifier for non-explicit media supplied by consenting legal adults. Return broad visible categories only. You do not provide coaching, instructions, clearance, medical assessment, consent or age verification, exact tie identification, or physiology inference.`;
+  return `${scopeLine}
 
 Rules:
 - Classify only the user-selected labeled stills. Do not treat gallery order as chronology beyond the labels.
@@ -46,6 +59,7 @@ Return ONLY JSON in this exact shape:
     "note": "short note"
   }
 }`;
+}
 
 const triageValues = [
   "none",
@@ -175,7 +189,21 @@ const analyzeInputSchema = z
     consent: z
       .object({
         adults: z.literal(true),
+        /**
+         * The batch is within this deployment's upload scope. What that
+         * attestation *says* depends on `scope` below: under `non_explicit`
+         * the operator confirmed no nudity; under `adult_nudity` they
+         * confirmed adult nudity at most. Sexual activity is out of scope at
+         * every setting.
+         */
         nonExplicit: z.literal(true),
+        /**
+         * Which scope wording the attestation checkbox carried. Verified
+         * against the deployment's configured scope in the validator, so the
+         * server knows which attestation was actually made instead of
+         * receiving one indistinguishable bit under both settings.
+         */
+        scope: z.enum(["non_explicit", "adult_nudity"]),
         nonSecret: z.literal(true),
         nonCoerced: z.literal(true),
         allPeopleConsented: z.literal(true),
@@ -204,6 +232,15 @@ export const analyzeRope = createServerFn({ method: "POST" })
     const consentAgeMs = Date.now() - parsed.consent.confirmedAt;
     if (consentAgeMs < -5 * 60_000 || consentAgeMs > 60 * 60_000) {
       throw new Error("Media permissions must be reconfirmed for this batch");
+    }
+    // The attestation must be the one this deployment's scope setting asks
+    // for. A stale client built against a different scope — or a widened
+    // hand-rolled request — fails closed here rather than being silently
+    // reinterpreted.
+    if (parsed.consent.scope !== mediaUploadScope()) {
+      throw new Error(
+        "This batch's upload-scope attestation does not match the deployment's configured scope; reload and reconfirm a new batch",
+      );
     }
     const tieSlug = parsed.tieSlug?.slice(0, 60);
     return {
@@ -317,7 +354,7 @@ export const analyzeRope = createServerFn({ method: "POST" })
         responseFormat: MODEL_RESPONSE_FORMAT,
         signal: authorization.signal,
         messages: [
-          { role: "system", content: SYSTEM },
+          { role: "system", content: buildSystemPrompt(mediaUploadScope()) },
           { role: "user", content },
         ],
       });

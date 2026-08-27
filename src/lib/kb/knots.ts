@@ -8,7 +8,7 @@ const CORE_KNOTS: KnotSource[] = [
     name: "Somerville Bowline",
     jp: "非締め付けシングルコラム",
     summary:
-      "A non-cinching single-column knot taught here only as an unoccupied handling drill. Body use still requires consent, direct monitoring, rapid release, and hands-on instruction.",
+      "The non-cinching single-column knot. Learn the hand movements here as an unoccupied handling drill first; the guided single-column lesson then applies it on a consenting adult once its negotiated limit is agreed, with direct monitoring and rehearsed release.",
     cinches: false,
     loadBearing: false,
     steps: [

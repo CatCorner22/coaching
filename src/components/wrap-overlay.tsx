@@ -9,7 +9,6 @@ export const WrapOverlay = memo(function WrapOverlay({
   obs?: FrameObservation | null;
 }) {
   if (!src) return null;
-  const neck = (obs?.neckRope ?? 0) > 0.08;
   const width = Math.max(1, obs?.width ?? 4);
   const height = Math.max(1, obs?.height ?? 3);
   const maxWidth = Math.max(1, Math.round(320 * (width / height)));
@@ -64,11 +63,9 @@ export const WrapOverlay = memo(function WrapOverlay({
       <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-end justify-between gap-2 bg-gradient-to-t from-bg/90 to-transparent p-3 text-[11px]">
         <p className="text-fg">Limited image observation · not safety clearance</p>
       </div>
-      {neck && (
-        <p className="absolute left-3 top-3 rounded-full bg-danger px-2 py-0.5 text-[11px] uppercase tracking-wide text-danger-fg">
-          Possible neck overlap — stop and release now
-        </p>
-      )}
+      {/* No neck badge here: the local pipeline hardcodes neckRope to 0, so a
+          badge keyed on it was decoration guarding a signal that never fires.
+          Neck/airway categories come from the remote closed-schema report. */}
       </div>
     </div>
   );

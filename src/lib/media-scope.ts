@@ -12,9 +12,12 @@
  * Two limits are NOT configurable and never will be, because they are not the
  * provider's policy:
  *
- *  - Ambiguous or apparent-minor age is refused outright, at every setting.
- *  - Secretly or coercively obtained media is refused outright, at every
- *    setting.
+ *  - Ambiguous or apparent-minor age is refused at every setting, as a
+ *    required attestation, a search-side refusal, and passthrough of
+ *    provider refusals — not as detection. The prompt forbids inferring age.
+ *  - Secretly or coercively obtained media is refused at every setting,
+ *    the same way: attestation, coercion-triage stop, search-side refusal.
+ *    The app cannot detect either.
  *
  * Set with `VITE_MEDIA_UPLOAD_SCOPE`, via `.grok/app-env.json` in this
  * workspace or the provider's project environment when deployed.

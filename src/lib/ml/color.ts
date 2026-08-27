@@ -115,45 +115,7 @@ export function isDark(r: number, g: number, b: number) {
   return luma(r, g, b) < 42;
 }
 
-export function rgbToLab(c: RGB): [number, number, number] {
-  let r = c.r / 255;
-  let g = c.g / 255;
-  let b = c.b / 255;
-  r = r > 0.04045 ? ((r + 0.055) / 1.055) ** 2.4 : r / 12.92;
-  g = g > 0.04045 ? ((g + 0.055) / 1.055) ** 2.4 : g / 12.92;
-  b = b > 0.04045 ? ((b + 0.055) / 1.055) ** 2.4 : b / 12.92;
-  let x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
-  let y = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 1;
-  let z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
-  const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
-  x = f(x);
-  y = f(y);
-  z = f(z);
-  return [116 * y - 16, 500 * (x - y), 200 * (y - z)];
-}
-
-export function deltaE(a: RGB, b: RGB) {
-  const [l1, a1, b1] = rgbToLab(a);
-  const [l2, a2, b2] = rgbToLab(b);
-  return Math.hypot(l1 - l2, a1 - a2, b1 - b2);
-}
-
-export function palenessScore(c: RGB) {
-  const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-  const blueBias = c.b - (c.r + c.g) / 2;
-  return Math.max(0, Math.min(1, lum / 255 - 0.15 + Math.max(0, blueBias) / 180));
-}
-
-export function meanRgb(pixels: RGB[]): RGB {
-  if (!pixels.length) return { r: 0, g: 0, b: 0 };
-  const n = pixels.length;
-  let r = 0;
-  let g = 0;
-  let b = 0;
-  for (const p of pixels) {
-    r += p.r;
-    g += p.g;
-    b += p.b;
-  }
-  return { r: r / n, g: g / n, b: b / n };
-}
+// rgbToLab/deltaE/palenessScore/meanRgb were removed with the skin-tone and
+// paleness inference they served. The app deliberately does not localize
+// bodies or infer physiology from pixels; keeping their machinery exported
+// implied a capability the boundary forbids.
