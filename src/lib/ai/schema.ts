@@ -16,7 +16,8 @@ export type AnalyzeInput = {
   };
   consent: {
     adults: true;
-    nonExplicit: true;
+    /** Batch is within this deployment's upload scope (wording depends on `scope`). */
+    withinUploadScope: true;
     /** Which upload-scope attestation wording this batch confirmed. */
     scope: "non_explicit" | "adult_nudity";
     nonSecret: true;

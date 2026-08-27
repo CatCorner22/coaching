@@ -140,6 +140,7 @@ function TiePage() {
       cloudVoice={cloudVoice}
       media={s.media}
       tie={tie}
+      tieSlug={slug}
       stepIndex={step}
       expectedBands={s.expected.wrapBands}
       tieContext={{
@@ -149,6 +150,7 @@ function TiePage() {
         highlightIndex: wraps.length - 1,
       }}
       showCamera={!instructor}
+      nyxPose={instructor ? null : undefined}
     />
   );
 

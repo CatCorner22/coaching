@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { GraduationCap, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { HowToLearn } from "@/components/learn";
+import { HowToLearn, NyxModelPanel } from "@/components/learn";
 import { KnotFigure } from "@/components/knot-figure";
 import { RopeFigure } from "@/components/rope-figure";
 import {
@@ -13,6 +13,7 @@ import {
   getTie,
 } from "@/lib/kb";
 import { tieShape, tieShapeBlurb, tieShapeLabel } from "@/lib/kb/tie-factories";
+import { NYX_SHIBARI } from "@/lib/learn/nyx-model";
 
 export const Route = createFileRoute("/learn")({ component: LearnPage });
 
@@ -33,14 +34,19 @@ function LearnPage() {
         <div className="hidden rounded-xl border border-accent/25 bg-accent/8 p-3 sm:block">
           <GraduationCap className="size-8 text-accent" aria-hidden />
         </div>
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="text-sm uppercase tracking-wide text-muted">Knotty Academy</p>
           <h1 className="mt-2 font-display text-4xl sm:text-5xl">Easy-read lessons</h1>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted">
-            Short steps. Plain words. Pictures on every step. Listen aloud or use the practice cam for hints. Every knot
-            lesson here stays on a post or chair leg. The tie lessons differ from each other, so each one says on its own
-            card what it is — a prop drill, a tie taught in full, or a route this app only names.
+            Short steps. Plain words. Pictures on every step. {NYX_SHIBARI.name}, our demonstration
+            model, appears on taught lessons alongside diagrams. Listen aloud or use the practice cam
+            for hints. Every knot lesson here stays on a post or chair leg. The tie lessons differ from
+            each other, so each one says on its own card what it is — a prop drill, a tie taught in
+            full, or a route this app only names.
           </p>
+        </div>
+        <div className="hidden w-36 shrink-0 sm:block lg:w-44">
+          <NyxModelPanel pose="portrait" compact />
         </div>
       </div>
 

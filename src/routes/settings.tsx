@@ -1,6 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  mediaUploadScope,
+  uploadScopeLabel,
+  uploadScopeSettingsDescription,
+  uploadScopeSummary,
+} from "@/lib/media-scope";
 import { eraseAllLocalData } from "@/lib/privacy/local-data";
 import { useSettings } from "@/lib/stores/settings";
 import { clearCoachVoiceCache } from "@/lib/voice/play";
@@ -12,6 +18,7 @@ export const Route = createFileRoute("/settings")({
 
 function SettingsPage() {
   const s = useSettings();
+  const uploadScope = mediaUploadScope();
   const [confirmErase, setConfirmErase] = useState(false);
   const [eraseStatus, setEraseStatus] = useState<string | null>(null);
   const [erasing, setErasing] = useState(false);
@@ -40,6 +47,15 @@ function SettingsPage() {
       <p className="text-xs uppercase tracking-[0.22em] text-muted">Protocol</p>
       <h1 className="mt-2 font-display text-4xl">Settings</h1>
       <div className="mt-8 space-y-4">
+        <section className="rounded-lg border border-border bg-surface p-4">
+          <h2 className="font-display text-xl">Upload scope</h2>
+          <p className="mt-2 text-sm text-fg">{uploadScopeLabel(uploadScope)}</p>
+          <p className="mt-2 text-xs leading-relaxed text-muted">{uploadScopeSummary(uploadScope)}</p>
+          <p className="mt-2 text-xs leading-relaxed text-subtle">
+            {uploadScopeSettingsDescription(uploadScope)} This is an operator setting configured at
+            deploy time (`VITE_MEDIA_UPLOAD_SCOPE`), not a per-batch choice.
+          </p>
+        </section>
         <Field label="Your name / title" value={s.riggerName} onChange={(v) => s.set({ riggerName: v })} />
         <Field label="Other participant's name / title" value={s.bottomName} onChange={(v) => s.set({ bottomName: v })} />
         <Field label="Optional agreed honorific" value={s.honorific} onChange={(v) => s.set({ honorific: v })} />

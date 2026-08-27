@@ -3,6 +3,7 @@ import {
   SOURCE_LEDGER_REVISION,
   type SafetySourceId,
 } from "@/lib/kb/sources";
+import { uploadScopeSummary, type MediaUploadScope } from "@/lib/media-scope";
 
 export const CANONICAL_IDS = [
   "negotiation_materials_visible",
@@ -315,6 +316,7 @@ export function buildObservationReport(options: {
     recording: boolean;
     upload: boolean;
     output: boolean;
+    scope?: MediaUploadScope;
   };
   quality?: { sharpness: number; exposure: number; score: number } | null;
   matches?: ModelCategoryMatch[];
@@ -423,7 +425,12 @@ export function buildObservationReport(options: {
     recognized_categories: categories,
     observations: triage === "none" ? observationsFor(matches, mediaQuality) : [],
     nonvisual_checks: nonvisualChecksFor(triage, urgentStop),
-    limitations: limitationsFor(options.modelStatus, mediaMode, options.hardLimit === true),
+    limitations: limitationsFor(
+      options.modelStatus,
+      mediaMode,
+      options.hardLimit === true,
+      consent.scope,
+    ),
     escalation,
     next_step_id: nextStep,
     source_ids: sourceIds,
@@ -642,6 +649,7 @@ function limitationsFor(
   status: ModelStatus,
   mode: ObservationReport["media_mode"],
   hardLimit: boolean,
+  uploadScope?: MediaUploadScope,
 ): string[] {
   if (mode === "no_media") {
     return [
@@ -654,6 +662,9 @@ function limitationsFor(
     "The report cannot validate an exact knot, tie, harness, placement, construction, material, anchor, rating, technique, instructor qualification, or safety.",
     "Broad category matches are unvalidated and may contain false positives or false negatives; no visible concern is never an all-clear.",
   ];
+  if (uploadScope) {
+    limitations.push(`Upload scope attested for this batch: ${uploadScopeSummary(uploadScope)}`);
+  }
   limitations.push("The app resized and re-encoded the selected stills; crop, lighting, perspective, occlusion, and unknown prior edits can change appearance.");
   if (hardLimit) {
     limitations.unshift(

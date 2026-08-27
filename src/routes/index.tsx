@@ -4,11 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MiniTie } from "@/components/rope-figure";
 import { SEQUENCES, TIES, kbStats } from "@/lib/kb";
+import { mediaUploadScope, uploadScopeIntroLine } from "@/lib/media-scope";
 
 export const Route = createFileRoute("/")({ component: Home });
 
 function Home() {
   const stats = kbStats();
+  const uploadScope = mediaUploadScope();
   const featured = TIES.filter((t) =>
     ["single-column", "futomomo", "frog-tie", "mermaid", "karada", "takate-kote"].includes(t.slug),
   );
@@ -34,7 +36,7 @@ function Home() {
             Check directly.
           </h1>
           <p className="mt-5 max-w-lg text-base leading-relaxed text-muted">
-            Capture equipment-only or non-identifying stills. Knotty returns a bounded,
+            {uploadScopeIntroLine(uploadScope)} Knotty returns a bounded,
             evidence-labeled observation report with explicit uncertainty and consequence floors—
             never physiology, exact-tie validation, monitoring, clearance, or next-wrap coaching.
           </p>
