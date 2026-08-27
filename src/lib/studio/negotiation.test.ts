@@ -46,6 +46,15 @@ test("media cleanup runs only on a genuine allowed-to-blocked transition", () =>
   assert.equal(invalidations, 1, "reapproval cannot undo an already-observed revocation");
 });
 
+test("guided restraint ties wait for the cuffs limit", () => {
+  const none = buildStudioNegotiationPolicy(normalizeNegotiationItems([]));
+  assert.equal(none.isTieBlocked("single-column"), true);
+  assert.equal(none.isTieBlocked("double-column"), true);
+  const cuffs = buildStudioNegotiationPolicy([item("cuffs", "yes")]);
+  assert.equal(cuffs.isTieBlocked("single-column"), false);
+  assert.equal(cuffs.isTieBlocked("double-column"), false);
+});
+
 test("maybe blocks mapped ties and equipment until each item becomes yes", () => {
   const unresolved = buildStudioNegotiationPolicy([
     item("gote", "maybe"),

@@ -85,7 +85,7 @@ test("a cancelled photo import cannot commit after its decoder resolves", () => 
   const camera = read("src/components/camera-capture.tsx");
   const photoImport = between(
     camera,
-    "const { jpeg, imageData } = await processMediaFrame(file",
+    "const { jpeg, imageData, detailData } = await processMediaFrame(file",
     "} catch (e) {",
   );
   assert.match(

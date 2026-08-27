@@ -287,13 +287,13 @@ export const TECHNIQUE_ARTICLES: Article[] = [
           "**Two fingers under the rope.** Measures the gap at the point you chose to measure. Pressure is not uniform around a wrap, a nerve is compressed by what is happening at one specific spot, and your fingers are not there. A tie can pass this and be compressing a nerve an inch away.",
           "**Pink and warm fingertips.** Measures blood supply. Nerve compression does not require blood supply to be interrupted, so this stays perfectly normal while the damage happens. This is the most confidently wrong of the four.",
           "**Capillary refill.** Same system, same problem, with a number attached — which makes it feel more rigorous and no more relevant.",
-          "**Can you wiggle your fingers.** Do not treat passing this as reassurance: nerve compression does not announce itself in a fixed order, and acute radial compression — the most documented rope injury — often presents as sudden weakness or wrist drop with little or no sensory warning first. Passing this check means the function tested is working right now, not that an injury is not underway.",
+          "**Can you wiggle your fingers.** A working result here is not reassurance: nerve compression does not announce itself in a fixed order, and acute radial compression — the most documented rope injury — often presents as sudden weakness or wrist drop with little or no sensory warning first. This check says the function tested is working right now, not that an injury is not underway.",
         ],
       },
       {
         type: "callout",
         title: "The pattern",
-        text: "Three of the four measure circulation. Circulation is not the mechanism. The fourth measures a symptom that appears after the damage is already established.",
+        text: "Three of the four measure circulation. Circulation is not the mechanism. The fourth measures motor function at this instant, which can stay intact until it suddenly is not — or fail first, with no sensory warning.",
       },
       {
         type: "h",
