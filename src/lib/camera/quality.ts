@@ -224,21 +224,3 @@ export function pickBest<T>(
     .map(({ entry }) => entry.item);
 }
 
-export function enhanceContrast(data: ImageData): ImageData {
-  const out = new ImageData(new Uint8ClampedArray(data.data), data.width, data.height);
-  const buf = out.data;
-  let min = 255;
-  let max = 0;
-  for (let i = 0; i < buf.length; i += 4) {
-    const y = 0.299 * buf[i]! + 0.587 * buf[i + 1]! + 0.114 * buf[i + 2]!;
-    if (y < min) min = y;
-    if (y > max) max = y;
-  }
-  const span = Math.max(1, max - min);
-  for (let i = 0; i < buf.length; i += 4) {
-    buf[i] = Math.min(255, Math.max(0, ((buf[i]! - min) / span) * 255));
-    buf[i + 1] = Math.min(255, Math.max(0, ((buf[i + 1]! - min) / span) * 255));
-    buf[i + 2] = Math.min(255, Math.max(0, ((buf[i + 2]! - min) / span) * 255));
-  }
-  return out;
-}

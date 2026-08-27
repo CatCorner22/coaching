@@ -73,24 +73,6 @@ export function findPeaks(xs: number[], minRatio = 0.38): { index: number; value
   return selected.sort((a, b) => a.index - b.index);
 }
 
-export function linearSlope(xs: number[]): number {
-  const n = xs.length;
-  if (n < 2) return 0;
-  let sumX = 0;
-  let sumY = 0;
-  let sumXY = 0;
-  let sumXX = 0;
-  for (let i = 0; i < n; i++) {
-    sumX += i;
-    sumY += xs[i]!;
-    sumXY += i * xs[i]!;
-    sumXX += i * i;
-  }
-  const den = n * sumXX - sumX * sumX;
-  if (Math.abs(den) < 1e-9) return 0;
-  return (n * sumXY - sumX * sumY) / den;
-}
-
 export function clamp01(n: number) {
   return Math.max(0, Math.min(1, n));
 }

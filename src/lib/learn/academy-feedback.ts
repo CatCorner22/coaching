@@ -8,11 +8,24 @@ export type AcademyFeedback = {
   detail: string;
   speak: string;
   confidence: number;
+  /**
+   * Qualitative rendering of `confidence`. The step-inference distance
+   * transform is not calibrated, so presenting it as a percentage implied a
+   * precision that does not exist; buckets say what it actually is — a rough
+   * comparison of band counts.
+   */
+  matchLabel: string;
   wrapCount: number;
   expectedBands: number | null;
   inferredStep: number | null;
   recommend: "continue" | "adjust" | "stop";
 };
+
+function describeMatch(confidence: number): string {
+  if (confidence >= 0.65) return "close band-count match";
+  if (confidence >= 0.4) return "rough band-count match";
+  return "weak band-count match";
+}
 
 export function buildAcademyFeedback(opts: {
   det: DeterministicReport;
@@ -57,13 +70,17 @@ export function buildAcademyFeedback(opts: {
   let speak = report.final.speak;
 
   if (stop) {
-    headline = "Pause — possible neck overlap in view";
+    // Keyed on the flag's own note rather than naming a specific hazard: the
+    // only stop-severity local flag is defensive and its note already says
+    // what was seen, so a hardcoded "neck overlap" headline here claimed a
+    // detection the local pipeline does not perform.
+    headline = "Pause — release and check directly";
     detail = det.flags.find((f) => f.severity === "stop")?.note ?? detail;
-    speak = "Stop. Release anything near the neck. This view is not an all-clear.";
+    speak = "Stop and release. This view is not an all-clear.";
   } else if (tie && expectedBands != null) {
     if (bandMatch) {
       headline = `Heuristic sees about ${det.wrapCount} band${det.wrapCount === 1 ? "" : "s"} — matches this step`;
-      detail = `The app guessed ${Math.round(confidence * 100)}% confidence for step ${stepIndex + 1}. This is not proof of correct tying. Compare your prop to the diagram and check list.`;
+      detail = `The band count is a ${describeMatch(confidence)} for step ${stepIndex + 1}. It is an uncalibrated heuristic, not proof of correct tying. Compare your prop to the diagram and check list.`;
       speak = `About ${det.wrapCount} bands visible. Compare to the diagram. This is not clearance.`;
     } else {
       headline = `Heuristic sees ${det.wrapCount} band${det.wrapCount === 1 ? "" : "s"}; this step expects ${expectedBands}`;
@@ -86,6 +103,7 @@ export function buildAcademyFeedback(opts: {
     detail,
     speak,
     confidence,
+    matchLabel: describeMatch(confidence),
     wrapCount: det.wrapCount,
     expectedBands: expectedBands ?? null,
     inferredStep,

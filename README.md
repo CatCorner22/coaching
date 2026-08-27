@@ -6,10 +6,10 @@ The camera accepts photos or short clips, converts video to user-selected labele
 
 ## Camera privacy and safety boundary
 
-- Per batch: legal-adult attestation; separate clothed/non-explicit, non-secret, non-coerced, and all-people-consented attestations; and separate activity, recording, upload, and output permission.
+- Per batch: legal-adult attestation; an upload-scope attestation whose wording matches this deployment's `VITE_MEDIA_UPLOAD_SCOPE` (clothed/intimate-wear only, or adult nudity at most); separate non-secret, non-coerced, and all-people-consented attestations; and separate activity, recording, upload, and output permission. The server rejects a batch whose scope field does not match the deployment.
 - Prefer equipment-only or non-identifying media; exclude faces, tattoos, screens, mail, and room details.
 - What may be uploaded is an operator setting, `VITE_MEDIA_UPLOAD_SCOPE` (see **Upload scope** below). Intimate wear is always within it; full nudity is within it only when the operator has set it so; explicit sexual activity never is.
-- Two limits are not the provider's policy and are not configurable at any setting: apparent or ambiguous minor age, and secretly or coercively obtained media. Both are refused outright.
+- Two limits are not the provider's policy and are not configurable at any setting: apparent or ambiguous minor age, and secretly or coercively obtained media. Both are refused as required attestations, a coercion-triage stop, and passthrough of provider refusals — not as detection. The prompt itself forbids inferring age or consent. The honest framing used for nudity (an operator attestation, not automatic content moderation) applies to these two as well.
 - The setting governs the upload only. It says nothing about what anyone photographs, keeps, or shares, and the app has no visibility into any of that — its controls end at its own local batch.
 - The non-explicit boundary is an operator attestation, not automatic content moderation. The app does not certify or reliably detect nudity; do not select explicit media.
 - Video stays local and is reduced to one to three stills selected by the user.
@@ -28,9 +28,9 @@ The **Deploy** button is deliberately refused, with an explanation. A Replit Dep
 
 **The adult gate** asks for four separate attestations before anything opens, and reappears per browser profile. It is not a login.
 
-**Negotiated limits gate the app.** Every restraint category in the catalog maps to at least one limit and stays blocked until that limit is set to yes on `/negotiate` — takate-kote needs `gote`, the karada family needs `torso`, arm ties need `arms`, leg ties need `legs`, matanawa needs `crotch`. Unoccupied prop drills, such as the single column, are open from the start; they put rope on nobody. The `photos` limit gates the whole camera path. Four limits — neck, breath, suspension, alone — are locked to no and cannot be set otherwise, so partial-suspension, neck rope and every suspension category stay blocked however the list is edited. The list also carries the activity families beyond rope, one row each, because a single "impact" row would cover a hand and a cane alike. Limits sync between open tabs, and a revocation in one tab wins over a stale tab's later save.
+**Negotiated limits gate the app.** Every restraint category and every guided tie maps to at least one limit and stays blocked — in Studio and on the tie page — until that limit is set to yes on `/negotiate`. Takate-kote needs `gote`, the karada family needs `torso`, arm ties need `arms`, leg ties need `legs`, matanawa needs `crotch`, and the two guided restraint ties (single-column, double-column) need `cuffs`. Unoccupied prop drills — the cuff-pattern drill, the hexagon net, the diamond column — are open from the start; they put rope on nobody. The catalog entry named `single-column` is not one of those drills: it is the guided on-a-person lesson, and it waits for `cuffs`. The `photos` limit gates the whole camera path, including the local practice cam on taught tie pages. Cloud observation lives only in the Studio, behind the per-batch attestations. Four limits — neck, breath, suspension, alone — are locked to no and cannot be set otherwise, so partial-suspension, neck rope and every suspension category stay blocked however the list is edited. The list also carries the activity families beyond rope, one row each, because a single "impact" row would cover a hand and a cane alike. Limits sync between open tabs, and a revocation in one tab wins over a stale tab's later save.
 
-**What's in the catalog.** 63 ties and 85 articles. Ties come in exactly three shapes, labelled on every card:
+**What's in the catalog.** 63 ties and 92 articles. Ties come in exactly three shapes, labelled on every card:
 
 | Shape | What it means |
 | --- | --- |
@@ -80,7 +80,7 @@ To change it, edit that value, or override it without touching the repo:
 - `.grok/app-env.json` in a workspace (gitignored, so it does not survive a fresh clone or reach a deployment), or
 - a real `VITE_MEDIA_UPLOAD_SCOPE` in the deployment's project environment, which beats both.
 
-An unrecognised value falls back to `non_explicit` rather than widening, so a typo cannot silently open the boundary. Read the provider's current Acceptable Use Policy before changing it upward; a policy change changes what this setting is allowed to be. The capture panel states the setting in force on every batch.
+An unrecognised value falls back to `non_explicit` rather than widening, so a typo cannot silently open the boundary. Read the provider's current Acceptable Use Policy before changing it upward; a policy change changes what this setting is allowed to be. The capture panel states the setting in force on every batch. The server receives that setting as `consent.scope`, rejects a mismatch, and builds the classifier prompt from it: an `adult_nudity` deployment tells the model the media may include nudity of consenting adults and that sexual activity is still out of scope. The two hard refusals — apparent or ambiguous minor age, and secretly or coercively obtained media — stay refused at every setting.
 
 ## Development
 

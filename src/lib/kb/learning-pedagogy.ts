@@ -298,13 +298,13 @@ export const LEARNING_PEDAGOGY_ARTICLES: Article[] = [
     section: "craft",
     minutes: 8,
     summary:
-      "These six knots teach you everything you need to know to tie safely. Every other knot is a variation or a combination.",
+      "Six knots that teach the core mechanics behind most of the catalog. Knowing them is understanding, not clearance — no knot knowledge makes a tie safe.",
     related: ["rope-basics", "learning-modalities"],
     blocks: [
-      { type: "h", text: "Start with these six, master them completely" },
+      { type: "h", text: "Start with these six, learn them one at a time" },
       {
         type: "p",
-        text: "The six foundation knots in this app are not random. Each one teaches a core principle. Master these six and you will understand the mechanics behind dozens of other knots.",
+        text: "The six foundation knots in this app are not random. Each one teaches a core principle, and mastering them will let you read the mechanics behind dozens of other knots. What none of them does is make anything safe: a correctly tied knot is a correctly tied knot, nothing more.",
       },
       {
         type: "h",
@@ -312,15 +312,15 @@ export const LEARNING_PEDAGOGY_ARTICLES: Article[] = [
       },
       {
         type: "p",
-        text: "Teaches: How to make a loop that stays open no matter how much you pull. This is the foundation of safe rope work because a cinching loop can trap and cut off circulation. Once you tie a bowline correctly, you never have to guess whether a loop is safe.",
+        text: "Teaches: How to make a loop that holds its size instead of drawing down when pulled. That matters because a cinching loop on a limb tightens under movement. Tying it correctly removes one specific failure mode — cinching — and nothing else: placement, tension, duration, and nerve position all still matter, and no knot check clears any of them.",
       },
       {
         type: "h",
-        text: "2. Lark's Head — anchoring the rope",
+        text: "2. Lark's Head — using the middle of the rope",
       },
       {
         type: "p",
-        text: "Teaches: How to use the middle of a rope and attach it to a post. This is the most reliable starting point for any rope work. Every single shibari tie can be started with a lark's head and a post.",
+        text: "Teaches: How doubled rope anchors to an object, and what a cinching hitch feels like as it loads. This app teaches it on an unoccupied post or beam only — it cinches, which is exactly why it is worth understanding and exactly why the catalog never uses it as a cuff, a harness start, or anything else that touches a person.",
       },
       {
         type: "h",
@@ -336,23 +336,23 @@ export const LEARNING_PEDAGOGY_ARTICLES: Article[] = [
       },
       {
         type: "p",
-        text: "Teaches: How two identical wraps make a strong, stable hold. This is the basis for cuffs and for most of the rope-to-rope connections you will use.",
+        text: "Teaches: How two identical wraps make a stable hold, and how friction accumulates. It is the mechanical idea underneath many of the finishes and direction changes you will meet later.",
       },
       {
         type: "h",
-        text: "5. Square Knot — rope-to-rope on open ends",
+        text: "5. Square Knot — a flat, decorative finish, not a join",
       },
       {
         type: "p",
-        text: "Teaches: How to tie two rope ends together when you need the knot to be completely predictable and not slip. This is used when you are joining two separate ropes.",
+        text: "Teaches: How two mirrored throws press flat against each other — and the limits of that. A square knot is a binding and decorative knot. It is not a knot for joining two ropes that will carry real tension: under a hard steady pull the interlocked bights slide, capsize into a girth-hitch shape, and the ends work loose, which is why rope-craft references pair it with a proper bend whenever an actual working load is expected. Learn it for what it is; the knot's own entry lists the ways it fails.",
       },
       {
         type: "h",
-        text: "6. Overhand on a Bight — the emergency loop",
+        text: "6. Overhand on a Bight — a loop without the ends",
       },
       {
         type: "p",
-        text: "Teaches: How to tie a secure loop in the middle of a rope without using the ends. This is used for attachment points and for backup loops in ties.",
+        text: "Teaches: How to put a loop in the middle of a rope without using the ends, and why that structure has costs. It cinches, it can jam solid when loaded, and it is not a rapid-release method — so it is demonstrated on loose practice material and used in the catalog only as the karada's decorative, unloaded knot chain. It is not an attachment point and not a backup for anything that carries load.",
       },
       {
         type: "callout",

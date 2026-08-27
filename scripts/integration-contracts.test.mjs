@@ -562,4 +562,37 @@ test("the media upload scope is an operator setting with a conservative default"
   assert.match(camera, /const scope = mediaUploadScope\(\);/);
   assert.match(camera, /label=\{uploadScopeAttestation\(scope\)\}/);
   assert.match(camera, /\{uploadScopeSummary\(scope\)\}/);
+  // The batch carries which wording was attested, not a single bit that
+  // meant the same thing under both settings.
+  assert.match(camera, /scope,/);
+  // File-imported photos use the native-scale crop for focus, same as live
+  // capture and video stills. Scoring the 240px downscale alone understates blur.
+  assert.match(camera, /const \{ jpeg, imageData, detailData \} = await processMediaFrame/);
+  assert.match(camera, /scoreFrame\(imageData, detailData\)/);
+
+  // The server knows which attestation was made and builds the prompt from
+  // the deployment's actual scope. A stale client or a widened request fails.
+  const analyze = read("src/lib/ai/analyze.ts");
+  assert.match(analyze, /scope: z\.enum\(\["non_explicit", "adult_nudity"\]\)/);
+  assert.match(analyze, /parsed\.consent\.scope !== mediaUploadScope\(\)/);
+  assert.match(analyze, /function buildSystemPrompt\(scope: MediaUploadScope\)/);
+  assert.match(analyze, /content: buildSystemPrompt\(mediaUploadScope\(\)\)/);
+  assert.match(
+    analyze,
+    /The media may include nudity of consenting adults; explicit sexual activity is out of scope/,
+  );
+});
+
+test("the tie-page practice cam stays local and waits for the photos limit", () => {
+  // A second, ungated camera-and-analyze path on the taught pages used to
+  // fabricate every per-batch attestation and mint a non-UUID batch id.
+  const observe = read("src/components/learn/academy-observe-panel.tsx");
+  assert.doesNotMatch(observe, /analyzeRope/);
+  assert.doesNotMatch(observe, /adults:\s*true/);
+  assert.match(observe, /photosApproved/);
+  assert.match(observe, /item\.id === "photos" && item\.rank === "yes"/);
+
+  const studio = read("src/routes/studio.tsx");
+  // Plain "yellow" stays armed even when a custom yellow word is set.
+  assert.match(studio, /\[settings\.safeword, settings\.yellowWord, "red", "yellow"\]/);
 });

@@ -46,6 +46,13 @@ export async function authorizeAiRequest(verifiedUserId?: string): Promise<{ use
     !isTrustedAppOrigin(origin, {
       configuredOrigin: process.env.BETTER_AUTH_URL,
       allowLoopback: viteDevServer,
+      // The shared preview domain is a trusted origin only where the live
+      // preview is actually wired up: the dev server, or a deployment holding
+      // the preview OAuth client secret. A production app on its own domain
+      // gets its origin from BETTER_AUTH_URL and never trusts the shared
+      // sandbox domain.
+      allowPreviewHosts:
+        viteDevServer || Boolean(process.env.GROK_PREVIEW_CLIENT_SECRET?.trim()),
     })
   ) {
     throw new AiRequestDeniedError("Request origin is not allowed");

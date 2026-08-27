@@ -41,7 +41,18 @@ export function matchesHostPattern(hostname: string, pattern: string): boolean {
  */
 export function isTrustedAppOrigin(
   origin: string,
-  options: { configuredOrigin?: string | null; allowLoopback?: boolean } = {},
+  options: {
+    configuredOrigin?: string | null;
+    allowLoopback?: boolean;
+    /**
+     * Accept the shared live-preview host patterns. Only the caller knows
+     * whether this deployment actually serves the live preview (the preview
+     * OAuth client secret is configured, or this is the dev server).
+     * Unconditional acceptance meant any page on the shared preview domain
+     * was a trusted origin for every production deployment, forever.
+     */
+    allowPreviewHosts?: boolean;
+  } = {},
 ): boolean {
   let url: URL;
   try {
@@ -60,7 +71,7 @@ export function isTrustedAppOrigin(
     }
   }
 
-  if (url.protocol === "https:") {
+  if (options.allowPreviewHosts && url.protocol === "https:") {
     for (const pattern of PREVIEW_ALLOWED_HOSTS) {
       if (matchesHostPattern(url.hostname, pattern)) return true;
     }

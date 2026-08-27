@@ -6,7 +6,7 @@ export const MORE_KNOTS: KnotSource[] = [
     name: "Overhand on a Bight",
     jp: "止め結び",
     summary:
-      "A stopper-loop category demonstrated only on loose, unoccupied material. This app does not teach it as a cuff, loaded connection, or person-bearing component.",
+      "A stopper-loop category demonstrated on loose, unoccupied material. Its one guided use is the karada's decorative, unloaded knot chain; this app does not teach it as a cuff, loaded connection, or person-bearing component.",
     cinches: true,
     loadBearing: false,
     steps: [

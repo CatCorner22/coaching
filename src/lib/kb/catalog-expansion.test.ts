@@ -130,6 +130,25 @@ test("every gated restraint category maps to a negotiated limit", () => {
   }
   assert.deepEqual(ungated, [], `restraint categories open with every limit at no: ${ungated.join(", ")}`);
 
+  // Guided ties go on a person, and their cards promise "once its negotiated
+  // limit is agreed" — so every one of them must map to a limit too. This
+  // invariant used to be asserted only for instructor routes, which is how
+  // single-column and double-column shipped selectable with every limit at no.
+  const ungatedGuided: string[] = [];
+  for (const tie of TIES) {
+    if (!tie.intent.includes("guided-practice")) continue;
+    if (!allNo.isTieBlocked(tie.slug)) ungatedGuided.push(tie.slug);
+  }
+  assert.deepEqual(
+    ungatedGuided,
+    [],
+    `guided ties open with every limit at no: ${ungatedGuided.join(", ")}`,
+  );
+  // And approving their limit opens them.
+  assert.equal(allYes.isTieBlocked("single-column"), false);
+  assert.equal(allYes.isTieBlocked("double-column"), false);
+  assert.equal(allYes.isTieBlocked("karada"), false);
+
   // And the gate is a gate, not a wall: approving everything opens the ones
   // that are approvable.
   assert.equal(allYes.isTieBlocked("teppou"), false);
@@ -540,5 +559,36 @@ test("the strip-down step clears the figure instead of showing the finished patt
       `${tie.slug}: strip-down media still draws rope`,
     );
     assert.equal(last.expected.wrapBands, 0, `${tie.slug}: strip-down still claims bands`);
+  }
+});
+
+test("knot-foundations agrees with the knot catalog", () => {
+  // This article used to teach the square knot as a predictable non-slipping
+  // bend, bless the lark's head as the start of every shibari tie, and promise
+  // that a correctly tied bowline meant you never had to guess whether a loop
+  // was safe. The catalog entries it is introducing all contradict those.
+  const article = ARTICLES.find((a) => a.slug === "knot-foundations");
+  assert.ok(article);
+  const copy = JSON.stringify(article);
+  assert.doesNotMatch(copy, /completely predictable and not slip/i);
+  assert.doesNotMatch(copy, /every single shibari tie/i);
+  assert.doesNotMatch(copy, /never have to guess whether a loop is safe/i);
+  assert.match(copy, /binding and decorative knot/i);
+  assert.match(copy, /cinches/i);
+  assert.match(copy, /not a rapid-release method/i);
+});
+
+test("karada lists the knot its steps actually use", () => {
+  const karada = getTie("karada");
+  assert.ok(karada);
+  assert.deepEqual(karada.knots, ["overhand-on-bight"]);
+});
+
+test("the formerly skeletal core articles now teach something", () => {
+  for (const slug of ["warmup-stretch", "gear-care", "furniture", "time-and-clocks"]) {
+    const article = ARTICLES.find((a) => a.slug === slug);
+    assert.ok(article, slug);
+    const words = JSON.stringify(article.blocks).split(/\s+/).length;
+    assert.ok(words > 120, `${slug} is still a single hedged paragraph (${words} words)`);
   }
 });

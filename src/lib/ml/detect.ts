@@ -1,4 +1,4 @@
-import { isDark, isDarkFiber, isRope, type RGB } from "./color";
+import { isDark, isDarkFiber, isRope } from "./color";
 import { findPeaks, smooth } from "./signal";
 import type { FrameObservation, WrapBand } from "./types";
 
@@ -109,7 +109,3 @@ export function observeFrame(
   };
 }
 
-/** @deprecated Image-only hand/physiology sampling is intentionally disabled. */
-export function sampleHands(_data: ImageData): RGB | null {
-  return null;
-}

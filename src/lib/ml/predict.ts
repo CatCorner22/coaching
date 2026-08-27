@@ -1,5 +1,5 @@
 import type { Tie } from "@/lib/kb/types";
-import { clamp01, mean } from "./signal";
+import { clamp01 } from "./signal";
 import type {
   DeterministicReport,
   FrameObservation,
@@ -112,8 +112,4 @@ export function rankRecommend(
   if (xs.includes("stop")) return "stop";
   if (xs.includes("adjust")) return "adjust";
   return "continue";
-}
-
-export function meanPaleness(frames: FrameObservation[]) {
-  return mean(frames.map((f) => f.paleness));
 }

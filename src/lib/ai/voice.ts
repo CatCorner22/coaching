@@ -20,6 +20,15 @@ export const speakCoach = createServerFn({ method: "POST" })
       return { ok: false, error: "Cloud voice accepts only reviewed app guidance" };
     }
     const authorization = await authorizeAiRequest(context.userId);
+    // Cheap local availability checks come before the quota charge: a
+    // deployment without a key or the explicit ZDR flag used to burn the
+    // whole voice budget on attempts that could never succeed. Charging
+    // before the network preflight itself stays deliberate — probes spend
+    // provider quota and must remain bounded.
+    const { zeroDataRetentionRequired } = await import("./grok");
+    if (!process.env.XAI_API_KEY?.trim() || !zeroDataRetentionRequired()) {
+      return { ok: false, error: "Voice is not available" };
+    }
     const { consumeAiBudget } = await import("./rate-limit.server");
     try {
       consumeAiBudget("voice", 20, 10 * 60_000, authorization.userId);
