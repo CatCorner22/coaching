@@ -30,6 +30,10 @@ export function NyxModelPanel({ pose, className, compact = false }: NyxModelPane
           className="h-full w-full object-cover object-center"
           loading="lazy"
           decoding="async"
+          onError={(event) => {
+            event.currentTarget.classList.add("opacity-40");
+            event.currentTarget.alt = `${NYX_SHIBARI.name} — image unavailable`;
+          }}
         />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-surface/95 via-surface/40 to-transparent px-3 pb-3 pt-10">
           <p className="text-xs font-medium text-fg">{NYX_SHIBARI.name}</p>
