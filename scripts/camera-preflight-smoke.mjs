@@ -44,9 +44,13 @@ try {
 
     const waitForConsentReady = async () => {
       const enter = page.getByRole("button", { name: "Step inside", exact: true });
+      const openLive = page.getByRole("button", { name: "Open live camera", exact: true });
+      // The account-boundary gate also renders a <main>. Racing that used to
+      // treat "Checking the local account boundary…" as Studio-ready and skip
+      // Step inside, so Open live camera never appeared.
       await Promise.race([
-        enter.waitFor({ state: "visible", timeout: 10_000 }),
-        page.locator("main").waitFor({ state: "visible", timeout: 10_000 }),
+        enter.waitFor({ state: "visible", timeout: 15_000 }),
+        openLive.waitFor({ state: "visible", timeout: 15_000 }),
       ]);
       if (await enter.isVisible().catch(() => false)) {
         const checks = page.getByRole("checkbox");
@@ -55,7 +59,7 @@ try {
         }
         await checks.first().check();
         await enter.click();
-        await page.locator("main").waitFor({ state: "visible", timeout: 10_000 });
+        await openLive.waitFor({ state: "visible", timeout: 15_000 });
       }
     };
 

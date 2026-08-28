@@ -531,6 +531,13 @@ test("the emergency card stays offered when the account boundary blocks the app"
   assert.doesNotMatch(status, /<Link/);
 });
 
+test("camera preflight waits for Step inside, not the account-boundary main", () => {
+  const smoke = read("scripts/camera-preflight-smoke.mjs");
+  assert.doesNotMatch(smoke, /page\.locator\("main"\)\.waitFor/);
+  assert.match(smoke, /Open live camera/);
+  assert.match(smoke, /account-boundary gate also renders a <main>/);
+});
+
 test("the elapsed direct-check reminder is announced, not just drawn", () => {
   const studio = read("src/routes/studio.tsx");
   assert.match(studio, /function CirculationBanner[\s\S]*<div role="status" aria-live="polite">/);
