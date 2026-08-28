@@ -1,7 +1,6 @@
 #!/bin/sh
-set -eu
-cd /workspace
-if curl -sf -o /dev/null --max-time 2 http://127.0.0.1:8080/; then
+# Idempotent dev-server startup for Knotty preview (port 8080).
+if curl -sf http://127.0.0.1:8080/ >/dev/null 2>&1; then
   exit 0
 fi
-npm run dev >>/tmp/app-startup.log 2>&1 &
+cd /workspace && npm run dev >/tmp/knotty-dev.log 2>&1 &

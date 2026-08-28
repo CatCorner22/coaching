@@ -36,10 +36,7 @@ export function NyxModelPanel({ pose, className, compact = false }: NyxModelPane
           <p className="mt-0.5 text-[11px] leading-snug text-muted">{caption}</p>
         </div>
       </div>
-      <figcaption className="px-3 py-2 text-[10px] leading-relaxed text-subtle">
-        Fictional adult demonstration model ({NYX_SHIBARI.ageLabel}). Stills support pattern recognition
-        only — they do not verify consent, technique, pressure, or safety.
-      </figcaption>
+      <figcaption className="sr-only">{NYX_SHIBARI.name}: {caption}</figcaption>
     </figure>
   );
 }

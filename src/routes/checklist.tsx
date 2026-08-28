@@ -1,27 +1,27 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { mediaUploadScope, uploadScopeChecklistLine } from "@/lib/media-scope";
+import { useChecklist } from "@/lib/stores/checklist";
 import { useKit } from "@/lib/stores/kit";
 import { useSettings } from "@/lib/stores/settings";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/checklist")({ component: ChecklistPage });
 
 const ITEMS = [
-  { id: "adults", label: "Everyone involved is 18 or older." },
-  { id: "consent", label: "Today's specific yes / maybe / no was confirmed directly; maybe still means no." },
-  { id: "safewords", label: "Verbal and non-verbal stop channels were agreed and tested while unrestrained." },
-  { id: "shears", label: "Trauma shears are on the scene, not in another room." },
-  { id: "water", label: "Water and a blanket are within reach." },
-  { id: "furniture", label: "Furniture is stable and remains non-load-bearing; no household anchor is assumed rated." },
-  { id: "machine", label: "Any machine is off, and its emergency stop is unobstructed and directly tested." },
-  { id: "camera", label: uploadScopeChecklistLine(mediaUploadScope()) },
-  { id: "clock", label: "Any reminder is only a prompt to check directly, never a safe-duration guarantee." },
-  { id: "exit", label: "The release plan was practiced unrestrained; emergency actions stay within your training and dispatcher instructions." },
+  { id: "adults", label: "We're both 18+ and chose this together tonight." },
+  { id: "consent", label: "We said yes out loud to what we're doing — maybe still means not tonight." },
+  { id: "safewords", label: "Our stop words work, even when hands are busy." },
+  { id: "shears", label: "Trauma shears are right here, not in another room." },
+  { id: "water", label: "Water and something cozy are within reach." },
+  { id: "furniture", label: "The bed or frame is stable — nothing load-bearing we didn't mean to use." },
+  { id: "machine", label: "Any toy or machine is off until we want it, with an easy stop." },
+  { id: "camera", label: "We're happy to use the camera and Analyze if we feel like it." },
+  { id: "clock", label: "Reminders are just nudges to check in — not a timer that overrides us." },
+  { id: "exit", label: "We know how to untie fast if either of us needs out." },
 ] as const;
 
 function ChecklistPage() {
-  const [done, setDone] = useState<Record<string, boolean>>({});
+  const done = useChecklist((s) => s.done);
+  const setDone = useChecklist((s) => s.setDone);
   const shears = useKit((s) => s.shears);
   const eights = useKit((s) => s.eights);
   const safeword = useSettings((s) => s.safeword);
@@ -32,8 +32,8 @@ function ChecklistPage() {
       <p className="text-xs uppercase tracking-[0.22em] text-muted">Before rope</p>
       <h1 className="mt-2 font-display text-4xl">Pre-scene</h1>
       <p className="mt-3 text-sm text-muted">
-        Ten prompts to verify directly before any activity. Your saved stop word is {safeword}. Your
-        kit lists {eights} × 8m lengths{shears ? " and trauma shears" : ""}; a checked box is not proof of safety.
+        Ten sweet checks before you begin. Your stop word is <strong className="text-fg">{safeword}</strong>.
+        Your kit lists {eights} × 8m lengths{shears ? " and trauma shears" : ""}.
       </p>
       <ul className="mt-8 space-y-3">
         {ITEMS.map((item) => (
@@ -43,7 +43,7 @@ function ChecklistPage() {
                 type="checkbox"
                 className="mt-1 size-4 accent-accent"
                 checked={!!done[item.id]}
-                onChange={(e) => setDone((d) => ({ ...d, [item.id]: e.target.checked }))}
+                onChange={(e) => setDone(item.id, e.target.checked)}
               />
               <span>{item.label}</span>
             </label>
@@ -66,7 +66,7 @@ function ChecklistPage() {
         </Button>
       </div>
       {!ready && (
-        <p className="mt-4 text-xs text-subtle">Complete each item directly with everyone involved before opening Studio.</p>
+        <p className="mt-4 text-xs text-subtle">Tick each box together when it's true for you both.</p>
       )}
     </div>
   );

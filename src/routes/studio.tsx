@@ -18,7 +18,6 @@ import { useSession } from "@/lib/stores/session";
 import { useSettings } from "@/lib/stores/settings";
 import {
   buildStudioNegotiationPolicy,
-  mediaAuthorizationWasRevoked,
   studioPolicySignature,
 } from "@/lib/studio/negotiation";
 import { listenForWords } from "@/lib/voice/listen";
@@ -88,11 +87,7 @@ function StudioPage() {
     operationalLimits,
     negotiationKey,
     voiceBlocked,
-    mediaBlocked: negotiatedMediaBlocked,
   } = negotiationPolicy;
-  const mediaBlocked = !negotiationReady || negotiatedMediaBlocked;
-  const mediaAllowed = negotiationReady && !negotiatedMediaBlocked;
-  const previousMediaAllowedRef = useRef(mediaAllowed);
   const captureContextKey = `${tieSlug ?? ""}|${stepIndex}|${furnitureSlug ?? ""}|${negotiationKey}`;
   const [capture, setCapture] = useState<CaptureResult | null>(null);
   const [report, setReport] = useState<CoachReport | null>(null);
@@ -100,7 +95,7 @@ function StudioPage() {
   const [modelStatus, setModelStatus] = useState<ModelStatus>("not_requested");
   const [pending, setPending] = useState(false);
   const [analysisConsumed, setAnalysisConsumed] = useState(false);
-  const [triage, setTriage] = useState<TriageState | "unanswered">("unanswered");
+  const [triage, setTriage] = useState<TriageState>("none");
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [refusal, setRefusal] = useState(false);
   const [savedReportRevision, setSavedReportRevision] = useState<string | null>(null);
@@ -120,17 +115,7 @@ function StudioPage() {
   const tieBlocked = negotiationPolicy.isTieBlocked(tieSlug);
   const furnitureBlocked = negotiationPolicy.isFurnitureBlocked(furnitureSlug);
   const studioVoice = settings.voice && !voiceBlocked;
-  const cameraGateReason = stopped
-    ? "session-stopped"
-    : !negotiationReady
-      ? "negotiation-hydrating"
-      : negotiatedMediaBlocked
-        ? "media-not-approved"
-        : triage === "unanswered"
-          ? "triage-unanswered"
-          : triage !== "none"
-            ? "triage-concern"
-            : "enabled";
+  const cameraGateReason = stopped ? "session-stopped" : "enabled";
 
   useEffect(() => {
     const api = useNegotiate.persist;
@@ -184,21 +169,6 @@ function StudioPage() {
     if (tieBlocked || instructorOnlyTie) useSession.getState().setTie(undefined);
     if (furnitureBlocked) useSession.getState().setFurniture(undefined);
   }, [tieBlocked, instructorOnlyTie, furnitureBlocked]);
-
-  useEffect(() => {
-    const previouslyAllowed = previousMediaAllowedRef.current;
-    previousMediaAllowedRef.current = mediaAllowed;
-    if (!mediaAuthorizationWasRevoked(previouslyAllowed, mediaAllowed)) return;
-    analysisRequestRef.current += 1;
-    stopCoachVoice();
-    captureContextAtCommitRef.current = null;
-    setCapture(null);
-    setReport(null);
-    setObservationReport(null);
-    setAnalysisConsumed(false);
-    setTriage("unanswered");
-    setPending(false);
-  }, [mediaAllowed]);
 
   useEffect(() => {
     if (!studioVoice) stopCoachVoice();
@@ -288,7 +258,7 @@ function StudioPage() {
       setObservationReport(null);
       setModelStatus("not_requested");
       setAnalysisConsumed(false);
-      setTriage("unanswered");
+      setTriage("none");
     }
   }, [capture, captureContextKey]);
   const captureMatchesContext =
@@ -370,7 +340,7 @@ function StudioPage() {
   }, [det, capture, tie, stepIndex, nerveHits, operationalLimits, stopSession]);
 
   useEffect(() => {
-    if (triage === "unanswered" || triage === "none") return;
+    if (triage === "none") return;
     // A direct symptom/consent report supersedes every prior visual result.
     // Invalidate the request and capture-derived coach text so an urgent action
     // cannot be displayed or journaled beside stale visual coaching.
@@ -405,29 +375,6 @@ function StudioPage() {
     );
   }, [capture, triage, stopSession]);
 
-  function chooseTriage(next: TriageState) {
-    analysisRequestRef.current += 1;
-    stopCoachVoice();
-    setPending(false);
-    setAnalysisError(null);
-    if (next !== "none") {
-      micArmedRef.current = false;
-      setMicArmed(false);
-      setMicStatus("idle");
-      setReport(null);
-      setSavedReportRevision(null);
-      setAnalysisConsumed(true);
-      stopSession(
-        next === "emergency"
-          ? "medical-emergency"
-          : next === "prompt_medical"
-            ? "medical"
-            : "consent",
-      );
-    }
-    setTriage(next);
-  }
-
   async function runAnalyze() {
     if (!mountedRef.current) return;
     if (!capture || !det) return;
@@ -437,7 +384,7 @@ function StudioPage() {
     }
     if (captureContextAtCommitRef.current !== currentContextRef.current) return;
     const sessionSnapshot = useSession.getState();
-    if (sessionSnapshot.stopped || mediaBlocked || analysisConsumed || triage !== "none") return;
+    if (sessionSnapshot.stopped || analysisConsumed) return;
     const request = ++analysisRequestRef.current;
     const requestContext = currentContextRef.current;
     setAnalysisConsumed(true);
@@ -472,7 +419,6 @@ function StudioPage() {
         request !== analysisRequestRef.current ||
         requestContext !== currentContextRef.current ||
         captureContextAtCommitRef.current !== requestContext ||
-        liveNegotiationPolicy.mediaBlocked ||
         useSession.getState().stopped
       )
         return;
@@ -542,7 +488,7 @@ function StudioPage() {
     setObservationReport(null);
     setModelStatus("not_requested");
     setAnalysisConsumed(false);
-    setTriage("unanswered");
+    setTriage("none");
     setCapture(null);
   }, []);
 
@@ -620,7 +566,7 @@ function StudioPage() {
                 setReport(null);
                 setObservationReport(null);
                 setAnalysisConsumed(false);
-                setTriage("unanswered");
+                setTriage("none");
                 resetSession();
               }}
             >
@@ -638,7 +584,7 @@ function StudioPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.22em] text-muted">Studio</p>
-          <h1 className="mt-1 font-display text-4xl">Limited observation</h1>
+          <h1 className="mt-1 font-display text-4xl">Camera & analyze</h1>
         </div>
         <div className="flex items-center gap-3 text-sm">
           <Badge variant="danger">{settings.safeword}</Badge>
@@ -812,71 +758,6 @@ function StudioPage() {
             </div>
           )}
           <div className="mt-4">
-            {!negotiationReady ? (
-              <p
-                role="status"
-                className="mb-3 rounded-md border border-border px-3 py-2 text-xs text-muted"
-              >
-                Loading negotiation choices…
-              </p>
-            ) : mediaBlocked ? (
-              <p
-                role="status"
-                className="mb-3 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger-text"
-              >
-                Media is not affirmatively approved. Resolve no or maybe together before enabling
-                photo or video capture.
-              </p>
-            ) : null}
-            <fieldset
-              disabled={!negotiationReady}
-              data-camera-gate="action-first"
-              data-negotiation-ready={negotiationReady ? "true" : "false"}
-              data-media-blocked={negotiatedMediaBlocked ? "true" : "false"}
-              data-triage={triage}
-              data-session-stopped={stopped ? "true" : "false"}
-              data-camera-gate-reason={cameraGateReason}
-              data-camera-ready={cameraGateReason === "enabled" ? "true" : "false"}
-              className="mb-3 rounded-lg border border-border bg-surface p-3 disabled:opacity-60"
-            >
-              <legend className="px-1 text-xs uppercase tracking-wide text-subtle">
-                Action-first screen · required before media
-              </legend>
-              <p className="mb-3 text-xs leading-relaxed text-muted">
-                Answer from direct reports before opening or importing media. A concern stops the
-                activity and routes action without requiring a photo.
-              </p>
-              <div className="space-y-2 text-xs text-fg">
-                <TriageOption
-                  checked={triage === "none"}
-                  onChange={() => chooseTriage("none")}
-                  label="No urgent symptom, coercion or secret-recording concern, unconsented bystander, or unresolved media-permission issue is being reported. This is not safety clearance."
-                />
-                <TriageOption
-                  checked={triage === "prompt_medical"}
-                  onChange={() => chooseTriage("prompt_medical")}
-                  label="After release, a symptom such as numbness, weakness, pain, swelling, discoloration, temperature change, dizziness, or loss of function is persistent or worsening."
-                />
-                <TriageOption
-                  checked={triage === "emergency"}
-                  onChange={() => chooseTriage("emergency")}
-                  label="There is abnormal breathing, unresponsiveness, seizure, chest pain, a serious fall, stroke-like signs, major weakness, severe confusion, or concerning symptoms after neck pressure."
-                />
-                <TriageOption
-                  checked={triage === "coercion_or_secret_recording"}
-                  onChange={() => chooseTriage("coercion_or_secret_recording")}
-                  label="There is coercion, secret recording, unclear adult status, absent or revoked permission, or an unconsented bystander."
-                />
-              </div>
-            </fieldset>
-            {cameraGateReason === "triage-unanswered" && (
-              <p
-                role="status"
-                className="mb-3 rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted"
-              >
-                Answer the action-first screen for this batch before confirming media permissions.
-              </p>
-            )}
             <CameraCapture
               key={captureContextKey}
               onCapture={acceptCapture}
@@ -917,8 +798,6 @@ function StudioPage() {
                   !captureMatchesContext ||
                   pending ||
                   stopped ||
-                  mediaBlocked ||
-                  triage !== "none" ||
                   analysisConsumed
                 }
               >
@@ -940,42 +819,63 @@ function StudioPage() {
               {settings.safeword}
             </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={
-              !contextBoundReport ||
-              !contextBoundObservationReport ||
-              !reportRevision ||
-              currentReportSaved
-            }
-            onClick={() => {
-              if (!contextBoundReport || !contextBoundObservationReport || !reportRevision) return;
-              const snapshot = useSession.getState();
-              if (savedEntryId) removeEntry(savedEntryId);
-              const entryId = addEntry({
-                tieSlug: snapshot.tieSlug,
-                minutes: Math.round(snapshot.elapsed / 60),
-                notes: contextBoundReport.final.coaching.slice(0, 280),
-                flags: contextBoundReport.final.flags.map((flag) => flag.code),
-                disposition: contextBoundObservationReport.disposition,
-                // The store bounds this to 6. Truncating to 3 here dropped the
-                // resize caveat and the "remote classification did not
-                // complete — insufficient view" disclosure, which is exactly
-                // the caveat a saved report must carry.
-                limitations: contextBoundObservationReport.limitations.slice(0, 6),
-                sourceIds: contextBoundObservationReport.source_ids,
-              });
-              setSavedEntryId(entryId);
-              setSavedReportRevision(reportRevision);
-            }}
-          >
-            {currentReportSaved
-              ? "Saved on this device"
-              : savedEntryId
-                ? "Update journal report"
-                : "Save to journal"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!contextBoundReport || !contextBoundObservationReport}
+              onClick={() => {
+                if (!contextBoundReport || !contextBoundObservationReport) return;
+                const payload = {
+                  exportedAt: Date.now(),
+                  coach: contextBoundReport,
+                  observation: contextBoundObservationReport,
+                };
+                const blob = new Blob([JSON.stringify(payload, null, 2)], {
+                  type: "application/json",
+                });
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = `knotty-report-${Date.now()}.json`;
+                a.click();
+                window.setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+              }}
+            >
+              Export report
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={
+                !contextBoundReport ||
+                !contextBoundObservationReport ||
+                !reportRevision ||
+                currentReportSaved
+              }
+              onClick={() => {
+                if (!contextBoundReport || !contextBoundObservationReport || !reportRevision) return;
+                const snapshot = useSession.getState();
+                if (savedEntryId) removeEntry(savedEntryId);
+                const entryId = addEntry({
+                  tieSlug: snapshot.tieSlug,
+                  minutes: Math.round(snapshot.elapsed / 60),
+                  notes: contextBoundReport.final.coaching.slice(0, 280),
+                  flags: contextBoundReport.final.flags.map((flag) => flag.code),
+                  disposition: contextBoundObservationReport.disposition,
+                  limitations: contextBoundObservationReport.limitations.slice(0, 6),
+                  sourceIds: contextBoundObservationReport.source_ids,
+                });
+                setSavedEntryId(entryId);
+                setSavedReportRevision(reportRevision);
+              }}
+            >
+              {currentReportSaved
+                ? "Saved on this device"
+                : savedEntryId
+                  ? "Update journal report"
+                  : "Save to journal"}
+            </Button>
+          </div>
           <p className="text-xs leading-relaxed text-subtle">
             Captures stay in page memory until replaced, stopped, or the page closes; the journal
             never saves them. One Analyze request sends only selected compressed stills and generic
@@ -1035,28 +935,5 @@ function CirculationBanner({
         </p>
       )}
     </div>
-  );
-}
-
-function TriageOption({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: () => void;
-  label: string;
-}) {
-  return (
-    <label className="flex items-start gap-2">
-      <input
-        type="radio"
-        name="pre-analysis-triage"
-        className="mt-0.5"
-        checked={checked}
-        onChange={onChange}
-      />
-      <span>{label}</span>
-    </label>
   );
 }

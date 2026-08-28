@@ -60,14 +60,16 @@ type SettingsState = Settings & {
   resetConsent: () => void;
 };
 
+export const CURRENT_CONSENT_VERSION = 5;
+
 /** Normalize an untrusted persisted snapshot without carrying unknown fields forward. */
 export function normalizePersistedSettings(persisted: unknown, current: Settings): Settings {
   const p = (persisted ?? {}) as Partial<Settings>;
-  const adults = p.adults === true;
-  const shears = p.shears === true;
-  const photosOk = p.photosOk === true;
-  const consentVersion = p.consentVersion === 4 ? 4 : 0;
-  const consented = p.consented === true && adults && shears && photosOk && consentVersion === 4;
+  const consentVersion = p.consentVersion === CURRENT_CONSENT_VERSION ? CURRENT_CONSENT_VERSION : 0;
+  const consented = p.consented === true && consentVersion === CURRENT_CONSENT_VERSION;
+  const adults = consented || p.adults === true;
+  const shears = consented || p.shears === true;
+  const photosOk = consented || p.photosOk === true;
   return {
     consentVersion,
     consented,
@@ -107,7 +109,14 @@ export const useSettings = create<SettingsState>()(
               ? Math.min(12, Math.max(2, Number(p.circulationMins) || s.circulationMins))
               : s.circulationMins,
         })),
-      enter: () => set({ consentVersion: 4, consented: true, adults: true, shears: true, photosOk: true }),
+      enter: () =>
+        set({
+          consentVersion: CURRENT_CONSENT_VERSION,
+          consented: true,
+          adults: true,
+          shears: true,
+          photosOk: true,
+        }),
       // Withdrawing consent also drops the consent-bearing cloud-voice and mic
       // opt-ins, so the live state matches the hydration invariant (voice and
       // listen require consented) instead of lingering enabled until reload.

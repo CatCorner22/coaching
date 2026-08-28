@@ -58,7 +58,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     // but this keeps that true if the layout ever changes).
     mainRef.current?.focus({ preventScroll: true });
   }, [pathname]);
-  if (pathname === "/emergency") {
+  if (pathname === "/emergency" || pathname === "/login") {
     return <div className="min-h-dvh bg-bg text-fg">{children}</div>;
   }
   // Rig Mode is the arm's-length scene view. It drops the sidebar, header and

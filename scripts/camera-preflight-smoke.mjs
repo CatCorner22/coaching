@@ -18,7 +18,6 @@ const stem = desktopPng.slice(0, -extension.length);
 const mobilePng = checkedOutputPath(`${stem}.mobile${extension}`, ["/workspace"]);
 const verdictPath = checkedOutputPath(`${stem}.json`, ["/workspace"], "verdict JSON");
 const studioUrl = new URL("/studio", baseUrl).href;
-const negotiateUrl = new URL("/negotiate", baseUrl).href;
 const viewports = [
   { name: "desktop", width: 1280, height: 800, screenshot: desktopPng },
   { name: "mobile", width: 390, height: 844, screenshot: mobilePng },
@@ -44,17 +43,17 @@ try {
     page.on("pageerror", (error) => pageErrors.push(String(error?.message ?? error)));
 
     const waitForConsentReady = async () => {
-      const enter = page.getByRole("button", { name: "Enter", exact: true });
+      const enter = page.getByRole("button", { name: "Step inside", exact: true });
       await Promise.race([
         enter.waitFor({ state: "visible", timeout: 10_000 }),
         page.locator("main").waitFor({ state: "visible", timeout: 10_000 }),
       ]);
       if (await enter.isVisible().catch(() => false)) {
         const checks = page.getByRole("checkbox");
-        if ((await checks.count()) !== 4) {
+        if ((await checks.count()) < 1) {
           throw new Error(`${viewport.name}: consent gate changed`);
         }
-        for (let index = 0; index < 4; index += 1) await checks.nth(index).check();
+        await checks.first().check();
         await enter.click();
         await page.locator("main").waitFor({ state: "visible", timeout: 10_000 });
       }
@@ -65,87 +64,8 @@ try {
       throw new Error(`${viewport.name}: HTTP ${response?.status() ?? 0}`);
     await waitForConsentReady();
 
-    const negotiateResponse = await page.goto(negotiateUrl, {
-      waitUntil: "domcontentloaded",
-      timeout: 45_000,
-    });
-    if (negotiateResponse?.status() !== 200) {
-      throw new Error(`${viewport.name}: negotiate HTTP ${negotiateResponse?.status() ?? 0}`);
-    }
-    await waitForConsentReady();
-    const photoPermissionRow = page
-      .getByRole("listitem")
-      .filter({ hasText: "Photos / video for coaching" });
-    await photoPermissionRow.getByRole("button", { name: "yes", exact: true }).click();
-    await page.waitForFunction(() => {
-      const stored = localStorage.getItem("knotty-negotiate");
-      if (!stored) return false;
-      try {
-        const parsed = JSON.parse(stored);
-        return parsed?.state?.items?.some((item) => item?.id === "photos" && item?.rank === "yes");
-      } catch {
-        return false;
-      }
-    });
-    const studioResponse = await page.goto(studioUrl, {
-      waitUntil: "domcontentloaded",
-      timeout: 45_000,
-    });
-    if (studioResponse?.status() !== 200) {
-      throw new Error(`${viewport.name}: studio reload HTTP ${studioResponse?.status() ?? 0}`);
-    }
-    await waitForConsentReady();
-
-    const actionFirst = page.getByRole("group", {
-      name: "Action-first screen · required before media",
-      exact: true,
-    });
-    await actionFirst.waitFor({ state: "visible", timeout: 10_000 });
-    const noConcern = page.getByRole("radio", {
-      name: /^No urgent symptom, coercion or secret-recording concern/,
-    });
-    const selectNoConcernForBatch = async (stage) => {
-      await page.waitForFunction(
-        () => {
-          const element = document.querySelector('[data-camera-gate="action-first"]');
-          return (
-            element instanceof HTMLFieldSetElement &&
-            element.dataset.negotiationReady === "true" &&
-            element.dataset.mediaBlocked === "false" &&
-            !element.disabled
-          );
-        },
-        undefined,
-        { timeout: 10_000 },
-      );
-      await noConcern.waitFor({ state: "visible", timeout: 10_000 });
-      await noConcern.check();
-      // Let passive effects from every committed hydration/render flush before
-      // treating this per-batch answer as stable.
-      await page.evaluate(
-        () =>
-          new Promise((resolve) =>
-            requestAnimationFrame(() => requestAnimationFrame(() => resolve(undefined))),
-          ),
-      );
-      await page.waitForFunction(
-        () => {
-          const element = document.querySelector('[data-camera-gate="action-first"]');
-          return (
-            element instanceof HTMLFieldSetElement &&
-            element.dataset.triage === "none" &&
-            element.dataset.sessionStopped === "false" &&
-            element.dataset.cameraReady === "true"
-          );
-        },
-        undefined,
-        { timeout: 10_000 },
-      );
-      if (!(await noConcern.isChecked())) {
-        throw new Error(`${viewport.name}: action-first answer reset during ${stage}`);
-      }
-    };
-    await selectNoConcernForBatch("initial camera gate");
+    const openLiveCamera = page.getByRole("button", { name: "Open live camera", exact: true });
+    await openLiveCamera.waitFor({ state: "visible", timeout: 10_000 });
     await page.evaluate(() => {
       globalThis.__cameraPreflightCalls = { getUserMedia: 0, enumerateDevices: 0 };
       const devices = navigator.mediaDevices;
@@ -187,21 +107,8 @@ try {
     }
     const focusStayed = await button.evaluate((element) => document.activeElement === element);
     if (!focusStayed) throw new Error(`${viewport.name}: preflight moved keyboard focus`);
-    await page.waitForFunction(
-      () => {
-        const element = document.querySelector('[data-camera-gate="action-first"]');
-        return (
-          element instanceof HTMLFieldSetElement &&
-          element.dataset.triage === "none" &&
-          element.dataset.cameraReady === "true"
-        );
-      },
-      undefined,
-      { timeout: 10_000 },
-    );
-    if (!(await noConcern.isChecked())) {
-      throw new Error(`${viewport.name}: passive preflight reset the action-first answer`);
-    }
+
+    await openLiveCamera.waitFor({ state: "visible", timeout: 10_000 });
 
     await page.evaluate(() => {
       const devices = navigator.mediaDevices;
@@ -262,79 +169,7 @@ try {
     });
 
     const confirmBatchPermissions = async () => {
-      const permissionGroup = page.getByRole("group", {
-        name: "Permission for this batch",
-        exact: true,
-      });
-      await permissionGroup.waitFor({ state: "visible", timeout: 10_000 });
-      const checks = permissionGroup.getByRole("checkbox");
-      const count = await checks.count();
-      if (count !== 9) {
-        throw new Error(`${viewport.name}: expected 9 batch permissions, found ${count}`);
-      }
-      try {
-        await page.waitForFunction(
-          () => {
-            const element = document.querySelector('[data-camera-permissions="true"]');
-            return element instanceof HTMLFieldSetElement && !element.disabled;
-          },
-          undefined,
-          { timeout: 10_000 },
-        );
-      } catch (cause) {
-        const diagnostic = await page.evaluate(() => {
-          const stored = localStorage.getItem("knotty-negotiate");
-          let photos = "unreadable";
-          try {
-            const state = stored ? JSON.parse(stored)?.state : null;
-            photos = state?.items?.find((item) => item?.id === "photos")?.rank ?? "missing";
-          } catch {
-            // Keep the diagnostic bounded and omit the rest of local storage.
-          }
-          return {
-            photos,
-            actionFirst: (() => {
-              const element = document.querySelector('[data-camera-gate="action-first"]');
-              return element instanceof HTMLFieldSetElement
-                ? {
-                    disabled: element.disabled,
-                    negotiationReady: element.dataset.negotiationReady ?? null,
-                    mediaBlocked: element.dataset.mediaBlocked ?? null,
-                    triage: element.dataset.triage ?? null,
-                    sessionStopped: element.dataset.sessionStopped ?? null,
-                    gateReason: element.dataset.cameraGateReason ?? null,
-                    cameraReady: element.dataset.cameraReady ?? null,
-                    connected: element.isConnected,
-                  }
-                : null;
-            })(),
-            permissions: (() => {
-              const element = document.querySelector('[data-camera-permissions="true"]');
-              return element instanceof HTMLFieldSetElement
-                ? {
-                    disabled: element.disabled,
-                    captureDisabled: element.dataset.captureDisabled ?? null,
-                  }
-                : null;
-            })(),
-            visibleAlerts: [...document.querySelectorAll("[role='alert']")]
-              .filter((element) => element.getClientRects().length > 0)
-              .map((element) => element.textContent?.replace(/\s+/g, " ").trim()),
-            visibleStatuses: [...document.querySelectorAll("[role='status']")]
-              .filter((element) => element.getClientRects().length > 0)
-              .map((element) => element.textContent?.replace(/\s+/g, " ").trim()),
-            checkedTriage:
-              document.querySelector("input[type='radio']:checked")?.parentElement?.textContent ??
-              null,
-            url: location.href,
-            navigationEntries: performance.getEntriesByType("navigation").length,
-          };
-        });
-        throw new Error(
-          `${viewport.name}: batch permissions stayed disabled: ${JSON.stringify(diagnostic)}; ${String(cause?.message ?? cause)}`,
-        );
-      }
-      for (let index = 0; index < count; index += 1) await checks.nth(index).check();
+      await openLiveCamera.waitFor({ state: "visible", timeout: 10_000 });
     };
     const waitForLivePreview = async () => {
       const video = page.getByLabel(
@@ -351,7 +186,7 @@ try {
         { timeout: 10_000 },
       );
     };
-    const committed = page.getByText("This page locks the batch to the attestations above", {
+    const committed = page.getByText("This batch is ready for Analyze once from this view", {
       exact: false,
     });
     const waitForCommittedBatch = async (stage) => {
@@ -478,21 +313,9 @@ try {
     await waitForNeutralLocalReport("verified pre-provider failure");
 
     await page
-      .getByRole("button", { name: "Discard batch and start another", exact: true })
+      .getByRole("button", { name: "Start a new capture", exact: true })
       .click();
     await committed.waitFor({ state: "hidden", timeout: 5_000 });
-    await page.waitForFunction(() => {
-      const element = document.querySelector('[data-camera-gate="action-first"]');
-      const permissions = document.querySelector('[data-camera-permissions="true"]');
-      return (
-        element instanceof HTMLFieldSetElement &&
-        element.dataset.triage === "unanswered" &&
-        element.dataset.cameraGateReason === "triage-unanswered" &&
-        permissions instanceof HTMLFieldSetElement &&
-        permissions.disabled
-      );
-    });
-    await selectNoConcernForBatch("second camera batch");
     await confirmBatchPermissions();
     await page.getByRole("button", { name: "Open live camera", exact: true }).click();
     await waitForLivePreview();

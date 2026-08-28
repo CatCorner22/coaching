@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   mediaUploadScope,
@@ -8,6 +8,12 @@ import {
   uploadScopeSummary,
 } from "@/lib/media-scope";
 import { eraseAllLocalData } from "@/lib/privacy/local-data";
+import {
+  appSyncFilename,
+  applyAppSyncBundle,
+  buildAppSyncBundle,
+  parseAppSyncBundle,
+} from "@/lib/app-sync";
 import { useSettings } from "@/lib/stores/settings";
 import { clearCoachVoiceCache } from "@/lib/voice/play";
 
@@ -23,6 +29,8 @@ function SettingsPage() {
   const [eraseStatus, setEraseStatus] = useState<string | null>(null);
   const [erasing, setErasing] = useState(false);
   const [eraseFailed, setEraseFailed] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const syncFileRef = useRef<HTMLInputElement>(null);
   if (erasing) {
     return (
       <div className="mx-auto max-w-xl px-5 py-10">
@@ -118,8 +126,66 @@ function SettingsPage() {
           feedback.
         </p>
         <Button variant="outline" onClick={() => s.resetConsent()}>
-          Reset consent gate
+          Reset tonight's checkbox
         </Button>
+        <section className="rounded-lg border border-border bg-surface p-4">
+          <h2 className="font-display text-xl">Optional sync</h2>
+          <p className="mt-2 text-xs leading-relaxed text-muted">
+            Export names, safewords, negotiate choices, and your pre-scene checklist to move them
+            between browsers. This is a plain JSON file — keep it somewhere private.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                const bundle = buildAppSyncBundle();
+                const blob = new Blob([JSON.stringify(bundle, null, 2)], {
+                  type: "application/json",
+                });
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = appSyncFilename(bundle.exportedAt);
+                a.click();
+                window.setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+                setSyncStatus("Sync file downloaded.");
+              }}
+            >
+              Export sync file
+            </Button>
+            <Button variant="outline" onClick={() => syncFileRef.current?.click()}>
+              Import sync file
+            </Button>
+            <input
+              ref={syncFileRef}
+              type="file"
+              accept="application/json,.json"
+              className="sr-only"
+              tabIndex={-1}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                void file.text().then(
+                  (text) => {
+                    const bundle = parseAppSyncBundle(text);
+                    if (!bundle) {
+                      setSyncStatus("That file is not a Knotty sync bundle.");
+                      return;
+                    }
+                    applyAppSyncBundle(bundle);
+                    setSyncStatus("Sync imported on this device.");
+                  },
+                  () => setSyncStatus("Could not read the sync file."),
+                );
+                event.target.value = "";
+              }}
+            />
+          </div>
+          {syncStatus && (
+            <p className="mt-2 text-xs text-muted" role="status">
+              {syncStatus}
+            </p>
+          )}
+        </section>
         <section className="rounded-lg border border-border bg-surface p-4">
           <h2 className="font-display text-2xl">Local data</h2>
           <p className="mt-2 text-xs leading-relaxed text-muted">

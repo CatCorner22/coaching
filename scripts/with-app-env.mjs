@@ -30,7 +30,7 @@ export const APP_ENV_REL_PATH = ".grok/app-env.json";
 
 const VITE_PREFIX = "VITE_";
 const DEFAULT_APP_ENV = Object.freeze({
-  VITE_AUTH_ENABLED: "false",
+  VITE_AUTH_ENABLED: "true",
   // This deployment's owner set the upload scope, having accepted that the
   // provider's Acceptable Use Policy is the governing document and that this
   // repository cannot verify it. See "Upload scope" in the README to change it.
