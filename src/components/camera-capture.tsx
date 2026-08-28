@@ -87,7 +87,12 @@ const EMPTY_PERMISSIONS: Record<PermissionKey, boolean> = {
   upload: false,
   output: false,
 };
-const BATCH_PERMISSION_MAX_AGE_MS = 4 * 60 * 60 * 1000;
+// Must stay shorter than the server's shared batch reservation (two hours in
+// src/lib/ai/media-replay-core.ts): the reservation exists to outlive every
+// permission this client still treats as fresh. A revision widened this to
+// four hours for convenience, which inverted that relationship — a three-hour
+// batch read as confirmed here after its replay protection had lapsed.
+const BATCH_PERMISSION_MAX_AGE_MS = 60 * 60 * 1000;
 
 type Guide = "equipment" | "context" | "detail" | "label";
 
@@ -815,7 +820,10 @@ export const CameraCapture = memo(function CameraCapture({
         </summary>
         <div className="mt-2">
         <p className="text-xs leading-relaxed text-muted">
-          See whether this browser can use a camera — without opening the lens yet.
+          See whether this browser can use a camera — without opening the lens yet. File decoding is
+          tested only after you select a file, and recording is tested only when recording starts.
+          This does not test the physical camera, image quality, consent, privacy, or safety, and it
+          is not device certification or safety clearance.
         </p>
         <Button
           type="button"
@@ -891,8 +899,8 @@ export const CameraCapture = memo(function CameraCapture({
             <div className="absolute inset-0 bg-bg/70" />
             <Camera className="relative size-8 text-muted" />
             <p className="relative px-6 text-center text-sm text-muted">
-              Open the camera, frame the rope, and capture when you are ready. Short clips become
-              stills you pick yourself.
+              Open the camera and capture when you are ready — prefer a non-identifying view of
+              equipment or rope. Short clips become stills you pick yourself.
             </p>
           </div>
         )}
