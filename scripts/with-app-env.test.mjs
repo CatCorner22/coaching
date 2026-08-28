@@ -17,6 +17,11 @@ const execFileAsync = promisify(execFile);
 const WRAPPER = join(projectRoot(), "scripts/with-app-env.mjs");
 const PRINT_FLAG = "process.stdout.write(String(process.env.VITE_AUTH_ENABLED));";
 
+/** What the wrapper injects: file defaults merged with the caller's process.env. */
+function expectedWrappedAuthEnabled() {
+  return mergeAppEnv(readAppEnv(projectRoot()), process.env).VITE_AUTH_ENABLED;
+}
+
 function makeWorkspace(appEnvJson) {
   const root = mkdtempSync(join(tmpdir(), "app-env-"));
   if (appEnvJson !== undefined) {
@@ -89,7 +94,7 @@ test("the wrapped command runs with the app env applied", async () => {
     "-e",
     PRINT_FLAG,
   ]);
-  assert.equal(stdout, "true");
+  assert.equal(stdout, expectedWrappedAuthEnabled());
 });
 
 test("the wrapped command sees an explicit override, not the file value", async () => {
@@ -133,5 +138,5 @@ test("the CLI still runs when invoked through a symlinked path", async () => {
     "-e",
     PRINT_FLAG,
   ]);
-  assert.equal(stdout, "true");
+  assert.equal(stdout, expectedWrappedAuthEnabled());
 });
