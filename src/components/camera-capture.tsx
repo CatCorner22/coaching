@@ -956,6 +956,12 @@ export const CameraCapture = memo(function CameraCapture({
                 value={permissionCopy(capabilityReport.permission)}
               />
             </dl>
+            <p className="mt-3 text-xs leading-relaxed text-subtle">
+              Photo/video file decoding is tested only after you select a file. In-app recording is
+              tested only when recording starts. This does not test the physical camera, image
+              quality, consent, privacy, or safety. It is not device certification or safety
+              clearance.
+            </p>
           </div>
         )}
         {capabilityError && (
@@ -968,7 +974,8 @@ export const CameraCapture = memo(function CameraCapture({
       {batchCommitted && (
         <div className="rounded-md border border-accent/30 bg-accent/10 p-3 text-xs text-muted">
           <p>
-            Ready for Analyze — tap once when you want cloud categories. Capture again anytime.
+            This batch is ready for Analyze once from this view — tap it when you want cloud
+            categories. Capture again anytime; nothing uploads until you tap Analyze.
           </p>
           <Button className="mt-2" variant="outline" size="sm" onClick={startNewBatch}>
             Start a new capture
