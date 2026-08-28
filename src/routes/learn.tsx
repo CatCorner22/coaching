@@ -13,7 +13,7 @@ import {
   getTie,
 } from "@/lib/kb";
 import { tieShape, tieShapeBlurb, tieShapeLabel } from "@/lib/kb/tie-factories";
-import { NYX_SHIBARI } from "@/lib/learn/nyx-model";
+import { NYX_SHIBARI, NYX_SHIBARI_POSES } from "@/lib/learn/nyx-model";
 
 export const Route = createFileRoute("/learn")({ component: LearnPage });
 
@@ -72,8 +72,21 @@ function LearnPage() {
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         <StatCard label="Knot lessons" value={knots.length} hint="On a post or chair leg" />
         <StatCard label="Tie lessons" value={ties.length} hint={tieHint} />
-        <StatCard label="Every step has" value="3 parts" hint="Do · Check · Say" />
+        <StatCard label={`${NYX_SHIBARI.name} stills`} value={NYX_SHIBARI_POSES.length} hint="Full frames + close crops" />
       </div>
+
+      <section className="mt-12">
+        <h2 className="font-display text-2xl">Meet {NYX_SHIBARI.name}</h2>
+        <p className="mt-2 max-w-2xl text-base leading-relaxed text-muted">
+          {NYX_SHIBARI.fullName} is our fictional demonstration model — {NYX_SHIBARI.ageLabel},{" "}
+          {NYX_SHIBARI.look.split(".")[0].toLowerCase()}. She appears on taught lessons with step-matched stills.
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {NYX_SHIBARI_POSES.map((pose) => (
+            <NyxModelPanel key={pose} pose={pose} compact />
+          ))}
+        </div>
+      </section>
 
       <section className="mt-12">
         <div className="flex items-center gap-2">
