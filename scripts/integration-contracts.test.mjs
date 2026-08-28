@@ -561,7 +561,10 @@ test("the media upload scope is an operator setting with a conservative default"
 
   const nyx = read("src/lib/learn/nyx-model.ts");
   assert.match(nyx, /NYX_SHIBARI/);
-  assert.match(read("src/components/learn/academy-coach-panel.tsx"), /NyxModelPanel/);
+  const coach = read("src/components/learn/academy-coach-panel.tsx");
+  assert.match(coach, /NyxModelPanel/);
+  assert.match(coach, /NyxNudeStrip/);
+  assert.match(read("src/lib/learn/nyx-nudes.ts"), /NYX_NUDE_POSES/);
 });
 
 test("the tie-page practice cam stays local and waits for the photos limit", () => {
