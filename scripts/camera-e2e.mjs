@@ -63,10 +63,30 @@ await page.addInitScript(() => {
   };
   md.enumerateDevices = async () => [{ deviceId: "synthetic", groupId: "synthetic", kind: "videoinput", label: "Synthetic rope cam", toJSON() { return this; } }];
 });
+// Classified at capture time rather than regexed out of a formatted string
+// later: the console message for a failed subresource ("Failed to load
+// resource: net::ERR_...") carries no URL, so only the paired requestfailed
+// event knows which host it was.
 const errors = [];
-page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
-page.on("console", (m) => { if (m.type() === "error") errors.push(`console: ${m.text()}`); });
-page.on("requestfailed", (r) => errors.push(`requestfailed: ${r.url().slice(0, 120)} — ${r.failure()?.errorText}`));
+const isExternal = (url) => /^https?:\/\//.test(url) && !/^https?:\/\/(localhost|127\.0\.0\.1)[:/]/.test(url);
+// A subresource that never loaded also surfaces as a console error with no
+// URL of its own; treat that shape as transport noise, since a genuine app
+// exception arrives as `pageerror` and a real same-origin failure still shows
+// up as a requestfailed we do count.
+const TRANSPORT = /Failed to load resource|net::ERR_/;
+page.on("pageerror", (e) => errors.push({ own: true, text: `pageerror: ${e.message}` }));
+page.on("console", (m) => {
+  if (m.type() !== "error") return;
+  const text = m.text();
+  errors.push({ own: !TRANSPORT.test(text), text: `console: ${text}` });
+});
+page.on("requestfailed", (r) => {
+  const url = r.url();
+  errors.push({
+    own: !isExternal(url),
+    text: `requestfailed: ${url.slice(0, 120)} — ${r.failure()?.errorText}`,
+  });
+});
 
 try {
   await page.goto("http://localhost:8080/", { waitUntil: "networkidle", timeout: 30000 });
@@ -149,10 +169,19 @@ try {
   await capture.click();
   await page.waitForTimeout(2500);
   await shot(page, "06-captured");
-  const after = await page.locator("body").innerText();
-  const captured = /analyze|readiness|good to analyze|hard to read|a little soft|lighting is dim|rope is small/i.test(after);
-  log("capture produced a still + readiness/analyze surface:", captured);
-  if (!captured) throw new Error("no capture evidence after the still-capture button");
+  // Assert something that exists only after a still commits. An earlier
+  // version matched /analyze/i, which the always-present "Analyze selected
+  // stills once" button satisfies — so a capture that failed internally still
+  // reported success. The readiness headlines are rendered from the captured
+  // frame's own quality score and cannot appear without one.
+  const READINESS = /good to analyze|stills are hard to read|a little soft|lighting is dim|rope is small in frame/i;
+  const readiness = page.locator("p").filter({ hasText: READINESS }).first();
+  await readiness.waitFor({ state: "visible", timeout: 15000 }).catch(() => {});
+  if (!(await readiness.count())) {
+    const body = (await page.locator("body").innerText()).replace(/\n+/g, " | ");
+    throw new Error(`no readiness card after capture — page: ${body.slice(0, 400)}`);
+  }
+  log("capture produced a still + readiness card:", (await readiness.innerText()).trim());
 
   // Academy practice cam: must be BLOCKED before photos=yes, open after.
   await page.goto("http://localhost:8080/tie/single-column", { waitUntil: "networkidle" });
@@ -161,13 +190,21 @@ try {
   const blockedBefore = /photos \/ video/i.test(academy) && /limit is a yes/i.test(academy);
   log("academy cam blocked before photos limit:", blockedBefore);
   await shot(page, "07-academy-blocked");
+  if (!blockedBefore) {
+    throw new Error("academy practice cam was NOT gated on the photos limit before it was agreed");
+  }
 
   await page.goto("http://localhost:8080/negotiate", { waitUntil: "networkidle" });
   await page.waitForTimeout(800);
   // Find the photos row and click its "yes".
   const yesBtn = page.locator('[aria-labelledby="neg-label-photos"] button', { hasText: /^yes$/i }).first();
-  if (await yesBtn.count()) { await yesBtn.click(); log("set photos limit to yes"); }
-  else log("neg-label-photos group not found");
+  if (!(await yesBtn.count())) {
+    // Silently skipping this left the unlock half of the test unexercised
+    // while still reporting PASS.
+    throw new Error('the photos "yes" control was not found on /negotiate');
+  }
+  await yesBtn.click();
+  log("set photos limit to yes");
   await page.waitForTimeout(600);
   await shot(page, "08-negotiated");
 
@@ -177,13 +214,30 @@ try {
   const openAfter = !( /limit is a yes/i.test(academy) );
   log("academy cam unlocked after photos=yes:", openAfter);
   await shot(page, "09-academy-open");
+  if (!openAfter) {
+    throw new Error("academy practice cam stayed blocked after the photos limit was agreed");
+  }
 
+  // An uncaught exception or a failed same-origin request during the camera
+  // flow is a regression, and printing it after PASS (as this did) hides it.
+  // External-host failures are excluded on purpose: this sandbox has no
+  // outbound network, and the page embeds a third-party script, so failing on
+  // those would make the harness red for environmental reasons rather than
+  // app ones. CI runners do reach them, and the preflight smoke there fails
+  // closed on any browser error.
+  const ownErrors = errors.filter((entry) => entry.own);
+  if (ownErrors.length) {
+    throw new Error(
+      `browser errors during the camera flow:\n${ownErrors.slice(0, 8).map((e) => e.text).join("\n")}`,
+    );
+  }
   console.log("\nRESULT: PASS");
-  if (errors.length) console.log("console errors seen:\n" + errors.slice(0, 8).join("\n"));
+  const external = errors.length - ownErrors.length;
+  if (external) console.log(`(${external} external-resource error(s) ignored — no outbound network here)`);
 } catch (e) {
   await shot(page, "99-failure").catch(() => {});
   console.log("\nRESULT: FAIL —", e.message);
-  if (errors.length) console.log("console errors:\n" + errors.slice(0, 8).join("\n"));
+  if (errors.length) console.log("browser errors:\n" + errors.slice(0, 8).map((e) => e.text).join("\n"));
   process.exitCode = 1;
 } finally {
   await browser.close();

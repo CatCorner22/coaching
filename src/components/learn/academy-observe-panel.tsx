@@ -30,13 +30,20 @@ type AcademyObservePanelProps = {
  * to the analyze endpoint with every attestation hardcoded to true; do not
  * bring that back.
  *
- * The negotiated `photos` limit gates the camera itself, exactly as it gates
- * the Studio capture surface: "photos / video for coaching" is one decision,
- * and a practice prop does not exempt the lens from it. A later revision
- * swapped this for the home-screen consent checkbox alone; that is the adult
- * gate, not the photos decision, and it silently opened every lesson-page lens
- * for anyone past the front door. Restored — and pinned by
- * integration-contracts — because the two gates answer different questions.
+ * The negotiated `photos` limit gates this camera: "photos / video for
+ * coaching" is one decision, and a practice prop does not exempt the lens from
+ * it. A later revision swapped this for the home-screen consent checkbox
+ * alone; that is the adult gate, not the photos decision, and it silently
+ * opened every lesson-page lens for anyone past the front door. Restored —
+ * and pinned by integration-contracts — because the two gates answer
+ * different questions.
+ *
+ * The blocked copy deliberately speaks only for this camera. The same
+ * revision also removed the Studio's media gate (`cameraGateReason` in
+ * src/routes/studio.tsx now reads only `stopped`), so the Studio lens opens
+ * regardless of this limit. Until that gate is restored, any wording here
+ * promising that every lens waits would be an assurance the app does not
+ * honour — a reader could leave this panel, open Studio, and film anyway.
  */
 export function AcademyObservePanel({
   tie,
@@ -227,8 +234,8 @@ export function AcademyObservePanel({
 
       {!cameraAllowed ? (
         <div className="mt-4 rounded-lg border border-border bg-elevated px-4 py-4 text-sm leading-relaxed text-muted">
-          The camera is off until the <strong className="font-medium text-fg">photos / video</strong> limit is a yes.
-          Every lens in this app waits for that one decision.{" "}
+          This practice camera is off until the{" "}
+          <strong className="font-medium text-fg">photos / video</strong> limit is a yes.{" "}
           <Link to="/negotiate" className="text-accent underline underline-offset-2">
             Review limits
           </Link>
