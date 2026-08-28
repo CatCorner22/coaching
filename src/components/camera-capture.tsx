@@ -12,6 +12,7 @@ import {
   setTorch,
   startClip,
   torchAvailable,
+  waitForNextVideoFrame,
   zoomRange,
   type CameraCapabilityReport,
   type CameraZoomRange,
@@ -162,9 +163,28 @@ export const CameraCapture = memo(function CameraCapture({
   const [recordMs, setRecordMs] = useState(0);
   const [zoom, setZoom] = useState(1);
   const [zoomCaps, setZoomCaps] = useState<CameraZoomRange | null>(null);
+  const zoomRef = useRef(zoom);
+  const zoomCapsRef = useRef(zoomCaps);
+  const zoomRequestRef = useRef(0);
+  const countdownRef = useRef<number | null>(null);
+  const busyRef = useRef(false);
+  const snapWithOptionalTimerRef = useRef<() => Promise<void>>(async () => undefined);
+  const toggleRecordRef = useRef<() => Promise<void>>(async () => undefined);
+  zoomRef.current = zoom;
+  zoomCapsRef.current = zoomCaps;
   const permissionsReady = Object.values(permissions).every(Boolean);
   permissionsRef.current = permissions;
   const studioConsented = useSettings((s) => s.consented);
+
+  function setBusyState(next: boolean) {
+    busyRef.current = next;
+    setBusy(next);
+  }
+
+  function setCountdownState(next: number | null) {
+    countdownRef.current = next;
+    setCountdown(next);
+  }
 
   function armBatchPermissions() {
     const allTrue = Object.fromEntries(
@@ -288,7 +308,9 @@ export const CameraCapture = memo(function CameraCapture({
     setLive(false);
     setTorchOn(false);
     setHasTorch(false);
-    setBusy(false);
+    setBusyState(false);
+    setCountdownState(null);
+    setLiveQuality(null);
     setVideoFrames([]);
     setSelectedFrames([]);
     setBatchCommitted(false);
@@ -404,7 +426,7 @@ export const CameraCapture = memo(function CameraCapture({
     const cameraController = new AbortController();
     cameraOpenRef.current = cameraController;
     let openedStream: MediaStream | null = null;
-    setBusy(true);
+    setBusyState(true);
     try {
       const stream = await openRopeCamera(next, { signal: cameraController.signal });
       openedStream = stream;
@@ -466,7 +488,7 @@ export const CameraCapture = memo(function CameraCapture({
       }
     } finally {
       if (cameraOpenRef.current === cameraController) cameraOpenRef.current = null;
-      if (mountedRef.current && request === cameraRequestRef.current) setBusy(false);
+      if (mountedRef.current && request === cameraRequestRef.current) setBusyState(false);
     }
   }
 
@@ -493,9 +515,9 @@ export const CameraCapture = memo(function CameraCapture({
     setLive(false);
     setTorchOn(false);
     setHasTorch(false);
-    setBusy(false);
+    setBusyState(false);
     setLiveQuality(null);
-    setCountdown(null);
+    setCountdownState(null);
     setRecordMs(0);
     setZoomCaps(null);
     setZoom(1);
@@ -558,16 +580,20 @@ export const CameraCapture = memo(function CameraCapture({
     }
     setVideoFrames([]);
     setSelectedFrames([]);
-    setBusy(true);
+    setBusyState(true);
     setError(null);
     const operation = beginMediaOperation();
     const { signal } = operation;
     try {
       const frames: ProcessedMediaFrame[] = [];
+      const digitalZoom = zoomCapsRef.current ? 1 : Math.max(1, zoomRef.current);
       for (let i = 0; i < BURST_FRAME_COUNT; i++) {
         signal.throwIfAborted();
-        frames.push(await processMediaFrame(v, 1600, 240, 0.82));
-        await new Promise((r) => setTimeout(r, 70));
+        await waitForNextVideoFrame(v);
+        if (v.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !v.videoWidth) {
+          throw new Error("The camera dropped the live frame.");
+        }
+        frames.push(await processMediaFrame(v, 1600, 240, 0.82, null, digitalZoom));
       }
       const observed = frames.map((frame) => ({
         frame,
@@ -605,7 +631,7 @@ export const CameraCapture = memo(function CameraCapture({
     } finally {
       if (ownsMediaOperation(operation.id)) {
         mediaOperationActiveRef.current = false;
-        setBusy(false);
+        setBusyState(false);
       }
     }
   }
@@ -616,6 +642,7 @@ export const CameraCapture = memo(function CameraCapture({
     const stream = streamRef.current;
     if (!stream) return;
     if (!clipRef.current) {
+      if (busyRef.current || countdownRef.current !== null) return;
       if (!hasCurrentBatchPermissions()) return;
       try {
         setError(null);
@@ -654,7 +681,7 @@ export const CameraCapture = memo(function CameraCapture({
       recordTransitionRef.current = false;
       return;
     }
-    setBusy(true);
+    setBusyState(true);
     const operation = beginMediaOperation();
     const { signal } = operation;
     try {
@@ -675,7 +702,7 @@ export const CameraCapture = memo(function CameraCapture({
       recordTransitionRef.current = false;
       if (ownsMediaOperation(operation.id)) {
         mediaOperationActiveRef.current = false;
-        setBusy(false);
+        setBusyState(false);
       }
     }
   }
@@ -750,7 +777,7 @@ export const CameraCapture = memo(function CameraCapture({
   async function onFile(file: File, kind: "photo" | "video") {
     if (recording || batchCommitted) return;
     if (!hasCurrentBatchPermissions()) return;
-    setBusy(true);
+    setBusyState(true);
     setError(null);
     const operation = beginMediaOperation();
     const { signal } = operation;
@@ -798,7 +825,7 @@ export const CameraCapture = memo(function CameraCapture({
     } finally {
       if (ownsMediaOperation(operation.id)) {
         mediaOperationActiveRef.current = false;
-        setBusy(false);
+        setBusyState(false);
       }
     }
   }
@@ -839,24 +866,51 @@ export const CameraCapture = memo(function CameraCapture({
   }
 
   async function snapWithOptionalTimer() {
-    if (recording || batchCommitted || busy || countdown !== null) return;
-    if (!useTimer) {
-      await snapBurst();
-      return;
+    if (recording || batchCommitted || busyRef.current || countdownRef.current !== null) return;
+    const request = cameraRequestRef.current;
+    if (useTimer) {
+      setBusyState(true);
+      try {
+        for (let n = 3; n >= 1; n--) {
+          if (!mountedRef.current || disabledRef.current || request !== cameraRequestRef.current) {
+            return;
+          }
+          setCountdownState(n);
+          await new Promise((resolve) => window.setTimeout(resolve, 450));
+        }
+      } finally {
+        setCountdownState(null);
+        if (!mountedRef.current || request !== cameraRequestRef.current) {
+          setBusyState(false);
+        }
+      }
+      if (!mountedRef.current || disabledRef.current || request !== cameraRequestRef.current) {
+        return;
+      }
     }
-    for (let n = 3; n >= 1; n--) {
-      if (!mountedRef.current || disabledRef.current) return;
-      setCountdown(n);
-      await new Promise((resolve) => window.setTimeout(resolve, 450));
-    }
-    setCountdown(null);
     await snapBurst();
   }
 
   async function changeZoom(next: number) {
+    const previous = zoomRef.current;
+    zoomRef.current = next;
     setZoom(next);
     const stream = streamRef.current;
-    if (stream && zoomCaps) await applyZoom(stream, next);
+    if (!stream || !zoomCapsRef.current) return;
+    const request = ++zoomRequestRef.current;
+    const ok = await applyZoom(stream, next);
+    if (
+      !mountedRef.current ||
+      request !== zoomRequestRef.current ||
+      streamRef.current !== stream
+    ) {
+      return;
+    }
+    if (!ok) {
+      zoomRef.current = previous;
+      setZoom(previous);
+      setHint("This camera could not apply that zoom. The last working level stays.");
+    }
   }
 
   useEffect(() => {
@@ -868,7 +922,8 @@ export const CameraCapture = memo(function CameraCapture({
     const tick = () => {
       const video = videoRef.current;
       if (!video || cancelled) return;
-      const quality = scoreLivePreview(video);
+      const digitalZoom = zoomCapsRef.current ? 1 : Math.max(1, zoomRef.current);
+      const quality = scoreLivePreview(video, digitalZoom);
       if (quality && !cancelled) setLiveQuality(quality);
     };
     tick();
@@ -891,24 +946,35 @@ export const CameraCapture = memo(function CameraCapture({
     return () => window.clearInterval(id);
   }, [recording]);
 
+  snapWithOptionalTimerRef.current = snapWithOptionalTimer;
+  toggleRecordRef.current = toggleRecord;
+
   useEffect(() => {
     if (!live || disabled) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+      const target = event.target;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
         return;
       }
       if (event.code === "Space") {
+        if (
+          target instanceof HTMLElement &&
+          (target.closest("button") || target.closest("[role='button']") || target.closest("label"))
+        ) {
+          return;
+        }
         event.preventDefault();
-        void snapWithOptionalTimer();
+        void snapWithOptionalTimerRef.current();
+        return;
       }
       if (event.key === "r" || event.key === "R") {
         event.preventDefault();
-        void toggleRecord();
+        void toggleRecordRef.current();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  });
+  }, [live, disabled]);
 
   return (
     <div className="space-y-3">
@@ -1242,7 +1308,13 @@ export const CameraCapture = memo(function CameraCapture({
               variant="secondary"
               className="flex-1"
               onClick={() => void toggleRecord()}
-              disabled={busy || batchCommitted || disabled || (!permissionsReady && !recording)}
+              disabled={
+                busy ||
+                batchCommitted ||
+                disabled ||
+                countdown !== null ||
+                (!permissionsReady && !recording)
+              }
             >
               {recording ? "Stop clip" : `Record ${CLIP_DURATION_MS / 1000}s`}
             </Button>
@@ -1263,7 +1335,7 @@ export const CameraCapture = memo(function CameraCapture({
               size="icon"
               onClick={() => void startLive(facing === "user" ? "environment" : "user")}
               aria-label="Flip camera"
-              disabled={busy || recording || disabled}
+              disabled={busy || recording || disabled || countdown !== null}
             >
               <SwitchCamera />
             </Button>

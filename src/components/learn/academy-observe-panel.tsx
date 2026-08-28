@@ -66,6 +66,8 @@ export function AcademyObservePanel({
   const streamRef = useRef<MediaStream | null>(null);
   const clipRef = useRef<ClipHandle | null>(null);
   const prevFrameRef = useRef<Uint8ClampedArray | undefined>(undefined);
+  const cameraRequestRef = useRef(0);
+  const recordTimeoutRef = useRef<number | null>(null);
 
   const [cameraOn, setCameraOn] = useState(false);
   const [facing, setFacing] = useState<"environment" | "user">("environment");
@@ -77,6 +79,11 @@ export function AcademyObservePanel({
   const [clipUrl, setClipUrl] = useState<string | null>(null);
 
   const stopCamera = useCallback(() => {
+    cameraRequestRef.current += 1;
+    if (recordTimeoutRef.current !== null) {
+      window.clearTimeout(recordTimeoutRef.current);
+      recordTimeoutRef.current = null;
+    }
     clipRef.current?.cancel();
     clipRef.current = null;
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -84,6 +91,7 @@ export function AcademyObservePanel({
     if (videoRef.current) videoRef.current.srcObject = null;
     setCameraOn(false);
     setRecording(false);
+    setBusy(false);
   }, []);
 
   // Unmount teardown only. This must not depend on clipUrl: when it did, every
@@ -101,23 +109,36 @@ export function AcademyObservePanel({
     if (hydrated && !photosApproved) stopCamera();
   }, [hydrated, photosApproved, stopCamera]);
 
-  async function startCamera() {
+  async function startCamera(nextFacing: "environment" | "user" = facing) {
     if (!cameraAllowed) return;
+    stopCamera();
+    const request = ++cameraRequestRef.current;
     setError(null);
     setBusy(true);
     try {
-      stopCamera();
-      const stream = await openRopeCamera(facing);
+      const stream = await openRopeCamera(nextFacing);
+      if (request !== cameraRequestRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
+      if (request !== cameraRequestRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        if (streamRef.current === stream) streamRef.current = null;
+        return;
+      }
+      setFacing(nextFacing);
       setCameraOn(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Camera unavailable on this device.");
+      if (request === cameraRequestRef.current) {
+        setError(e instanceof Error ? e.message : "Camera unavailable on this device.");
+      }
     } finally {
-      setBusy(false);
+      if (request === cameraRequestRef.current) setBusy(false);
     }
   }
 
@@ -166,13 +187,15 @@ export function AcademyObservePanel({
       // finally here re-enabled every control mid-recording.
       setBusy(true);
       setRecording(true);
-      window.setTimeout(() => {
+      recordTimeoutRef.current = window.setTimeout(() => {
+        recordTimeoutRef.current = null;
         clip
           .stop()
           .then((blob) => {
             setClipUrl(URL.createObjectURL(blob));
           })
           .catch((e) => {
+            if (e instanceof DOMException && e.name === "AbortError") return;
             setError(e instanceof Error ? e.message : "Could not record clip.");
           })
           .finally(() => {
@@ -286,8 +309,7 @@ export function AcademyObservePanel({
                   variant="outline"
                   disabled={busy}
                   onClick={() => {
-                    setFacing((f) => (f === "environment" ? "user" : "environment"));
-                    void startCamera();
+                    void startCamera(facing === "environment" ? "user" : "environment");
                   }}
                 >
                   <SwitchCamera className="size-4" aria-hidden />

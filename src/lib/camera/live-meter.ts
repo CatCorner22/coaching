@@ -18,6 +18,7 @@ function meterCanvas(): CanvasRenderingContext2D | null {
 export function sampleVideoImageData(
   video: HTMLVideoElement,
   maxWidth = LIVE_SAMPLE_MAX_WIDTH,
+  digitalZoom = 1,
 ): ImageData | null {
   if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth) return null;
   const ctx = meterCanvas();
@@ -27,12 +28,29 @@ export function sampleVideoImageData(
   const height = Math.max(16, Math.round(video.videoHeight * scale));
   sharedCanvas.width = width;
   sharedCanvas.height = height;
-  ctx.drawImage(video, 0, 0, width, height);
+  const z = Number.isFinite(digitalZoom) ? Math.max(1, digitalZoom) : 1;
+  if (z > 1.0001) {
+    const sw = video.videoWidth / z;
+    const sh = video.videoHeight / z;
+    ctx.drawImage(
+      video,
+      (video.videoWidth - sw) / 2,
+      (video.videoHeight - sh) / 2,
+      sw,
+      sh,
+      0,
+      0,
+      width,
+      height,
+    );
+  } else {
+    ctx.drawImage(video, 0, 0, width, height);
+  }
   return ctx.getImageData(0, 0, width, height);
 }
 
-export function scoreLivePreview(video: HTMLVideoElement): FrameQuality | null {
-  const data = sampleVideoImageData(video);
+export function scoreLivePreview(video: HTMLVideoElement, digitalZoom = 1): FrameQuality | null {
+  const data = sampleVideoImageData(video, LIVE_SAMPLE_MAX_WIDTH, digitalZoom);
   if (!data) return null;
   return scoreFrame(data);
 }

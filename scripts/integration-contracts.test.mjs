@@ -90,6 +90,23 @@ test("route registration and the preview bridge keep heavy knowledge and schema 
   assert.match(bridge, /parsePreviewHostMessage\(event\.data\)/);
 });
 
+test("studio burst waits for distinct frames, matches digital zoom, and does not double-fire Space", () => {
+  const camera = read("src/components/camera-capture.tsx");
+  assert.match(camera, /waitForNextVideoFrame\(v\)/);
+  assert.match(camera, /processMediaFrame\(v, 1600, 240, 0\.82, null, digitalZoom\)/);
+  const timer = between(camera, "async function snapWithOptionalTimer()", "async function changeZoom");
+  assert.match(timer, /request !== cameraRequestRef\.current/);
+  assert.match(timer, /setBusyState\(true\)/);
+  const zoom = between(camera, "async function changeZoom", "snapWithOptionalTimerRef.current");
+  assert.match(zoom, /await applyZoom\(stream, next\)/);
+  assert.match(zoom, /if \(!ok\)/);
+  assert.match(
+    camera,
+    /window\.addEventListener\("keydown", onKey\);[\s\S]*?\}, \[live, disabled\]\);/,
+  );
+  assert.match(camera, /target\.closest\("button"\)/);
+});
+
 test("a cancelled photo import cannot commit after its decoder resolves", () => {
   const camera = read("src/components/camera-capture.tsx");
   const photoImport = between(
@@ -590,6 +607,7 @@ test("the tie-page practice cam stays local and waits for the photos limit", () 
   // The gate must be the negotiated limit, not the front-door checkbox.
   assert.doesNotMatch(observe, /cameraAllowed = hydrated && (?:studioConsented|s\.consented)/);
   assert.match(observe, /Continue in Studio/);
+  assert.match(observe, /startCamera\(facing === "environment" \? "user" : "environment"\)/);
 
   const studio = read("src/routes/studio.tsx");
   // Plain "yellow" stays armed even when a custom yellow word is set.
