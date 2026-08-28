@@ -1,16 +1,23 @@
-import { Camera, Flashlight, ImagePlus, SwitchCamera, Video } from "lucide-react";
+import { Camera, Crosshair, Flashlight, ImagePlus, SwitchCamera, Timer, Video } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
+  applyZoom,
+  BURST_FRAME_COUNT,
+  BURST_KEEP,
+  CLIP_DURATION_MS,
   inspectCameraCapabilities,
   openRopeCamera,
   playCameraPreview,
   setTorch,
   startClip,
   torchAvailable,
+  zoomRange,
   type CameraCapabilityReport,
+  type CameraZoomRange,
   type ClipHandle,
 } from "@/lib/camera/stream";
+import { bestFrameIndices, scoreLivePreview } from "@/lib/camera/live-meter";
 import {
   pickBest,
   privacySafeQualityHint,
@@ -148,6 +155,13 @@ export const CameraCapture = memo(function CameraCapture({
   const [permissionExpiresAt, setPermissionExpiresAt] = useState<number | null>(null);
   const [videoFrames, setVideoFrames] = useState<PendingVideoFrame[]>([]);
   const [selectedFrames, setSelectedFrames] = useState<number[]>([]);
+  const [liveQuality, setLiveQuality] = useState<FrameQuality | null>(null);
+  const [showGrid, setShowGrid] = useState(true);
+  const [useTimer, setUseTimer] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [recordMs, setRecordMs] = useState(0);
+  const [zoom, setZoom] = useState(1);
+  const [zoomCaps, setZoomCaps] = useState<CameraZoomRange | null>(null);
   const permissionsReady = Object.values(permissions).every(Boolean);
   permissionsRef.current = permissions;
   const studioConsented = useSettings((s) => s.consented);
@@ -423,6 +437,9 @@ export const CameraCapture = memo(function CameraCapture({
       }
       setLive(true);
       setFacing(next);
+      const range = zoomRange(stream);
+      setZoomCaps(range);
+      setZoom(range?.min ?? 1);
       const track = stream.getVideoTracks()[0];
       const closeInterruptedCamera = () => {
         if (streamRef.current === stream) {
@@ -477,6 +494,11 @@ export const CameraCapture = memo(function CameraCapture({
     setTorchOn(false);
     setHasTorch(false);
     setBusy(false);
+    setLiveQuality(null);
+    setCountdown(null);
+    setRecordMs(0);
+    setZoomCaps(null);
+    setZoom(1);
   }
 
   async function emitFromMedia(
@@ -542,10 +564,10 @@ export const CameraCapture = memo(function CameraCapture({
     const { signal } = operation;
     try {
       const frames: ProcessedMediaFrame[] = [];
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < BURST_FRAME_COUNT; i++) {
         signal.throwIfAborted();
         frames.push(await processMediaFrame(v, 1600, 240, 0.82));
-        await new Promise((r) => setTimeout(r, 90));
+        await new Promise((r) => setTimeout(r, 70));
       }
       const observed = frames.map((frame) => ({
         frame,
@@ -558,16 +580,21 @@ export const CameraCapture = memo(function CameraCapture({
           neck: observation.neckRope,
           paleness: observation.paleness,
         })),
-        1,
+        BURST_KEEP,
       );
-      const chosen = best[0] ?? { ...frames[0]!, observation: observed[0]!.observation };
+      const chosen = best.length ? best : [{ ...frames[0]!, observation: observed[0]!.observation }];
       signal.throwIfAborted();
       await emitFromMedia(
         "photo",
-        [chosen.jpeg],
-        [chosen.observation],
-        [scoreFrame(chosen.imageData, chosen.detailData)],
+        chosen.map((frame) => frame.jpeg),
+        chosen.map((frame) => frame.observation),
+        chosen.map((frame) => scoreFrame(frame.imageData, frame.detailData)),
       );
+      try {
+        navigator.vibrate?.(12);
+      } catch {
+        /* ignore */
+      }
     } catch (cause) {
       if (
         ownsMediaOperation(operation.id) &&
@@ -605,7 +632,7 @@ export const CameraCapture = memo(function CameraCapture({
         recordTimerRef.current = window.setTimeout(() => {
           recordTimerRef.current = null;
           if (clipRef.current) void finishRecord();
-        }, 7000);
+        }, CLIP_DURATION_MS);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : "Could not start recording.");
       }
@@ -674,17 +701,16 @@ export const CameraCapture = memo(function CameraCapture({
     });
     signal.throwIfAborted();
     if (!ownsMediaOperation(operation.id) || disabledRef.current) return;
-    setVideoFrames(
-      observed.map((x, index) => ({
-        id: `F${String(index + 1).padStart(2, "0")}`,
-        jpeg: x.f.jpeg,
-        observation: x.obs,
-        quality: scoreFrame(x.f.imageData, x.f.detailData),
-      })),
-    );
-    setSelectedFrames([]);
+    const pending = observed.map((x, index) => ({
+      id: `F${String(index + 1).padStart(2, "0")}`,
+      jpeg: x.f.jpeg,
+      observation: x.obs,
+      quality: scoreFrame(x.f.imageData, x.f.detailData),
+    }));
+    setVideoFrames(pending);
+    setSelectedFrames(bestFrameIndices(pending.map((frame) => frame.quality), 3));
     setHint(
-      "Choose one to three labeled stills from the clip. Nothing is analyzed remotely until you confirm.",
+      "Best three stills pre-selected from the clip. Tap to change — Analyze still waits for your confirm.",
     );
   }
 
@@ -812,6 +838,78 @@ export const CameraCapture = memo(function CameraCapture({
     setTorchOn(next);
   }
 
+  async function snapWithOptionalTimer() {
+    if (recording || batchCommitted || busy || countdown !== null) return;
+    if (!useTimer) {
+      await snapBurst();
+      return;
+    }
+    for (let n = 3; n >= 1; n--) {
+      if (!mountedRef.current || disabledRef.current) return;
+      setCountdown(n);
+      await new Promise((resolve) => window.setTimeout(resolve, 450));
+    }
+    setCountdown(null);
+    await snapBurst();
+  }
+
+  async function changeZoom(next: number) {
+    setZoom(next);
+    const stream = streamRef.current;
+    if (stream && zoomCaps) await applyZoom(stream, next);
+  }
+
+  useEffect(() => {
+    if (!live) {
+      setLiveQuality(null);
+      return;
+    }
+    let cancelled = false;
+    const tick = () => {
+      const video = videoRef.current;
+      if (!video || cancelled) return;
+      const quality = scoreLivePreview(video);
+      if (quality && !cancelled) setLiveQuality(quality);
+    };
+    tick();
+    const id = window.setInterval(tick, 380);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [live]);
+
+  useEffect(() => {
+    if (!recording) {
+      setRecordMs(0);
+      return;
+    }
+    const started = recordStartedAtRef.current ?? Date.now();
+    const id = window.setInterval(() => {
+      setRecordMs(Date.now() - started);
+    }, 80);
+    return () => window.clearInterval(id);
+  }, [recording]);
+
+  useEffect(() => {
+    if (!live || disabled) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      if (event.code === "Space") {
+        event.preventDefault();
+        void snapWithOptionalTimer();
+      }
+      if (event.key === "r" || event.key === "R") {
+        event.preventDefault();
+        void toggleRecord();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
   return (
     <div className="space-y-3">
       <details className="rounded-lg border border-border bg-surface p-3">
@@ -893,18 +991,36 @@ export const CameraCapture = memo(function CameraCapture({
         <video
           ref={videoRef}
           className={cn("aspect-[3/4] w-full object-contain", !live && "hidden")}
+          style={{
+            transform: [
+              facing === "user" ? "scaleX(-1)" : "",
+              !zoomCaps && zoom !== 1 ? `scale(${zoom})` : "",
+            ]
+              .filter(Boolean)
+              .join(" ") || undefined,
+          }}
           aria-label="Live camera preview; no media is sent until capture and confirmation"
           playsInline
           muted
         />
+        {live && showGrid && <ThirdsGrid />}
         {live && <GuideOverlay guide={guide} />}
+        {live && liveQuality && <LiveQualityHud quality={liveQuality} />}
+        {countdown !== null && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-bg/40">
+            <p className="font-display text-7xl text-fg" role="status">
+              {countdown}
+            </p>
+          </div>
+        )}
         {!live && (
           <div className="flex aspect-[3/4] w-full flex-col items-center justify-center gap-2 bg-elevated">
             <div className="absolute inset-0 bg-bg/70" />
             <Camera className="relative size-8 text-muted" />
             <p className="relative px-6 text-center text-sm text-muted">
               Open the camera and capture when you are ready — prefer a non-identifying view of
-              equipment or rope. Short clips become stills you pick yourself.
+              equipment or rope. A five-shot burst keeps the sharpest stills, and clips become
+              labeled stills you confirm.
             </p>
           </div>
         )}
@@ -915,8 +1031,16 @@ export const CameraCapture = memo(function CameraCapture({
             aria-live="polite"
             aria-label="Recording in progress"
           >
-            Rec
+            Rec {Math.min(7, Math.max(0, recordMs / 1000)).toFixed(1)}s
           </span>
+        )}
+        {recording && (
+          <div className="absolute inset-x-0 bottom-0 h-1 bg-bg/50" aria-hidden>
+            <div
+              className="h-full bg-danger"
+              style={{ width: `${Math.min(100, (recordMs / CLIP_DURATION_MS) * 100)}%` }}
+            />
+          </div>
         )}
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -934,7 +1058,48 @@ export const CameraCapture = memo(function CameraCapture({
             {g}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => setShowGrid((on) => !on)}
+          aria-pressed={showGrid}
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-wide",
+            showGrid ? "border-accent text-fg" : "border-border text-muted",
+          )}
+        >
+          <Crosshair className="size-3" aria-hidden />
+          Grid
+        </button>
+        <button
+          type="button"
+          onClick={() => setUseTimer((on) => !on)}
+          aria-pressed={useTimer}
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] uppercase tracking-wide",
+            useTimer ? "border-accent text-fg" : "border-border text-muted",
+          )}
+        >
+          <Timer className="size-3" aria-hidden />
+          3s
+        </button>
       </div>
+      {live && (
+        <label className="flex items-center gap-3 text-xs text-muted">
+          <span className="w-12 shrink-0 uppercase tracking-wide">Zoom</span>
+          <input
+            type="range"
+            min={zoomCaps?.min ?? 1}
+            max={zoomCaps?.max ?? 2.4}
+            step={zoomCaps?.step ?? 0.05}
+            value={zoom}
+            disabled={busy || recording || disabled}
+            onChange={(event) => void changeZoom(Number(event.target.value))}
+            className="h-2 flex-1 accent-accent"
+            aria-label="Camera zoom"
+          />
+          <span className="w-10 tabular-nums text-fg">{zoom.toFixed(1)}×</span>
+        </label>
+      )}
       {/* The one-hour batch window was invisible until it expired and silently
           discarded the batch. Show when it runs out. */}
       {permissionsReady && permissionExpiresAt !== null && (
@@ -983,7 +1148,7 @@ export const CameraCapture = memo(function CameraCapture({
                     className="aspect-[4/3] w-full object-contain"
                   />
                   <span className="absolute bottom-1 left-1 rounded bg-bg/85 px-1.5 py-0.5 text-[10px] text-fg">
-                    {frame.id}
+                    {frame.id} · {Math.round(frame.quality.score * 100)}
                   </span>
                 </button>
               );
@@ -998,6 +1163,12 @@ export const CameraCapture = memo(function CameraCapture({
               }
             >
               Use selected stills
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setSelectedFrames(bestFrameIndices(videoFrames.map((frame) => frame.quality), 3))}
+            >
+              Best 3
             </Button>
             <Button
               variant="ghost"
@@ -1062,10 +1233,10 @@ export const CameraCapture = memo(function CameraCapture({
           <>
             <Button
               className="flex-1"
-              onClick={() => void snapBurst()}
-              disabled={busy || recording || batchCommitted || disabled || !permissionsReady}
+              onClick={() => void snapWithOptionalTimer()}
+              disabled={busy || recording || batchCommitted || disabled || !permissionsReady || countdown !== null}
             >
-              Capture still
+              {countdown !== null ? `Capturing in ${countdown}` : "Burst stills"}
             </Button>
             <Button
               variant="secondary"
@@ -1073,7 +1244,7 @@ export const CameraCapture = memo(function CameraCapture({
               onClick={() => void toggleRecord()}
               disabled={busy || batchCommitted || disabled || (!permissionsReady && !recording)}
             >
-              {recording ? "Stop clip" : "Record 7s"}
+              {recording ? "Stop clip" : `Record ${CLIP_DURATION_MS / 1000}s`}
             </Button>
             {hasTorch && (
               <Button
@@ -1177,6 +1348,46 @@ function cameraErrorMessage(cause: unknown): string {
     }
   }
   return cause instanceof Error ? cause.message : "Could not open the camera.";
+}
+
+function ThirdsGrid() {
+  return (
+    <div className="pointer-events-none absolute inset-0" aria-hidden>
+      <div className="absolute inset-x-0 top-1/3 border-t border-white/25" />
+      <div className="absolute inset-x-0 top-2/3 border-t border-white/25" />
+      <div className="absolute inset-y-0 left-1/3 border-l border-white/25" />
+      <div className="absolute inset-y-0 left-2/3 border-l border-white/25" />
+    </div>
+  );
+}
+
+function LiveQualityHud({ quality }: { quality: FrameQuality }) {
+  const bars = [
+    { label: "Sharp", value: quality.sharpness },
+    { label: "Light", value: quality.exposure },
+    { label: "Rope", value: quality.ropeHint },
+  ];
+  return (
+    <div className="pointer-events-none absolute left-2 top-2 w-36 rounded-md bg-bg/75 px-2 py-1.5 backdrop-blur-sm">
+      {bars.map((bar) => (
+        <div key={bar.label} className="mb-1 last:mb-0">
+          <div className="flex justify-between text-[10px] uppercase tracking-wide text-subtle">
+            <span>{bar.label}</span>
+            <span className="tabular-nums text-fg">{Math.round(bar.value * 100)}</span>
+          </div>
+          <div className="mt-0.5 h-1 overflow-hidden rounded-full bg-border">
+            <div
+              className={cn(
+                "h-full rounded-full",
+                bar.value >= 0.55 ? "bg-accent" : bar.value >= 0.35 ? "bg-warn" : "bg-danger",
+              )}
+              style={{ width: `${Math.round(Math.min(1, Math.max(0, bar.value)) * 100)}%` }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function GuideOverlay({ guide }: { guide: Guide }) {

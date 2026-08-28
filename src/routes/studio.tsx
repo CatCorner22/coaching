@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { analyzeRope } from "@/lib/ai/analyze";
 import { analyzeErrorMessage } from "@/lib/ai/analyze-errors";
+import { captureReadinessForAnalyze } from "@/lib/camera/capture-readiness";
 import { authEnabled } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { DUNGEON, TIES, getTie } from "@/lib/kb";
@@ -24,7 +25,6 @@ import {
 import { listenForWords } from "@/lib/voice/listen";
 import { playCoachVoice, stopCoachVoice } from "@/lib/voice/play";
 import { DIRECT_CHECK_REMINDER } from "@/lib/voice/reviewed-lines";
-import { captureReadinessForAnalyze } from "@/lib/camera/capture-readiness";
 import { buildDeterministic } from "@/lib/ml/predict";
 import {
   buildObservationReport,

@@ -263,7 +263,7 @@ try {
     await confirmBatchPermissions();
     await page.getByRole("button", { name: "Open live camera", exact: true }).click();
     await waitForLivePreview();
-    await page.getByRole("button", { name: "Capture still", exact: true }).click();
+    await page.getByRole("button", { name: "Burst stills", exact: true }).click();
     await waitForCommittedBatch("photo");
     await waitForNeutralLocalReport("neutral synthetic still");
 
@@ -337,7 +337,15 @@ try {
       state: "visible",
       timeout: 25_000,
     });
-    await page.getByRole("img", { name: "F01 video still", exact: true }).click();
+    // The clip picker now pre-selects the best stills, so a blind click on
+    // F01 deselects it when it was auto-picked — with a one-frame clip that
+    // left zero selected and the commit button disabled forever. The intent
+    // is "commit with F01 selected": toggle it only if auto-pick skipped it.
+    const f01 = page
+      .locator("button[aria-pressed]")
+      .filter({ has: page.getByRole("img", { name: "F01 video still", exact: true }) })
+      .first();
+    if ((await f01.getAttribute("aria-pressed")) !== "true") await f01.click();
     await page.getByRole("button", { name: "Use selected stills", exact: true }).click();
     await waitForCommittedBatch("video");
     await waitForNeutralLocalReport("neutral synthetic video still");

@@ -141,15 +141,18 @@ try {
   log("live preview streaming at", dims.w + "x" + dims.h);
   await shot(page, "05-live");
 
-  const capture = page.getByRole("button", { name: /capture still/i }).first();
-  if (!(await capture.count())) throw new Error("Capture still button not found");
+  // The still control is "Burst stills" since the five-shot burst landed; it
+  // was "Capture still" before. Match either so this harness keeps working
+  // across that rename rather than failing on a label change.
+  const capture = page.getByRole("button", { name: /burst stills|capture still/i }).first();
+  if (!(await capture.count())) throw new Error("still-capture button not found");
   await capture.click();
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(2500);
   await shot(page, "06-captured");
   const after = await page.locator("body").innerText();
   const captured = /analyze|readiness|good to analyze|hard to read|a little soft|lighting is dim|rope is small/i.test(after);
   log("capture produced a still + readiness/analyze surface:", captured);
-  if (!captured) throw new Error("No capture evidence after Capture still");
+  if (!captured) throw new Error("no capture evidence after the still-capture button");
 
   // Academy practice cam: must be BLOCKED before photos=yes, open after.
   await page.goto("http://localhost:8080/tie/single-column", { waitUntil: "networkidle" });
