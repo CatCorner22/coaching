@@ -24,6 +24,7 @@
     "test:stores": "node --experimental-strip-types --import ./scripts/register-ts.mjs --test src/lib/stores/session.test.ts src/lib/stores/planner.test.ts src/lib/stores/settings-migration.test.ts src/lib/studio/negotiation.test.ts",
     "test": "npm run test:core && npm run test:stores",
     "lint": "eslint . --max-warnings=0",
+    "generate:nyx-nudes": "node scripts/generate-nyx-photo-nudes.mjs",
     "format": "prettier --write ."
   },
   "dependencies": {

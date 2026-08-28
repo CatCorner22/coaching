@@ -7,6 +7,7 @@ import type { LearnMedia } from "@/lib/kb/types";
 import type { Tie } from "@/lib/kb/types";
 import { nyxPoseForTieStep, type NyxShibariPose } from "@/lib/learn/nyx-model";
 import { nyxNudesForKnotStep, nyxNudesForTieStep, type NyxNudePose } from "@/lib/learn/nyx-nudes";
+import type { NyxPhotoNudePose } from "@/lib/learn/nyx-photo-nudes";
 import type { VoiceStepInput } from "@/lib/learn/voice-script";
 
 type AcademyCoachPanelProps = {
@@ -29,7 +30,7 @@ type AcademyCoachPanelProps = {
   /** Knot slug — used to pick three nude body studies for this step. */
   knotSlug?: string;
   /** Extra nude studies; defaults from knot/tie slug + step. */
-  nyxNudes?: NyxNudePose[];
+  nyxNudes?: Array<NyxNudePose | NyxPhotoNudePose>;
 };
 
 export function AcademyCoachPanel({

@@ -14,7 +14,7 @@ import {
 } from "@/lib/kb";
 import { tieShape, tieShapeBlurb, tieShapeLabel } from "@/lib/kb/tie-factories";
 import { NYX_SHIBARI, NYX_SHIBARI_POSES } from "@/lib/learn/nyx-model";
-import { NYX_NUDE_POSES } from "@/lib/learn/nyx-nudes";
+import { NYX_NUDE_POSES, nyxPhotoGalleryPoses } from "@/lib/learn/nyx-nudes";
 
 export const Route = createFileRoute("/learn")({ component: LearnPage });
 
@@ -92,10 +92,17 @@ function LearnPage() {
       <section className="mt-12">
         <h2 className="font-display text-2xl">{NYX_SHIBARI.name} nude body studies</h2>
         <p className="mt-2 max-w-2xl text-base leading-relaxed text-muted">
-          Fourteen illustrated adult nudes — life-drawings of {NYX_SHIBARI.name} so you can read breast line, waist,
-          hip, and wrist on a body, not only a clothed still. Three of these appear on every taught lesson step.
+          Twenty photo slots plus fourteen illustrated fallbacks. When you generate real photo nudes (Settings →
+          Generate Nyx photos, or the xAI script), they replace the drawings automatically. Five appear on every taught
+          lesson step.
         </p>
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {nyxPhotoGalleryPoses().map((pose) => (
+            <NyxNudePanel key={pose} pose={pose} compact />
+          ))}
+        </div>
+        <p className="mt-6 text-sm font-medium text-muted">Illustrated fallback set</p>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {NYX_NUDE_POSES.map((pose) => (
             <NyxNudePanel key={pose} pose={pose} compact />
           ))}

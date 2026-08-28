@@ -187,6 +187,21 @@ function SettingsPage() {
           )}
         </section>
         <section className="rounded-lg border border-border bg-surface p-4">
+          <h2 className="font-display text-xl">Nyx photo nudes</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted">
+            Academy lessons show five nude studies per step. When real photo files exist in{" "}
+            <code className="text-xs">public/instructor/nyx/nude/</code>, they replace the illustrated
+            fallbacks automatically.
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-subtle">
+            Generate with your xAI Grok Imagine key on a machine that has{" "}
+            <code className="text-xs">XAI_API_KEY</code> set:{" "}
+            <code className="text-xs">XAI_API_KEY=xai-… npm run generate:nyx-nudes</code>, then commit
+            the WebP files. Built-in Cursor and Hugging Face generators refuse nude prompts in this
+            environment.
+          </p>
+        </section>
+        <section className="rounded-lg border border-border bg-surface p-4">
           <h2 className="font-display text-2xl">Local data</h2>
           <p className="mt-2 text-xs leading-relaxed text-muted">
             Names and titles, safewords, negotiation choices and notes, plans, kit state, and journal
