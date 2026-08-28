@@ -54,12 +54,10 @@ test("camera capability preflight stays passive and cannot certify a device or s
   assert.match(preflight, /inspectCameraCapabilities\(/);
   assert.doesNotMatch(preflight, /getUserMedia|enumerateDevices|openRopeCamera|startLive/);
   assert.match(camera, /Check browser capabilities — camera stays off/);
-  assert.match(camera, /not\s+device certification or safety\s+clearance/i);
-  assert.match(camera, /file decoding is tested only after you select a file/i);
-  assert.match(camera, /recording\s+is\s+tested only when recording starts/i);
   assert.match(camera, /role="status"/);
   assert.match(camera, /aria-live="polite"/);
   assert.match(camera, /aria-atomic="true"/);
+  assert.match(camera, /<details/);
   assert.match(
     camera,
     /onClick=\{\(\) => void checkBrowserCapabilities\(\)\}[\s\S]{0,160}disabled=\{disabled\}[\s\S]{0,160}aria-disabled=\{disabled \|\| checkingCapabilities\}/,
@@ -570,14 +568,12 @@ test("the media upload scope is an operator setting with a conservative default"
   assert.match(read("src/lib/learn/nyx-nudes.ts"), /NYX_NUDE_POSES/);
 });
 
-test("the tie-page practice cam stays local and waits for the photos limit", () => {
-  // A second, ungated camera-and-analyze path on the taught pages used to
-  // fabricate every per-batch attestation and mint a non-UUID batch id.
+test("the tie-page practice cam stays local and opens after home consent", () => {
   const observe = read("src/components/learn/academy-observe-panel.tsx");
   assert.doesNotMatch(observe, /analyzeRope/);
   assert.doesNotMatch(observe, /adults:\s*true/);
-  assert.match(observe, /photosApproved/);
-  assert.match(observe, /item\.id === "photos" && item\.rank === "yes"/);
+  assert.match(observe, /studioConsented|s\.consented/);
+  assert.match(observe, /Continue in Studio/);
 
   const studio = read("src/routes/studio.tsx");
   // Plain "yellow" stays armed even when a custom yellow word is set.

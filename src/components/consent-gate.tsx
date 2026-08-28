@@ -110,8 +110,7 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
           Step inside
         </Button>
         <p className="mt-4 text-xs leading-relaxed text-subtle">
-          Uncheck or reset anytime in Settings. Analyze sends selected stills to xAI only when you
-          tap it — never in the background.
+          Reset consent anytime in Settings. Analyze runs only when you tap it.
         </p>
       </div>
     </div>

@@ -907,17 +907,13 @@ export const CameraCapture = memo(function CameraCapture({
 
   return (
     <div className="space-y-3">
-      <section
-        className="rounded-lg border border-border bg-surface p-3"
-        aria-labelledby="camera-capability-heading"
-        aria-busy={checkingCapabilities}
-      >
-        <h3 id="camera-capability-heading" className="text-sm font-medium text-fg">
-          Browser camera preflight
-        </h3>
-        <p className="mt-1 text-xs leading-relaxed text-muted">
-          Check browser capabilities without opening the camera, prompting for access, or listing
-          devices. This snapshot can identify some browser-layer blockers only.
+      <details className="rounded-lg border border-border bg-surface p-3">
+        <summary className="cursor-pointer text-sm font-medium text-fg">
+          Browser camera check (optional)
+        </summary>
+        <div className="mt-2">
+        <p className="text-xs leading-relaxed text-muted">
+          See whether this browser can use a camera — without opening the lens yet.
         </p>
         <Button
           type="button"
@@ -960,12 +956,6 @@ export const CameraCapture = memo(function CameraCapture({
                 value={permissionCopy(capabilityReport.permission)}
               />
             </dl>
-            <p className="mt-3 text-xs leading-relaxed text-subtle">
-              Photo/video file decoding is tested only after you select a file. In-app recording is
-              tested only when recording starts. This does not test the physical camera, image
-              quality, consent, privacy, or safety. It is not device certification or safety
-              clearance.
-            </p>
           </div>
         )}
         {capabilityError && (
@@ -973,12 +963,12 @@ export const CameraCapture = memo(function CameraCapture({
             {capabilityError}
           </p>
         )}
-      </section>
+        </div>
+      </details>
       {batchCommitted && (
         <div className="rounded-md border border-accent/30 bg-accent/10 p-3 text-xs text-muted">
           <p>
-            This batch is ready for Analyze once from this view. Start another capture anytime —
-            nothing uploads until you tap Analyze.
+            Ready for Analyze — tap once when you want cloud categories. Capture again anytime.
           </p>
           <Button className="mt-2" variant="outline" size="sm" onClick={startNewBatch}>
             Start a new capture
@@ -1016,8 +1006,8 @@ export const CameraCapture = memo(function CameraCapture({
             <div className="absolute inset-0 bg-bg/70" />
             <Camera className="relative size-8 text-muted" />
             <p className="relative px-6 text-center text-sm text-muted">
-              Open the camera, frame the rope, and capture. A five-shot burst keeps the sharpest
-              stills. Clips become labeled stills you confirm.
+              Open the camera, frame the rope, and capture when you are ready. A five-shot burst
+              keeps the sharpest stills, and clips become labeled stills you confirm.
             </p>
           </div>
         )}

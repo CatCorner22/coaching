@@ -7,7 +7,7 @@ export type CaptureReadiness = {
   suggestRetake: boolean;
 };
 
-/** Plain-language readiness for Analyze — not safety clearance. */
+/** Plain-language readiness for the Analyze button — not safety clearance. */
 export function captureReadinessForAnalyze(quality: FrameQuality): CaptureReadiness {
   if (quality.sharpness < 0.35 || quality.exposure < 0.35) {
     return {
@@ -44,7 +44,7 @@ export function captureReadinessForAnalyze(quality: FrameQuality): CaptureReadin
   return {
     label: "ready",
     headline: "Good to analyze",
-    detail: `${quality.score.toFixed(2)} composite · tap Analyze once when you are ready.`,
+    detail: `${quality.score.toFixed(2)} composite score · tap Analyze once when you are ready.`,
     suggestRetake: false,
   };
 }
