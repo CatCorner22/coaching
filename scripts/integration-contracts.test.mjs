@@ -64,7 +64,7 @@ test("camera capability preflight stays passive and cannot certify a device or s
   // optional.
   assert.match(camera, /not\s+device certification or safety\s+clearance/i);
   assert.match(camera, /decoding is\s+tested only after you select a file/i);
-  assert.match(camera, /recording is tested only when recording starts/i);
+  assert.match(camera, /recording is\s+tested only when recording starts/i);
   assert.match(
     camera,
     /onClick=\{\(\) => void checkBrowserCapabilities\(\)\}[\s\S]{0,160}disabled=\{disabled\}[\s\S]{0,160}aria-disabled=\{disabled \|\| checkingCapabilities\}/,

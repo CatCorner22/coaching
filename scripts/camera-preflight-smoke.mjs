@@ -86,6 +86,13 @@ try {
       });
     });
 
+    // The preflight now lives inside a collapsed <details>; a hidden button
+    // is unreachable by role, which is exactly what a keyboard user hits too.
+    // Expand it the way a person would, then run the passive check.
+    const summary = page.locator("details > summary", {
+      hasText: "Browser camera check (optional)",
+    });
+    await summary.click();
     const button = page.getByRole("button", {
       name: "Check browser capabilities — camera stays off",
       exact: true,
