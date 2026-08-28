@@ -194,11 +194,10 @@ function SettingsPage() {
             fallbacks automatically.
           </p>
           <p className="mt-2 text-xs leading-relaxed text-subtle">
-            Generate with your xAI Grok Imagine key on a machine that has{" "}
-            <code className="text-xs">XAI_API_KEY</code> set:{" "}
-            <code className="text-xs">XAI_API_KEY=xai-… npm run generate:nyx-nudes</code>, then commit
-            the WebP files. Built-in Cursor and Hugging Face generators refuse nude prompts in this
-            environment.
+            Generate with your xAI Grok Imagine developer key on a machine where that key is exported
+            in the shell environment, then run{" "}
+            <code className="text-xs">npm run generate:nyx-nudes</code> and commit the WebP files.
+            Built-in Cursor and Hugging Face generators refuse nude prompts in this environment.
           </p>
         </section>
         <section className="rounded-lg border border-border bg-surface p-4">
