@@ -67,6 +67,7 @@ export const NYX_PHOTO_NUDE_PROMPTS = {
     "Photorealistic fine-art figure study. Fictional adult woman late 20s nude seated with both legs to one side mermaid pose, long black hair, warm olive skin, calm face. Grey studio, educational.",
 };
 
+/** @param {string} pose */
 export function nyxPhotoNudeFile(pose) {
   return `nyx-nude-${pose}.webp`;
 }
