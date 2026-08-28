@@ -7,7 +7,7 @@
 
 import nudeManifest from "../../../public/instructor/nyx/nude/manifest.json" with { type: "json" };
 
-const V = 1;
+const V = 2;
 const BASE = `/instructor/nyx/nude`;
 
 const manifestPhotos = new Set(
@@ -35,6 +35,26 @@ export const NYX_PHOTO_NUDE_POSES = [
   "chest-line",
   "thigh-stack",
   "mermaid-seat",
+  "squat-prep",
+  "bend-forward",
+  "ankle-offer",
+  "prone-back",
+  "side-recline",
+  "contrapposto",
+  "hands-on-hips",
+  "back-kneel",
+  "leg-lift",
+  "spine-arch",
+  "crouch-floor",
+  "shoulder-line",
+  "z-sit",
+  "rope-at-chest",
+  "double-column-wrist",
+  "waist-wrap",
+  "full-length-front",
+  "full-length-side",
+  "full-length-back",
+  "seated-profile",
 ] as const;
 
 export type NyxPhotoNudePose = (typeof NYX_PHOTO_NUDE_POSES)[number];
@@ -66,6 +86,26 @@ export const NYX_PHOTO_NUDE_CAPTIONS: Record<NyxPhotoNudePose, string> = {
   "chest-line": "Photo — chest line. Loose rope drape, never on the neck.",
   "thigh-stack": "Photo — thigh stack. Folded leg line before futomomo.",
   "mermaid-seat": "Photo — mermaid seat. Both legs to one side, grounded hips.",
+  "squat-prep": "Photo — squat prep. Hips low, heels down, spine long.",
+  "bend-forward": "Photo — forward bend. Lumbar and hamstring line visible.",
+  "ankle-offer": "Photo — ankle offered. Joint line clear for futomomo start.",
+  "prone-back": "Photo — prone back. Scapula spread on the mat.",
+  "side-recline": "Photo — side recline. Rib flare and hip stack.",
+  contrapposto: "Photo — contrapposto. Weight shift shows true hip line.",
+  "hands-on-hips": "Photo — hands on hips. Waist readable, elbows clear.",
+  "back-kneel": "Photo — kneel from behind. Shoulder blades and sacrum.",
+  "leg-lift": "Photo — leg lift. Thigh line and hip flexion.",
+  "spine-arch": "Photo — gentle arch. Sternum lift for chest harness spacing.",
+  "crouch-floor": "Photo — crouch on floor. Compact base, both feet flat.",
+  "shoulder-line": "Photo — shoulder line. Collarbone to deltoid, throat clear.",
+  "z-sit": "Photo — z-sit. Grounded hips, one shin forward.",
+  "rope-at-chest": "Photo — rope at chest. Coil held high, never on neck.",
+  "double-column-wrist": "Photo — double column on wrists. Two columns, finger gaps.",
+  "waist-wrap": "Photo — waist wrap awareness. Hip line before a harness.",
+  "full-length-front": "Photo — full length front. Entire front line in frame.",
+  "full-length-side": "Photo — full length side. Profile from head to foot.",
+  "full-length-back": "Photo — full length back. Rear line from hair to heel.",
+  "seated-profile": "Photo — seated profile. Side view, grounded hips.",
 };
 
 export function nyxPhotoNudeFile(pose: NyxPhotoNudePose): string {
@@ -101,6 +141,20 @@ export const ILLUSTRATED_TO_PHOTO: Partial<Record<string, NyxPhotoNudePose>> = {
   hipStudy: "hip-close",
   recline: "recline",
   kneelSide: "kneel-side",
+  squatPrep: "squat-prep",
+  bendForward: "bend-forward",
+  ankleOffer: "ankle-offer",
+  proneBack: "prone-back",
+  sideRecline: "side-recline",
+  contrapposto: "contrapposto",
+  handsOnHips: "hands-on-hips",
+  backKneel: "back-kneel",
+  legLift: "leg-lift",
+  spineArch: "spine-arch",
+  crouchFloor: "crouch-floor",
+  shoulderLine: "shoulder-line",
+  zSit: "z-sit",
+  ropeAtChest: "rope-at-chest",
 };
 
 export function photoPoseForIllustrated(illustrated: string): NyxPhotoNudePose | null {
@@ -119,8 +173,23 @@ const PHOTO_ONLY_ILLUSTRATED: Partial<Record<NyxPhotoNudePose, keyof typeof ILLU
   "chest-line": "torsoStudy",
   "thigh-stack": "hipStudy",
   "mermaid-seat": "seated",
+  "double-column-wrist": "wristOffer",
+  "waist-wrap": "hipTurn",
+  "full-length-front": "standFront",
+  "full-length-side": "standSide",
+  "full-length-back": "standBack",
+  "seated-profile": "standSide",
 };
 
 export function illustratedPoseForPhoto(photo: NyxPhotoNudePose): string | null {
   return PHOTO_TO_ILLUSTRATED[photo] ?? PHOTO_ONLY_ILLUSTRATED[photo] ?? null;
+}
+
+/** Every photo slot must resolve to an illustrated fallback for offline rendering. */
+export function assertPhotoCatalogComplete(): void {
+  for (const pose of NYX_PHOTO_NUDE_POSES) {
+    if (!illustratedPoseForPhoto(pose)) {
+      throw new Error(`Photo pose "${pose}" has no illustrated fallback`);
+    }
+  }
 }

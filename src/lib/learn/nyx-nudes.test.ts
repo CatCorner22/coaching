@@ -11,6 +11,7 @@ import {
   NYX_NUDES_PER_STEP,
 } from "./nyx-nudes.ts";
 import {
+  assertPhotoCatalogComplete,
   illustratedPoseForPhoto,
   isNyxPhotoNudePose,
   NYX_PHOTO_NUDE_POSES,
@@ -19,10 +20,10 @@ import {
   nyxPhotoNudeUrl,
 } from "./nyx-photo-nudes.ts";
 
-test("Nyx nude catalog covers fourteen illustrated and twenty photo slots", () => {
-  assert.equal(NYX_NUDE_POSES.length, 14);
-  assert.equal(NYX_PHOTO_NUDE_POSES.length, 20);
-  assert.equal(nyxPhotoGalleryPoses().length, 20);
+test("Nyx nude catalog covers twenty-eight illustrated and forty photo slots", () => {
+  assert.equal(NYX_NUDE_POSES.length, 28);
+  assert.equal(NYX_PHOTO_NUDE_POSES.length, 40);
+  assert.equal(nyxPhotoGalleryPoses().length, 40);
   for (const pose of NYX_NUDE_POSES) {
     assert.ok(nyxNudeCaption(pose).length > 20, pose);
   }
@@ -30,13 +31,14 @@ test("Nyx nude catalog covers fourteen illustrated and twenty photo slots", () =
     assert.match(nyxPhotoNudeUrl(pose), /^\/instructor\/nyx\/nude\//);
     assert.ok(nyxPhotoNudeCaption(pose).length > 12, pose);
   }
+  assertPhotoCatalogComplete();
 });
 
 test("script manifest poses match client catalog", () => {
   assert.deepEqual([...SCRIPT_POSES].sort(), [...NYX_PHOTO_NUDE_POSES].sort());
 });
 
-test("every knot and tie step returns five unique nude studies", () => {
+test("every knot and tie step returns eight unique nude studies", () => {
   const knots = nyxNudesForKnotStep("somerville-bowline", 0);
   assert.equal(knots.length, NYX_NUDES_PER_STEP);
   assert.equal(new Set(knots).size, NYX_NUDES_PER_STEP);
@@ -53,7 +55,7 @@ test("every knot and tie step returns five unique nude studies", () => {
   assert.equal(unknown.length, NYX_NUDES_PER_STEP);
 });
 
-test("every foundation lesson step returns five unique nude studies", () => {
+test("every foundation lesson step returns eight unique nude studies", () => {
   for (const slug of FOUNDATION_KNOT_SLUGS) {
     for (let step = 0; step < 3; step++) {
       const poses = nyxNudesForKnotStep(slug, step);
@@ -77,10 +79,14 @@ test("photo-only poses map to illustrated fallbacks", () => {
   assert.equal(illustratedPoseForPhoto("chest-line"), "torsoStudy");
   assert.equal(illustratedPoseForPhoto("thigh-stack"), "hipStudy");
   assert.equal(illustratedPoseForPhoto("mermaid-seat"), "seated");
+  assert.equal(illustratedPoseForPhoto("double-column-wrist"), "wristOffer");
+  assert.equal(illustratedPoseForPhoto("full-length-front"), "standFront");
+  assert.equal(illustratedPoseForPhoto("squat-prep"), "squatPrep");
+  assert.equal(illustratedPoseForPhoto("z-sit"), "zSit");
 });
 
 test("unhyphenated photo catalog keys are detected as photo poses", () => {
-  for (const pose of ["seated", "kneeling", "floor", "recline", "walk"] as const) {
+  for (const pose of ["seated", "kneeling", "floor", "recline", "walk", "contrapposto"] as const) {
     assert.ok(isNyxPhotoNudePose(pose), pose);
   }
   assert.ok(!isNyxPhotoNudePose("standFront"));

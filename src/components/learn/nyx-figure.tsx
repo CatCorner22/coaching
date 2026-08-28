@@ -43,6 +43,20 @@ export function NyxFigure({ pose, className }: NyxFigureProps) {
         {pose === "hipStudy" && <HipStudy />}
         {pose === "recline" && <Recline />}
         {pose === "kneelSide" && <KneelSide />}
+        {pose === "squatPrep" && <SquatPrep />}
+        {pose === "bendForward" && <BendForward />}
+        {pose === "ankleOffer" && <AnkleOffer />}
+        {pose === "proneBack" && <ProneBack />}
+        {pose === "sideRecline" && <SideRecline />}
+        {pose === "contrapposto" && <Contrapposto />}
+        {pose === "handsOnHips" && <HandsOnHips />}
+        {pose === "backKneel" && <BackKneel />}
+        {pose === "legLift" && <LegLift />}
+        {pose === "spineArch" && <SpineArch />}
+        {pose === "crouchFloor" && <CrouchFloor />}
+        {pose === "shoulderLine" && <ShoulderLine />}
+        {pose === "zSit" && <ZSit />}
+        {pose === "ropeAtChest" && <RopeAtChest />}
       </g>
     </svg>
   );
@@ -368,6 +382,262 @@ function KneelSide() {
       <path d="M120 140 C96 170, 88 210, 94 246" stroke={SKIN} strokeWidth="14" fill="none" strokeLinecap="round" />
       <Face cx={130} cy={90} profile />
       <RopeCoil cx={94} cy={246} />
+    </g>
+  );
+}
+
+function SquatPrep() {
+  return (
+    <g transform="translate(0 20)">
+      <HairDown cx={120} cy={70} />
+      <ellipse cx="120" cy="158" rx="34" ry="44" fill={SKIN} />
+      <Breast cx={106} cy={156} />
+      <Breast cx={136} cy={156} />
+      <MothTattoo cx={120} cy={138} />
+      <ellipse cx="120" cy="228" rx="38" ry="28" fill={SKIN} />
+      <Pubic cx={120} cy={238} />
+      <path d="M88 228 C60 260, 48 300, 54 340" stroke={SKIN} strokeWidth="18" fill="none" strokeLinecap="round" />
+      <path d="M152 228 C180 260, 192 300, 186 340" stroke={SKIN} strokeWidth="18" fill="none" strokeLinecap="round" />
+      <ellipse cx="50" cy="348" rx="22" ry="10" fill={SKIN} />
+      <ellipse cx="190" cy="348" rx="22" ry="10" fill={SKIN} />
+      <path d="M86 150 C64 180, 58 210, 62 236" stroke={SKIN} strokeWidth="14" fill="none" strokeLinecap="round" />
+      <Face cx={120} cy={70} />
+    </g>
+  );
+}
+
+function BendForward() {
+  return (
+    <g transform="translate(0 30)">
+      <HairDown cx={120} cy={120} scale={0.9} />
+      <ellipse cx="120" cy="200" rx="36" ry="40" fill={SKIN} />
+      <ellipse cx="108" cy="198" rx="14" ry="12" fill={SKIN} />
+      <circle cx="112" cy="200" r="3.4" fill={AREOLA} />
+      <ellipse cx="120" cy="268" rx="34" ry="24" fill={SKIN} />
+      <path d="M120 160 C120 220, 118 280, 120 320" stroke={SKIN_DEEP} strokeWidth="2" opacity="0.4" />
+      <ellipse cx="104" cy="360" rx="13" ry="66" fill={SKIN} />
+      <ellipse cx="136" cy="360" rx="13" ry="66" fill={SKIN} />
+      <path d="M90 180 C70 200, 58 230, 54 260" stroke={SKIN} strokeWidth="14" fill="none" strokeLinecap="round" />
+      <path d="M150 180 C170 200, 182 230, 186 260" stroke={SKIN} strokeWidth="14" fill="none" strokeLinecap="round" />
+      <Face cx={120} cy={120} scale={0.85} />
+    </g>
+  );
+}
+
+function AnkleOffer() {
+  return (
+    <g>
+      <HairDown cx={120} cy={78} />
+      <ellipse cx="120" cy="168" rx="34" ry="42" fill={SKIN} />
+      <Breast cx={106} cy={166} />
+      <Breast cx={136} cy={166} />
+      <ellipse cx="120" cy="248" rx="36" ry="22" fill={SKIN} />
+      <path d="M150 250 C200 270, 230 300, 240 330" stroke={SKIN} strokeWidth="16" fill="none" strokeLinecap="round" />
+      <ellipse cx="248" cy="338" rx="18" ry="10" fill={SKIN} />
+      <path d="M90 250 C60 280, 48 320, 54 350" stroke={SKIN} strokeWidth="16" fill="none" strokeLinecap="round" />
+      <ellipse cx="50" cy="358" rx="20" ry="10" fill={SKIN} />
+      <Face cx={120} cy={78} />
+    </g>
+  );
+}
+
+function ProneBack() {
+  return (
+    <g transform="translate(0 60)">
+      <HairDown cx={70} cy={100} scale={0.7} />
+      <ellipse cx="140" cy="120" rx="56" ry="28" fill={SKIN} />
+      <ellipse cx="104" cy="108" rx="8" ry="12" fill={SKIN_SHADOW} opacity="0.4" />
+      <ellipse cx="176" cy="108" rx="8" ry="12" fill={SKIN_SHADOW} opacity="0.4" />
+      <path d="M140 96 L140 210" stroke={SKIN_DEEP} strokeWidth="2" opacity="0.45" />
+      <ellipse cx="200" cy="130" rx="28" ry="16" fill={SKIN} />
+      <path d="M220 130 C250 120, 270 100, 278 80" stroke={SKIN} strokeWidth="13" fill="none" strokeLinecap="round" />
+      <path d="M220 138 C248 150, 268 170, 274 190" stroke={SKIN} strokeWidth="13" fill="none" strokeLinecap="round" />
+    </g>
+  );
+}
+
+function SideRecline() {
+  return (
+    <g transform="translate(0 70)">
+      <ellipse cx="60" cy="90" rx="20" ry="16" fill={SKIN} />
+      <Face cx={60} cy={90} scale={0.75} profile />
+      <HairDown cx={60} cy={90} scale={0.6} />
+      <ellipse cx="130" cy="110" rx="54" ry="22" fill={SKIN} />
+      <ellipse cx="118" cy="96" rx="13" ry="10" fill={SKIN} />
+      <circle cx="122" cy="96" r="3" fill={AREOLA} />
+      <ellipse cx="196" cy="118" rx="26" ry="14" fill={SKIN} />
+      <Pubic cx={182} cy={122} />
+      <path d="M210 112 C240 90, 258 70, 264 52" stroke={SKIN} strokeWidth="12" fill="none" strokeLinecap="round" />
+    </g>
+  );
+}
+
+function Contrapposto() {
+  return (
+    <g transform="skewX(-6) translate(8 0)">
+      <HairDown cx={120} cy={58} />
+      <ellipse cx="124" cy="150" rx="36" ry="50" fill={SKIN} />
+      <Breast cx={110} cy={148} />
+      <Breast cx={140} cy={150} />
+      <MothTattoo cx={124} cy={128} />
+      <ellipse cx="128" cy="248" rx="32" ry="26" fill={SKIN} />
+      <Pubic cx={126} cy={262} />
+      <ellipse cx="108" cy="342" rx="13" ry="68" fill={SKIN} />
+      <ellipse cx="148" cy="338" rx="12" ry="70" fill={SKIN} />
+      <path d="M92 118 C72 168, 66 210, 74 248" stroke={SKIN} strokeWidth="15" fill="none" strokeLinecap="round" />
+      <path d="M156 118 C176 168, 182 210, 174 248" stroke={SKIN} strokeWidth="15" fill="none" strokeLinecap="round" />
+      <Face cx={124} cy={58} />
+    </g>
+  );
+}
+
+function HandsOnHips() {
+  return (
+    <g>
+      <HairDown cx={120} cy={58} />
+      <ellipse cx="120" cy="150" rx="36" ry="50" fill={SKIN} />
+      <Breast cx={106} cy={148} />
+      <Breast cx={136} cy={148} />
+      <MothTattoo cx={120} cy={128} />
+      <ellipse cx="120" cy="248" rx="32" ry="26" fill={SKIN} />
+      <Pubic cx={120} cy={262} />
+      <ellipse cx="104" cy="340" rx="13" ry="70" fill={SKIN} />
+      <ellipse cx="136" cy="340" rx="13" ry="70" fill={SKIN} />
+      <path d="M88 118 C72 190, 68 230, 74 248" stroke={SKIN} strokeWidth="14" fill="none" strokeLinecap="round" />
+      <path d="M152 118 C168 190, 172 230, 166 248" stroke={SKIN} strokeWidth="14" fill="none" strokeLinecap="round" />
+      <ellipse cx="74" cy="248" rx="10" ry="8" fill={SKIN} />
+      <ellipse cx="166" cy="248" rx="10" ry="8" fill={SKIN} />
+      <Face cx={120} cy={58} />
+    </g>
+  );
+}
+
+function BackKneel() {
+  return (
+    <g>
+      <HairDown cx={120} cy={58} />
+      <ellipse cx="120" cy="150" rx="36" ry="50" fill={SKIN} />
+      <path d="M120 96 L120 230" stroke={SKIN_DEEP} strokeWidth="2" opacity="0.45" />
+      <ellipse cx="104" cy="140" rx="8" ry="14" fill={SKIN_SHADOW} opacity="0.4" />
+      <ellipse cx="136" cy="140" rx="8" ry="14" fill={SKIN_SHADOW} opacity="0.4" />
+      <ellipse cx="120" cy="248" rx="32" ry="20" fill={SKIN} />
+      <path d="M96 248 C80 300, 70 340, 78 370" stroke={SKIN} strokeWidth="18" fill="none" strokeLinecap="round" />
+      <path d="M144 248 C160 300, 170 340, 162 370" stroke={SKIN} strokeWidth="18" fill="none" strokeLinecap="round" />
+      <ellipse cx="78" cy="382" rx="16" ry="8" fill={SKIN} />
+      <ellipse cx="162" cy="382" rx="16" ry="8" fill={SKIN} />
+    </g>
+  );
+}
+
+function LegLift() {
+  return (
+    <g>
+      <HairDown cx={120} cy={58} />
+      <ellipse cx="120" cy="150" rx="34" ry="50" fill={SKIN} />
+      <Breast cx={106} cy={148} />
+      <Breast cx={136} cy={148} />
+      <ellipse cx="120" cy="248" rx="30" ry="24" fill={SKIN} />
+      <Pubic cx={120} cy={260} />
+      <ellipse cx="136" cy="340" rx="13" ry="70" fill={SKIN} />
+      <path d="M96 248 C70 200, 50 160, 40 120" stroke={SKIN} strokeWidth="16" fill="none" strokeLinecap="round" />
+      <ellipse cx="36" cy="112" rx="12" ry="9" fill={SKIN} />
+      <path d="M90 120 C70 160, 64 200, 70 236" stroke={SKIN} strokeWidth="14" fill="none" strokeLinecap="round" />
+      <path d="M150 120 C168 150, 174 190, 168 230" stroke={SKIN} strokeWidth="14" fill="none" strokeLinecap="round" />
+      <Face cx={120} cy={58} />
+    </g>
+  );
+}
+
+function SpineArch() {
+  return (
+    <g>
+      <HairDown cx={120} cy={62} />
+      <ellipse cx="120" cy="158" rx="36" ry="48" fill={SKIN} />
+      <Breast cx={106} cy={154} />
+      <Breast cx={136} cy={154} />
+      <MothTattoo cx={120} cy={134} />
+      <path d="M120 200 C132 220, 132 240, 120 252" stroke={SKIN_DEEP} strokeWidth="2" opacity="0.35" fill="none" />
+      <ellipse cx="120" cy="252" rx="30" ry="24" fill={SKIN} />
+      <Pubic cx={120} cy={264} />
+      <ellipse cx="104" cy="348" rx="13" ry="66" fill={SKIN} />
+      <ellipse cx="136" cy="348" rx="13" ry="66" fill={SKIN} />
+      <path d="M90 130 C70 170, 58 210, 54 248" stroke={SKIN} strokeWidth="14" fill="none" strokeLinecap="round" />
+      <path d="M150 130 C170 170, 182 210, 186 248" stroke={SKIN} strokeWidth="14" fill="none" strokeLinecap="round" />
+      <Face cx={120} cy={62} />
+    </g>
+  );
+}
+
+function CrouchFloor() {
+  return (
+    <g transform="translate(0 50)">
+      <HairDown cx={120} cy={80} />
+      <ellipse cx="120" cy="168" rx="34" ry="40" fill={SKIN} />
+      <Breast cx={106} cy={166} />
+      <Breast cx={136} cy={166} />
+      <ellipse cx="120" cy="228" rx="36" ry="26" fill={SKIN} />
+      <Pubic cx={120} cy={238} />
+      <path d="M88 228 C56 250, 44 290, 50 320" stroke={SKIN} strokeWidth="17" fill="none" strokeLinecap="round" />
+      <path d="M152 228 C184 250, 196 290, 190 320" stroke={SKIN} strokeWidth="17" fill="none" strokeLinecap="round" />
+      <ellipse cx="46" cy="328" rx="20" ry="9" fill={SKIN} />
+      <ellipse cx="194" cy="328" rx="20" ry="9" fill={SKIN} />
+      <Face cx={120} cy={80} />
+    </g>
+  );
+}
+
+function ShoulderLine() {
+  return (
+    <g transform="translate(0 60) scale(1.3)">
+      <HairDown cx={92} cy={36} scale={0.8} />
+      <ellipse cx="92" cy="110" rx="44" ry="36" fill={SKIN} />
+      <path d="M48 100 C36 110, 30 130, 32 150" stroke={SKIN} strokeWidth="12" fill="none" strokeLinecap="round" />
+      <path d="M136 100 C148 110, 154 130, 152 150" stroke={SKIN} strokeWidth="12" fill="none" strokeLinecap="round" />
+      <ellipse cx="78" cy="108" rx="14" ry="12" fill={SKIN} />
+      <ellipse cx="106" cy="108" rx="14" ry="12" fill={SKIN} />
+      <circle cx="82" cy="110" r="3.4" fill={AREOLA} />
+      <circle cx="110" cy="110" r="3.4" fill={AREOLA} />
+      <MothTattoo cx={92} cy={92} />
+      <Face cx={92} cy={36} scale={0.85} />
+    </g>
+  );
+}
+
+function ZSit() {
+  return (
+    <g>
+      <HairDown cx={120} cy={78} />
+      <ellipse cx="120" cy="168" rx="34" ry="42" fill={SKIN} />
+      <Breast cx={106} cy={166} />
+      <Breast cx={136} cy={166} />
+      <ellipse cx="120" cy="248" rx="36" ry="22" fill={SKIN} />
+      <Pubic cx={120} cy={258} />
+      <path d="M90 250 C50 270, 40 310, 48 340" stroke={SKIN} strokeWidth="18" fill="none" strokeLinecap="round" />
+      <path d="M150 250 C190 270, 200 310, 192 340" stroke={SKIN} strokeWidth="18" fill="none" strokeLinecap="round" />
+      <ellipse cx="44" cy="348" rx="22" ry="10" fill={SKIN} />
+      <ellipse cx="196" cy="348" rx="22" ry="10" fill={SKIN} />
+      <path d="M86 150 C60 190, 54 220, 58 248" stroke={SKIN} strokeWidth="14" fill="none" strokeLinecap="round" />
+      <Face cx={120} cy={78} />
+    </g>
+  );
+}
+
+function RopeAtChest() {
+  return (
+    <g>
+      <HairDown cx={120} cy={58} />
+      <ellipse cx="120" cy="150" rx="36" ry="50" fill={SKIN} />
+      <Breast cx={106} cy={148} />
+      <Breast cx={136} cy={148} />
+      <MothTattoo cx={120} cy={128} />
+      <ellipse cx="120" cy="248" rx="32" ry="26" fill={SKIN} />
+      <Pubic cx={120} cy={262} />
+      <ellipse cx="104" cy="340" rx="13" ry="70" fill={SKIN} />
+      <ellipse cx="136" cy="340" rx="13" ry="70" fill={SKIN} />
+      <path d="M90 120 C70 160, 64 200, 70 236" stroke={SKIN} strokeWidth="14" fill="none" strokeLinecap="round" />
+      <path d="M150 120 C170 160, 176 200, 170 236" stroke={SKIN} strokeWidth="14" fill="none" strokeLinecap="round" />
+      <RopeCoil cx={120} cy={118} />
+      <Face cx={120} cy={58} />
     </g>
   );
 }

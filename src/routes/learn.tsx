@@ -70,10 +70,11 @@ function LearnPage() {
         </section>
       </div>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-3">
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Knot lessons" value={knots.length} hint="On a post or chair leg" />
         <StatCard label="Tie lessons" value={ties.length} hint={tieHint} />
         <StatCard label={`${NYX_SHIBARI.name} stills`} value={NYX_SHIBARI_POSES.length} hint="Full frames + close crops" />
+        <StatCard label="Nude studies" value={NYX_NUDE_POSES.length + nyxPhotoGalleryPoses().length} hint="28 illustrated + 40 photo slots" />
       </div>
 
       <section className="mt-12">
@@ -92,17 +93,17 @@ function LearnPage() {
       <section className="mt-12">
         <h2 className="font-display text-2xl">{NYX_SHIBARI.name} nude body studies</h2>
         <p className="mt-2 max-w-2xl text-base leading-relaxed text-muted">
-          Twenty photo slots plus fourteen illustrated fallbacks. Generate real photo nudes with{" "}
+          Forty photo slots plus twenty-eight illustrated fallbacks. Generate real photo nudes with{" "}
           <code className="text-xs">npm run generate:nyx-nudes</code> (see Settings for details) — they replace the
-          drawings automatically. Five appear on every taught lesson step.
+          drawings automatically. Eight appear on every taught lesson step.
         </p>
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {nyxPhotoGalleryPoses().map((pose) => (
             <NyxNudePanel key={pose} pose={pose} compact />
           ))}
         </div>
-        <p className="mt-6 text-sm font-medium text-muted">Illustrated fallback set</p>
-        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <p className="mt-6 text-sm font-medium text-muted">Illustrated fallback set ({NYX_NUDE_POSES.length})</p>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {NYX_NUDE_POSES.map((pose) => (
             <NyxNudePanel key={pose} pose={pose} compact />
           ))}

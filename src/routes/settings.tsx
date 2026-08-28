@@ -189,7 +189,7 @@ function SettingsPage() {
         <section className="rounded-lg border border-border bg-surface p-4">
           <h2 className="font-display text-xl">Nyx photo nudes</h2>
           <p className="mt-2 text-sm leading-relaxed text-muted">
-            Academy lessons show five nude studies per step. When real photo files exist in{" "}
+            Academy lessons show eight nude studies per step. When real photo files exist in{" "}
             <code className="text-xs">public/instructor/nyx/nude/</code>, they replace the illustrated
             fallbacks automatically.
           </p>
