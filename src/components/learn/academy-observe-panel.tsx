@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Camera, SwitchCamera, Video } from "lucide-react";
+import { Camera, ExternalLink, SwitchCamera, Video } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { openRopeCamera, startClip, type ClipHandle } from "@/lib/camera/stream";
@@ -8,7 +8,6 @@ import { extractVideoFrames, processMediaFrame } from "@/lib/media";
 import { buildDeterministic } from "@/lib/ml/predict";
 import { observeFrame } from "@/lib/ml/detect";
 import type { Tie } from "@/lib/kb/types";
-import { useNegotiate } from "@/lib/stores/negotiate";
 import { useSettings } from "@/lib/stores/settings";
 import { playCoachVoice } from "@/lib/voice/play";
 import { cn } from "@/lib/utils";
@@ -24,15 +23,7 @@ type AcademyObservePanelProps = {
 /**
  * Local practice cam only. Everything here stays on the device: frames are
  * scored by the local band heuristic and never leave page memory. Selected-still
- * cloud observation is deliberately NOT offered from this panel — it lives in
- * the Studio, behind the per-batch attestation checkboxes, the one-hour window,
- * and the one-use batch reservation. An earlier version of this panel submitted
- * to the analyze endpoint with every attestation hardcoded to true; do not
- * bring that back.
- *
- * The negotiated `photos` limit gates the camera itself, exactly as it gates
- * the Studio capture surface: "photos / video for coaching" is one decision,
- * and a practice prop does not exempt the lens from it.
+ * cloud observation lives in the Studio behind the one home consent checkbox.
  */
 export function AcademyObservePanel({
   tie,
@@ -42,14 +33,10 @@ export function AcademyObservePanel({
   className,
 }: AcademyObservePanelProps) {
   const settings = useSettings();
-  const photosApproved = useNegotiate((s) =>
-    s.items.some((item) => item.id === "photos" && item.rank === "yes"),
-  );
-  // Fail closed until the client has hydrated the persisted negotiation
-  // snapshot; the server-rendered HTML always shows the blocked state.
+  const studioConsented = useSettings((s) => s.consented);
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
-  const cameraAllowed = hydrated && photosApproved;
+  const cameraAllowed = hydrated && studioConsented;
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -85,10 +72,10 @@ export function AcademyObservePanel({
     return () => URL.revokeObjectURL(clipUrl);
   }, [clipUrl]);
 
-  // A revocation in another tab (or on /negotiate) closes a live camera.
+  // Signing out or resetting consent closes a live camera.
   useEffect(() => {
-    if (hydrated && !photosApproved) stopCamera();
-  }, [hydrated, photosApproved, stopCamera]);
+    if (hydrated && !studioConsented) stopCamera();
+  }, [hydrated, studioConsented, stopCamera]);
 
   async function startCamera() {
     if (!cameraAllowed) return;
@@ -223,11 +210,7 @@ export function AcademyObservePanel({
 
       {!cameraAllowed ? (
         <div className="mt-4 rounded-lg border border-border bg-elevated px-4 py-4 text-sm leading-relaxed text-muted">
-          The camera is off until the <strong className="font-medium text-fg">photos / video</strong> limit is a yes.
-          Every lens in this app waits for that one decision.{" "}
-          <Link to="/negotiate" className="text-accent underline underline-offset-2">
-            Review limits
-          </Link>
+          Step inside on the home screen first — one yes unlocks the practice cam and Studio.
         </div>
       ) : (
         <>
@@ -320,12 +303,25 @@ export function AcademyObservePanel({
           )}
 
           <p className="mt-3 text-xs leading-relaxed text-subtle">
-            Selected-still cloud observation lives in the{" "}
-            <Link to="/studio" className="text-accent underline underline-offset-2">
+            Want cloud categories on selected stills? Open the{" "}
+            <Link
+              to="/studio"
+              search={tie ? { tie: tie.slug, step: stepIndex } : undefined}
+              className="text-accent underline underline-offset-2"
+            >
               Studio
-            </Link>
-            , behind its per-batch attestations. Nothing captured here is uploaded.
+            </Link>{" "}
+            with this tie loaded — nothing from here uploads automatically.
           </p>
+
+          {feedback && tie && (
+            <Button asChild className="mt-3 w-full sm:w-auto" variant="outline" size="sm">
+              <Link to="/studio" search={{ tie: tie.slug, step: stepIndex }}>
+                <ExternalLink className="size-4" aria-hidden />
+                Continue in Studio
+              </Link>
+            </Button>
+          )}
 
           {error && <p className="mt-3 text-sm text-danger">{error}</p>}
         </>
