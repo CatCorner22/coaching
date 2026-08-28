@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
-import { migrationName, pendingMigrations } from "./migration-plan.mjs";
+import { pendingMigrations } from "./migration-plan.mjs";
 
 const ROOT = join(import.meta.dirname, "..");
 const MIGRATIONS_DIR = join(ROOT, "migrations");
