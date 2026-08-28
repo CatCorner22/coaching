@@ -1,4 +1,6 @@
 export { NyxModelPanel } from "./nyx-model-panel";
+export { NyxFigure } from "./nyx-figure";
+export { NyxNudePanel, NyxNudeStrip } from "./nyx-nude-panel";
 export { AcademyCoachPanel } from "./academy-coach-panel";
 export { AcademyObservePanel } from "./academy-observe-panel";
 export { AcademyShell } from "./academy-shell";

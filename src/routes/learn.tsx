@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { GraduationCap, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { HowToLearn, NyxModelPanel } from "@/components/learn";
+import { HowToLearn, NyxModelPanel, NyxNudePanel } from "@/components/learn";
 import { KnotFigure } from "@/components/knot-figure";
 import { RopeFigure } from "@/components/rope-figure";
 import {
@@ -14,6 +14,7 @@ import {
 } from "@/lib/kb";
 import { tieShape, tieShapeBlurb, tieShapeLabel } from "@/lib/kb/tie-factories";
 import { NYX_SHIBARI, NYX_SHIBARI_POSES } from "@/lib/learn/nyx-model";
+import { NYX_NUDE_POSES, nyxPhotoGalleryPoses } from "@/lib/learn/nyx-nudes";
 
 export const Route = createFileRoute("/learn")({ component: LearnPage });
 
@@ -84,6 +85,26 @@ function LearnPage() {
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {NYX_SHIBARI_POSES.map((pose) => (
             <NyxModelPanel key={pose} pose={pose} compact />
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-12">
+        <h2 className="font-display text-2xl">{NYX_SHIBARI.name} nude body studies</h2>
+        <p className="mt-2 max-w-2xl text-base leading-relaxed text-muted">
+          Twenty photo slots plus fourteen illustrated fallbacks. Generate real photo nudes with{" "}
+          <code className="text-xs">npm run generate:nyx-nudes</code> (see Settings for details) — they replace the
+          drawings automatically. Five appear on every taught lesson step.
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+          {nyxPhotoGalleryPoses().map((pose) => (
+            <NyxNudePanel key={pose} pose={pose} compact />
+          ))}
+        </div>
+        <p className="mt-6 text-sm font-medium text-muted">Illustrated fallback set</p>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {NYX_NUDE_POSES.map((pose) => (
+            <NyxNudePanel key={pose} pose={pose} compact />
           ))}
         </div>
       </section>

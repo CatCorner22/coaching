@@ -96,6 +96,7 @@ function KnotPage() {
             stepIndex={step}
             showCamera={foundation}
             nyxPose={nyxPoseForKnotStep(slug, step)}
+            knotSlug={slug}
           />
         </div>
       }
@@ -129,6 +130,7 @@ function KnotPage() {
           stepIndex={step}
           showCamera={foundation}
           nyxPose={nyxPoseForKnotStep(slug, step)}
+          knotSlug={slug}
         />
       </div>
 
