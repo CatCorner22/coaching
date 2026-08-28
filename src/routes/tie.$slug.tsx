@@ -25,10 +25,8 @@ import {
   requiresStepConfirmation,
 } from "@/lib/kb";
 import { tieShape, tieShapeBlurb, tieShapeLabel } from "@/lib/kb/tie-factories";
-import { tieLimitIds } from "@/lib/studio/negotiation";
 import { coachVoiceLabel } from "@/lib/voice/coach-profile";
 import { useLearnProgress } from "@/lib/stores/learn-progress";
-import { useNegotiate } from "@/lib/stores/negotiate";
 import { useSettings } from "@/lib/stores/settings";
 import { playCoachVoice } from "@/lib/voice/play";
 
@@ -47,11 +45,6 @@ function TiePage() {
   const setLast = useLearnProgress((s) => s.setLast);
   const [step, setStep] = useState(0);
   const [confirm, setConfirm] = useState<StepConfirm>(emptyStepConfirm);
-  const negotiationItems = useNegotiate((s) => s.items);
-  // Fail closed until the client has hydrated the persisted negotiation
-  // snapshot; server-rendered HTML always shows the gated state.
-  const [negotiationHydrated, setNegotiationHydrated] = useState(false);
-  useEffect(() => setNegotiationHydrated(true), []);
 
   useEffect(() => {
     setConfirm(emptyStepConfirm());
@@ -102,19 +95,6 @@ function TiePage() {
   // let it page past the cinch step — the step its own title calls "the step
   // that makes this safe" — without confirming anything.
   const mustConfirm = requiresStepConfirmation(tie);
-  // A guided tie puts rope on a person, and its own card promises "once its
-  // negotiated limit is agreed" — so its taught steps wait for that limit to
-  // be a yes, exactly as Studio does. Prop drills map to no limit (rope on
-  // nobody), and instructor routes carry recognition-only content that exists
-  // precisely so it can be read before anything is negotiated.
-  const requiredLimits = tieLimitIds(slug);
-  const missingLimits = negotiationItems.filter(
-    (item) => requiredLimits.includes(item.id) && item.rank !== "yes",
-  );
-  const stepsGated =
-    shape === "guided" &&
-    requiredLimits.length > 0 &&
-    (!negotiationHydrated || missingLimits.length > 0);
   const voiceLabel = coachVoiceLabel(cloudVoice);
   const bottomLines = bulletsOrFallback(s.bottomBullets, s.bottom);
   const voiceStep = {
@@ -154,29 +134,6 @@ function TiePage() {
     />
   );
 
-  const limitGate = (
-    <section className="rounded-xl border border-warn/30 bg-warn/10 px-4 py-5 sm:px-5">
-      <h3 className="text-lg font-medium text-warn">The steps wait for a negotiated yes</h3>
-      <p className="mt-2 text-base leading-relaxed text-fg">
-        This tie is taught in full and it goes on a person, so its step-by-step instruction stays
-        closed until{" "}
-        <strong className="font-medium">
-          {missingLimits.length > 0
-            ? missingLimits.map((item) => item.label).join(" and ")
-            : "its negotiated limit"}
-        </strong>{" "}
-        is a yes on the limits list. Decide that out loud together first — the page will be here.
-      </p>
-      <Button asChild className="mt-4">
-        <Link to="/negotiate">Open the limits list</Link>
-      </Button>
-    </section>
-  );
-
-  // The coach panel only draws a figure for steps that carry media, and only
-  // the three academy ties get media synthesised. Every other entry still gets
-  // the rope diagram this page has always shown — inline in the step card, so
-  // it never appears twice alongside the panel's copy.
   const stepFigure =
     (s.media?.length ?? 0) > 0 ? undefined : (
       <figure className="px-4 py-4">
@@ -217,7 +174,7 @@ function TiePage() {
       sidebar={
         <div className="hidden space-y-4 lg:block">
           <BeforeYouStart propOnly={shape !== "guided"} />
-          {!stepsGated && coachPanel}
+          {coachPanel}
           {instructor && <InstructorPrepCard tieName={tie.name} />}
         </div>
       }
@@ -235,7 +192,7 @@ function TiePage() {
 
       <BeforeYouStart propOnly={shape !== "guided"} className="lg:hidden" />
 
-      {!stepsGated && <div className="lg:hidden">{coachPanel}</div>}
+      <div className="lg:hidden">{coachPanel}</div>
 
       <div className="rounded-lg border border-warn/30 bg-warn/10 px-4 py-3 text-base leading-relaxed text-warn">
         <p>
@@ -247,10 +204,7 @@ function TiePage() {
         </p>
       </div>
 
-      {stepsGated ? (
-        limitGate
-      ) : (
-        <>
+      <>
           <StepProgress step={step} total={tie.steps.length} />
 
           <StepFilmstrip steps={tie.steps} active={step} onSelect={setStep} />
@@ -294,7 +248,6 @@ function TiePage() {
             canAdvance={!mustConfirm || (confirm.didDo && confirm.didCheck)}
           />
         </>
-      )}
 
       <StopStrip items={tie.stop} className="mt-4 rounded-xl border border-danger/20 bg-danger/5 p-5" />
 

@@ -26,15 +26,11 @@ import {
   validateMediaSignature,
   type ProcessedMediaFrame,
 } from "@/lib/media";
-import {
-  mediaUploadScope,
-  uploadScopeAttestation,
-  uploadScopeCapturePreference,
-  uploadScopeSummary,
-} from "@/lib/media-scope";
+import { mediaUploadScope } from "@/lib/media-scope";
 import { observeFrame } from "@/lib/ml/detect";
 import type { FrameObservation } from "@/lib/ml/types";
 import { cn } from "@/lib/utils";
+import { useSettings } from "@/lib/stores/settings";
 
 export type CaptureResult = {
   preview: string;
@@ -149,6 +145,41 @@ export const CameraCapture = memo(function CameraCapture({
   const [selectedFrames, setSelectedFrames] = useState<number[]>([]);
   const permissionsReady = Object.values(permissions).every(Boolean);
   permissionsRef.current = permissions;
+  const studioConsented = useSettings((s) => s.consented);
+
+  function armBatchPermissions() {
+    const allTrue = Object.fromEntries(
+      Object.keys(EMPTY_PERMISSIONS).map((key) => [key, true]),
+    ) as Record<PermissionKey, boolean>;
+    permissionsRef.current = allTrue;
+    setPermissions(allTrue);
+    const confirmedAt = Date.now();
+    permissionConfirmedAtRef.current = confirmedAt;
+    setPermissionExpiresAt(confirmedAt + BATCH_PERMISSION_MAX_AGE_MS);
+    if (permissionExpiryTimerRef.current !== null) {
+      window.clearTimeout(permissionExpiryTimerRef.current);
+    }
+    permissionExpiryTimerRef.current = window.setTimeout(() => {
+      permissionExpiryTimerRef.current = null;
+      permissionConfirmedAtRef.current = null;
+      setPermissionExpiresAt(null);
+      permissionsRef.current = EMPTY_PERMISSIONS;
+      setPermissions({ ...EMPTY_PERMISSIONS });
+      setBatchCommitted(false);
+      stopLive();
+      setVideoFrames([]);
+      setSelectedFrames([]);
+      onDiscard();
+      setHint("This batch timed out — start a fresh capture when you're ready.");
+    }, BATCH_PERMISSION_MAX_AGE_MS);
+  }
+
+  useEffect(() => {
+    if (!studioConsented || disabled || batchCommitted) return;
+    if (Object.values(permissionsRef.current).every(Boolean)) return;
+    armBatchPermissions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studioConsented, disabled, batchCommitted]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -297,59 +328,6 @@ export const CameraCapture = memo(function CameraCapture({
     return mountedRef.current && mediaOperationIdRef.current === id;
   }
 
-  function updatePermission(key: PermissionKey, checked: boolean) {
-    const wasReady = Object.values(permissionsRef.current).every(Boolean);
-    const next = { ...permissionsRef.current, [key]: checked };
-    const isReady = Object.values(next).every(Boolean);
-    permissionsRef.current = next;
-    setPermissions(next);
-    if (isReady && !wasReady) {
-      const confirmedAt = Date.now();
-      permissionConfirmedAtRef.current = confirmedAt;
-      setPermissionExpiresAt(confirmedAt + BATCH_PERMISSION_MAX_AGE_MS);
-      if (permissionExpiryTimerRef.current !== null) {
-        window.clearTimeout(permissionExpiryTimerRef.current);
-      }
-      permissionExpiryTimerRef.current = window.setTimeout(() => {
-        permissionExpiryTimerRef.current = null;
-        permissionConfirmedAtRef.current = null;
-        setPermissionExpiresAt(null);
-        permissionsRef.current = EMPTY_PERMISSIONS;
-        setPermissions({ ...EMPTY_PERMISSIONS });
-        setBatchCommitted(false);
-        stopLive();
-        setVideoFrames([]);
-        setSelectedFrames([]);
-        onDiscard();
-        setHint("Batch permissions expired; the pending batch was discarded. Reconfirm all items.");
-      }, BATCH_PERMISSION_MAX_AGE_MS);
-    } else if (!isReady) {
-      permissionConfirmedAtRef.current = null;
-      setPermissionExpiresAt(null);
-      if (permissionExpiryTimerRef.current !== null) {
-        window.clearTimeout(permissionExpiryTimerRef.current);
-        permissionExpiryTimerRef.current = null;
-      }
-    }
-    if (!checked) {
-      // Withdrawal always stops capture, but only claim a discard when there
-      // was something to discard. Unchecking a box while still filling the
-      // form in used to reset Studio triage, wipe every other box, and report
-      // that a pending batch had been discarded when none existed.
-      const hadPendingWork = live || recording || batchCommitted || videoFrames.length > 0;
-      stopLive();
-      setBatchCommitted(false);
-      setVideoFrames([]);
-      setSelectedFrames([]);
-      if (hadPendingWork) {
-        onDiscard();
-        setHint("Permission withdrawn; the pending batch was discarded.");
-      } else {
-        setHint("Every item must stay confirmed for this batch before the camera opens.");
-      }
-    }
-  }
-
   function startNewBatch() {
     stopLive();
     if (permissionExpiryTimerRef.current !== null) {
@@ -364,7 +342,8 @@ export const CameraCapture = memo(function CameraCapture({
     setVideoFrames([]);
     setSelectedFrames([]);
     onDiscard();
-    setHint("Previous batch discarded. Confirm each item for the new batch.");
+    if (studioConsented && !disabledRef.current) armBatchPermissions();
+    else setHint("Previous batch discarded.");
   }
 
   function confirmedAtForBatch(): number {
@@ -374,7 +353,7 @@ export const CameraCapture = memo(function CameraCapture({
       Date.now() - confirmedAt < 0 ||
       Date.now() - confirmedAt > BATCH_PERMISSION_MAX_AGE_MS
     ) {
-      throw new Error("Batch permissions are no longer current. Reconfirm every item.");
+      throw new Error("Batch permissions are no longer current. Start a new capture.");
     }
     return confirmedAt;
   }
@@ -385,7 +364,7 @@ export const CameraCapture = memo(function CameraCapture({
       return true;
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "Reconfirm every permission for this batch.",
+        cause instanceof Error ? cause.message : "Start a new capture when you're ready.",
       );
       return false;
     }
@@ -394,9 +373,7 @@ export const CameraCapture = memo(function CameraCapture({
   async function startLive(next: "user" | "environment" = facing) {
     if (disabledRef.current || batchCommitted) return;
     if (!Object.values(permissionsRef.current).every(Boolean)) {
-      setError(
-        "Confirm adult status, every media-scope item, and all four permissions before opening the camera.",
-      );
+      setError("Step inside from the home screen first, then open the camera.");
       return;
     }
     if (!hasCurrentBatchPermissions()) return;
@@ -507,9 +484,7 @@ export const CameraCapture = memo(function CameraCapture({
   ) {
     if (!mountedRef.current || disabledRef.current) return;
     if (!Object.values(permissionsRef.current).every(Boolean)) {
-      throw new Error(
-        "Reconfirm adult status, every media-scope item, and all four permissions for this batch.",
-      );
+      throw new Error("Step inside from the home screen first, then capture again.");
     }
     const confirmedAt = confirmedAtForBatch();
     if (!jpegs.length || !observations.length) throw new Error("No readable frame was captured.");
@@ -901,87 +876,14 @@ export const CameraCapture = memo(function CameraCapture({
           </p>
         )}
       </section>
-      <fieldset
-        disabled={disabled}
-        data-camera-permissions="true"
-        data-capture-disabled={disabled ? "true" : "false"}
-        className="rounded-lg border border-border bg-surface p-3 disabled:opacity-60"
-      >
-        <legend className="px-1 text-xs uppercase tracking-wide text-subtle">
-          Permission for this batch
-        </legend>
-        <p className="mb-2 text-xs leading-relaxed text-muted">
-          Confirm legal-adult status, upload scope, and all four permissions separately for each
-          batch. {uploadScopeCapturePreference(scope)} {uploadScopeSummary(scope)} That limit is on what this app sends
-          to the analysis provider, and is configured for this deployment by whoever read that
-          provider's policy — it is not a rule about what you photograph, keep, or share
-          yourselves, and this app has no visibility into any of that. Ambiguous age and
-          secretly or coercively obtained media are refused at every setting. The app cannot detect
-          or certify what a still contains; the confirmation is yours.
-        </p>
-        <div className="space-y-2 text-xs text-fg">
-          <PermissionCheck
-            checked={permissions.adults}
-            onChange={(checked) => updatePermission("adults", checked)}
-            label="I confirm every depicted person is a legal adult. The app cannot infer age from media."
-          />
-          <PermissionCheck
-            checked={permissions.withinUploadScope}
-            onChange={(checked) => updatePermission("withinUploadScope", checked)}
-            label={uploadScopeAttestation(scope)}
-          />
-          <PermissionCheck
-            checked={permissions.nonSecret}
-            onChange={(checked) => updatePermission("nonSecret", checked)}
-            label="I confirm this batch was not recorded secretly."
-          />
-          <PermissionCheck
-            checked={permissions.nonCoerced}
-            onChange={(checked) => updatePermission("nonCoerced", checked)}
-            label="I confirm neither the activity nor media permission was coerced."
-          />
-          <PermissionCheck
-            checked={permissions.allPeopleConsented}
-            onChange={(checked) => updatePermission("allPeopleConsented", checked)}
-            label="I confirm every depicted person consented and there are no unconsented bystanders."
-          />
-          <PermissionCheck
-            checked={permissions.activity}
-            onChange={(checked) => updatePermission("activity", checked)}
-            label="Every depicted adult currently agrees to the activity."
-          />
-          <PermissionCheck
-            checked={permissions.recording}
-            onChange={(checked) => updatePermission("recording", checked)}
-            label="I directly confirmed every depicted adult currently agrees to this specific photo or video recording."
-          />
-          <PermissionCheck
-            checked={permissions.upload}
-            onChange={(checked) => updatePermission("upload", checked)}
-            label="I directly confirmed every depicted adult agrees to send the selected compressed stills and generic frame labels to xAI in this submission."
-          />
-          <PermissionCheck
-            checked={permissions.output}
-            onChange={(checked) => updatePermission("output", checked)}
-            label="I directly confirmed every depicted adult agrees that this operator may read the report, optionally save a text-only summary on this device, and share or discuss it only within the agreed audience and deletion plan."
-          />
-          <p className="text-subtle">
-            Withdrawal discards the pending local batch and suppresses its result, but it cannot
-            recall a request that was already transmitted to xAI.
-          </p>
-        </div>
-      </fieldset>
       {batchCommitted && (
         <div className="rounded-md border border-accent/30 bg-accent/10 p-3 text-xs text-muted">
           <p>
-            This page locks the batch to the attestations above and submits it at most once from
-            this view. Shared database storage rejects the same verified-user batch across replicas
-            for two hours—longer than the one-hour permission window—but this is not a permanent
-            global exactly-once guarantee. Uncheck any item to withdraw permission and discard it,
-            or discard it before starting another batch.
+            This batch is ready for Analyze once from this view. Start another capture anytime —
+            nothing uploads until you tap Analyze.
           </p>
           <Button className="mt-2" variant="outline" size="sm" onClick={startNewBatch}>
-            Discard batch and start another
+            Start a new capture
           </Button>
         </div>
       )}
@@ -1035,12 +937,12 @@ export const CameraCapture = memo(function CameraCapture({
           discarded the batch. Show when it runs out. */}
       {permissionsReady && permissionExpiresAt !== null && (
         <p className="text-xs text-muted">
-          Batch permissions confirmed for this hour; they expire at{" "}
+          This capture window closes at{" "}
           {new Date(permissionExpiresAt).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
           })}
-          , after which every item must be confirmed again.
+          .
         </p>
       )}
       {hint && (
@@ -1291,27 +1193,5 @@ function GuideOverlay({ guide }: { guide: Guide }) {
         Keep only the relevant, non-identifying area in frame
       </p>
     </div>
-  );
-}
-
-function PermissionCheck({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  label: string;
-}) {
-  return (
-    <label className="flex cursor-pointer items-start gap-2">
-      <input
-        type="checkbox"
-        className="mt-0.5 size-4 accent-accent"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-      <span>{label}</span>
-    </label>
   );
 }

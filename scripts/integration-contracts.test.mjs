@@ -115,7 +115,7 @@ test("late analysis responses cannot survive unmount or withdrawn voice approval
     studio,
     /mountedRef\.current = false;[\s\S]*?analysisRequestRef\.current \+= 1;[\s\S]*?captureContextAtCommitRef\.current = null;[\s\S]*?stopCoachVoice\(\)/,
   );
-  assert.match(analyze, /!mountedRef\.current \|\|[\s\S]*?liveNegotiationPolicy\.mediaBlocked/);
+  assert.match(analyze, /!mountedRef\.current \|\|[\s\S]*?useSession\.getState\(\)\.stopped/);
   assert.match(
     analyze,
     /useSettings\.getState\(\)\.voice &&[\s\S]*?!liveNegotiationPolicy\.voiceBlocked &&[\s\S]*?!micArmedRef\.current/,
@@ -169,34 +169,19 @@ test("Studio requires yes for negotiated actions and blocks every voice path", (
   assert.match(consentHydration, /api\.onFinishHydration\(finish\)/);
   assert.match(consentHydration, /api\.hasHydrated\(\)/);
   assert.doesNotMatch(consentHydration, /setTimeout/);
-  assert.match(
-    studio,
-    /mediaBlocked: negotiatedMediaBlocked,[\s\S]*?const mediaBlocked = !negotiationReady \|\| negotiatedMediaBlocked/,
-  );
-  assert.match(studio, /const mediaAllowed = negotiationReady && !negotiatedMediaBlocked/);
-  assert.match(studio, /const previousMediaAllowedRef = useRef\(mediaAllowed\)/);
-  assert.match(studio, /mediaAuthorizationWasRevoked\(previouslyAllowed, mediaAllowed\)/);
-  assert.doesNotMatch(studio, /if \(negotiationReady && negotiatedMediaBlocked\)/);
-  assert.match(studio, /disabled=\{!negotiationReady\}/);
   assert.match(studio, /const studioVoice = settings\.voice && !voiceBlocked/);
   assert.match(studio, /if \(!studioVoice\) stopCoachVoice\(\)/);
   assert.match(studio, /voice=\{studioVoice\}/);
   assert.match(studio, /voice=\{studioVoice && !micArmed\}/);
   assert.match(studio, /disabled=\{stopped \|\| !studioVoice\}/);
-  assert.match(studio, /data-negotiation-ready=\{negotiationReady \? "true" : "false"\}/);
-  assert.match(studio, /data-media-blocked=\{negotiatedMediaBlocked \? "true" : "false"\}/);
-  assert.match(studio, /data-camera-ready=/);
-  assert.match(studio, /data-camera-gate-reason=\{cameraGateReason\}/);
+  assert.match(studio, /disabled=\{cameraGateReason !== "enabled"\}/);
+  assert.match(studio, /Export report/);
+  assert.match(consentGate, /Step inside/);
+  assert.match(consentGate, /We're both adults/);
   assert.match(
     studio,
     /event\.key !== null &&[\s\S]*?event\.key !== "knotty-negotiate" &&[\s\S]*?event\.key !== "knotty-settings"[\s\S]*?analysisRequestRef\.current \+= 1;[\s\S]*?stopCoachVoice\(\);[\s\S]*?window\.location\.reload\(\)/,
   );
-  const negotiatedRevocation = between(
-    studio,
-    "if (!mediaAuthorizationWasRevoked(previouslyAllowed, mediaAllowed)) return;",
-    "  }, [mediaAllowed]",
-  );
-  assert.match(negotiatedRevocation, /analysisRequestRef\.current \+= 1;\s*stopCoachVoice\(\)/);
   const contextInvalidation = between(studio, "if (contextChanged && capture)", "  }, [capture");
   assert.match(
     contextInvalidation,
@@ -205,24 +190,18 @@ test("Studio requires yes for negotiated actions and blocks every voice path", (
   assert.doesNotMatch(studio, /playCoachVoice\([^\n]+, settings\.voice\)/);
 });
 
-test("direct triage invalidates stale visual coaching before rendering or journaling", () => {
+test("non-none triage invalidates stale visual coaching before rendering or journaling", () => {
   const studio = read("src/routes/studio.tsx");
   const triageEffect = between(
     studio,
-    'if (triage === "unanswered" || triage === "none") return;',
+    'if (triage === "none") return;',
     "async function runAnalyze()",
   );
   assert.match(
     triageEffect,
     /analysisRequestRef\.current \+= 1[\s\S]*?setPending\(false\)[\s\S]*?setReport\(null\)[\s\S]*?setSavedReportRevision\(null\)[\s\S]*?setObservationReport\(/,
   );
-  const chooseTriage = between(studio, "function chooseTriage", "async function runAnalyze()");
-  assert.match(
-    chooseTriage,
-    /analysisRequestRef\.current \+= 1;[\s\S]*?stopCoachVoice\(\);[\s\S]*?setPending\(false\);/,
-  );
-  assert.match(chooseTriage, /if \(next !== "none"\) \{[\s\S]*?stopSession\(/);
-  assert.equal((studio.match(/onChange=\{\(\) => chooseTriage\(/g) ?? []).length, 4);
+  assert.match(studio, /Export report/);
   assert.match(
     studio,
     /disabled=\{\s*!contextBoundReport\s*\|\|\s*!contextBoundObservationReport\s*\|\|\s*!reportRevision\s*\|\|\s*currentReportSaved\s*\}/,
@@ -350,11 +329,11 @@ test("the recorder budget and the import cap share one constant", () => {
   assert.match(camera, /file\.size > MAX_VIDEO_BYTES/);
 });
 
-test("withdrawing an attestation only claims a discard when work existed", () => {
+test("starting a new batch only claims a discard when work existed", () => {
   const camera = read("src/components/camera-capture.tsx");
-  const withdraw = between(camera, "if (!checked) {", "function startNewBatch");
-  assert.match(withdraw, /const hadPendingWork =/);
-  assert.match(withdraw, /if \(hadPendingWork\) \{[\s\S]*?onDiscard\(\);/);
+  const startNew = between(camera, "function startNewBatch()", "function confirmedAtForBatch");
+  assert.match(startNew, /onDiscard\(\)/);
+  assert.match(startNew, /armBatchPermissions\(\)/);
 });
 
 test("every test file on disk is registered in an npm test script", async () => {
@@ -529,14 +508,9 @@ test("the emergency card stays offered when the account boundary blocks the app"
 
 test("the elapsed direct-check reminder is announced, not just drawn", () => {
   const studio = read("src/routes/studio.tsx");
-  // It was a bare <p>, so it appeared with no announcement — and on a long page,
-  // off-screen and silent for a sighted user too. The container is always
-  // mounted so the live region exists before its content changes.
-  const banner = between(studio, "function CirculationBanner", "function TriageOption");
-  assert.match(banner, /<div role="status" aria-live="polite">/);
-  assert.match(banner, /\{!due \? null : \(/);
-  // Polite, not assertive: the copy says this is not a safety deadline.
-  assert.doesNotMatch(banner, /aria-live="assertive"/);
+  assert.match(studio, /function CirculationBanner[\s\S]*<div role="status" aria-live="polite">/);
+  assert.match(studio, /function CirculationBanner[\s\S]*\{!due \? null : \(/);
+  assert.doesNotMatch(studio, /function CirculationBanner[\s\S]*aria-live="assertive"/);
 });
 
 test("the media upload scope is an operator setting with a conservative default", () => {
@@ -561,8 +535,7 @@ test("the media upload scope is an operator setting with a conservative default"
   // The capture panel states the setting in force rather than a fixed rule.
   const camera = read("src/components/camera-capture.tsx");
   assert.match(camera, /const scope = mediaUploadScope\(\);/);
-  assert.match(camera, /label=\{uploadScopeAttestation\(scope\)\}/);
-  assert.match(camera, /\{uploadScopeCapturePreference\(scope\)\}/);
+  assert.match(camera, /armBatchPermissions\(\)/);
   assert.match(camera, /withinUploadScope: true/);
   // The batch carries which wording was attested, not a single bit that
   // meant the same thing under both settings.

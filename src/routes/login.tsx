@@ -46,11 +46,11 @@ function LoginPage() {
   return (
     <div className="mx-auto flex min-h-[70dvh] max-w-md items-center px-5 py-10">
       <section className="w-full rounded-xl border border-border bg-surface p-6">
-        <p className="text-xs uppercase tracking-[0.22em] text-muted">Knotty account</p>
-        <h1 className="mt-3 font-display text-4xl leading-none">Sign in for cloud analysis</h1>
+        <p className="text-xs uppercase tracking-[0.22em] text-muted">Knotty · just us</p>
+        <h1 className="mt-3 font-display text-4xl leading-none">Sign in together</h1>
         <p className="mt-4 text-sm leading-relaxed text-muted">
-          Local reading, planning, camera preview, and direct checks do not require cloud analysis.
-          Sign-in is required before selected stills or optional cloud voice text can be sent to xAI.
+          Your private rope studio. Sign in once — then one checkbox on the home screen unlocks
+          everything, including Studio Analyze when you choose it.
         </p>
         {isPending ? (
           <p className="mt-6 text-sm text-muted" role="status">

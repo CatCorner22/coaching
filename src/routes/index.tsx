@@ -1,16 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, Camera, Shield, BookOpen } from "lucide-react";
+import { Camera, Heart, BookOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MiniTie } from "@/components/rope-figure";
 import { SEQUENCES, TIES, kbStats } from "@/lib/kb";
-import { mediaUploadScope, uploadScopeIntroLine } from "@/lib/media-scope";
 
 export const Route = createFileRoute("/")({ component: Home });
 
 function Home() {
   const stats = kbStats();
-  const uploadScope = mediaUploadScope();
   const featured = TIES.filter((t) =>
     ["single-column", "futomomo", "frog-tie", "mermaid", "karada", "takate-kote"].includes(t.slug),
   );
@@ -29,16 +27,15 @@ function Home() {
           </svg>
         </div>
         <div className="relative mx-auto max-w-3xl px-5 pb-16 pt-14 md:pt-24">
-          <p className="text-xs uppercase tracking-[0.28em] text-muted">Knotty · adult rope studio</p>
+          <p className="text-xs uppercase tracking-[0.28em] text-muted">Knotty · your private studio</p>
           <h1 className="mt-4 font-display text-5xl leading-[0.95] text-fg md:text-6xl">
-            Observe less.
+            Slow hands.
             <br />
-            Check directly.
+            Sweet tension.
           </h1>
           <p className="mt-5 max-w-lg text-base leading-relaxed text-muted">
-            {uploadScopeIntroLine(uploadScope)} Knotty returns a bounded,
-            evidence-labeled observation report with explicit uncertainty and consequence floors—
-            never physiology, exact-tie validation, monitoring, clearance, or next-wrap coaching.
+            A rope playground built for two — learn together, plan a scene, open the camera, and run
+            Studio Analyze when you feel like it. Shears close, safewords sacred, aftercare always.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg">
@@ -62,18 +59,18 @@ function Home() {
       <section className="mx-auto grid max-w-5xl gap-3 px-5 py-10 md:grid-cols-3">
         <Card
           icon={<Camera className="size-4" />}
-          title="Photo & selected-still report"
-          body="The app holds a short clip in page memory. Analyze sends selected compressed stills and generic labels through the app server to xAI. Closed categories, confounders, abstention, and limitations make uncertainty visible."
+          title="Studio Analyze"
+          body="Capture a moment together. Selected stills go to xAI once, on your tap — with honest limits and no hidden uploads."
         />
         <Card
-          icon={<Shield className="size-4" />}
-          title="Consent is the container"
-          body="Current, specific, revocable agreement comes first. Direct symptoms and coercion route action before any camera or model output."
+          icon={<Heart className="size-4" />}
+          title="Just the two of you"
+          body="One sign-in, one checkbox, then the whole studio is yours — negotiate, plan, check in, and play at your pace."
         />
         <Card
           icon={<BookOpen className="size-4" />}
-          title="A working knowledge base"
-          body="Lower-consequence foundations, emergency guidance, aftercare, privacy, evidence notes, and clear instructor-only routes."
+          title="Learn & practice"
+          body="Guided ties, Nyx demonstrations, foundations, and emergency cards — everything in plain English."
         />
       </section>
 
@@ -81,17 +78,17 @@ function Home() {
         <h2 className="mb-4 font-display text-3xl">Tools</h2>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {[
-            { to: "/checklist" as const, t: "Pre-scene", d: "Ten things before rope" },
-            { to: "/checkin" as const, t: "Check-in", d: "Direct report, no defaults" },
-            { to: "/dungeon" as const, t: "Equipment", d: "Boundaries and instructor routes" },
+            { to: "/checklist" as const, t: "Pre-scene", d: "Ten sweet checks before rope" },
+            { to: "/checkin" as const, t: "Check-in", d: "Ask how they're feeling" },
+            { to: "/dungeon" as const, t: "Equipment", d: "Gear and boundaries" },
             { to: "/negotiate" as const, t: "Negotiate", d: "Yes / maybe / no" },
-            { to: "/nerves" as const, t: "Symptoms", d: "Release and escalation" },
-            { to: "/calc" as const, t: "Rope calc", d: "Staffs for tonight" },
-            { to: "/aftercare" as const, t: "Aftercare", d: "Stay present and check directly" },
-            { to: "/emergency" as const, t: "Emergency", d: "Release, call, follow dispatch" },
-            { to: "/settings" as const, t: "Settings", d: "Safewords, voice" },
-            { to: "/knots" as const, t: "Knots", d: "Non-cinch school" },
-            { to: "/journal" as const, t: "Journal", d: "Local notes" },
+            { to: "/nerves" as const, t: "Symptoms", d: "When something feels off" },
+            { to: "/calc" as const, t: "Rope calc", d: "Lengths for tonight" },
+            { to: "/aftercare" as const, t: "Aftercare", d: "Stay close afterward" },
+            { to: "/emergency" as const, t: "Emergency", d: "Release and call for help" },
+            { to: "/settings" as const, t: "Settings", d: "Names, safewords, sync" },
+            { to: "/knots" as const, t: "Knots", d: "Foundations on a prop" },
+            { to: "/journal" as const, t: "Journal", d: "Private notes" },
           ].map((x) => (
             <Link
               key={x.to}
@@ -120,7 +117,7 @@ function Home() {
               search={{ seq: s.slug }}
               className="rounded-lg border border-border bg-surface p-4 transition-colors hover:border-border-strong"
             >
-              <p className="text-xs uppercase tracking-wide text-muted">Planning outline · not a safety duration</p>
+              <p className="text-xs uppercase tracking-wide text-muted">Planning outline</p>
               <p className="mt-1 font-display text-2xl">{s.name}</p>
               <p className="mt-2 text-sm text-muted">{s.blurb}</p>
             </Link>
@@ -132,7 +129,7 @@ function Home() {
         <div className="mb-4 flex items-end justify-between">
           <h2 className="font-display text-3xl">Start here</h2>
           <Link to="/library" className="inline-flex items-center gap-1 text-sm text-muted hover:text-fg">
-            All ties <ArrowRight className="size-3.5" />
+            All ties
           </Link>
         </div>
         <div className="grid min-w-0 gap-3 sm:grid-cols-2">
@@ -145,9 +142,6 @@ function Home() {
             >
               <MiniTie wraps={t.steps.at(-1)?.wraps ?? []} pose={t.steps.at(-1)?.expected.pose} />
               <div className="min-w-0">
-                {/* Wrapping, not a nested nowrap row: side by side the title's
-                    longest word plus the badge set a min-content wider than a
-                    390px phone, and the whole page scrolled sideways. */}
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <p className="min-w-0 wrap-anywhere font-display text-2xl">{t.name}</p>
                   <Badge className="shrink-0">{t.level}</Badge>

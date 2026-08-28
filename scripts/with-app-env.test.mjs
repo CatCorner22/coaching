@@ -17,6 +17,11 @@ const execFileAsync = promisify(execFile);
 const WRAPPER = join(projectRoot(), "scripts/with-app-env.mjs");
 const PRINT_FLAG = "process.stdout.write(String(process.env.VITE_AUTH_ENABLED));";
 
+/** What the wrapper injects: file defaults merged with the caller's process.env. */
+function expectedWrappedAuthEnabled() {
+  return mergeAppEnv(readAppEnv(projectRoot()), process.env).VITE_AUTH_ENABLED;
+}
+
 function makeWorkspace(appEnvJson) {
   const root = mkdtempSync(join(tmpdir(), "app-env-"));
   if (appEnvJson !== undefined) {
@@ -41,9 +46,9 @@ test("drops non-VITE keys, non-string values and malformed documents", () => {
   assert.deepEqual(parseAppEnv("null"), {});
 });
 
-test("a missing app-env.json uses the safe standalone auth-off default", () => {
+test("a missing app-env.json uses the couple-studio default", () => {
   assert.deepEqual(readAppEnv(makeWorkspace()), {
-    VITE_AUTH_ENABLED: "false",
+    VITE_AUTH_ENABLED: "true",
     VITE_MEDIA_UPLOAD_SCOPE: "adult_nudity",
   });
 });
@@ -65,12 +70,9 @@ test("an explicit process-env override wins over the file", () => {
   assert.equal(merged.PATH, "/usr/bin");
 });
 
-test("the template ships auth off and records the chosen upload scope", () => {
-  // The scope is a tracked repo-level setting rather than a workspace file,
-  // because .grok/ is gitignored: a value set there would not survive a fresh
-  // clone or reach a deployment. A real process.env entry still overrides it.
+test("the template ships auth on for this couple studio and records the upload scope", () => {
   assert.deepEqual(readAppEnv(projectRoot()), {
-    VITE_AUTH_ENABLED: "false",
+    VITE_AUTH_ENABLED: "true",
     VITE_MEDIA_UPLOAD_SCOPE: "adult_nudity",
   });
 });
@@ -92,7 +94,7 @@ test("the wrapped command runs with the app env applied", async () => {
     "-e",
     PRINT_FLAG,
   ]);
-  assert.equal(stdout, "false");
+  assert.equal(stdout, expectedWrappedAuthEnabled());
 });
 
 test("the wrapped command sees an explicit override, not the file value", async () => {
@@ -136,5 +138,5 @@ test("the CLI still runs when invoked through a symlinked path", async () => {
     "-e",
     PRINT_FLAG,
   ]);
-  assert.equal(stdout, "false");
+  assert.equal(stdout, expectedWrappedAuthEnabled());
 });

@@ -61,7 +61,7 @@ if (baselineRequested) {
 
 const timeoutMs = Number(process.env.BROWSER_SMOKE_TIMEOUT_MS || 45000);
 const workspaceRoot = realpathSync(new URL("..", import.meta.url));
-const APP_LOADING_TEXT = "Loading your consent on this device…";
+const APP_LOADING_TEXT = "Loading your studio…";
 const APP_READY_TIMEOUT_MS = 10_000;
 
 const VIEWPORTS = [

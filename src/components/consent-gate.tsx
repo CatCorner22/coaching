@@ -1,21 +1,21 @@
+import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { mediaUploadScope, uploadScopeGateLine } from "@/lib/media-scope";
+import {
+  getAuthCapabilitiesBounded,
+  type AuthCapabilities,
+} from "@/lib/auth/capabilities";
+import { authEnabled } from "@/lib/auth/client";
+import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { useSettings } from "@/lib/stores/settings";
 
 export function ConsentGate({ children }: { children: React.ReactNode }) {
   const consented = useSettings((s) => s.consented);
-  const adultsOk = useSettings((s) => s.adults);
-  const shearsOk = useSettings((s) => s.shears);
-  const photosOk = useSettings((s) => s.photosOk);
-  const set = useSettings((s) => s.set);
   const enter = useSettings((s) => s.enter);
+  const { user, isPending: authPending } = useCurrentUserState();
   const [mounted, setMounted] = useState(false);
-  const [adults, setAdults] = useState(false);
-  const [shears, setShears] = useState(false);
-  const [photos, setPhotos] = useState(false);
-  const [consent, setConsent] = useState(false);
-  const uploadScope = mediaUploadScope();
+  const [ready, setReady] = useState(false);
+  const [capabilities, setCapabilities] = useState<AuthCapabilities | null>(null);
 
   useEffect(() => {
     const finish = () => setMounted(true);
@@ -25,91 +25,95 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
     return unsubscribe;
   }, []);
 
-  if (!mounted) {
+  useEffect(() => {
+    if (!authEnabled) return;
+    let current = true;
+    void getAuthCapabilitiesBounded()
+      .then((next) => {
+        if (current) setCapabilities(next);
+      })
+      .catch(() => {
+        if (current) setCapabilities({ gateIdentity: false, oauthProviders: false });
+      });
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  if (!mounted || authPending) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-bg px-5 py-10">
         <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6">
           <p className="text-xs uppercase tracking-[0.22em] text-muted">Knotty</p>
-          <h1 className="mt-3 font-display text-4xl leading-none text-fg">Enter the studio</h1>
-          <p className="mt-4 text-sm text-muted">Loading your consent on this device…</p>
+          <h1 className="mt-3 font-display text-4xl leading-none text-fg">Our rope studio</h1>
+          <p className="mt-4 text-sm text-muted">Loading your studio…</p>
         </div>
       </div>
     );
   }
-  if (consented && adultsOk && shearsOk && photosOk) return <>{children}</>;
 
-  const ready = adults && shears && photos && consent;
+  const signInRequired =
+    authEnabled &&
+    !user &&
+    Boolean(capabilities?.oauthProviders || capabilities?.gateIdentity);
+
+  if (signInRequired) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-bg px-5 py-10">
+        <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
+          <p className="text-xs uppercase tracking-[0.22em] text-muted">Knotty · just us</p>
+          <h1 className="mt-3 font-display text-4xl leading-none text-fg">Sign in together</h1>
+          <p className="mt-4 text-sm leading-relaxed text-muted">
+            This is your private studio. Sign in once, then one simple yes on the home screen —
+            camera, Studio Analyze, and your saved words stay between you two.
+          </p>
+          <Button asChild className="mt-7 w-full" size="lg">
+            <Link to="/login">Sign in</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (consented) return <>{children}</>;
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-bg px-5 py-10">
       <div className="w-full max-w-md rounded-xl border border-border bg-surface p-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
-        <p className="text-xs uppercase tracking-[0.22em] text-muted">Knotty</p>
-        <h1 className="mt-3 font-display text-4xl leading-none text-fg">Enter the studio</h1>
+        <p className="text-xs uppercase tracking-[0.22em] text-muted">Knotty · just us</p>
+        <h1 className="mt-3 font-display text-4xl leading-none text-fg">Tonight is ours</h1>
         <p className="mt-4 text-sm leading-relaxed text-muted">
-          This adult-only app provides general education and limited image observations, never
-          consent verification, medical assessment, live monitoring, or safety clearance.{" "}
-          {uploadScopeGateLine(uploadScope)}
+          A playful rope studio for the two of you — learning, planning, camera preview, and optional
+          cloud analysis when you choose it. Shears within reach, safewords honored, aftercare
+          included.
         </p>
-        <ul className="mt-6 space-y-3 text-sm text-fg">
-          <Check checked={adults} onChange={setAdults} label="Everyone involved is 18 or older." />
-          <Check
-            checked={consent}
-            onChange={setConsent}
-            label="I will obtain separate, current permission for the activity, recording, upload, and generated output for every media batch."
+        <label className="mt-6 flex cursor-pointer items-start gap-3 text-sm text-fg">
+          <input
+            type="checkbox"
+            className="mt-1 size-4 accent-accent"
+            checked={ready}
+            onChange={(e) => setReady(e.target.checked)}
           />
-          <Check
-            checked={shears}
-            onChange={setShears}
-            label="Trauma shears are in reach before the first wrap."
-          />
-          <Check
-            checked={photos}
-            onChange={setPhotos}
-            label="I understand Analyze sends selected compressed stills and generic frame labels to xAI once per batch only after a non-sensitive zero-data-retention check; the response must confirm that setting again, but an initiated request cannot be recalled."
-          />
-        </ul>
+          <span>
+            We're both adults, we chose this together for tonight, and we're happy to use the camera
+            and Studio Analyze when we want.
+          </span>
+        </label>
         <Button
           className="mt-7 w-full"
           size="lg"
           disabled={!ready}
           onClick={() => {
-            set({ adults: true, shears: true, photosOk: true });
             enter();
           }}
         >
-          Enter
+          Step inside
         </Button>
         <p className="mt-4 text-xs leading-relaxed text-subtle">
-          Captures remain page-memory only unless you explicitly save a text summary. If cloud voice
-          is enabled later, its exact spoken text is also sent to xAI. Browser speech and local
-          storage may involve device or platform services; do not use a shared device if that
-          exposure is unacceptable.
+          Uncheck or reset anytime in Settings. Analyze sends selected stills to xAI only when you
+          tap it — never in the background.
         </p>
       </div>
     </div>
-  );
-}
-
-function Check({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <li>
-      <label className="flex cursor-pointer items-start gap-3">
-        <input
-          type="checkbox"
-          className="mt-1 size-4 accent-accent"
-          checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
-        />
-        <span>{label}</span>
-      </label>
-    </li>
   );
 }
