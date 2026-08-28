@@ -27,7 +27,7 @@ type AcademyCoachPanelProps = {
   showCamera?: boolean;
   /** When set, show the Nyx demonstration still above diagrams. */
   nyxPose?: NyxShibariPose | null;
-  /** Knot slug — used to pick three nude body studies for this step. */
+  /** Knot slug — used to pick five nude body studies for this step. */
   knotSlug?: string;
   /** Extra nude studies; defaults from knot/tie slug + step. */
   nyxNudes?: Array<NyxNudePose | NyxPhotoNudePose>;

@@ -131,6 +131,7 @@ function TiePage() {
       }}
       showCamera={!instructor}
       nyxPose={instructor ? null : undefined}
+      nyxNudes={instructor ? [] : undefined}
     />
   );
 

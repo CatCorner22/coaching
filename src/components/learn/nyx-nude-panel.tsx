@@ -1,6 +1,8 @@
 import type { NyxNudePose } from "@/lib/learn/nyx-nudes";
 import {
   illustratedPoseForPhoto,
+  isNyxPhotoNudePose,
+  nyxPhotoNudeAvailable,
   photoPoseForIllustrated,
   nyxPhotoNudeCaption,
   nyxPhotoNudeUrl,
@@ -22,22 +24,24 @@ type NyxNudePanelProps = {
 
 function captionFor(pose: NyxNudePose | NyxPhotoNudePose, photoPose: NyxPhotoNudePose | null) {
   if (photoPose) return nyxPhotoNudeCaption(photoPose);
-  if (pose.includes("-")) return nyxPhotoNudeCaption(pose as NyxPhotoNudePose);
+  if (isNyxPhotoNudePose(pose)) return nyxPhotoNudeCaption(pose);
   return nyxNudeCaption(pose as NyxNudePose);
 }
 
 /** One nude study — real photo when the file exists, illustrated fallback otherwise. */
 export function NyxNudePanel({ pose, className, compact = false, photoPose: photoPoseProp }: NyxNudePanelProps) {
-  const isPhotoKey = typeof pose === "string" && pose.includes("-");
+  const isPhotoKey = isNyxPhotoNudePose(pose);
   const photoPose =
     photoPoseProp ??
-    (isPhotoKey ? (pose as NyxPhotoNudePose) : photoPoseForIllustrated(String(pose)));
+    (isPhotoKey ? pose : photoPoseForIllustrated(String(pose)));
   const illustrated = (
-    !isPhotoKey ? (pose as NyxNudePose) : (illustratedPoseForPhoto(pose as NyxPhotoNudePose) ?? "standFront")
+    !isPhotoKey ? (pose as NyxNudePose) : (illustratedPoseForPhoto(pose) ?? "standFront")
   ) as NyxNudePose;
   const [photoFailed, setPhotoFailed] = useState(false);
   const caption = captionFor(pose, photoPose);
-  const showPhoto = Boolean(photoPose && !photoFailed);
+  const showPhoto = Boolean(
+    photoPose && nyxPhotoNudeAvailable(photoPose) && !photoFailed,
+  );
 
   return (
     <figure
@@ -86,7 +90,7 @@ export function NyxNudeStrip({ poses, className }: NyxNudeStripProps) {
   return (
     <div className={cn("learn-panel rounded-xl border border-border bg-surface p-4", className)}>
       <p className="mb-3 text-sm font-medium text-fg">Nyx — nude body studies</p>
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {poses.map((pose) => (
           <NyxNudePanel key={pose} pose={pose} compact />
         ))}

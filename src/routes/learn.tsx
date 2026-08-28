@@ -92,9 +92,9 @@ function LearnPage() {
       <section className="mt-12">
         <h2 className="font-display text-2xl">{NYX_SHIBARI.name} nude body studies</h2>
         <p className="mt-2 max-w-2xl text-base leading-relaxed text-muted">
-          Twenty photo slots plus fourteen illustrated fallbacks. When you generate real photo nudes (Settings →
-          Generate Nyx photos, or the xAI script), they replace the drawings automatically. Five appear on every taught
-          lesson step.
+          Twenty photo slots plus fourteen illustrated fallbacks. Generate real photo nudes with{" "}
+          <code className="text-xs">npm run generate:nyx-nudes</code> (see Settings for details) — they replace the
+          drawings automatically. Five appear on every taught lesson step.
         </p>
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {nyxPhotoGalleryPoses().map((pose) => (

@@ -1,8 +1,8 @@
 /**
  * Illustrated adult nude studies of Nyx for Academy lessons.
  *
- * Photoreal nudes live under `/instructor/nyx/nude/` — generate with Settings
- * or `node scripts/generate-nyx-photo-nudes.mjs` when XAI_API_KEY is set.
+ * Photoreal nudes live under `/instructor/nyx/nude/` — generate with
+ * `npm run generate:nyx-nudes` when your xAI developer key is in the shell.
  * These illustrated poses are the fallback when photo files are missing.
  */
 
@@ -45,26 +45,29 @@ export const NYX_NUDE_CAPTIONS: Record<NyxNudePose, string> = {
   kneelSide: "Kneel from the side — shin and thigh stack before a mermaid or frog tie.",
 };
 
+/** Every foundation lesson step shows this many unique nude studies. */
+export const NYX_NUDES_PER_STEP = 5;
+
 const KNOT_NUDES: Record<string, Array<NyxNudePose | NyxPhotoNudePose>> = {
   "somerville-bowline": ["wrist-offer", "stand-front", "torso-close", "column-wrist", "stand-side"],
-  "larks-head": ["wrist-offer", "stand-front", "rope-coil", "walk"],
-  "half-hitch": ["wrist-offer", "stand-side", "column-wrist", "torso-close"],
-  "double-half-hitch": ["wrist-offer", "stand-front", "arms-up", "column-wrist"],
-  square: ["wrist-offer", "seated", "stand-front", "rope-coil"],
-  "overhand-on-bight": ["wrist-offer", "torso-close", "stand-front", "portrait-nude"],
+  "larks-head": ["wrist-offer", "stand-front", "rope-coil", "walk", "portrait-nude"],
+  "half-hitch": ["wrist-offer", "stand-side", "column-wrist", "torso-close", "portrait-nude"],
+  "double-half-hitch": ["wrist-offer", "stand-front", "arms-up", "column-wrist", "torso-close"],
+  square: ["wrist-offer", "seated", "stand-front", "rope-coil", "walk"],
+  "overhand-on-bight": ["wrist-offer", "torso-close", "stand-front", "portrait-nude", "arms-up"],
 };
 
 const TIE_NUDES: Record<string, Array<NyxNudePose | NyxPhotoNudePose>> = {
   "single-column": ["wrist-offer", "stand-front", "stand-side", "arms-up", "column-wrist"],
-  "double-column": ["wrist-offer", "stand-front", "seated", "torso-close"],
+  "double-column": ["wrist-offer", "stand-front", "seated", "torso-close", "stand-side"],
   karada: ["stand-front", "torso-close", "chest-line", "arms-up", "stand-back"],
-  tasuki: ["stand-back", "torso-close", "arms-up", "stand-front"],
-  shinju: ["torso-close", "stand-front", "chest-line", "stand-side"],
-  "hip-harness": ["hip-close", "hip-turn", "stand-front", "stand-side"],
-  chair: ["seated", "wrist-offer", "torso-close", "stand-front"],
+  tasuki: ["stand-back", "torso-close", "arms-up", "stand-front", "chest-line"],
+  shinju: ["torso-close", "stand-front", "chest-line", "stand-side", "portrait-nude"],
+  "hip-harness": ["hip-close", "hip-turn", "stand-front", "stand-side", "portrait-nude"],
+  chair: ["seated", "wrist-offer", "torso-close", "stand-front", "arms-up"],
   futomomo: ["floor", "hip-close", "kneeling", "thigh-stack", "kneel-side"],
-  "frog-tie": ["kneeling", "floor", "hip-close", "recline"],
-  mermaid: ["mermaid-seat", "floor", "hip-turn", "walk"],
+  "frog-tie": ["kneeling", "floor", "hip-close", "recline", "thigh-stack"],
+  mermaid: ["mermaid-seat", "floor", "hip-turn", "walk", "seated"],
 };
 
 const DEFAULT_KNOT: Array<NyxNudePose | NyxPhotoNudePose> = [
@@ -82,26 +85,24 @@ const DEFAULT_TIE: Array<NyxNudePose | NyxPhotoNudePose> = [
   "portrait-nude",
 ];
 
-function rotate<T extends string>(poses: T[], stepIndex: number, count: number): T[] {
-  if (poses.length === 0) return [];
-  const start = ((stepIndex % poses.length) + poses.length) % poses.length;
-  const out: T[] = [];
-  for (let i = 0; i < count; i += 1) {
-    out.push(poses[(start + i) % poses.length]!);
+/** Rotate a pool of unique poses; pool must hold at least `count` distinct entries. */
+function rotateUnique<T extends string>(pool: T[], stepIndex: number, count: number): T[] {
+  const unique = [...new Set(pool)];
+  if (unique.length < count) {
+    throw new Error(`Nyx nude pool needs at least ${count} unique poses (got ${unique.length})`);
   }
-  return out;
+  const start = ((stepIndex % unique.length) + unique.length) % unique.length;
+  return Array.from({ length: count }, (_, i) => unique[(start + i) % unique.length]!);
 }
 
-/** Five nude studies per knot step — photo paths when generated, illustrated fallback. */
 export function nyxNudesForKnotStep(slug: string, stepIndex: number): Array<NyxNudePose | NyxPhotoNudePose> {
-  return rotate(KNOT_NUDES[slug] ?? DEFAULT_KNOT, stepIndex, 5);
+  return rotateUnique(KNOT_NUDES[slug] ?? DEFAULT_KNOT, stepIndex, NYX_NUDES_PER_STEP);
 }
 
 export function nyxNudesForTieStep(slug: string, stepIndex: number): Array<NyxNudePose | NyxPhotoNudePose> {
-  return rotate(TIE_NUDES[slug] ?? DEFAULT_TIE, stepIndex, 5);
+  return rotateUnique(TIE_NUDES[slug] ?? DEFAULT_TIE, stepIndex, NYX_NUDES_PER_STEP);
 }
 
-/** Full photo catalog for the Academy gallery. */
 export function nyxPhotoGalleryPoses(): readonly NyxPhotoNudePose[] {
   return NYX_PHOTO_NUDE_POSES;
 }

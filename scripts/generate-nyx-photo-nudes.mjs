@@ -9,7 +9,7 @@
  * Requires network + a valid xAI API key with Imagine access. Content moderation may
  * refuse some prompts — skipped poses are reported at the end.
  */
-import { mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import {
@@ -80,6 +80,18 @@ function toWebp(pngOrJpgPath, webpPath) {
   });
 }
 
+function writeManifest() {
+  const files = readdirSync(OUT_DIR).filter(
+    (name) => name.startsWith("nyx-nude-") && name.endsWith(".webp"),
+  );
+  const photos = files
+    .map((name) => name.slice("nyx-nude-".length, -".webp".length))
+    .filter((pose) => NYX_PHOTO_NUDE_POSES.includes(pose))
+    .sort();
+  writeFileSync(join(OUT_DIR, "manifest.json"), `${JSON.stringify({ photos }, null, 2)}\n`);
+  return photos;
+}
+
 async function main() {
   const requested = process.argv.slice(2);
   const poses =
@@ -128,7 +140,8 @@ async function main() {
     }
   }
 
-  console.log(JSON.stringify({ outDir: OUT_DIR, ...results }, null, 2));
+  const manifest = writeManifest();
+  console.log(JSON.stringify({ outDir: OUT_DIR, manifest, ...results }, null, 2));
   if (results.ok.length === 0 && results.skipped.length === 0) process.exit(1);
 }
 
