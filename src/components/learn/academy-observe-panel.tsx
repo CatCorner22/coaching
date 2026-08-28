@@ -8,6 +8,7 @@ import { extractVideoFrames, processMediaFrame } from "@/lib/media";
 import { buildDeterministic } from "@/lib/ml/predict";
 import { observeFrame } from "@/lib/ml/detect";
 import type { Tie } from "@/lib/kb/types";
+import { useNegotiate } from "@/lib/stores/negotiate";
 import { useSettings } from "@/lib/stores/settings";
 import { playCoachVoice } from "@/lib/voice/play";
 import { cn } from "@/lib/utils";
@@ -23,7 +24,26 @@ type AcademyObservePanelProps = {
 /**
  * Local practice cam only. Everything here stays on the device: frames are
  * scored by the local band heuristic and never leave page memory. Selected-still
- * cloud observation lives in the Studio behind the one home consent checkbox.
+ * cloud observation is deliberately NOT offered from this panel — it lives in
+ * the Studio, behind the per-batch attestation checkboxes, the one-hour window,
+ * and the one-use batch reservation. An earlier version of this panel submitted
+ * to the analyze endpoint with every attestation hardcoded to true; do not
+ * bring that back.
+ *
+ * The negotiated `photos` limit gates this camera: "photos / video for
+ * coaching" is one decision, and a practice prop does not exempt the lens from
+ * it. A later revision swapped this for the home-screen consent checkbox
+ * alone; that is the adult gate, not the photos decision, and it silently
+ * opened every lesson-page lens for anyone past the front door. Restored —
+ * and pinned by integration-contracts — because the two gates answer
+ * different questions.
+ *
+ * The blocked copy deliberately speaks only for this camera. The same
+ * revision also removed the Studio's media gate (`cameraGateReason` in
+ * src/routes/studio.tsx now reads only `stopped`), so the Studio lens opens
+ * regardless of this limit. Until that gate is restored, any wording here
+ * promising that every lens waits would be an assurance the app does not
+ * honour — a reader could leave this panel, open Studio, and film anyway.
  */
 export function AcademyObservePanel({
   tie,
@@ -33,10 +53,14 @@ export function AcademyObservePanel({
   className,
 }: AcademyObservePanelProps) {
   const settings = useSettings();
-  const studioConsented = useSettings((s) => s.consented);
+  const photosApproved = useNegotiate((s) =>
+    s.items.some((item) => item.id === "photos" && item.rank === "yes"),
+  );
+  // Fail closed until the client has hydrated the persisted negotiation
+  // snapshot; the server-rendered HTML always shows the blocked state.
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
-  const cameraAllowed = hydrated && studioConsented;
+  const cameraAllowed = hydrated && photosApproved;
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -72,10 +96,10 @@ export function AcademyObservePanel({
     return () => URL.revokeObjectURL(clipUrl);
   }, [clipUrl]);
 
-  // Signing out or resetting consent closes a live camera.
+  // A revocation in another tab (or on /negotiate) closes a live camera.
   useEffect(() => {
-    if (hydrated && !studioConsented) stopCamera();
-  }, [hydrated, studioConsented, stopCamera]);
+    if (hydrated && !photosApproved) stopCamera();
+  }, [hydrated, photosApproved, stopCamera]);
 
   async function startCamera() {
     if (!cameraAllowed) return;
@@ -210,7 +234,11 @@ export function AcademyObservePanel({
 
       {!cameraAllowed ? (
         <div className="mt-4 rounded-lg border border-border bg-elevated px-4 py-4 text-sm leading-relaxed text-muted">
-          Step inside on the home screen first — one yes unlocks the practice cam and Studio.
+          This practice camera is off until the{" "}
+          <strong className="font-medium text-fg">photos / video</strong> limit is a yes.{" "}
+          <Link to="/negotiate" className="text-accent underline underline-offset-2">
+            Review limits
+          </Link>
         </div>
       ) : (
         <>

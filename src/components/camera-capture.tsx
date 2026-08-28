@@ -94,7 +94,12 @@ const EMPTY_PERMISSIONS: Record<PermissionKey, boolean> = {
   upload: false,
   output: false,
 };
-const BATCH_PERMISSION_MAX_AGE_MS = 4 * 60 * 60 * 1000;
+// Must stay shorter than the server's shared batch reservation (two hours in
+// src/lib/ai/media-replay-core.ts): the reservation exists to outlive every
+// permission this client still treats as fresh. A revision widened this to
+// four hours for convenience, which inverted that relationship — a three-hour
+// batch read as confirmed here after its replay protection had lapsed.
+const BATCH_PERMISSION_MAX_AGE_MS = 60 * 60 * 1000;
 
 type Guide = "equipment" | "context" | "detail" | "label";
 
@@ -1013,8 +1018,9 @@ export const CameraCapture = memo(function CameraCapture({
             <div className="absolute inset-0 bg-bg/70" />
             <Camera className="relative size-8 text-muted" />
             <p className="relative px-6 text-center text-sm text-muted">
-              Open the camera, frame the rope, and capture when you are ready. A five-shot burst
-              keeps the sharpest stills, and clips become labeled stills you confirm.
+              Open the camera and capture when you are ready — prefer a non-identifying view of
+              equipment or rope. A five-shot burst keeps the sharpest stills, and clips become
+              labeled stills you confirm.
             </p>
           </div>
         )}

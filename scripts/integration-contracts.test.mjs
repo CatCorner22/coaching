@@ -58,6 +58,13 @@ test("camera capability preflight stays passive and cannot certify a device or s
   assert.match(camera, /aria-live="polite"/);
   assert.match(camera, /aria-atomic="true"/);
   assert.match(camera, /<details/);
+  // A UX pass deleted these two caveats together with the assertions that
+  // pinned them, so the suite stayed green while the preflight started reading
+  // as a device check. The collapsible presentation is fine; the facts are not
+  // optional.
+  assert.match(camera, /not\s+device certification or safety\s+clearance/i);
+  assert.match(camera, /decoding is\s+tested only after you select a file/i);
+  assert.match(camera, /recording is\s+tested only when recording starts/i);
   assert.match(
     camera,
     /onClick=\{\(\) => void checkBrowserCapabilities\(\)\}[\s\S]{0,160}disabled=\{disabled\}[\s\S]{0,160}aria-disabled=\{disabled \|\| checkingCapabilities\}/,
@@ -568,14 +575,57 @@ test("the media upload scope is an operator setting with a conservative default"
   assert.match(read("src/lib/learn/nyx-nudes.ts"), /NYX_NUDE_POSES/);
 });
 
-test("the tie-page practice cam stays local and opens after home consent", () => {
+test("the tie-page practice cam stays local and waits for the photos limit", () => {
+  // A second, ungated camera-and-analyze path on the taught pages used to
+  // fabricate every per-batch attestation and mint a non-UUID batch id. A
+  // later UX pass swapped the negotiated photos gate for the home consent
+  // checkbox and rewrote this test to bless it — the adult gate answers "is
+  // an adult present", not "did these people agree to a lens", and the README
+  // promises the photos limit gates the whole camera path.
   const observe = read("src/components/learn/academy-observe-panel.tsx");
   assert.doesNotMatch(observe, /analyzeRope/);
   assert.doesNotMatch(observe, /adults:\s*true/);
-  assert.match(observe, /studioConsented|s\.consented/);
+  assert.match(observe, /photosApproved/);
+  assert.match(observe, /item\.id === "photos" && item\.rank === "yes"/);
+  // The gate must be the negotiated limit, not the front-door checkbox.
+  assert.doesNotMatch(observe, /cameraAllowed = hydrated && (?:studioConsented|s\.consented)/);
   assert.match(observe, /Continue in Studio/);
 
   const studio = read("src/routes/studio.tsx");
   // Plain "yellow" stays armed even when a custom yellow word is set.
   assert.match(studio, /\[settings\.safeword, settings\.yellowWord, "red", "yellow"\]/);
+});
+
+test("the client batch-permission window stays inside the server replay reservation", () => {
+  // The shared Postgres reservation rejects a duplicate batch for two hours
+  // precisely so that it outlives every permission the client still treats as
+  // fresh (README: "exceeding the one-hour permission window"). A revision
+  // quadrupled the client window to four hours, inverting that: a three-hour
+  // batch read as confirmed on the page after its replay protection had
+  // lapsed on the server. Pin both numbers and their relationship.
+  const capture = read("src/components/camera-capture.tsx");
+  const replay = read("src/lib/ai/media-replay-core.ts");
+
+  const windowMatch = capture.match(/BATCH_PERMISSION_MAX_AGE_MS = ([0-9*_ ]+);/);
+  assert.ok(windowMatch, "BATCH_PERMISSION_MAX_AGE_MS must be a literal product");
+  const permissionWindowMs = Function(`"use strict"; return (${windowMatch[1]});`)();
+
+  const ttlMatches = [...replay.matchAll(/options\.ttlMs \?\? ([0-9*_ ]+),/g)];
+  assert.ok(ttlMatches.length >= 2, "both replay helpers must default ttlMs");
+  for (const ttl of ttlMatches) {
+    const reservationMs = Function(`"use strict"; return (${ttl[1]});`)();
+    assert.ok(
+      permissionWindowMs < reservationMs,
+      `client permission window (${permissionWindowMs}ms) must stay below the server reservation (${reservationMs}ms)`,
+    );
+  }
+  assert.equal(permissionWindowMs, 60 * 60 * 1000, "the documented window is one hour");
+});
+
+test("the consent gate names where Analyze sends stills", () => {
+  // "Analyze runs only when you tap it" hid the recipient; naming xAI at the
+  // gate is the disclosure the tap-to-send promise rests on.
+  const gate = read("src/components/consent-gate.tsx");
+  assert.match(gate, /sends your selected stills to xAI only when you\s+tap it/);
+  assert.match(gate, /never in the background/);
 });
