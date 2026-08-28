@@ -7,6 +7,8 @@ import { CoachPanel } from "@/components/coach-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { analyzeRope } from "@/lib/ai/analyze";
+import { analyzeErrorMessage } from "@/lib/ai/analyze-errors";
+import { captureReadinessForAnalyze } from "@/lib/camera/capture-readiness";
 import { authEnabled } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { DUNGEON, TIES, getTie } from "@/lib/kb";
@@ -441,7 +443,7 @@ function StudioPage() {
           void playCoachVoice(res.report.final.speak, true);
         }
       } else {
-        setAnalysisError(res.error || "The analysis could not be completed.");
+        setAnalysisError(analyzeErrorMessage(res));
         // Only a server-declared retryable admission denial before durable
         // reservation can reopen this batch. Never reopen after reservation,
         // selected-media dispatch, an ambiguous outcome, or replay.
@@ -504,6 +506,8 @@ function StudioPage() {
     const line = tie?.steps[stepIndex]?.speak;
     if (line && studioVoice && !micArmed) void playCoachVoice(line, studioVoice);
   }, [stepIndex, stopped, tie, studioVoice, micArmed]);
+
+  const captureReadiness = capture ? captureReadinessForAnalyze(capture.quality) : null;
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
@@ -768,6 +772,18 @@ function StudioPage() {
           {capture && captureMatchesContext && (
             <WrapOverlay src={capture.preview} obs={capture.previewObservation} />
           )}
+          {captureReadiness && captureMatchesContext && (
+            <div
+              className={`mt-3 rounded-lg border px-3 py-3 text-sm ${
+                captureReadiness.suggestRetake
+                  ? "border-warn/40 bg-warn/10 text-fg"
+                  : "border-border bg-surface text-muted"
+              }`}
+            >
+              <p className="font-medium text-fg">{captureReadiness.headline}</p>
+              <p className="mt-1 leading-relaxed">{captureReadiness.detail}</p>
+            </div>
+          )}
         </div>
         <div className="space-y-4">
           <CoachPanel
@@ -778,6 +794,7 @@ function StudioPage() {
             pending={pending}
             refusal={refusal}
             halted={stopped}
+            captureQuality={capture && captureMatchesContext ? capture.quality : null}
           />
           {analysisError && (
             <p className="text-sm text-danger-text" role="alert">

@@ -256,7 +256,7 @@ try {
     await confirmBatchPermissions();
     await page.getByRole("button", { name: "Open live camera", exact: true }).click();
     await waitForLivePreview();
-    await page.getByRole("button", { name: "Capture still", exact: true }).click();
+    await page.getByRole("button", { name: "Burst stills", exact: true }).click();
     await waitForCommittedBatch("photo");
     await waitForNeutralLocalReport("neutral synthetic still");
 

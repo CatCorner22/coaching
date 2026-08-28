@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SourceEvidence } from "@/components/source-evidence";
 import type { CoachReport } from "@/lib/ml/types";
+import type { FrameQuality } from "@/lib/camera/quality";
 import type { ModelStatus, ObservationReport } from "@/lib/observation/report";
 import { playCoachVoice } from "@/lib/voice/play";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,7 @@ export const CoachPanel = memo(function CoachPanel({
   pending,
   refusal,
   halted,
+  captureQuality,
 }: {
   report: CoachReport | null;
   observationReport: ObservationReport | null;
@@ -24,6 +26,7 @@ export const CoachPanel = memo(function CoachPanel({
   pending?: boolean;
   refusal?: boolean;
   halted?: boolean;
+  captureQuality?: FrameQuality | null;
 }) {
   if (!report && !observationReport && pending) {
     return (
@@ -67,6 +70,13 @@ export const CoachPanel = memo(function CoachPanel({
       {refusal && (
         <p className="text-xs text-muted">
           The vision model declined the still. Only limited local image observations are shown.
+        </p>
+      )}
+      {captureQuality && modelStatus === "not_requested" && (
+        <p className="text-xs text-subtle">
+          Frame quality · sharp {Math.round(captureQuality.sharpness * 100)}% · light{" "}
+          {Math.round(captureQuality.exposure * 100)}% · rope hint{" "}
+          {Math.round(captureQuality.ropeHint * 100)}%
         </p>
       )}
       {report && <p className="text-sm leading-relaxed text-fg">{report.final.coaching}</p>}
