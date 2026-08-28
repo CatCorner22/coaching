@@ -341,6 +341,55 @@ export function torchAvailable(stream: MediaStream | null) {
   }
 }
 
+export type CameraZoomRange = { min: number; max: number; step: number };
+
+export function zoomRange(stream: MediaStream | null): CameraZoomRange | null {
+  try {
+    const track = stream?.getVideoTracks()[0];
+    const caps = (track?.getCapabilities?.() ?? {}) as {
+      zoom?: { min?: number; max?: number; step?: number } | number[];
+    };
+    const zoom = caps.zoom;
+    if (!zoom) return null;
+    if (Array.isArray(zoom) && zoom.length >= 2) {
+      const min = Number(zoom[0]);
+      const max = Number(zoom[zoom.length - 1]);
+      if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return null;
+      return { min, max, step: 0.1 };
+    }
+    if (typeof zoom === "object" && zoom !== null && "min" in zoom && "max" in zoom) {
+      const min = Number(zoom.min);
+      const max = Number(zoom.max);
+      const step = Number(zoom.step ?? 0.1);
+      if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return null;
+      return { min, max, step: Number.isFinite(step) && step > 0 ? step : 0.1 };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function applyZoom(stream: MediaStream, zoom: number): Promise<boolean> {
+  const range = zoomRange(stream);
+  if (!range) return false;
+  const clamped = Math.min(range.max, Math.max(range.min, zoom));
+  try {
+    const track = stream.getVideoTracks()[0];
+    if (!track) return false;
+    return await settleWithin(
+      track.applyConstraints({ advanced: [{ zoom: clamped } as MediaTrackConstraintSet] }),
+      FOCUS_SETUP_TIMEOUT_MS,
+    );
+  } catch {
+    return false;
+  }
+}
+
+export const CLIP_DURATION_MS = 7_000;
+export const BURST_FRAME_COUNT = 5;
+export const BURST_KEEP = 3;
+
 export function startClip(stream: MediaStream): ClipHandle {
   if (typeof MediaRecorder === "undefined") {
     throw new Error("Video recording is not supported in this browser. Choose a video instead.");

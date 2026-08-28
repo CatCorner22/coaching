@@ -12,12 +12,17 @@ import {
 } from "../src/lib/media.ts";
 import {
   applyFocus,
+  applyZoom,
+  BURST_FRAME_COUNT,
+  BURST_KEEP,
+  CLIP_DURATION_MS,
   inspectCameraCapabilities,
   openRopeCamera,
   playCameraPreview,
   setTorch,
   startClip,
   torchAvailable,
+  zoomRange,
 } from "../src/lib/camera/stream.ts";
 
 test("dataUrlSize measures padded base64 payloads", () => {
@@ -574,6 +579,37 @@ test("applyFocus requests continuous modes only when each capability advertises 
   };
   await applyFocus(stream);
   assert.deepEqual(applied, [{ advanced: [{ exposureMode: "continuous" }] }]);
+});
+
+test("zoom helpers stay fail-closed and burst/clip constants stay aligned", () => {
+  assert.equal(CLIP_DURATION_MS, 7000);
+  assert.equal(BURST_FRAME_COUNT, 5);
+  assert.equal(BURST_KEEP, 3);
+  assert.equal(zoomRange(null), null);
+  assert.deepEqual(
+    zoomRange({
+      getVideoTracks: () => [{ getCapabilities: () => ({ zoom: { min: 1, max: 4, step: 0.25 } }) }],
+    }),
+    { min: 1, max: 4, step: 0.25 },
+  );
+});
+
+test("applyZoom clamps and applies when a track advertises zoom", async () => {
+  const applied = [];
+  const stream = {
+    getVideoTracks: () => [
+      {
+        getCapabilities: () => ({ zoom: { min: 1, max: 3, step: 0.5 } }),
+        applyConstraints: (c) => {
+          applied.push(c);
+          return Promise.resolve();
+        },
+      },
+    ],
+  };
+  assert.deepEqual(zoomRange(stream), { min: 1, max: 3, step: 0.5 });
+  assert.equal(await applyZoom(stream, 9), true);
+  assert.equal(applied[0].advanced[0].zoom, 3);
 });
 
 test("torch capability races fail closed instead of throwing", () => {

@@ -67,6 +67,9 @@ test("camera capability preflight stays passive and cannot certify a device or s
   assert.match(camera, /aria-label="Live camera preview;/);
   assert.match(camera, /aria-label="Recording in progress"/);
   assert.match(camera, /aria-pressed=\{torch\}/);
+  assert.match(camera, /scoreLivePreview/);
+  assert.match(camera, /BURST_FRAME_COUNT/);
+  assert.match(camera, /bestFrameIndices/);
 });
 
 test("route registration and the preview bridge keep heavy knowledge and schema graphs lazy", () => {
