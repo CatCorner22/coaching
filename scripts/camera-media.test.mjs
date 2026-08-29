@@ -6,6 +6,7 @@ import {
   MAX_VIDEO_BYTES,
   dataUrlSize,
   extractVideoFrames,
+  digitalZoomCrop,
   processMediaFrame,
   validateMediaFile,
   validateMediaSignature,
@@ -22,6 +23,7 @@ import {
   setTorch,
   startClip,
   torchAvailable,
+  waitForNextVideoFrame,
   zoomRange,
 } from "../src/lib/camera/stream.ts";
 
@@ -610,6 +612,28 @@ test("applyZoom clamps and applies when a track advertises zoom", async () => {
   assert.deepEqual(zoomRange(stream), { min: 1, max: 3, step: 0.5 });
   assert.equal(await applyZoom(stream, 9), true);
   assert.equal(applied[0].advanced[0].zoom, 3);
+});
+
+test("applyZoom returns false when constraints fail", async () => {
+  const stream = {
+    getVideoTracks: () => [
+      {
+        getCapabilities: () => ({ zoom: { min: 1, max: 3, step: 0.5 } }),
+        applyConstraints: () => Promise.reject(new Error("constraint failed")),
+      },
+    ],
+  };
+  assert.equal(await applyZoom(stream, 2), false);
+});
+
+test("digitalZoomCrop is a no-op at 1x and centre-crops above", () => {
+  assert.equal(digitalZoomCrop(1000, 800, 1), undefined);
+  assert.deepEqual(digitalZoomCrop(1000, 800, 2), { sx: 250, sy: 200, sw: 500, sh: 400 });
+  assert.equal(digitalZoomCrop(0, 800, 2), undefined);
+});
+
+test("waitForNextVideoFrame settles even without video frame callbacks", async () => {
+  await waitForNextVideoFrame(/** @type {HTMLVideoElement} */ ({}), 30);
 });
 
 test("torch capability races fail closed instead of throwing", () => {

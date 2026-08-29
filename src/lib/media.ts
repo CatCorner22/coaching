@@ -396,22 +396,48 @@ export async function loadImage(src: string | Blob): Promise<HTMLImageElement> {
   }
 }
 
+export type PixelCrop = { sx: number; sy: number; sw: number; sh: number };
+
+/** Centre crop matching a CSS digital zoom (hardware zoom already changes the video pixels). */
+export function digitalZoomCrop(width: number, height: number, zoom: number): PixelCrop | undefined {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return undefined;
+  }
+  const z = Number.isFinite(zoom) ? Math.max(1, zoom) : 1;
+  if (z <= 1.0001) return undefined;
+  const sw = Math.max(1, width / z);
+  const sh = Math.max(1, height / z);
+  return {
+    sx: (width - sw) / 2,
+    sy: (height - sh) / 2,
+    sw,
+    sh,
+  };
+}
+
 export function drawContain(
   img: CanvasImageSource,
   maxEdge: number,
   iw: number,
   ih: number,
+  crop?: PixelCrop,
 ): HTMLCanvasElement {
-  assertPixelBudget(iw, ih);
-  const scale = Math.min(1, maxEdge / Math.max(iw, ih, 1));
-  const w = Math.max(1, Math.round(iw * scale));
-  const h = Math.max(1, Math.round(ih * scale));
+  const srcW = crop?.sw ?? iw;
+  const srcH = crop?.sh ?? ih;
+  assertPixelBudget(srcW, srcH);
+  const scale = Math.min(1, maxEdge / Math.max(srcW, srcH, 1));
+  const w = Math.max(1, Math.round(srcW * scale));
+  const h = Math.max(1, Math.round(srcH * scale));
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   if (!ctx) throw new Error("No canvas");
-  ctx.drawImage(img, 0, 0, w, h);
+  if (crop) {
+    ctx.drawImage(img, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, w, h);
+  } else {
+    ctx.drawImage(img, 0, 0, w, h);
+  }
   return canvas;
 }
 
@@ -429,14 +455,12 @@ async function canvasFromSource(
   src: Blob | HTMLImageElement | HTMLVideoElement,
   maxEdge: number,
   knownDimensions?: { width: number; height: number } | null,
+  digitalZoom = 1,
 ): Promise<HTMLCanvasElement> {
   if (typeof HTMLVideoElement !== "undefined" && src instanceof HTMLVideoElement) {
-    return drawContain(
-      src,
-      maxEdge,
-      src.videoWidth || 640,
-      src.videoHeight || 480,
-    );
+    const iw = src.videoWidth || 640;
+    const ih = src.videoHeight || 480;
+    return drawContain(src, maxEdge, iw, ih, digitalZoomCrop(iw, ih, digitalZoom));
   } else if (typeof HTMLImageElement !== "undefined" && src instanceof HTMLImageElement) {
     return drawContain(src, maxEdge, src.naturalWidth, src.naturalHeight);
   } else if (typeof createImageBitmap === "function") {
@@ -554,8 +578,9 @@ export async function processMediaFrame(
   analysisEdge = 240,
   quality = 0.72,
   knownDimensions?: { width: number; height: number } | null,
+  digitalZoom = 1,
 ): Promise<ProcessedMediaFrame> {
-  const preview = await canvasFromSource(src, previewEdge, knownDimensions);
+  const preview = await canvasFromSource(src, previewEdge, knownDimensions, digitalZoom);
   const analysis = drawContain(preview, analysisEdge, preview.width, preview.height);
   const ctx = analysis.getContext("2d", { willReadFrequently: true });
   if (!ctx) throw new Error("No canvas");
