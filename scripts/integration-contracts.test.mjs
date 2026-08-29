@@ -93,7 +93,7 @@ test("route registration and the preview bridge keep heavy knowledge and schema 
 test("studio burst waits for distinct frames, matches digital zoom, and does not double-fire Space", () => {
   const camera = read("src/components/camera-capture.tsx");
   assert.match(camera, /waitForNextVideoFrame\(v\)/);
-  assert.match(camera, /processMediaFrame\(v, 1600, 240, 0\.82, null, digitalZoom\)/);
+  assert.match(camera, /processMediaFrame\(v, 1600, 240, 0\.82, null, digitalZoom, CAPTURE_PREVIEW_ASPECT\)/);
   const timer = between(camera, "async function snapWithOptionalTimer()", "async function changeZoom");
   assert.match(timer, /request !== cameraRequestRef\.current/);
   assert.match(timer, /setBusyState\(true\)/);
@@ -104,7 +104,18 @@ test("studio burst waits for distinct frames, matches digital zoom, and does not
     camera,
     /window\.addEventListener\("keydown", onKey\);[\s\S]*?\}, \[live, disabled\]\);/,
   );
-  assert.match(camera, /target\.closest\("button"\)/);
+  // Merged form of the two parallel scoping fixes (#32's Space-only button
+  // check, #33's multi-target bail): one bail covers Space AND R, over the
+  // union of interactive targets. Pin the union so neither half regresses.
+  assert.match(
+    camera,
+    /closest\(\s*\n?\s*"button, a, input, textarea, select, summary, label, \[role='button'\], \[role='slider'\], \[contenteditable\]",?\s*\n?\s*\)/,
+  );
+  // Ctrl/Cmd+R must stay a refresh and Shift+Space a scroll, not a capture.
+  assert.match(
+    camera,
+    /event\.ctrlKey \|\| event\.metaKey \|\| event\.altKey \|\| \(event\.shiftKey && event\.code === "Space"\)/,
+  );
 });
 
 test("a cancelled photo import cannot commit after its decoder resolves", () => {

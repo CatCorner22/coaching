@@ -95,6 +95,14 @@ const EMPTY_PERMISSIONS: Record<PermissionKey, boolean> = {
   upload: false,
   output: false,
 };
+// The preview <video> below renders inside a fixed 3:4 box with
+// object-contain, so a stream that isn't 3:4 letterboxes: part of the sensor
+// frame is visible along one axis at full extent even when zoomed. The crop
+// passed to capture and to the live meter must model that same box, or a
+// zoomed capture of a 16:9 stream keeps less than the user could see.
+// Tied to the aspect-[3/4] class on the <video> element.
+const CAPTURE_PREVIEW_ASPECT = 3 / 4;
+
 // Must stay shorter than the server's shared batch reservation (two hours in
 // src/lib/ai/media-replay-core.ts): the reservation exists to outlive every
 // permission this client still treats as fresh. A revision widened this to
@@ -586,6 +594,10 @@ export const CameraCapture = memo(function CameraCapture({
     const { signal } = operation;
     try {
       const frames: ProcessedMediaFrame[] = [];
+      // Software zoom scales only the preview element; hardware zoom changes
+      // the stream itself. Cropping each still to the centred 1/zoom region
+      // keeps the capture honest about what the user framed — everything they
+      // zoomed away from stays out of the file, not just out of the preview.
       const digitalZoom = zoomCapsRef.current ? 1 : Math.max(1, zoomRef.current);
       for (let i = 0; i < BURST_FRAME_COUNT; i++) {
         signal.throwIfAborted();
@@ -593,7 +605,7 @@ export const CameraCapture = memo(function CameraCapture({
         if (v.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !v.videoWidth) {
           throw new Error("The camera dropped the live frame.");
         }
-        frames.push(await processMediaFrame(v, 1600, 240, 0.82, null, digitalZoom));
+        frames.push(await processMediaFrame(v, 1600, 240, 0.82, null, digitalZoom, CAPTURE_PREVIEW_ASPECT));
       }
       const observed = frames.map((frame) => ({
         frame,
@@ -646,6 +658,16 @@ export const CameraCapture = memo(function CameraCapture({
       if (!hasCurrentBatchPermissions()) return;
       try {
         setError(null);
+        // A clip records the camera's raw stream; a CSS-only zoom cannot crop
+        // it. Recording while the preview shows a tighter frame than the file
+        // will contain is the zoom privacy bug in video form, so drop back to
+        // 1x — preview and recording agree again — and say why.
+        if (!zoomCaps && zoom > 1) {
+          setZoom(1);
+          setHint(
+            "Digital zoom applies to stills only — the clip records the camera's full frame, so zoom was reset before recording.",
+          );
+        }
         setVideoFrames([]);
         setSelectedFrames([]);
         const handle = startClip(stream);
@@ -872,11 +894,20 @@ export const CameraCapture = memo(function CameraCapture({
       setBusyState(true);
       try {
         for (let n = 3; n >= 1; n--) {
-          if (!mountedRef.current || disabledRef.current || request !== cameraRequestRef.current) {
+          // The control says 3s, so each displayed count holds a real second —
+          // 450ms per step fired after ~1.35s, photographing people still
+          // positioning the camera. Close does not bump the camera request,
+          // so a dead stream aborts the count too.
+          if (
+            !mountedRef.current ||
+            disabledRef.current ||
+            request !== cameraRequestRef.current ||
+            !streamRef.current
+          ) {
             return;
           }
           setCountdownState(n);
-          await new Promise((resolve) => window.setTimeout(resolve, 450));
+          await new Promise((resolve) => window.setTimeout(resolve, 1000));
         }
       } finally {
         setCountdownState(null);
@@ -884,7 +915,12 @@ export const CameraCapture = memo(function CameraCapture({
           setBusyState(false);
         }
       }
-      if (!mountedRef.current || disabledRef.current || request !== cameraRequestRef.current) {
+      if (
+        !mountedRef.current ||
+        disabledRef.current ||
+        request !== cameraRequestRef.current ||
+        !streamRef.current
+      ) {
         return;
       }
     }
@@ -923,7 +959,7 @@ export const CameraCapture = memo(function CameraCapture({
       const video = videoRef.current;
       if (!video || cancelled) return;
       const digitalZoom = zoomCapsRef.current ? 1 : Math.max(1, zoomRef.current);
-      const quality = scoreLivePreview(video, digitalZoom);
+      const quality = scoreLivePreview(video, digitalZoom, CAPTURE_PREVIEW_ASPECT);
       if (quality && !cancelled) setLiveQuality(quality);
     };
     tick();
@@ -952,17 +988,31 @@ export const CameraCapture = memo(function CameraCapture({
   useEffect(() => {
     if (!live || disabled) return;
     const onKey = (event: KeyboardEvent) => {
+      // Shortcuts fire only from a non-interactive target (the page body or
+      // the preview). On a focused button, link, slider, or label the key
+      // keeps its normal meaning — Space on a focused Close used to fire a
+      // burst and consume the one-use batch instead of closing the camera,
+      // and R from a focused link started a recording. One bail covers both
+      // keys.
       const target = event.target;
-      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.closest(
+            "button, a, input, textarea, select, summary, label, [role='button'], [role='slider'], [contenteditable]",
+          ))
+      ) {
+        return;
+      }
+      // A held modifier means the key is a browser or OS chord, not this
+      // panel's shortcut — Ctrl/Cmd+R is a page refresh, and Shift+Space
+      // scrolls the page up; swallowing either hijacks a navigation the user
+      // asked for. Shift+R still records: the handler always accepted the
+      // uppercase form, and shifted R has no browser meaning to preserve.
+      if (event.ctrlKey || event.metaKey || event.altKey || (event.shiftKey && event.code === "Space")) {
         return;
       }
       if (event.code === "Space") {
-        if (
-          target instanceof HTMLElement &&
-          (target.closest("button") || target.closest("[role='button']") || target.closest("label"))
-        ) {
-          return;
-        }
         event.preventDefault();
         void snapWithOptionalTimerRef.current();
         return;
