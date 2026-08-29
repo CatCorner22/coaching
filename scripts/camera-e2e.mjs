@@ -336,13 +336,27 @@ try {
     throw new Error("clip analysis produced no feedback card: " + panel.slice(0, 300));
   }
   log("practice cam 3s clip recorded and analyzed to feedback");
+
+  // Reload before the still leg: feedback is component-local state and the
+  // panel offers no reset, so without this the clip's card pre-satisfies the
+  // still assertion and a no-op Snap & hint would pass (Codex's finding —
+  // the mirror of the ordering fix). The negotiated limits persist, so only
+  // the feedback state resets; assert the reset itself before reasserting.
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForTimeout(1200);
+  panel = await page.locator("body").innerText();
+  if (/not validated/.test(panel)) {
+    throw new Error("feedback card survived the reload — the still assertion would be vacuous");
+  }
+  await page.locator("button", { hasText: /^Start camera$/ }).filter({ visible: true }).first().click();
+  await page.waitForTimeout(1800);
   await page.locator("button", { hasText: /Snap & hint/ }).filter({ visible: true }).first().click();
   await page.waitForTimeout(2500);
   panel = await page.locator("body").innerText();
   if (!/not validated/.test(panel) || /could not|no readable/i.test(panel)) {
     throw new Error("practice-cam still produced no feedback card: " + panel.slice(0, 300));
   }
-  log("practice cam still produced heuristic feedback");
+  log("practice cam still produced heuristic feedback from a clean page");
   await shot(page, "10-academy-flows");
 
   // An uncaught exception or a failed same-origin request during the camera
