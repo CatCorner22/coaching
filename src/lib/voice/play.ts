@@ -15,6 +15,13 @@ const MAX_INFLIGHT_VOICES = 2;
 let cachedVoiceBytes = 0;
 let currentAudio: HTMLAudioElement | null = null;
 let playbackGeneration = 0;
+// Bumped only when the cache is erased. Distinct from playbackGeneration on
+// purpose: an in-flight load is shared by every caller of the same script,
+// and judging it by its CREATOR's playback generation meant the second of two
+// simultaneous auto-reads (the dual-mounted panels) invalidated the shared
+// response — the current caller then fell back to browser speech and the
+// fetched audio was thrown away uncached.
+let cacheEpoch = 0;
 
 export function stopCoachVoice() {
   playbackGeneration += 1;
@@ -30,6 +37,7 @@ export function stopCoachVoice() {
 }
 
 export function clearCoachVoiceCache() {
+  cacheEpoch += 1;
   stopCoachVoice();
   for (const entry of cache.values()) URL.revokeObjectURL(entry.url);
   cache.clear();
@@ -64,7 +72,7 @@ export async function playCoachVoice(
   const cacheKey = coachVoiceCacheKey(key);
   if (cloudEnabled) {
     try {
-      const cached = cache.get(cacheKey) ?? (await loadVoice(key, cacheKey, generation));
+      const cached = cache.get(cacheKey) ?? (await loadVoice(key, cacheKey));
       if (cached && generation === playbackGeneration) {
         // Refresh LRU order without duplicating the object URL.
         cache.delete(cacheKey);
@@ -94,18 +102,21 @@ export async function playCoachVoice(
   }
 }
 
-async function loadVoice(key: string, cacheKey: string, generation: number): Promise<CachedVoice | null> {
+async function loadVoice(key: string, cacheKey: string): Promise<CachedVoice | null> {
   const existing = inflight.get(cacheKey);
   if (existing) return existing;
   if (inflight.size >= MAX_INFLIGHT_VOICES) return null;
+  const epoch = cacheEpoch;
   const pending = (async () => {
     const response = await speakCoach({ data: { text: key } });
     if (!response.ok) return null;
     const bytes = base64Bytes(response.b64);
     if (!bytes.length || bytes.length > 1024 * 1024) return null;
-    // Stop, discard, cache erase, and a newer spoken line all advance this
-    // generation. Never let a late server response recreate cleared data.
-    if (generation !== playbackGeneration) return null;
+    // A cache erase mid-flight means this response must never recreate the
+    // cleared data. Whether anyone still wants it PLAYED is a separate
+    // question playCoachVoice answers with its own generation check after
+    // the await.
+    if (epoch !== cacheEpoch) return null;
     const audioBuffer = new ArrayBuffer(bytes.byteLength);
     new Uint8Array(audioBuffer).set(bytes);
     const entry = {

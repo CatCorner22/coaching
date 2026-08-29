@@ -697,7 +697,7 @@ test("tie page gates guided steps behind negotiated limits; auto-voice survives 
   // cleanup on the first re-render and stopped the voice mid-sentence with
   // no restart.
   const voice = read("src/components/learn/use-academy-voice.ts");
-  assert.match(voice, /\}, \[enabled, stepIndex, cloudVoice\]\);/);
+  assert.match(voice, /\}, \[enabled, narrationKey, cloudVoice\]\);/);
   assert.doesNotMatch(voice, /\}, \[enabled, input, cloudVoice\]\);/);
 
   // Stem x follows the same fraction-or-raw convention as the y axes: the
@@ -829,4 +829,27 @@ test("go-live hardening holds: preload, sw deadline, safe ids, pool guard, lesso
     /if \(busyEpochRef\.current === epoch\) setBusyState\(false\);/,
   );
   assert.match(read("src/lib/voice/play.ts"), /if \(generation !== playbackGeneration\) return;/);
+});
+
+test("review round: narration keys on lesson identity, shared voice loads survive, imports outstamp", () => {
+  const voice = read("src/components/learn/use-academy-voice.ts");
+  // Lesson navigation at the same step index must restart narration — the
+  // route component is reused, so a bare stepIndex key missed it.
+  assert.match(voice, /\}, \[enabled, narrationKey, cloudVoice\]\);/);
+  assert.match(voice, /`\$\{input\.stepIndex\}\/\$\{input\.totalSteps\}:\$\{input\.title\}`/);
+
+  // A shared in-flight voice load is judged by cache lifetime, not by its
+  // creator's playback generation — two simultaneous auto-reads no longer
+  // discard the response they share and fall back to browser speech.
+  const play = read("src/lib/voice/play.ts");
+  assert.match(play, /let cacheEpoch = 0;/);
+  assert.match(play, /if \(epoch !== cacheEpoch\) return null;/);
+  assert.match(play, /cacheEpoch \+= 1;\s*\n\s*stopCoachVoice\(\);/);
+  assert.doesNotMatch(play, /loadVoice\(key, cacheKey, generation\)/);
+
+  // Imported negotiation decisions carry import-time stamps so the write
+  // merger and a reload cannot silently reverse the import.
+  const sync = read("src/lib/app-sync.ts");
+  assert.match(sync, /nextNegotiationStamp\(existingStamps\)/);
+  assert.match(sync, /updatedAt: importStamp \+ index,/);
 });

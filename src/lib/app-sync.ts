@@ -1,4 +1,5 @@
 import { normalizeNegotiationItems, useNegotiate } from "@/lib/stores/negotiate";
+import { nextNegotiationStamp } from "@/lib/stores/persist";
 import { useChecklist } from "@/lib/stores/checklist";
 import { useSettings, type Settings } from "@/lib/stores/settings";
 
@@ -81,8 +82,19 @@ export function applyAppSyncBundle(bundle: AppSyncBundle): void {
 
   // Normalized, not raw: the same pass the store applies on rehydration, so a
   // file cannot show a locked-no row as yes even transiently, and malformed
-  // rows never reach the UI.
-  useNegotiate.setState({ items: normalizeNegotiationItems(bundle.negotiate) });
+  // rows never reach the UI. Restamped to the import operation, not the
+  // source device's clock: the write-time stamp merger resolves conflicts by
+  // stamp, so an imported approval carrying an older stamp displayed in
+  // memory while storage kept the stored rejection — and a reload silently
+  // reversed the import. The import is the user's newest decision here.
+  const existingStamps = useNegotiate.getState().items.map((item) => item.updatedAt);
+  const importStamp = nextNegotiationStamp(existingStamps);
+  useNegotiate.setState({
+    items: normalizeNegotiationItems(bundle.negotiate).map((item, index) => ({
+      ...item,
+      updatedAt: importStamp + index,
+    })),
+  });
 
   const done: Record<string, boolean> = {};
   for (const [key, value] of Object.entries(bundle.checklist)) {

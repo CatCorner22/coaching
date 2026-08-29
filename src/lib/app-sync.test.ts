@@ -101,3 +101,34 @@ test("imported checklist keeps only boolean entries and the round-trip is lossle
   assert.equal(useSettings.getState().riggerName, "Ryn");
   assert.equal(useSettings.getState().safeword, "carmine");
 });
+
+test("imported decisions are stamped as the import, so persistence cannot reverse them", async () => {
+  const { mergeNegotiationItemsByStamp } = await import("./stores/persist.ts");
+  // The write-time merger resolves by stamp. An imported approval carrying
+  // the source device's older stamp used to show in memory while storage
+  // kept the stored rejection — a reload then silently reversed the import.
+  useNegotiate.setState({
+    items: [{ id: "torso", label: "Chest / karada harnesses", rank: "no", updatedAt: 5_000_000 }],
+  });
+  const bundle = bundleWith({
+    negotiate: [{ id: "torso", label: "Chest / karada harnesses", rank: "yes", updatedAt: 1_000 }],
+  });
+  applyAppSyncBundle(bundle);
+  const imported = useNegotiate.getState().items;
+  assert.ok(
+    imported.every((item) => (item.updatedAt ?? 0) > 5_000_000),
+    "every imported row must outstamp the pre-import list",
+  );
+  // Simulate the write-time merge the storage layer applies: the freshly
+  // stamped import survives against the older stored rejection.
+  const merged = mergeNegotiationItemsByStamp(imported, [
+    { id: "torso", label: "Chest / karada harnesses", rank: "no", updatedAt: 5_000_000 },
+  ]) as Array<{ id: string; rank: string }>;
+  assert.equal(merged.find((item) => item.id === "torso")?.rank, "yes");
+  // Locked rows still cannot be imported open, fresh stamp or not.
+  const locked = bundleWith({
+    negotiate: [{ id: "neck", label: "Neck", rank: "yes", updatedAt: 9e12 }],
+  });
+  applyAppSyncBundle(locked);
+  assert.equal(useNegotiate.getState().items.find((item) => item.id === "neck")?.rank, "no");
+});

@@ -23,15 +23,21 @@ export function useAcademyAutoVoice(
   // speech: the step, the voice, and the toggle.
   const inputRef = useRef(input);
   inputRef.current = input;
-  const stepIndex = input ? input.stepIndex : -1;
+  // Content-derived, not object-derived: the /tie/$slug route component is
+  // reused across lessons, so navigating between two lessons parked on the
+  // same step index changes neither the mount nor a bare stepIndex — the old
+  // lesson's narration kept playing over the new page. Index, total, and
+  // title come from the authored catalog, so the key is stable across
+  // re-renders and distinct across lessons and steps.
+  const narrationKey = input ? `${input.stepIndex}/${input.totalSteps}:${input.title}` : null;
 
   useEffect(() => {
-    if (!enabled || stepIndex < 0) return;
+    if (!enabled || narrationKey === null) return;
     const current = inputRef.current;
     if (!current) return;
     void playCoachVoice(buildAcademyVoiceScript(current), cloudVoice, { reviewed: true });
     return () => stopCoachVoice();
-  }, [enabled, stepIndex, cloudVoice]);
+  }, [enabled, narrationKey, cloudVoice]);
 }
 
 export function readAcademyStep(input: VoiceStepInput, cloudVoice: boolean) {
