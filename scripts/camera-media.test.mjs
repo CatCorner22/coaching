@@ -1198,8 +1198,12 @@ test("the capture surface honours digital zoom, resets it for clips, and scopes 
     /closest\(\s*\n?\s*"button, a, input, textarea, select, summary, label, \[role='button'\], \[role='slider'\], \[contenteditable\]",?\s*\n?\s*\)/,
   );
   // Modifier chords keep their browser meaning: Ctrl/Cmd+R used to swallow
-  // the refresh and start a recording instead.
-  assert.match(capture, /event\.ctrlKey \|\| event\.metaKey \|\| event\.altKey/);
+  // the refresh and start a recording, and Shift+Space fired a burst instead
+  // of scrolling the page up.
+  assert.match(
+    capture,
+    /event\.ctrlKey \|\| event\.metaKey \|\| event\.altKey \|\| \(event\.shiftKey && event\.code === "Space"\)/,
+  );
 });
 
 test("digitalZoomCrop edge semantics stay total and centred", () => {

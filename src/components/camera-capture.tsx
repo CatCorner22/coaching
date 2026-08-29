@@ -1005,9 +1005,11 @@ export const CameraCapture = memo(function CameraCapture({
         return;
       }
       // A held modifier means the key is a browser or OS chord, not this
-      // panel's shortcut — Ctrl/Cmd+R is a page refresh, and swallowing it
-      // to start a recording hijacks a navigation the user asked for.
-      if (event.ctrlKey || event.metaKey || event.altKey) {
+      // panel's shortcut — Ctrl/Cmd+R is a page refresh, and Shift+Space
+      // scrolls the page up; swallowing either hijacks a navigation the user
+      // asked for. Shift+R still records: the handler always accepted the
+      // uppercase form, and shifted R has no browser meaning to preserve.
+      if (event.ctrlKey || event.metaKey || event.altKey || (event.shiftKey && event.code === "Space")) {
         return;
       }
       if (event.code === "Space") {
