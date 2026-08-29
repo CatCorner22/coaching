@@ -45,7 +45,7 @@ await page.addInitScript(() => {
   const paint = () => {
     t += 1;
     g.fillStyle = "#d8d2c8"; g.fillRect(0, 0, canvas.width, canvas.height);
-    g.fillStyle = "#7a5230";
+    g.fillStyle = window.__syntheticBand ?? "#7a5230";
     for (let i = 0; i < 4; i++) {
       const y = 260 + i * 110 + Math.sin(t / 40) * 6;
       g.fillRect(140, y, canvas.width - 280, 46);
@@ -61,6 +61,18 @@ await page.addInitScript(() => {
   const md = navigator.mediaDevices;
   md.getUserMedia = async (constraints) => {
     if (!constraints || !constraints.video) throw Object.assign(new Error("no video requested"), { name: "NotFoundError" });
+    // Record the facing the app actually requested so the flip leg can assert
+    // the request (not just the UI), and tint the bands per facing so the
+    // stream itself is distinguishable.
+    const video = constraints.video;
+    const facing =
+      video && typeof video === "object"
+        ? typeof video.facingMode === "string"
+          ? video.facingMode
+          : video.facingMode && video.facingMode.ideal
+        : undefined;
+    window.__syntheticFacing = facing ?? "any";
+    window.__syntheticBand = facing === "user" ? "#30527a" : "#7a5230";
     return fakeStream();
   };
   md.enumerateDevices = async () => [{ deviceId: "synthetic", groupId: "synthetic", kind: "videoinput", label: "Synthetic rope cam", toJSON() { return this; } }];
@@ -163,6 +175,60 @@ try {
   log("live preview streaming at", dims.w + "x" + dims.h);
   await shot(page, "05-live");
 
+  // Torch: the synthetic track exposes no torch capability, so the torch
+  // control must not render — offering a control the device cannot honour is
+  // the failure mode torchAvailable() exists to prevent.
+  const torchButtons = await page.locator('[aria-label="Torch"]').count();
+  if (torchButtons !== 0) throw new Error("torch control rendered for a stream without the capability");
+  log("torch control absent for a capability-less stream");
+
+  // Flip: the app must REQUEST the flipped facing (asserted at the
+  // getUserMedia boundary, not just in the UI) and mirror the selfie preview.
+  await page.locator('[aria-label="Flip camera"]').click();
+  await page.waitForTimeout(1500);
+  const flippedFacing = await page.evaluate(() => window.__syntheticFacing);
+  if (flippedFacing !== "user") throw new Error(`flip requested facing ${flippedFacing}, expected user`);
+  const mirrored = await page.evaluate(() => {
+    const video = document.querySelector("video");
+    return video ? video.style.transform : "";
+  });
+  if (!/scaleX\(-1\)/.test(mirrored)) throw new Error("selfie preview is not mirrored after flip");
+  await page.locator('[aria-label="Flip camera"]').click();
+  await page.waitForTimeout(1500);
+  const restoredFacing = await page.evaluate(() => window.__syntheticFacing);
+  if (restoredFacing !== "environment") throw new Error(`flip back requested ${restoredFacing}`);
+  log("flip requests the flipped facing and mirrors the selfie preview");
+
+  // Clip auto-stop: recording must end ON ITS OWN at the 7s budget — nobody
+  // taps Stop. The indicator appears, then clears without interaction, and
+  // the record control returns to its idle label with no error.
+  await page.locator("button", { hasText: /^Record 7s$/ }).click();
+  const recIndicator = page.locator('[aria-label="Recording in progress"]');
+  await recIndicator.waitFor({ state: "visible", timeout: 5000 });
+  const recordingStartedAt = Date.now();
+  log("recording started; waiting for the 7s auto-stop with no interaction");
+  await recIndicator.waitFor({ state: "hidden", timeout: 12000 });
+  // Bounded from BELOW too: an auto-stop firing at one second is a broken
+  // recording contract that "indicator eventually hides" cannot see.
+  const recordedForMs = Date.now() - recordingStartedAt;
+  if (recordedForMs < 6000) {
+    throw new Error(`clip auto-stopped after ${recordedForMs}ms — the budget is 7s`);
+  }
+  // Positive finalization artifact, not just an error blocklist: the healthy
+  // path pre-selects the best stills from the clip. Waiting on it also spans
+  // the frame-extraction latency the old fixed 2.5s sample raced.
+  await page
+    .locator("text=Best three stills pre-selected from the clip")
+    .first()
+    .waitFor({ state: "visible", timeout: 15000 });
+  const afterAutoStop = await page.locator("body").innerText();
+  if (/Stop clip/.test(afterAutoStop)) throw new Error("recording did not auto-stop at the clip budget");
+  if (/video is empty|recorder did not finish|recording failed|could not|no readable|too large/i.test(afterAutoStop)) {
+    throw new Error("clip finalization surfaced an error: " + afterAutoStop.slice(0, 300));
+  }
+  log("7s clip auto-stopped and finalized to pre-selected stills");
+  await shot(page, "06b-clip-autostop");
+
   // The still control is "Burst stills" since the five-shot burst landed; it
   // was "Capture still" before. Match either so this harness keeps working
   // across that rename rather than failing on a label change.
@@ -248,6 +314,50 @@ try {
   if (!openAfter) {
     throw new Error("academy practice cam stayed blocked after the photos limit was agreed");
   }
+
+  // Drive the unlocked practice cam end to end. The CLIP goes first, so its
+  // feedback is the first feedback card the page ever shows — with the still
+  // first, its leftover card pre-satisfied the clip assertion and the clip
+  // leg could not fail (the adversarial audit's finding: deleting the
+  // duration hint still passed). Both lesson layouts mount the coach panel;
+  // drive the visible instance.
+  await page.locator("button", { hasText: /^Start camera$/ }).filter({ visible: true }).first().click();
+  await page.waitForTimeout(1800);
+  await page.locator("button", { hasText: /^Record 3s$/ }).filter({ visible: true }).first().click();
+  await page.waitForTimeout(4500);
+  await page.locator("button", { hasText: /^Analyze clip$/ }).filter({ visible: true }).first().waitFor({ state: "visible", timeout: 8000 });
+  await page.locator("button", { hasText: /^Analyze clip$/ }).filter({ visible: true }).first().click();
+  await page.waitForTimeout(3500);
+  let panel = await page.locator("body").innerText();
+  if (/could not|no readable|no frames|resolution is too large|has no readable/i.test(panel)) {
+    throw new Error("clip analysis failed: " + panel.slice(0, 300));
+  }
+  if (!/not validated/.test(panel)) {
+    throw new Error("clip analysis produced no feedback card: " + panel.slice(0, 300));
+  }
+  log("practice cam 3s clip recorded and analyzed to feedback");
+
+  // Reload before the still leg: feedback is component-local state and the
+  // panel offers no reset, so without this the clip's card pre-satisfies the
+  // still assertion and a no-op Snap & hint would pass (Codex's finding —
+  // the mirror of the ordering fix). The negotiated limits persist, so only
+  // the feedback state resets; assert the reset itself before reasserting.
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForTimeout(1200);
+  panel = await page.locator("body").innerText();
+  if (/not validated/.test(panel)) {
+    throw new Error("feedback card survived the reload — the still assertion would be vacuous");
+  }
+  await page.locator("button", { hasText: /^Start camera$/ }).filter({ visible: true }).first().click();
+  await page.waitForTimeout(1800);
+  await page.locator("button", { hasText: /Snap & hint/ }).filter({ visible: true }).first().click();
+  await page.waitForTimeout(2500);
+  panel = await page.locator("body").innerText();
+  if (!/not validated/.test(panel) || /could not|no readable/i.test(panel)) {
+    throw new Error("practice-cam still produced no feedback card: " + panel.slice(0, 300));
+  }
+  log("practice cam still produced heuristic feedback from a clean page");
+  await shot(page, "10-academy-flows");
 
   // An uncaught exception or a failed same-origin request during the camera
   // flow is a regression, and printing it after PASS (as this did) hides it.
