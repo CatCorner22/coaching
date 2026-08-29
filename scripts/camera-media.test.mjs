@@ -6,10 +6,10 @@ import {
   MAX_VIDEO_BYTES,
   dataUrlSize,
   extractVideoFrames,
+  digitalZoomCrop,
   processMediaFrame,
   validateMediaFile,
   validateMediaSignature,
-  softwareCropRect,
 } from "../src/lib/media.ts";
 import {
   applyFocus,
@@ -23,6 +23,7 @@ import {
   setTorch,
   startClip,
   torchAvailable,
+  waitForNextVideoFrame,
   zoomRange,
 } from "../src/lib/camera/stream.ts";
 
@@ -613,6 +614,28 @@ test("applyZoom clamps and applies when a track advertises zoom", async () => {
   assert.equal(applied[0].advanced[0].zoom, 3);
 });
 
+test("applyZoom returns false when constraints fail", async () => {
+  const stream = {
+    getVideoTracks: () => [
+      {
+        getCapabilities: () => ({ zoom: { min: 1, max: 3, step: 0.5 } }),
+        applyConstraints: () => Promise.reject(new Error("constraint failed")),
+      },
+    ],
+  };
+  assert.equal(await applyZoom(stream, 2), false);
+});
+
+test("digitalZoomCrop is a no-op at 1x and centre-crops above", () => {
+  assert.equal(digitalZoomCrop(1000, 800, 1), undefined);
+  assert.deepEqual(digitalZoomCrop(1000, 800, 2), { sx: 250, sy: 200, sw: 500, sh: 400 });
+  assert.equal(digitalZoomCrop(0, 800, 2), undefined);
+});
+
+test("waitForNextVideoFrame settles even without video frame callbacks", async () => {
+  await waitForNextVideoFrame(/** @type {HTMLVideoElement} */ ({}), 30);
+});
+
 test("torch capability races fail closed instead of throwing", () => {
   assert.equal(
     torchAvailable({ getVideoTracks: () => [{ getCapabilities: () => { throw new DOMException("ended", "InvalidStateError"); } }] }),
@@ -1144,52 +1167,45 @@ function installFakeVideoDom({ duration, silentLoad = false, onSeek = undefined 
   };
 }
 
-test("softwareCropRect crops to the centered 1/zoom region the preview showed", () => {
-  // Software zoom scales only the preview element, so a capture that draws
-  // the full frame includes everything the user framed out. The crop rect is
-  // the contract that stills match the preview; pin its math.
-  assert.deepEqual(softwareCropRect(1280, 960, 2), { sx: 320, sy: 240, sw: 640, sh: 480 });
-  // Non-integer zoom rounds, stays centered within a pixel.
-  const r = softwareCropRect(1920, 1080, 2.4);
-  assert.equal(r.sw, 800);
-  assert.equal(r.sh, 450);
-  assert.equal(r.sx, Math.floor((1920 - 800) / 2));
-  assert.equal(r.sy, Math.floor((1080 - 450) / 2));
-  // zoom <= 1, NaN, and Infinity are identity — never an enlargement or crash.
-  assert.deepEqual(softwareCropRect(640, 480, 1), { sx: 0, sy: 0, sw: 640, sh: 480 });
-  assert.deepEqual(softwareCropRect(640, 480, 0.5), { sx: 0, sy: 0, sw: 640, sh: 480 });
-  assert.deepEqual(softwareCropRect(640, 480, NaN), { sx: 0, sy: 0, sw: 640, sh: 480 });
-  // Extreme zoom bottoms out at one pixel, not zero.
-  const tiny = softwareCropRect(640, 480, 10_000);
-  assert.equal(tiny.sw, 1);
-  assert.equal(tiny.sh, 1);
-});
-
-test("the capture surface honours software zoom, resets it for clips, and scopes shortcuts", () => {
+test("the capture surface honours digital zoom, resets it for clips, and scopes shortcuts", () => {
   const capture = readFileSync(new URL("../src/components/camera-capture.tsx", import.meta.url), "utf8");
 
-  // Burst stills pass the software-zoom crop into processMediaFrame. Without
-  // this a 2.4x "zoomed" capture transmitted the full wide scene.
-  assert.match(capture, /softwareZoom = !zoomCaps && zoom > 1 \? zoom : undefined/);
-  assert.match(capture, /processMediaFrame\(v, 1600, 240, 0\.82, null, softwareZoom\)/);
+  // Burst stills pass the digital-zoom crop into processMediaFrame. Without
+  // this a 2.4x "zoomed" capture transmitted the full wide scene — everything
+  // the user had deliberately framed out.
+  assert.match(capture, /digitalZoom = zoomCapsRef\.current \? 1 : Math\.max\(1, zoomRef\.current\)/);
+  assert.match(capture, /processMediaFrame\(v, 1600, 240, 0\.82, null, digitalZoom\)/);
 
   // A clip records the raw stream; recording under a CSS-only zoom is the
   // same lie in video form. The record path resets to 1x and says why.
-  assert.match(capture, /if \(!zoomCaps && zoom > 1\) \{\s*\n\s*setZoom\(1\);/);
+  assert.match(capture, /setZoom\(1\);/);
   assert.match(capture, /clip records the camera's full frame, so zoom was reset/);
 
-  // The 3s timer waits real seconds and cannot leave a stuck countdown: the
-  // overlay clears in a finally, and a flip/close mid-count aborts via the
-  // camera-request token instead of snapping from the wrong camera.
+  // The 3s timer waits real seconds per displayed count — 450ms per step
+  // fired after ~1.35s — and a dead stream (plain Close does not bump the
+  // camera request) aborts the count.
   assert.match(capture, /setTimeout\(resolve, 1000\)/);
   assert.doesNotMatch(capture, /setTimeout\(resolve, 450\)/);
-  assert.match(capture, /const request = cameraRequestRef\.current;\s*\n\s*try \{/);
-  assert.match(capture, /\} finally \{\s*\n\s*if \(mountedRef\.current\) setCountdown\(null\);/);
+  assert.match(capture, /request !== cameraRequestRef\.current \|\|\s*\n\s*!streamRef\.current/);
 
-  // Space/R fire only from non-interactive targets. On a focused control the
-  // key keeps its normal meaning instead of consuming the one-use batch.
+  // Space/R fire only from non-interactive targets, one bail for both keys.
+  // Space on a focused Close used to fire a burst and consume the one-use
+  // batch; R from a focused link started a recording.
   assert.match(
     capture,
-    /closest\("button, a, input, textarea, select, \[role='slider'\], \[contenteditable\]"\)/,
+    /closest\(\s*\n?\s*"button, a, input, textarea, select, label, \[role='button'\], \[role='slider'\], \[contenteditable\]",?\s*\n?\s*\)/,
   );
+});
+
+test("digitalZoomCrop edge semantics stay total and centred", () => {
+  // Ported from the softwareCropRect suite this replaced in the merge: the
+  // helper must be total over junk zoom values and bottom out at one pixel.
+  assert.equal(digitalZoomCrop(640, 480, NaN), undefined);
+  assert.equal(digitalZoomCrop(640, 480, 0.5), undefined);
+  const tiny = digitalZoomCrop(640, 480, 10_000);
+  assert.ok(tiny && tiny.sw >= 1 && tiny.sh >= 1);
+  const r = digitalZoomCrop(1920, 1080, 2.4);
+  assert.ok(r);
+  assert.ok(Math.abs(r.sx * 2 + r.sw - 1920) < 1e-6, "horizontally centred");
+  assert.ok(Math.abs(r.sy * 2 + r.sh - 1080) < 1e-6, "vertically centred");
 });

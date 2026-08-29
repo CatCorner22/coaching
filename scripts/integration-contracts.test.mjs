@@ -90,6 +90,29 @@ test("route registration and the preview bridge keep heavy knowledge and schema 
   assert.match(bridge, /parsePreviewHostMessage\(event\.data\)/);
 });
 
+test("studio burst waits for distinct frames, matches digital zoom, and does not double-fire Space", () => {
+  const camera = read("src/components/camera-capture.tsx");
+  assert.match(camera, /waitForNextVideoFrame\(v\)/);
+  assert.match(camera, /processMediaFrame\(v, 1600, 240, 0\.82, null, digitalZoom\)/);
+  const timer = between(camera, "async function snapWithOptionalTimer()", "async function changeZoom");
+  assert.match(timer, /request !== cameraRequestRef\.current/);
+  assert.match(timer, /setBusyState\(true\)/);
+  const zoom = between(camera, "async function changeZoom", "snapWithOptionalTimerRef.current");
+  assert.match(zoom, /await applyZoom\(stream, next\)/);
+  assert.match(zoom, /if \(!ok\)/);
+  assert.match(
+    camera,
+    /window\.addEventListener\("keydown", onKey\);[\s\S]*?\}, \[live, disabled\]\);/,
+  );
+  // Merged form of the two parallel scoping fixes (#32's Space-only button
+  // check, #33's multi-target bail): one bail covers Space AND R, over the
+  // union of interactive targets. Pin the union so neither half regresses.
+  assert.match(
+    camera,
+    /closest\(\s*\n?\s*"button, a, input, textarea, select, label, \[role='button'\], \[role='slider'\], \[contenteditable\]",?\s*\n?\s*\)/,
+  );
+});
+
 test("a cancelled photo import cannot commit after its decoder resolves", () => {
   const camera = read("src/components/camera-capture.tsx");
   const photoImport = between(
@@ -514,6 +537,13 @@ test("the emergency card stays offered when the account boundary blocks the app"
   assert.doesNotMatch(status, /<Link/);
 });
 
+test("camera preflight waits for Step inside, not the account-boundary main", () => {
+  const smoke = read("scripts/camera-preflight-smoke.mjs");
+  assert.doesNotMatch(smoke, /page\.locator\("main"\)\.waitFor/);
+  assert.match(smoke, /Open live camera/);
+  assert.match(smoke, /account-boundary gate also renders a <main>/);
+});
+
 test("the elapsed direct-check reminder is announced, not just drawn", () => {
   const studio = read("src/routes/studio.tsx");
   assert.match(studio, /function CirculationBanner[\s\S]*<div role="status" aria-live="polite">/);
@@ -590,6 +620,7 @@ test("the tie-page practice cam stays local and waits for the photos limit", () 
   // The gate must be the negotiated limit, not the front-door checkbox.
   assert.doesNotMatch(observe, /cameraAllowed = hydrated && (?:studioConsented|s\.consented)/);
   assert.match(observe, /Continue in Studio/);
+  assert.match(observe, /startCamera\(facing === "environment" \? "user" : "environment"\)/);
 
   const studio = read("src/routes/studio.tsx");
   // Plain "yellow" stays armed even when a custom yellow word is set.

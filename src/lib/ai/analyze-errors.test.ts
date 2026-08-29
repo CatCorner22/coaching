@@ -39,6 +39,18 @@ test("fallback copy exists when the server sent no sentence", () => {
     analyzeErrorMessage({ ...base, error: "", code: "MEDIA_BATCH_REPLAYED", status: 409 }),
     /already analyzed/i,
   );
+  assert.match(
+    analyzeErrorMessage({
+      ok: false,
+      error:
+        "No media was sent to xAI. The service is not available in this environment; retry after the deployment is configured.",
+      code: "AI_PROVIDER_UNAVAILABLE",
+      status: 503,
+      providerAttempted: false,
+      retryableBeforeProvider: true,
+    }),
+    /No media was sent to xAI/,
+  );
 });
 
 test("an unverified ZDR response never claims nothing was sent or invites a re-tap", () => {

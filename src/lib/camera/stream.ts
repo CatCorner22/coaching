@@ -390,6 +390,33 @@ export const CLIP_DURATION_MS = 7_000;
 export const BURST_FRAME_COUNT = 5;
 export const BURST_KEEP = 3;
 
+/**
+ * Wait for a newly presented video frame so a burst does not encode the same
+ * pixels five times. Times out so a static or synthetic stream cannot hang.
+ */
+export function waitForNextVideoFrame(video: HTMLVideoElement, timeoutMs = 180): Promise<void> {
+  const budget = Number.isFinite(timeoutMs) ? Math.max(16, Math.min(1_000, timeoutMs)) : 180;
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const withRvfc = video as HTMLVideoElement & {
+      requestVideoFrameCallback?: (cb: () => void) => number;
+    };
+    if (typeof withRvfc.requestVideoFrameCallback === "function") {
+      withRvfc.requestVideoFrameCallback(() => finish());
+    } else if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => finish());
+      });
+    }
+    globalThis.setTimeout(finish, budget);
+  });
+}
+
 export function startClip(stream: MediaStream): ClipHandle {
   if (typeof MediaRecorder === "undefined") {
     throw new Error("Video recording is not supported in this browser. Choose a video instead.");
