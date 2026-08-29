@@ -20,7 +20,7 @@ test("cloud voice is fail-closed and route controls pass the saved opt-in", () =
   for (const path of ["src/routes/tie.$slug.tsx", "src/routes/knot.$slug.tsx"]) {
     const route = read(path);
     assert.match(route, /useSettings\(\(settings\) => settings\.voice\)/, path);
-    assert.match(route, /playCoachVoice\([^\n]+, cloudVoice\)/, path);
+    assert.match(route, /playCoachVoice\([^\n]+, cloudVoice, \{ reviewed: true \}\)/, path);
     assert.match(route, /coachVoiceLabel\(cloudVoice\)/, path);
   }
 
@@ -692,4 +692,63 @@ test("tie page gates guided steps behind negotiated limits; auto-voice survives 
   // figure's far-left edge.
   const figure = read("src/components/rope-figure.tsx");
   assert.match(figure, /rawX < 2 \? rawX \* \(floor \? 400 : 200\) : rawX/);
+});
+
+test("hard-no lines share one bound end to end; the stop banner names every reason", () => {
+  const studio = read("src/routes/studio.tsx");
+  const analyze = read("src/lib/ai/analyze.ts");
+  // One constant governs the client's construction, the schema's admission,
+  // and the server's sanitize pass. The old 80/24 pair rejected the client's
+  // own "<uuid>: <label>" lines (stranding one-use batches) and silently
+  // dropped entries past 24 of a possible 64.
+  assert.match(studio, /`\$\{item\.id\}: \$\{item\.label\}`\.slice\(0, MAX_HARD_NO_LENGTH\)/);
+  assert.match(analyze, /z\.array\(z\.string\(\)\.max\(MAX_HARD_NO_LENGTH\)\)\.max\(MAX_HARD_NOS\)/);
+  assert.match(analyze, /sanitizeQuestion\(value, MAX_HARD_NO_LENGTH\)/);
+  assert.match(analyze, /\.slice\(0, MAX_HARD_NOS\)/);
+  assert.doesNotMatch(analyze, /\.slice\(0, 24\)/);
+
+  // A triage, observation, or check-in stop must not read "Stopped manually"
+  // at exactly the moment the reason matters.
+  for (const reason of ["observation", "medical-emergency", "medical", "checkin-concern", "consent"]) {
+    assert.match(studio, new RegExp(`stopReason === "${reason}"`), `banner must map ${reason}`);
+  }
+});
+
+test("the banned-output scrub guards model text, not reviewed catalog narration", () => {
+  // Authored safety copy legitimately names dangers to warn against them
+  // ("never let it run away into a noose", the neck-lock notices). The scrub
+  // swapped those lines for the generic refusal paragraph, spoken aloud
+  // mid-lesson. Reviewed provenance is declared at the call site; the
+  // server's exact-string allowlist stays the control for cloud TTS.
+  const play = read("src/lib/voice/play.ts");
+  assert.match(play, /options\?: \{ reviewed\?: boolean \}/);
+  assert.match(play, /const key = !reviewed && textIsBanned\(text\) \? scrubBannedAnswer\(text\) : text\.trim\(\);/);
+
+  // Catalog narration call sites declare provenance; the model-report paths
+  // (coach panel, studio report speak) deliberately do not.
+  const voiceHook = read("src/components/learn/use-academy-voice.ts");
+  assert.equal((voiceHook.match(/\{ reviewed: true \}/g) ?? []).length, 3);
+  assert.match(read("src/routes/tie.$slug.tsx"), /playCoachVoice\(s\.speak, cloudVoice, \{ reviewed: true \}\)/);
+  assert.match(read("src/routes/knot.$slug.tsx"), /playCoachVoice\(s\.speak, cloudVoice, \{ reviewed: true \}\)/);
+  const coachPanel = read("src/components/coach-panel.tsx");
+  assert.doesNotMatch(coachPanel, /reviewed: true/);
+  const studio = read("src/routes/studio.tsx");
+  assert.doesNotMatch(studio, /playCoachVoice\(res\.report\.final\.speak, true, \{ reviewed: true \}\)/);
+
+  // Server side: the allowlist is the sole gate — no scrub ahead of it that
+  // could mangle a reviewed line out of the set — and the input slice admits
+  // the longest composed narration.
+  const voiceFn = read("src/lib/ai/voice.ts");
+  assert.doesNotMatch(voiceFn, /scrubBannedAnswer/);
+  assert.match(voiceFn, /\.slice\(0, MAX_REVIEWED_SPEECH_LENGTH\)/);
+  assert.match(voiceFn, /isReviewedCoachSpeech/);
+
+  // The lesson pages and the allowlist compose narration through the same
+  // builders, so they cannot drift apart.
+  const reviewed = read("src/lib/voice/reviewed.server.ts");
+  for (const builder of ["tieStepVoiceInput", "knotStepVoiceInput", "buildAcademyVoiceScript", "buildAcademyVoiceSegments"]) {
+    assert.match(reviewed, new RegExp(builder), `allowlist must use ${builder}`);
+  }
+  assert.match(read("src/routes/tie.$slug.tsx"), /tieStepVoiceInput\(s, step, tie\.steps\.length\)/);
+  assert.match(read("src/routes/knot.$slug.tsx"), /knotStepVoiceInput\(s, step, knot\.steps\.length\)/);
 });

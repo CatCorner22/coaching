@@ -40,9 +40,24 @@ export function clearCoachVoiceCache() {
  * Speak reviewed text. Cloud TTS is fail-closed and must be opted into by the
  * caller for this invocation; otherwise only the browser speech API is
  * considered.
+ *
+ * `reviewed` is a provenance declaration by the call site: the text is
+ * app-authored catalog copy, already rendered on the page as text. The
+ * banned-output scrub exists to guard model-composed lines, and it cannot
+ * tell provenance on its own — applied to authored copy it swapped safety
+ * warnings that legitimately name the dangers they forbid ("never let it run
+ * away into a noose", the neck-lock scope notices) for the generic refusal
+ * paragraph, spoken aloud mid-lesson as an alarming non-sequitur. The
+ * server's exact-string allowlist remains the control for cloud TTS either
+ * way; browser speech only ever reads out what the page already displays.
  */
-export async function playCoachVoice(text: string, cloudEnabled = false) {
-  const key = textIsBanned(text) ? scrubBannedAnswer(text) : text.trim();
+export async function playCoachVoice(
+  text: string,
+  cloudEnabled = false,
+  options?: { reviewed?: boolean },
+) {
+  const reviewed = options?.reviewed === true;
+  const key = !reviewed && textIsBanned(text) ? scrubBannedAnswer(text) : text.trim();
   if (!key) return;
   stopCoachVoice();
   const generation = playbackGeneration;

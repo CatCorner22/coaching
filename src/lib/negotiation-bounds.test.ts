@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { MAX_HARD_NOS, MAX_NEGOTIATION_ITEMS } from "./negotiation-bounds.ts";
+import { MAX_HARD_NO_LENGTH, MAX_HARD_NOS, MAX_NEGOTIATION_ITEMS } from "./negotiation-bounds.ts";
 import { normalizeNegotiationItems } from "./stores/negotiate.ts";
 import { buildStudioNegotiationPolicy } from "./studio/negotiation.ts";
 
@@ -66,5 +66,20 @@ test("the hard-no list is never silently shortened", () => {
     operationalLimits.map((item) => item.id),
     expected.map((item) => item.id),
     "the unapproved set must be reported in full",
+  );
+});
+
+test("every constructible hard-no line fits the shared per-element bound", () => {
+  // Studio sends `"<id>: <label>"`. A custom row's id is a 36-char UUID and
+  // labels clamp to 80, so the longest legitimate line is 118 — the old
+  // per-element cap of 80 was shorter than the client's own construction, so
+  // one long custom label made every analyze request fail validation and
+  // stranded the one-use batch as "already submitted".
+  const uuid = "0123456789abcdef0123456789abcdef0123".slice(0, 36);
+  const label = "x".repeat(80);
+  const line = `${uuid}: ${label}`;
+  assert.ok(
+    line.length <= MAX_HARD_NO_LENGTH,
+    `longest constructible line (${line.length}) must fit MAX_HARD_NO_LENGTH (${MAX_HARD_NO_LENGTH})`,
   );
 });

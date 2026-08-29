@@ -76,6 +76,64 @@ export function buildAcademyVoiceScript(input: VoiceStepInput): string {
     .join(" ");
 }
 
+/**
+ * The exact voice inputs the tie and knot pages build, extracted so the
+ * server's reviewed-speech allowlist can compose the identical narration.
+ * If a page maps its step fields itself and drifts by one word, every cloud
+ * request for that step fails the allowlist and silently falls back to
+ * browser speech under a "· cloud" label.
+ */
+export function tieStepVoiceInput(
+  step: {
+    title: string;
+    goal?: string;
+    rigger: string;
+    check: string;
+    riggerBullets?: string[];
+    checkBullets?: string[];
+    speak: string;
+  },
+  stepIndex: number,
+  totalSteps: number,
+): VoiceStepInput {
+  return {
+    stepIndex,
+    totalSteps,
+    title: step.title,
+    stepGoal: step.goal,
+    doText: step.rigger,
+    checkText: step.check,
+    doBullets: step.riggerBullets,
+    checkBullets: step.checkBullets,
+    speak: step.speak,
+  };
+}
+
+export function knotStepVoiceInput(
+  step: {
+    title: string;
+    do?: string;
+    body: string;
+    check?: string;
+    doBullets?: string[];
+    checkBullets?: string[];
+    speak: string;
+  },
+  stepIndex: number,
+  totalSteps: number,
+): VoiceStepInput {
+  return {
+    stepIndex,
+    totalSteps,
+    title: step.title,
+    doText: step.do ?? step.body,
+    checkText: step.check ?? "It looks like the diagram.",
+    doBullets: step.doBullets,
+    checkBullets: step.checkBullets,
+    speak: step.speak,
+  };
+}
+
 export function buildAcademyIntroScript(lessonName: string, goal?: string): string {
   return [
     `Knotty Academy. ${lessonName}.`,

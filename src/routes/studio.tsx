@@ -22,6 +22,7 @@ import {
   buildStudioNegotiationPolicy,
   studioPolicySignature,
 } from "@/lib/studio/negotiation";
+import { MAX_HARD_NO_LENGTH } from "@/lib/negotiation-bounds";
 import { listenForWords } from "@/lib/voice/listen";
 import { playCoachVoice, stopCoachVoice } from "@/lib/voice/play";
 import { DIRECT_CHECK_REMINDER } from "@/lib/voice/reviewed-lines";
@@ -402,7 +403,9 @@ function StudioPage() {
           tieSlug,
           stepIndex,
           elapsedSec: sessionSnapshot.elapsed,
-          hardNos: operationalLimits.map((item) => `${item.id}: ${item.label}`),
+          hardNos: operationalLimits.map((item) =>
+            `${item.id}: ${item.label}`.slice(0, MAX_HARD_NO_LENGTH),
+          ),
           triage,
           media: {
             mode: capture.kind === "video" ? "selected_video_stills" : "static_photos",
@@ -548,9 +551,15 @@ function StudioPage() {
             <p className="mt-1 text-xs uppercase tracking-wide text-muted">
               {stopReason === "safeword"
                 ? "Safeword heard"
-                : stopReason === "coach"
+                : stopReason === "coach" || stopReason === "observation"
                   ? "Stopped by an observation flag"
-                  : "Stopped manually"}
+                  : stopReason === "medical-emergency" || stopReason === "medical"
+                    ? "Stopped for a medical concern"
+                    : stopReason === "checkin-concern"
+                      ? "Stopped at a check-in concern"
+                      : stopReason === "consent"
+                        ? "Stopped at the consent triage"
+                        : "Stopped manually"}
             </p>
           )}
           <p className="mt-1 text-sm text-fg">
@@ -931,7 +940,7 @@ function CirculationBanner({
   useEffect(() => {
     if (due && voice && !micArmed && !stopped && !nagged.current) {
       nagged.current = true;
-      void playCoachVoice(DIRECT_CHECK_REMINDER, voice);
+      void playCoachVoice(DIRECT_CHECK_REMINDER, voice, { reviewed: true });
     }
     if (!due) nagged.current = false;
   }, [due, voice, micArmed, stopped]);

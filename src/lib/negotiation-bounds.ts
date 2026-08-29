@@ -29,3 +29,14 @@ export const MAX_NEGOTIATION_ITEMS = 64;
  * being at no — which is exactly what a fresh install looks like.
  */
 export const MAX_HARD_NOS = MAX_NEGOTIATION_ITEMS;
+
+/**
+ * Ceiling on one hard-no line, shared by the client that builds
+ * `"<id>: <label>"` and the server schema that admits it. A custom row's id is
+ * a 36-char UUID and labels clamp to 80, so the longest legitimate line is
+ * 36 + 2 + 80 = 118. The old per-element cap of 80 was shorter than the
+ * client's own construction, so a long custom label made every analyze
+ * request fail validation — stranding the one-use batch as "already
+ * submitted" with nothing sent.
+ */
+export const MAX_HARD_NO_LENGTH = 120;

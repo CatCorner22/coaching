@@ -29,18 +29,18 @@ export function useAcademyAutoVoice(
     if (!enabled || stepIndex < 0) return;
     const current = inputRef.current;
     if (!current) return;
-    void playCoachVoice(buildAcademyVoiceScript(current), cloudVoice);
+    void playCoachVoice(buildAcademyVoiceScript(current), cloudVoice, { reviewed: true });
     return () => stopCoachVoice();
   }, [enabled, stepIndex, cloudVoice]);
 }
 
 export function readAcademyStep(input: VoiceStepInput, cloudVoice: boolean) {
-  return playCoachVoice(buildAcademyVoiceScript(input), cloudVoice);
+  return playCoachVoice(buildAcademyVoiceScript(input), cloudVoice, { reviewed: true });
 }
 
 /** Read one section of the step — the check on its own, for instance. */
 export function readAcademySegment(segment: VoiceSegment, cloudVoice: boolean) {
-  return playCoachVoice(segment.text, cloudVoice);
+  return playCoachVoice(segment.text, cloudVoice, { reviewed: true });
 }
 
 export function academyStepSegments(input: VoiceStepInput): VoiceSegment[] {

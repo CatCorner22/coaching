@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getTie } from "@/lib/kb";
 import { mediaUploadScope } from "@/lib/media-scope";
-import { MAX_HARD_NOS } from "@/lib/negotiation-bounds";
+import { MAX_HARD_NO_LENGTH, MAX_HARD_NOS } from "@/lib/negotiation-bounds";
 import { authMiddleware } from "@/lib/auth/middleware";
 import { fuseCoach } from "@/lib/ml/fuse";
 import { clampStep, isCameraDataUrl, sanitizeDet, sanitizeQuestion } from "@/lib/ml/sanitize";
@@ -133,7 +133,7 @@ const analyzeInputSchema = z
     tieSlug: z.string().max(60).optional(),
     stepIndex: z.number().finite().optional(),
     elapsedSec: z.number().finite().optional(),
-    hardNos: z.array(z.string().max(80)).max(MAX_HARD_NOS).optional(),
+    hardNos: z.array(z.string().max(MAX_HARD_NO_LENGTH)).max(MAX_HARD_NOS).optional(),
     triage: z.enum(triageValues),
     media: z
       .object({
@@ -205,10 +205,13 @@ export const analyzeRope = createServerFn({ method: "POST" })
       // Relabel the selected images by bounded batch position. Source clip
       // labels can be sparse and are not a trusted chronology declaration.
       frameLabels: parsed.images.map((_, index) => `F${String(index + 1).padStart(2, "0")}`),
+      // The module's contract: the hard-no list is never silently shortened.
+      // Both bounds match the schema — the old 80/24 pair was a leftover of a
+      // bare-24 cap and dropped entries (and tail text) with nothing to say so.
       hardNos: (parsed.hardNos ?? [])
-        .map((value) => sanitizeQuestion(value, 80))
+        .map((value) => sanitizeQuestion(value, MAX_HARD_NO_LENGTH))
         .filter(Boolean)
-        .slice(0, 24),
+        .slice(0, MAX_HARD_NOS),
       deterministic: sanitizeDet(parsed.deterministic),
       stepIndex: Number.isFinite(parsed.stepIndex) ? Math.round(parsed.stepIndex as number) : 0,
       elapsedSec: Math.max(0, Math.min(8 * 3600, Number(parsed.elapsedSec) || 0)),

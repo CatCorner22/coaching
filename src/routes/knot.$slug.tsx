@@ -15,6 +15,7 @@ import {
 } from "@/components/learn";
 import { getAcademyKnot, isFoundationKnot } from "@/lib/kb";
 import { nyxPoseForKnotStep } from "@/lib/learn/nyx-model";
+import { knotStepVoiceInput } from "@/lib/learn/voice-script";
 import { coachVoiceLabel } from "@/lib/voice/coach-profile";
 import { useLearnProgress } from "@/lib/stores/learn-progress";
 import { useSettings } from "@/lib/stores/settings";
@@ -50,16 +51,10 @@ function KnotPage() {
   const s = knot.steps[step]!;
   const foundation = isFoundationKnot(slug);
   const voiceLabel = coachVoiceLabel(cloudVoice);
-  const voiceStep = {
-    stepIndex: step,
-    totalSteps: knot.steps.length,
-    title: s.title,
-    doText: s.do ?? s.body,
-    checkText: s.check ?? "It looks like the diagram.",
-    doBullets: s.doBullets,
-    checkBullets: s.checkBullets,
-    speak: s.speak,
-  };
+  // Shared builder, not an inline literal: the server's reviewed-speech
+  // allowlist composes the same narration through this function, and a page
+  // that drifts by one word loses cloud voice for every step.
+  const voiceStep = knotStepVoiceInput(s, step, knot.steps.length);
 
   function goNext() {
     markStepComplete("knot", slug, step);
@@ -151,7 +146,7 @@ function KnotPage() {
         confirm={confirm}
         onConfirmChange={setConfirm}
         requireConfirm={foundation}
-        onSpeak={() => void playCoachVoice(s.speak, cloudVoice)}
+        onSpeak={() => void playCoachVoice(s.speak, cloudVoice, { reviewed: true })}
       />
 
       <StepNav

@@ -17,6 +17,7 @@ import {
   type StepConfirm,
 } from "@/components/learn";
 import { bulletsOrFallback } from "@/lib/learn/plain-language";
+import { tieStepVoiceInput } from "@/lib/learn/voice-script";
 import {
   getAcademyTie,
   getKnot,
@@ -107,17 +108,10 @@ function TiePage() {
   const limitsAgreed = missingLimits.length === 0;
   const voiceLabel = coachVoiceLabel(cloudVoice);
   const bottomLines = bulletsOrFallback(s.bottomBullets, s.bottom);
-  const voiceStep = {
-    stepIndex: step,
-    totalSteps: tie.steps.length,
-    title: s.title,
-    stepGoal: s.goal,
-    doText: s.rigger,
-    checkText: s.check,
-    doBullets: s.riggerBullets,
-    checkBullets: s.checkBullets,
-    speak: s.speak,
-  };
+  // Shared builder, not an inline literal: the server's reviewed-speech
+  // allowlist composes the same narration through this function, and a page
+  // that drifts by one word loses cloud voice for every step.
+  const voiceStep = tieStepVoiceInput(s, step, tie.steps.length);
 
   function goNext() {
     markStepComplete("tie", slug, step);
@@ -265,7 +259,7 @@ function TiePage() {
             onConfirmChange={setConfirm}
             requireConfirm={mustConfirm}
             media={stepFigure}
-            onSpeak={() => void playCoachVoice(s.speak, cloudVoice)}
+            onSpeak={() => void playCoachVoice(s.speak, cloudVoice, { reviewed: true })}
           />
 
           <aside className="rounded-lg border border-border bg-surface px-4 py-4 sm:px-5">
