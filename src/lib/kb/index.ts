@@ -16,17 +16,20 @@ import { TIES } from "./ties";
 export const SEQUENCES = [
   {
     slug: "first-night",
-    name: "First handling practice",
+    name: "First guided ties",
     minutes: 20,
     steps: ["single-column", "karada"],
-    blurb: "Unoccupied prop drills only: recognize a non-cinching structure and a decorative pattern, then rehearse prompt removal.",
+    // These two are taught in full now, not drilled on a prop — the blurb
+    // used to promise "unoccupied prop drills only" over steps that say to
+    // watch her face. Framing must match the tie shapes it links to.
+    blurb: "Two ties taught step by step: a single column on a wrist or ankle, then the karada. Each stays blocked until its negotiated limit is a yes.",
   },
   {
     slug: "chest-evening",
     name: "Chest harness: instructor questions",
     minutes: 0,
     steps: ["shinju", "tasuki", "karada"],
-    blurb: "Recognition and unoccupied pattern practice only; body application and monitoring require qualified hands-on instruction.",
+    blurb: "Shinju and tasuki are recognition-and-instructor entries this app does not teach; the karada is taught in full and waits for its negotiated yes.",
   },
   {
     slug: "box-session",

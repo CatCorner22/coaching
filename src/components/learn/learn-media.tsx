@@ -36,7 +36,13 @@ export function LearnMediaPanel({
           view={tieContext.view}
           wraps={wraps.wraps}
           nerves={tieContext.nerves}
-          highlightIndex={tieContext.highlightIndex}
+          highlightIndex={
+            // Clamped to the wraps actually rendered: an authored strip-down
+            // step draws an empty figure, and a highlight index carried over
+            // from the route's cumulative list painted "New wrap highlighted"
+            // over deliberately empty space.
+            Math.min(tieContext.highlightIndex ?? wraps.wraps.length - 1, wraps.wraps.length - 1)
+          }
           className="aspect-[4/5] w-full text-rope"
         />
       )}

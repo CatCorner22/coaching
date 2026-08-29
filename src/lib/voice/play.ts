@@ -85,6 +85,10 @@ export async function playCoachVoice(
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(key);
     const voices = await loadCoachBrowserVoices();
+    // Re-check after the await: both lesson layouts mount a coach panel, so
+    // two auto-reads can race — without this the loser spoke anyway and the
+    // narration played twice, interleaved.
+    if (generation !== playbackGeneration) return;
     applyCoachBrowserVoice(u, voices);
     window.speechSynthesis.speak(u);
   }

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { randomId } from "@/lib/random-id";
 import { MAX_NEGOTIATION_ITEMS } from "@/lib/negotiation-bounds";
 import { persist } from "zustand/middleware";
 import {
@@ -202,7 +203,7 @@ export const useNegotiate = create<State>()(
           items: normalizeNegotiationItems([
             ...get().items,
             {
-              id: crypto.randomUUID(),
+              id: randomId(),
               label: clean,
               rank: "no" as Rank,
               updatedAt: nextNegotiationStamp(get().items.map((i) => i.updatedAt)),

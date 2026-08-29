@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { randomId } from "@/lib/random-id";
 
 export type CheckChoice = "not_checked" | "no_concern" | "concern";
 export type ConsentChoice = "not_checked" | "yes" | "no";
@@ -29,7 +30,7 @@ export const useCheckIn = create<State>((set, get) => ({
     set({
       logs: [
         {
-          id: crypto.randomUUID(),
+          id: randomId(),
           at: Date.now(),
           ...check,
           note: String(check.note ?? "").slice(0, 240),

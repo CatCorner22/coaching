@@ -19,7 +19,9 @@ const shot = (p, n) => p.screenshot({ path: `${OUT}/${n}.png`, fullPage: false }
 const log = (...a) => console.log("[e2e]", ...a);
 
 const browser = await chromium.launch({
-  executablePath: "/opt/pw-browsers/chromium",
+  // Overridable so the harness runs outside this sandbox too; unset means
+  // Playwright's own resolution (its managed browsers or PLAYWRIGHT_BROWSERS_PATH).
+  executablePath: process.env.CAMERA_E2E_CHROMIUM ?? "/opt/pw-browsers/chromium",
   args: [
     "--use-fake-device-for-media-capture",
     "--use-fake-ui-for-media-capture",
@@ -183,11 +185,38 @@ try {
   }
   log("capture produced a still + readiness card:", (await readiness.innerText()).trim());
 
-  // Academy practice cam: must be BLOCKED before photos=yes, open after.
+  // The tie page has two gates in series: the negotiated-limit gate withholds
+  // the taught steps AND the coach panel (practice cam included) until the
+  // tie's own limit is a yes, and the photos limit then gates the camera
+  // inside the panel. Drive them in order — each asserted positively.
   await page.goto("http://localhost:8080/tie/single-column", { waitUntil: "networkidle" });
   await page.waitForTimeout(1200);
   let academy = await page.locator("body").innerText();
-  const blockedBefore = /photos \/ video/i.test(academy) && /limit is a yes/i.test(academy);
+  const limitGated = /This tie waits for a yes/i.test(academy);
+  log("guided tie blocked before its limit:", limitGated);
+  await shot(page, "07a-tie-limit-blocked");
+  if (!limitGated) {
+    throw new Error("guided tie taught its steps before its negotiated limit was agreed");
+  }
+  if (/Practice cam/i.test(academy)) {
+    throw new Error("the practice cam rendered while the tie's limit gate was closed");
+  }
+
+  // Agree the tie's own limit (cuffs for single-column), then the photos gate
+  // must still hold the camera closed.
+  await page.goto("http://localhost:8080/negotiate", { waitUntil: "networkidle" });
+  await page.waitForTimeout(800);
+  const cuffsYes = page.locator('[aria-labelledby="neg-label-cuffs"] button', { hasText: /^yes$/i }).first();
+  if (!(await cuffsYes.count())) throw new Error('the cuffs "yes" control was not found on /negotiate');
+  await cuffsYes.click();
+  log("set cuffs limit to yes");
+  await page.waitForTimeout(600);
+
+  await page.goto("http://localhost:8080/tie/single-column", { waitUntil: "networkidle" });
+  await page.waitForTimeout(1200);
+  academy = await page.locator("body").innerText();
+  const blockedBefore =
+    /Practice cam/i.test(academy) && /photos \/ video/i.test(academy) && /limit is a yes/i.test(academy);
   log("academy cam blocked before photos limit:", blockedBefore);
   await shot(page, "07-academy-blocked");
   if (!blockedBefore) {
@@ -211,7 +240,9 @@ try {
   await page.goto("http://localhost:8080/tie/single-column", { waitUntil: "networkidle" });
   await page.waitForTimeout(1200);
   academy = await page.locator("body").innerText();
-  const openAfter = !( /limit is a yes/i.test(academy) );
+  // Positive assertion: the unlocked panel offers its Start camera control —
+  // absence of the gate text alone also matched a page with no panel at all.
+  const openAfter = !/limit is a yes/i.test(academy) && /Start camera/i.test(academy);
   log("academy cam unlocked after photos=yes:", openAfter);
   await shot(page, "09-academy-open");
   if (!openAfter) {

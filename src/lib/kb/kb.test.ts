@@ -1713,3 +1713,19 @@ test("getAcademyTie keeps every authored goal", () => {
     assert.equal(academy.goal, t.goal, `${t.slug}: authored goal was replaced`);
   }
 });
+
+test("sequence copy never calls a guided tie an unoccupied drill", async () => {
+  const { tieShape } = await import("./tie-factories.ts");
+  for (const sequence of SEQUENCES) {
+    const guided = sequence.steps.some((slug) => {
+      const tie = getTie(slug);
+      return tie !== undefined && tieShape(tie) === "guided";
+    });
+    if (!guided) continue;
+    assert.doesNotMatch(
+      `${sequence.name} ${sequence.blurb}`,
+      /unoccupied|prop drills? only/i,
+      `${sequence.slug}: describes a guided tie as an unoccupied drill`,
+    );
+  }
+});

@@ -197,6 +197,11 @@ export const GUIDED_TIES: Tie[] = [
         speak: "Untie rather than cut. Ask again tomorrow.",
         expected: { wrapBands: 0, pose: "sit", view: "front", handsVisible: true, neckClear: true },
         wraps: [],
+        // An empty `wraps` does not clear the cumulative figure (the route
+        // draws steps.slice(0, i + 1)); the explicit empty media is what
+        // "you have taken it off" should look like — the same override the
+        // prop-drill strip-down step uses.
+        media: [{ kind: "wraps" as const, wraps: [] }],
       },
     ],
   }),
@@ -321,6 +326,11 @@ export const GUIDED_TIES: Tie[] = [
         speak: "Release the cinch before unwrapping. Compare both sides.",
         expected: { wrapBands: 0, pose: "sit", view: "front", handsVisible: true, neckClear: true },
         wraps: [],
+        // An empty `wraps` does not clear the cumulative figure (the route
+        // draws steps.slice(0, i + 1)); the explicit empty media is what
+        // "you have taken it off" should look like — the same override the
+        // prop-drill strip-down step uses.
+        media: [{ kind: "wraps" as const, wraps: [] }],
       },
     ],
   }),
@@ -477,6 +487,11 @@ export const GUIDED_TIES: Tie[] = [
         speak: "Cut between knots if it needs to be fast.",
         expected: { wrapBands: 0, pose: "stand", view: "front", handsVisible: true, neckClear: true },
         wraps: [],
+        // An empty `wraps` does not clear the cumulative figure (the route
+        // draws steps.slice(0, i + 1)); the explicit empty media is what
+        // "you have taken it off" should look like — the same override the
+        // prop-drill strip-down step uses.
+        media: [{ kind: "wraps" as const, wraps: [] }],
       },
     ],
   }),

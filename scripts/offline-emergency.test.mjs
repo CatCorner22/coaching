@@ -90,9 +90,11 @@ test("the worker's scope stays narrow enough to be safe", () => {
   assert.match(workerSource, /request\.mode !== "navigate"/);
   assert.match(workerSource, /path !== "\/emergency"/);
   assert.match(workerSource, /url\.origin !== self\.location\.origin/);
-  // Network-first: the live card wins whenever it can be fetched.
+  // Network-first with a deadline: the live card wins whenever the network
+  // answers promptly, and a stalled ("lie-fi") connection cannot withhold
+  // the cached card until the browser's own timeout.
   const respondIndex = workerSource.indexOf("respondWith");
-  const fetchIndex = workerSource.indexOf("await fetch(request)");
+  const fetchIndex = workerSource.indexOf("await fetchWithDeadline(request, 3000)");
   const matchIndex = workerSource.indexOf("caches.match");
   assert.ok(fetchIndex > respondIndex && fetchIndex < matchIndex, "cache must be the fallback");
   // Exactly one call site, so nothing else can be intercepted by accident.

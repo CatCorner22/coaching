@@ -228,6 +228,19 @@ test("Studio requires yes for negotiated actions and blocks every voice path", (
 
 test("non-none triage invalidates stale visual coaching before rendering or journaling", () => {
   const studio = read("src/routes/studio.tsx");
+  // Truth in labelling: commit 80d27d8 removed the triage radio inputs (the
+  // "removed Studio triage gate" item awaiting the owner's decision), so
+  // today NO call site sets triage to a non-none value and the effect below
+  // is dead code held in reserve. This test keeps pinning the invalidation
+  // logic so the gate can return intact — and pins the dead state itself, so
+  // it flags for re-review if either the entry path returns or the reserved
+  // logic gets deleted as "unused".
+  const nonNoneSetters = (studio.match(/setTriage\((?!"none")/g) ?? []).length;
+  assert.equal(
+    nonNoneSetters,
+    0,
+    "a triage entry path returned — re-review this pin and the triage gate decision",
+  );
   const triageEffect = between(
     studio,
     'if (triage === "none") return;',
@@ -775,4 +788,45 @@ test("the capture panel states the upload scope in force on every batch", () => 
   // itself never told the user what this deployment's batch may contain.
   const camera = read("src/components/camera-capture.tsx");
   assert.match(camera, /\{uploadScopeCapturePreference\(scope\)\}/);
+});
+
+test("go-live hardening holds: preload, sw deadline, safe ids, pool guard, lesson honesty", () => {
+  // Offline resilience: chunks preload while the network is up, the
+  // emergency route is resident before it is needed, and the worker's
+  // network-first attempt is bounded so a stalled network cannot withhold
+  // the cached card.
+  assert.match(read("src/router.tsx"), /defaultPreload: "viewport"/);
+  assert.match(read("src/components/app-shell.tsx"), /preloadRoute\(\{ to: "\/emergency" \}\)/);
+  const sw = read("public/sw.js");
+  assert.match(sw, /fetchWithDeadline\(request, 3000\)/);
+  assert.match(sw, /refillPrecacheIfMissing/);
+  assert.match(sw, /refreshPrecache/);
+
+  // Ops: an idle pooled client error is logged, not a process crash.
+  assert.match(read("src/lib/db.ts"), /pool\.on\("error"/);
+
+  // Insecure contexts (http LAN dev) mint ids through the fallback helper.
+  for (const path of [
+    "src/components/camera-capture.tsx",
+    "src/lib/stores/negotiate.ts",
+    "src/lib/stores/checkin.ts",
+    "src/lib/stores/journal.ts",
+    "src/lib/auth/client.ts",
+  ]) {
+    assert.doesNotMatch(read(path), /crypto\.randomUUID/, path);
+  }
+
+  // Lesson honesty and safety UX.
+  assert.match(read("src/components/learn/academy-coach-panel.tsx"), /nyxPoseProp !== undefined/);
+  assert.match(read("src/routes/tie.$slug.tsx"), /mustConfirm && i > current \? current : i/);
+  assert.match(read("src/routes/studio.tsx"), /if \(modelStatus !== "not_requested"\) return;/);
+  assert.match(
+    read("src/components/learn/academy-observe-panel.tsx"),
+    /extractVideoFrames\(file, 3, undefined, 3\)/,
+  );
+  assert.match(
+    read("src/components/camera-capture.tsx"),
+    /if \(busyEpochRef\.current === epoch\) setBusyState\(false\);/,
+  );
+  assert.match(read("src/lib/voice/play.ts"), /if \(generation !== playbackGeneration\) return;/);
 });

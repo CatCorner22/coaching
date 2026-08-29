@@ -242,7 +242,16 @@ function TiePage() {
       {limitsAgreed && <>
           <StepProgress step={step} total={tie.steps.length} />
 
-          <StepFilmstrip steps={tie.steps} active={step} onSelect={setStep} />
+          <StepFilmstrip
+            steps={tie.steps}
+            active={step}
+            onSelect={(i) =>
+              // Jumping back to review is free; jumping forward must not
+              // bypass the Do/Check acknowledgement the Next button enforces
+              // (the cinch step and release rehearsal are what it protects).
+              setStep((current) => (mustConfirm && i > current ? current : i))
+            }
+          />
 
           <StepCard
             index={step}

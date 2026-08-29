@@ -317,6 +317,11 @@ function StudioPage() {
     if (!det || !capture) return;
     if (captureContextAtCommitRef.current !== currentContextRef.current) return;
     if (useSession.getState().stopped) return;
+    // A completed model report is one-use: the batch cannot be re-requested.
+    // This effect keys on nerveHits, so saving the report to the journal (or
+    // any other tab's journal write) used to re-run it and overwrite the
+    // completed report with the local not-requested one.
+    if (modelStatus !== "not_requested") return;
     const next = fuseCoach({
       det,
       frames: capture.observations,
@@ -340,7 +345,7 @@ function StudioPage() {
     setRefusal(false);
     setModelStatus("not_requested");
     if (next.final.recommend === "stop") stopSession("coach");
-  }, [det, capture, tie, stepIndex, nerveHits, operationalLimits, stopSession]);
+  }, [det, capture, tie, stepIndex, nerveHits, operationalLimits, stopSession, modelStatus]);
 
   useEffect(() => {
     if (triage === "none") return;

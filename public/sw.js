@@ -14,8 +14,10 @@
  *  - It is network-first even for /emergency: the live card wins whenever it
  *    can be fetched, and the cached copy is strictly a fallback.
  *
- * Bump CACHE when public/emergency-offline.html changes so the old entry is
- * dropped rather than shadowing the new one.
+ * The cached card converges on the deployed one without version bumps: every
+ * successful /emergency visit re-fetches and overwrites the cached copy, and
+ * activate refills a cache that a failed install left empty. Bumping CACHE
+ * remains the way to force-drop an entry immediately.
  */
 const CACHE = "knotty-emergency-v1";
 const OFFLINE_CARD = "/emergency-offline.html";
@@ -45,10 +47,66 @@ self.addEventListener("activate", (event) => {
       await Promise.all(
         names.filter((name) => name.startsWith("knotty-") && name !== CACHE).map((name) => caches.delete(name)),
       );
+      // A failed install-time precache used to be permanent: the worker
+      // activated with an empty cache and nothing ever refilled it, so the
+      // fallback stayed dead until the next deploy. Re-attempt here (and on
+      // every /emergency fetch below) so one flaky moment at install time
+      // cannot cost the card forever.
+      await refillPrecacheIfMissing();
       await self.clients.claim();
     })(),
   );
 });
+
+async function refillPrecacheIfMissing() {
+  try {
+    const cache = await caches.open(CACHE);
+    const existing = await cache.match(OFFLINE_CARD);
+    if (existing) return;
+    await cache.add(new Request(OFFLINE_CARD, { cache: "reload" }));
+  } catch {
+    // Still offline or the server is down; the next attempt may succeed.
+  }
+}
+
+/** Re-fetch the card and overwrite the cached copy, keeping it current. */
+async function refreshPrecache() {
+  try {
+    const fresh = await fetch(new Request(OFFLINE_CARD, { cache: "reload" }));
+    if (!fresh || !fresh.ok) return;
+    const cache = await caches.open(CACHE);
+    await cache.put(OFFLINE_CARD, fresh);
+  } catch {
+    // The existing cached copy stays; a later healthy visit converges it.
+  }
+}
+
+/**
+ * Network attempt with a deadline. A blackholed connection (associated wifi
+ * that routes nowhere — the classic captive-portal state) can hold a
+ * navigation fetch open for tens of seconds before the browser gives up;
+ * the person standing at /emergency sees a blank page that whole time while
+ * the cached card sits ready. Three seconds is generous for a healthy
+ * network and the live card still wins whenever one answers.
+ */
+function fetchWithDeadline(request, ms) {
+  if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+    return fetch(request, { signal: AbortSignal.timeout(ms) });
+  }
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("network deadline")), ms);
+    fetch(request).then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
 
 self.addEventListener("fetch", (event) => {
   const request = event.request;
@@ -69,12 +127,19 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     (async () => {
       try {
-        const fresh = await fetch(request);
+        const fresh = await fetchWithDeadline(request, 3000);
         // A 5xx from a running-but-broken server is still a failure to deliver
         // the card, so fall through to the cached copy rather than render it.
-        if (fresh && (fresh.ok || fresh.status < 500)) return fresh;
+        if (fresh && (fresh.ok || fresh.status < 500)) {
+          // A healthy network moment is also the moment to converge the
+          // cached card on the deployed one: installed clients whose worker
+          // bytes never changed would otherwise keep a stale card until the
+          // CACHE constant is remembered and bumped.
+          event.waitUntil(refreshPrecache());
+          return fresh;
+        }
       } catch {
-        // Offline, DNS failure, or the dev server went away.
+        // Offline, DNS failure, a stalled network, or the dev server went away.
       }
       const cached = await caches.match(OFFLINE_CARD, { cacheName: CACHE });
       if (cached) return cached;

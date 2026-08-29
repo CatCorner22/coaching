@@ -1,4 +1,4 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { Menu } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ConsentGate } from "@/components/consent-gate";
@@ -23,6 +23,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     void registerEmergencyWorker();
   }, []);
+  // The Emergency route's chunk must be resident BEFORE connectivity is
+  // needed: its link lives behind the More sheet, so viewport preloading
+  // never sees it until the sheet opens — which mid-scene is exactly when
+  // the network may already be gone. With the chunk in memory an offline
+  // Emergency tap renders the full page instead of leaning on the
+  // once-per-tab document-reload rescue.
+  const router = useRouter();
+  useEffect(() => {
+    void router.preloadRoute({ to: "/emergency" }).catch(() => undefined);
+  }, [router]);
   // Never leave the sheet covering the screen after a navigation.
   useEffect(() => setMoreOpen(false), [pathname]);
   // The sheet's markup precedes its trigger, so forward Tab walked straight

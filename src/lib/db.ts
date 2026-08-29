@@ -121,6 +121,13 @@ function createNeonSql(): Promise<Sql> {
       connectionString: databaseUrl,
       ...APP_POOL_OPTIONS,
     });
+    // An idle pooled client can error outside any query (Neon scale-to-zero,
+    // a server-side disconnect). With no 'error' listener the EventEmitter
+    // throws and takes the whole server process down; the pool already
+    // discards the broken client, so the right response is to log and go on.
+    pool.on("error", (error) => {
+      console.error("[db] idle client error:", error instanceof Error ? error.message : error);
+    });
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
       return res.rows as T[];

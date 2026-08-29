@@ -152,7 +152,9 @@ test("preview popup completion is bound to its opener and a one-time nonce", () 
   const popup = read("src/lib/auth/popup.server.ts");
   assert.match(client, /event\.source !== popup/);
   assert.match(client, /data\.nonce !== nonce/);
-  assert.match(client, /crypto\.randomUUID\(\)/);
+  // randomId() is the insecure-context-safe UUID helper; the nonce is still
+  // 122 bits of getRandomValues-backed entropy on every path.
+  assert.match(client, /randomId\(\)/);
   assert.match(popup, /VALID_NONCE/);
   assert.match(popup, /VALID_PROVIDER_IDS/);
   assert.match(popup, /nonce: string/);

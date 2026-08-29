@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   AcademyCoachPanel,
@@ -25,7 +25,10 @@ export const Route = createFileRoute("/knot/$slug")({ component: KnotPage });
 
 function KnotPage() {
   const { slug } = Route.useParams();
-  const knot = getAcademyKnot(slug);
+  // Memoized like the tie page: getAcademyKnot builds a fresh object per
+  // call, and an unmemoized value re-ran the setLast effect — a persisted
+  // store write — on every render of the page.
+  const knot = useMemo(() => getAcademyKnot(slug), [slug]);
   const cloudVoice = useSettings((settings) => settings.voice);
   const markStepComplete = useLearnProgress((s) => s.markStepComplete);
   const setLast = useLearnProgress((s) => s.setLast);

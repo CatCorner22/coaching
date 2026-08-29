@@ -35,6 +35,7 @@ import {
   type ProcessedMediaFrame,
 } from "@/lib/media";
 import { mediaUploadScope, uploadScopeCapturePreference } from "@/lib/media-scope";
+import { randomId } from "@/lib/random-id";
 import { observeFrame } from "@/lib/ml/detect";
 import type { FrameObservation } from "@/lib/ml/types";
 import { cn } from "@/lib/utils";
@@ -184,7 +185,13 @@ export const CameraCapture = memo(function CameraCapture({
   permissionsRef.current = permissions;
   const studioConsented = useSettings((s) => s.consented);
 
+  // Each busy=true is an epoch; an async path that set busy may clear it
+  // only while its epoch is still the latest, so an abandoned operation
+  // resolving late cannot clobber the flag a newer operation now owns.
+  const busyEpochRef = useRef(0);
+
   function setBusyState(next: boolean) {
+    if (next) busyEpochRef.current += 1;
     busyRef.current = next;
     setBusy(next);
   }
@@ -274,9 +281,15 @@ export const CameraCapture = memo(function CameraCapture({
       // the rest of the teardown. Say so instead of leaving the capture area
       // blank with no explanation of where the import went.
       const hadMediaOperation = mediaOperationActiveRef.current;
+      const wasRecording = clipRef.current !== null;
       stopLive();
-      if (hadMediaOperation) {
-        setHint("Processing stopped when the app went to the background. Choose the file again.");
+      if (wasRecording) {
+        setHint("Recording stopped when the app went to the background. Reopen the camera to record again.");
+      } else if (hadMediaOperation) {
+        // Burst frames and clip finalization run through the same operation
+        // guard as a file import, but "choose the file again" only describes
+        // the import.
+        setHint("Processing stopped when the app went to the background. Capture or choose the file again.");
       }
     };
     const onVisibility = () => {
@@ -575,7 +588,7 @@ export const CameraCapture = memo(function CameraCapture({
         recording: true,
         upload: true,
         output: true,
-        batchId: crypto.randomUUID(),
+        batchId: randomId(),
         confirmedAt,
       },
     });
@@ -899,6 +912,7 @@ export const CameraCapture = memo(function CameraCapture({
     const request = cameraRequestRef.current;
     if (useTimer) {
       setBusyState(true);
+      const epoch = busyEpochRef.current;
       try {
         for (let n = 3; n >= 1; n--) {
           // The control says 3s, so each displayed count holds a real second —
@@ -916,20 +930,25 @@ export const CameraCapture = memo(function CameraCapture({
           setCountdownState(n);
           await new Promise((resolve) => window.setTimeout(resolve, 1000));
         }
+        if (
+          !mountedRef.current ||
+          disabledRef.current ||
+          request !== cameraRequestRef.current ||
+          !streamRef.current
+        ) {
+          return;
+        }
+        await snapBurst();
       } finally {
         setCountdownState(null);
-        if (!mountedRef.current || request !== cameraRequestRef.current) {
-          setBusyState(false);
-        }
+        // Ownership-scoped: an abandoned countdown resolving after Close used
+        // to force busy=false over a newer operation's flag, and a dead
+        // stream (or a snapBurst that bailed before taking over) used to
+        // leave busy stranded true with every control disabled. If snapBurst
+        // ran, it owns a newer epoch and this clear is a no-op.
+        if (busyEpochRef.current === epoch) setBusyState(false);
       }
-      if (
-        !mountedRef.current ||
-        disabledRef.current ||
-        request !== cameraRequestRef.current ||
-        !streamRef.current
-      ) {
-        return;
-      }
+      return;
     }
     await snapBurst();
   }

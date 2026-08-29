@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { randomId } from "@/lib/random-id";
 import { persist } from "zustand/middleware";
 import type { Disposition, SourceId } from "@/lib/observation/report";
 import { SAFETY_SOURCE_IDS } from "@/lib/kb/sources";
@@ -83,7 +84,7 @@ export const useJournal = create<JournalState>()(
       removedIds: [],
       nerveHits: 0,
       add: (e) => {
-        const id = crypto.randomUUID();
+        const id = randomId();
         const nerve = e.flags.some((f) => /nerve|radial|numb/i.test(f)) ? 1 : 0;
         set({
           entries: [{ id, at: Date.now(), ...e, notes: String(e.notes ?? "").slice(0, 400) }, ...get().entries].slice(0, 80),

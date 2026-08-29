@@ -290,6 +290,16 @@ export const analyzeRope = createServerFn({ method: "POST" })
           };
         }
         if (error instanceof MediaBatchReservationError) {
+          // Operator-visible: a missing media_batch_reservation table
+          // (db:migrate never ran) or a database outage reads to users as
+          // "could not be confirmed" while the function logs stayed empty.
+          // Cause class and message only — never media or identifiers.
+          console.error(
+            "[analyze] batch reservation failed:",
+            error.cause instanceof Error
+              ? `${error.cause.name}: ${error.cause.message}`
+              : error.code,
+          );
           return {
             ok: false,
             error:
