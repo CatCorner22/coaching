@@ -185,17 +185,24 @@ test("torch helpers are capability-gated and fail closed", async () => {
 // ---------------------------------------------------------------------------
 
 type RecorderHandlers = {
-  ondataavailable: ((event: { data: { size: number; type: string } }) => void) | null;
+  ondataavailable: ((event: { data: Blob }) => void) | null;
   onstop: (() => void) | null;
   onerror: (() => void) | null;
 };
+
+function chunk(bytes: number): Blob {
+  return new Blob(["x".repeat(bytes)], { type: "video/webm" });
+}
 
 async function withFakeRecorder<T>(
   body: (recorders: Array<RecorderHandlers & { state: string }>) => Promise<T>,
 ): Promise<T> {
   const recorders: Array<RecorderHandlers & { state: string }> = [];
   class FakeRecorder {
-    state = "recording";
+    // A real MediaRecorder is inactive until start() is called — a double
+    // that is born recording lets startClip skip start() entirely without
+    // any test noticing (the adversarial audit's exact finding).
+    state = "inactive";
     mimeType = "video/webm";
     ondataavailable: RecorderHandlers["ondataavailable"] = null;
     onstop: RecorderHandlers["onstop"] = null;
@@ -204,7 +211,7 @@ async function withFakeRecorder<T>(
       recorders.push(this as unknown as RecorderHandlers & { state: string });
     }
     start() {
-      /* timeslice accepted */
+      this.state = "recording";
     }
     stop() {
       this.state = "inactive";
@@ -221,14 +228,17 @@ async function withFakeRecorder<T>(
   }
 }
 
-test("startClip rejects a recording that exceeds the shared byte budget", async () => {
+test("startClip starts the recorder and rejects past the shared byte budget", async () => {
   await withFakeRecorder(async (recorders) => {
     const handle = startClip(fakeStream() as unknown as MediaStream);
     const rec = recorders[0]!;
-    const half = { size: Math.ceil(MAX_VIDEO_BYTES / 2) + 1, type: "video/webm" };
-    rec.ondataavailable?.({ data: half });
+    // The double is born inactive, so this only holds if startClip actually
+    // called start() — a clip that never starts records nothing and dies in
+    // the 5s stop-timeout on every real device.
+    assert.equal(rec.state, "recording", "startClip must start the recorder");
+    rec.ondataavailable?.({ data: chunk(Math.ceil(MAX_VIDEO_BYTES / 2) + 1) });
     assert.equal(rec.state, "recording", "under budget keeps recording");
-    rec.ondataavailable?.({ data: half });
+    rec.ondataavailable?.({ data: chunk(Math.ceil(MAX_VIDEO_BYTES / 2) + 1) });
     await assert.rejects(() => handle.stop(), /Keep clips under 100 MB/);
     assert.equal(rec.state, "inactive", "an over-budget recorder is stopped");
   });
@@ -237,12 +247,17 @@ test("startClip rejects a recording that exceeds the shared byte budget", async 
 test("startClip resolves the recorded bytes on stop and empties on cancel", async () => {
   await withFakeRecorder(async (recorders) => {
     const handle = startClip(fakeStream() as unknown as MediaStream);
-    recorders[0]!.ondataavailable?.({ data: { size: 3, type: "video/webm" } });
+    recorders[0]!.ondataavailable?.({ data: chunk(3) });
+    recorders[0]!.ondataavailable?.({ data: chunk(4) });
     const blob = await handle.stop();
     assert.equal(blob.type, "video/webm");
+    // The bytes, not just the label: a startClip that drops its chunks still
+    // resolved a correctly-typed empty blob, and nothing at any layer failed
+    // (the adversarial audit's exact finding).
+    assert.equal(blob.size, 7, "every recorded chunk must reach the resolved blob");
 
     const second = startClip(fakeStream() as unknown as MediaStream);
-    recorders[1]!.ondataavailable?.({ data: { size: 3, type: "video/webm" } });
+    recorders[1]!.ondataavailable?.({ data: chunk(3) });
     second.cancel();
     await assert.rejects(() => second.stop(), (error: unknown) => {
       assert.ok(error instanceof DOMException && error.name === "AbortError");
@@ -251,9 +266,19 @@ test("startClip resolves the recorded bytes on stop and empties on cancel", asyn
   });
 });
 
-test("the studio clip auto-stop budget matches the recorder contract", () => {
-  // The component schedules finishRecord after CLIP_DURATION_MS; the value is
-  // part of the recording contract the UI copy states ("3 second practice
-  // loop" is the academy's own 3s timer; the studio clip is this one).
+test("CLIP_DURATION_MS is the value the studio schedules its auto-stop with", async () => {
+  // Not a bare constant pin: the component must actually schedule
+  // finishRecord with this constant. Read the source so replacing the
+  // constant at the call site with a literal fails here.
+  const { readFileSync } = await import("node:fs");
+  const capture = readFileSync(
+    new URL("../../components/camera-capture.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    capture,
+    /recordTimerRef\.current = window\.setTimeout\(\(\) => \{[\s\S]{0,120}finishRecord\(\);[\s\S]{0,40}\}, CLIP_DURATION_MS\);/,
+    "the studio auto-stop must be scheduled with CLIP_DURATION_MS",
+  );
   assert.equal(CLIP_DURATION_MS, 7_000);
 });

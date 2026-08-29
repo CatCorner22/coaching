@@ -205,15 +205,28 @@ try {
   await page.locator("button", { hasText: /^Record 7s$/ }).click();
   const recIndicator = page.locator('[aria-label="Recording in progress"]');
   await recIndicator.waitFor({ state: "visible", timeout: 5000 });
+  const recordingStartedAt = Date.now();
   log("recording started; waiting for the 7s auto-stop with no interaction");
   await recIndicator.waitFor({ state: "hidden", timeout: 12000 });
-  await page.waitForTimeout(2500);
+  // Bounded from BELOW too: an auto-stop firing at one second is a broken
+  // recording contract that "indicator eventually hides" cannot see.
+  const recordedForMs = Date.now() - recordingStartedAt;
+  if (recordedForMs < 6000) {
+    throw new Error(`clip auto-stopped after ${recordedForMs}ms — the budget is 7s`);
+  }
+  // Positive finalization artifact, not just an error blocklist: the healthy
+  // path pre-selects the best stills from the clip. Waiting on it also spans
+  // the frame-extraction latency the old fixed 2.5s sample raced.
+  await page
+    .locator("text=Best three stills pre-selected from the clip")
+    .first()
+    .waitFor({ state: "visible", timeout: 15000 });
   const afterAutoStop = await page.locator("body").innerText();
   if (/Stop clip/.test(afterAutoStop)) throw new Error("recording did not auto-stop at the clip budget");
-  if (/Video recording failed|Could not/i.test(afterAutoStop)) {
-    throw new Error("clip auto-stop surfaced an error: " + afterAutoStop.slice(0, 300));
+  if (/video is empty|recorder did not finish|recording failed|could not|no readable|too large/i.test(afterAutoStop)) {
+    throw new Error("clip finalization surfaced an error: " + afterAutoStop.slice(0, 300));
   }
-  log("7s clip auto-stopped and finalized without interaction");
+  log("7s clip auto-stopped and finalized to pre-selected stills");
   await shot(page, "06b-clip-autostop");
 
   // The still control is "Burst stills" since the five-shot burst landed; it
@@ -302,32 +315,34 @@ try {
     throw new Error("academy practice cam stayed blocked after the photos limit was agreed");
   }
 
-  // Drive the unlocked practice cam end to end: live preview, still with
-  // heuristic feedback, and the 3s clip through Analyze — the flows the audit
-  // found untested beyond the gate text.
-  // Both lesson layouts mount the coach panel; drive the visible instance.
+  // Drive the unlocked practice cam end to end. The CLIP goes first, so its
+  // feedback is the first feedback card the page ever shows — with the still
+  // first, its leftover card pre-satisfied the clip assertion and the clip
+  // leg could not fail (the adversarial audit's finding: deleting the
+  // duration hint still passed). Both lesson layouts mount the coach panel;
+  // drive the visible instance.
   await page.locator("button", { hasText: /^Start camera$/ }).filter({ visible: true }).first().click();
   await page.waitForTimeout(1800);
-  await page.locator("button", { hasText: /Snap & hint/ }).filter({ visible: true }).first().click();
-  await page.waitForTimeout(2500);
-  let panel = await page.locator("body").innerText();
-  if (!/not validated/.test(panel)) {
-    throw new Error("practice-cam still produced no feedback card: " + panel.slice(0, 300));
-  }
-  log("practice cam still produced heuristic feedback");
   await page.locator("button", { hasText: /^Record 3s$/ }).filter({ visible: true }).first().click();
   await page.waitForTimeout(4500);
   await page.locator("button", { hasText: /^Analyze clip$/ }).filter({ visible: true }).first().waitFor({ state: "visible", timeout: 8000 });
   await page.locator("button", { hasText: /^Analyze clip$/ }).filter({ visible: true }).first().click();
   await page.waitForTimeout(3500);
-  panel = await page.locator("body").innerText();
-  if (/Could not analyze clip|No frames from clip/i.test(panel)) {
+  let panel = await page.locator("body").innerText();
+  if (/could not|no readable|no frames|resolution is too large|has no readable/i.test(panel)) {
     throw new Error("clip analysis failed: " + panel.slice(0, 300));
   }
   if (!/not validated/.test(panel)) {
-    throw new Error("clip analysis produced no feedback card");
+    throw new Error("clip analysis produced no feedback card: " + panel.slice(0, 300));
   }
   log("practice cam 3s clip recorded and analyzed to feedback");
+  await page.locator("button", { hasText: /Snap & hint/ }).filter({ visible: true }).first().click();
+  await page.waitForTimeout(2500);
+  panel = await page.locator("body").innerText();
+  if (!/not validated/.test(panel) || /could not|no readable/i.test(panel)) {
+    throw new Error("practice-cam still produced no feedback card: " + panel.slice(0, 300));
+  }
+  log("practice cam still produced heuristic feedback");
   await shot(page, "10-academy-flows");
 
   // An uncaught exception or a failed same-origin request during the camera
