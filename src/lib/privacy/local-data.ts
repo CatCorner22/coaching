@@ -5,10 +5,16 @@ export const LOCAL_DATA_KEYS = [
   "knotty-negotiate",
   "knotty-plan",
   "knotty-journal",
+  // Lesson progress and the pre-scene checklist are personal data too: which
+  // ties someone practised and what they prepared for crossed account
+  // sessions on a shared device when these two were left off this list.
+  "knotty-learn",
+  "knotty-checklist",
   "musubi-settings",
   "musubi-negotiate",
   "musubi-plan",
   "musubi-journal",
+  "musubi-learn",
   "knotty-kit",
   "knotty-checkin",
   LEGACY_EMERGENCY_NUMBER_KEY,
