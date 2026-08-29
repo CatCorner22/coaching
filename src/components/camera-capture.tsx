@@ -95,6 +95,14 @@ const EMPTY_PERMISSIONS: Record<PermissionKey, boolean> = {
   upload: false,
   output: false,
 };
+// The preview <video> below renders inside a fixed 3:4 box with
+// object-contain, so a stream that isn't 3:4 letterboxes: part of the sensor
+// frame is visible along one axis at full extent even when zoomed. The crop
+// passed to capture and to the live meter must model that same box, or a
+// zoomed capture of a 16:9 stream keeps less than the user could see.
+// Tied to the aspect-[3/4] class on the <video> element.
+const CAPTURE_PREVIEW_ASPECT = 3 / 4;
+
 // Must stay shorter than the server's shared batch reservation (two hours in
 // src/lib/ai/media-replay-core.ts): the reservation exists to outlive every
 // permission this client still treats as fresh. A revision widened this to
@@ -597,7 +605,7 @@ export const CameraCapture = memo(function CameraCapture({
         if (v.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !v.videoWidth) {
           throw new Error("The camera dropped the live frame.");
         }
-        frames.push(await processMediaFrame(v, 1600, 240, 0.82, null, digitalZoom));
+        frames.push(await processMediaFrame(v, 1600, 240, 0.82, null, digitalZoom, CAPTURE_PREVIEW_ASPECT));
       }
       const observed = frames.map((frame) => ({
         frame,
@@ -951,7 +959,7 @@ export const CameraCapture = memo(function CameraCapture({
       const video = videoRef.current;
       if (!video || cancelled) return;
       const digitalZoom = zoomCapsRef.current ? 1 : Math.max(1, zoomRef.current);
-      const quality = scoreLivePreview(video, digitalZoom);
+      const quality = scoreLivePreview(video, digitalZoom, CAPTURE_PREVIEW_ASPECT);
       if (quality && !cancelled) setLiveQuality(quality);
     };
     tick();
@@ -991,7 +999,7 @@ export const CameraCapture = memo(function CameraCapture({
         target instanceof HTMLElement &&
         (target.isContentEditable ||
           target.closest(
-            "button, a, input, textarea, select, label, [role='button'], [role='slider'], [contenteditable]",
+            "button, a, input, textarea, select, summary, label, [role='button'], [role='slider'], [contenteditable]",
           ))
       ) {
         return;

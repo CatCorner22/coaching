@@ -398,15 +398,48 @@ export async function loadImage(src: string | Blob): Promise<HTMLImageElement> {
 
 export type PixelCrop = { sx: number; sy: number; sw: number; sh: number };
 
-/** Centre crop matching a CSS digital zoom (hardware zoom already changes the video pixels). */
-export function digitalZoomCrop(width: number, height: number, zoom: number): PixelCrop | undefined {
+/**
+ * Centre crop matching a CSS digital zoom (hardware zoom already changes the
+ * video pixels).
+ *
+ * `viewportAspect` models the preview's object-contain letterboxing, and it
+ * is what keeps the crop honest for streams that do not match the preview
+ * box. The Studio preview is a fixed 3:4 box; a 16:9 stream is contain-fitted
+ * inside it with vertical letterbox, so scaling the element by z does NOT
+ * hide 1/z of the height — the full height stays visible until z exceeds the
+ * letterbox ratio. Cropping both axes by 1/z (the first version of this fix,
+ * in both parallel PRs) therefore discarded content the user could still see
+ * and had deliberately framed in. Per axis: the contain-binding axis crops by
+ * 1/z; the letterboxed axis keeps min(1, slack/z) of itself, where slack is
+ * how much larger the box is than the fitted content on that axis.
+ *
+ * Without `viewportAspect` the old both-axes crop applies — only correct when
+ * the element fills its box edge to edge.
+ */
+export function digitalZoomCrop(
+  width: number,
+  height: number,
+  zoom: number,
+  viewportAspect?: number,
+): PixelCrop | undefined {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
     return undefined;
   }
   const z = Number.isFinite(zoom) ? Math.max(1, zoom) : 1;
   if (z <= 1.0001) return undefined;
-  const sw = Math.max(1, width / z);
-  const sh = Math.max(1, height / z);
+  let fracW = 1 / z;
+  let fracH = 1 / z;
+  if (Number.isFinite(viewportAspect) && (viewportAspect as number) > 0) {
+    const contentAspect = width / height;
+    // Slack per axis: >= 1, and exactly 1 on the axis object-contain binds.
+    const slackW = Math.max(1, (viewportAspect as number) / contentAspect);
+    const slackH = Math.max(1, contentAspect / (viewportAspect as number));
+    fracW = Math.min(1, slackW / z);
+    fracH = Math.min(1, slackH / z);
+    if (fracW >= 1 && fracH >= 1) return undefined;
+  }
+  const sw = Math.max(1, width * fracW);
+  const sh = Math.max(1, height * fracH);
   return {
     sx: (width - sw) / 2,
     sy: (height - sh) / 2,
@@ -456,11 +489,12 @@ async function canvasFromSource(
   maxEdge: number,
   knownDimensions?: { width: number; height: number } | null,
   digitalZoom = 1,
+  previewAspect?: number,
 ): Promise<HTMLCanvasElement> {
   if (typeof HTMLVideoElement !== "undefined" && src instanceof HTMLVideoElement) {
     const iw = src.videoWidth || 640;
     const ih = src.videoHeight || 480;
-    return drawContain(src, maxEdge, iw, ih, digitalZoomCrop(iw, ih, digitalZoom));
+    return drawContain(src, maxEdge, iw, ih, digitalZoomCrop(iw, ih, digitalZoom, previewAspect));
   } else if (typeof HTMLImageElement !== "undefined" && src instanceof HTMLImageElement) {
     return drawContain(src, maxEdge, src.naturalWidth, src.naturalHeight);
   } else if (typeof createImageBitmap === "function") {
@@ -579,8 +613,9 @@ export async function processMediaFrame(
   quality = 0.72,
   knownDimensions?: { width: number; height: number } | null,
   digitalZoom = 1,
+  previewAspect?: number,
 ): Promise<ProcessedMediaFrame> {
-  const preview = await canvasFromSource(src, previewEdge, knownDimensions, digitalZoom);
+  const preview = await canvasFromSource(src, previewEdge, knownDimensions, digitalZoom, previewAspect);
   const analysis = drawContain(preview, analysisEdge, preview.width, preview.height);
   const ctx = analysis.getContext("2d", { willReadFrequently: true });
   if (!ctx) throw new Error("No canvas");

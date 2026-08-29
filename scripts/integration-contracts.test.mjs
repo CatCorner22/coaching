@@ -93,7 +93,7 @@ test("route registration and the preview bridge keep heavy knowledge and schema 
 test("studio burst waits for distinct frames, matches digital zoom, and does not double-fire Space", () => {
   const camera = read("src/components/camera-capture.tsx");
   assert.match(camera, /waitForNextVideoFrame\(v\)/);
-  assert.match(camera, /processMediaFrame\(v, 1600, 240, 0\.82, null, digitalZoom\)/);
+  assert.match(camera, /processMediaFrame\(v, 1600, 240, 0\.82, null, digitalZoom, CAPTURE_PREVIEW_ASPECT\)/);
   const timer = between(camera, "async function snapWithOptionalTimer()", "async function changeZoom");
   assert.match(timer, /request !== cameraRequestRef\.current/);
   assert.match(timer, /setBusyState\(true\)/);
@@ -109,7 +109,7 @@ test("studio burst waits for distinct frames, matches digital zoom, and does not
   // union of interactive targets. Pin the union so neither half regresses.
   assert.match(
     camera,
-    /closest\(\s*\n?\s*"button, a, input, textarea, select, label, \[role='button'\], \[role='slider'\], \[contenteditable\]",?\s*\n?\s*\)/,
+    /closest\(\s*\n?\s*"button, a, input, textarea, select, summary, label, \[role='button'\], \[role='slider'\], \[contenteditable\]",?\s*\n?\s*\)/,
   );
 });
 

@@ -1172,9 +1172,10 @@ test("the capture surface honours digital zoom, resets it for clips, and scopes 
 
   // Burst stills pass the digital-zoom crop into processMediaFrame. Without
   // this a 2.4x "zoomed" capture transmitted the full wide scene — everything
-  // the user had deliberately framed out.
+  // the user had deliberately framed out. The preview aspect rides along so
+  // the crop matches the object-contain letterbox, not the raw sensor frame.
   assert.match(capture, /digitalZoom = zoomCapsRef\.current \? 1 : Math\.max\(1, zoomRef\.current\)/);
-  assert.match(capture, /processMediaFrame\(v, 1600, 240, 0\.82, null, digitalZoom\)/);
+  assert.match(capture, /processMediaFrame\(v, 1600, 240, 0\.82, null, digitalZoom, CAPTURE_PREVIEW_ASPECT\)/);
 
   // A clip records the raw stream; recording under a CSS-only zoom is the
   // same lie in video form. The record path resets to 1x and says why.
@@ -1190,10 +1191,11 @@ test("the capture surface honours digital zoom, resets it for clips, and scopes 
 
   // Space/R fire only from non-interactive targets, one bail for both keys.
   // Space on a focused Close used to fire a burst and consume the one-use
-  // batch; R from a focused link started a recording.
+  // batch; R from a focused link started a recording; Space on a focused
+  // <summary> both toggled the disclosure and fired a capture.
   assert.match(
     capture,
-    /closest\(\s*\n?\s*"button, a, input, textarea, select, label, \[role='button'\], \[role='slider'\], \[contenteditable\]",?\s*\n?\s*\)/,
+    /closest\(\s*\n?\s*"button, a, input, textarea, select, summary, label, \[role='button'\], \[role='slider'\], \[contenteditable\]",?\s*\n?\s*\)/,
   );
 });
 
@@ -1208,4 +1210,54 @@ test("digitalZoomCrop edge semantics stay total and centred", () => {
   assert.ok(r);
   assert.ok(Math.abs(r.sx * 2 + r.sw - 1920) < 1e-6, "horizontally centred");
   assert.ok(Math.abs(r.sy * 2 + r.sh - 1080) < 1e-6, "vertically centred");
+});
+
+test("digitalZoomCrop models object-contain letterboxing when given the viewport aspect", () => {
+  // The Studio preview is a fixed 3:4 object-contain box. A 16:9 stream sits
+  // letterboxed inside it: at 2x the element scale hides half the WIDTH but
+  // the full height is still on screen (the vertical slack is 16:9 / 3:4 =
+  // 2.37). The first version of this fix cropped both axes by 1/zoom and
+  // discarded half the visible height — content the user deliberately kept
+  // in frame. These cases compare preview-visible bounds with captured
+  // bounds, per the review that caught it.
+  const BOX = 3 / 4;
+
+  // Landscape 16:9 at 2x: width halves, height stays FULL.
+  const wide = digitalZoomCrop(1920, 1080, 2, BOX);
+  assert.ok(wide);
+  assert.ok(Math.abs(wide.sw - 960) < 1e-6, "binding axis crops by 1/z");
+  assert.ok(Math.abs(wide.sh - 1080) < 1e-6, "letterboxed axis keeps its full visible extent");
+  assert.ok(Math.abs(wide.sy) < 1e-6);
+
+  // The slack axis only starts cropping once z exceeds its letterbox ratio
+  // (16:9 in 3:4 → slackH = (16/9)/(3/4) ≈ 2.37).
+  const past = digitalZoomCrop(1920, 1080, 3, BOX);
+  assert.ok(past);
+  assert.ok(past.sh < 1080, "beyond the slack ratio the height crops too");
+  assert.ok(Math.abs(past.sh - 1080 * (((16 / 9) / BOX) / 3)) < 1e-6);
+
+  // Portrait 9:16 at 2x: height halves, width keeps slackW/z = (3/4 / 9/16)/2.
+  const tall = digitalZoomCrop(1080, 1920, 2, BOX);
+  assert.ok(tall);
+  assert.ok(Math.abs(tall.sh - 960) < 1e-6);
+  assert.ok(Math.abs(tall.sw - 1080 * ((BOX / (9 / 16)) / 2)) < 1e-6);
+  assert.ok(Math.abs(tall.sx * 2 + tall.sw - 1080) < 1e-6, "centred");
+
+  // A stream matching the box exactly degrades to the plain both-axes crop.
+  const exact = digitalZoomCrop(1200, 1600, 2, BOX);
+  assert.deepEqual(exact, { sx: 300, sy: 400, sw: 600, sh: 800 });
+
+  // Without the aspect the legacy both-axes behavior is unchanged.
+  assert.deepEqual(digitalZoomCrop(1920, 1080, 2), { sx: 480, sy: 270, sw: 960, sh: 540 });
+});
+
+test("capture and live meter share the letterbox-aware crop", () => {
+  const capture = readFileSync(new URL("../src/components/camera-capture.tsx", import.meta.url), "utf8");
+  const meter = readFileSync(new URL("../src/lib/camera/live-meter.ts", import.meta.url), "utf8");
+  // Both surfaces must pass the preview box's aspect, or the HUD scores
+  // pixels a capture would not keep (and vice versa).
+  assert.match(capture, /CAPTURE_PREVIEW_ASPECT = 3 \/ 4/);
+  assert.match(capture, /processMediaFrame\(v, 1600, 240, 0\.82, null, digitalZoom, CAPTURE_PREVIEW_ASPECT\)/);
+  assert.match(capture, /scoreLivePreview\(video, digitalZoom, CAPTURE_PREVIEW_ASPECT\)/);
+  assert.match(meter, /digitalZoomCrop\(video\.videoWidth, video\.videoHeight, digitalZoom, previewAspect\)/);
 });
