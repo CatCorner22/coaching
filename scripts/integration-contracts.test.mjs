@@ -836,7 +836,10 @@ test("review round: narration keys on lesson identity, shared voice loads surviv
   // Lesson navigation at the same step index must restart narration — the
   // route component is reused, so a bare stepIndex key missed it.
   assert.match(voice, /\}, \[enabled, narrationKey, cloudVoice\]\);/);
-  assert.match(voice, /`\$\{input\.stepIndex\}\/\$\{input\.totalSteps\}:\$\{input\.title\}`/);
+  assert.match(voice, /`\$\{lessonKey\}:\$\{input\.stepIndex\}\/\$\{input\.totalSteps\}:\$\{input\.title\}`/);
+  // The slug must actually reach the hook: one-step instructor routes share
+  // an identical step title, so a content-only key missed lesson changes.
+  assert.match(read("src/components/learn/academy-coach-panel.tsx"), /lessonKey=\{tieSlug \?\? knotSlug \?\? ""\}/);
 
   // A shared in-flight voice load is judged by cache lifetime, not by its
   // creator's playback generation — two simultaneous auto-reads no longer

@@ -13,6 +13,7 @@ export function useAcademyAutoVoice(
   input: VoiceStepInput | null,
   cloudVoice: boolean,
   enabled: boolean,
+  lessonKey = "",
 ) {
   // The callers rebuild the step object every render, so the effect must not
   // key on its identity: when it did, the first re-render after narration
@@ -29,7 +30,13 @@ export function useAcademyAutoVoice(
   // lesson's narration kept playing over the new page. Index, total, and
   // title come from the authored catalog, so the key is stable across
   // re-renders and distinct across lessons and steps.
-  const narrationKey = input ? `${input.stepIndex}/${input.totalSteps}:${input.title}` : null;
+  // The slug rides in front because step titles alone repeat: the one-step
+  // instructor routes share the exact title "Recognition, negotiation, and
+  // qualified instruction", so navigating between two of them changed
+  // nothing a content-only key could see.
+  const narrationKey = input
+    ? `${lessonKey}:${input.stepIndex}/${input.totalSteps}:${input.title}`
+    : null;
 
   useEffect(() => {
     if (!enabled || narrationKey === null) return;

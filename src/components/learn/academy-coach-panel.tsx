@@ -66,7 +66,7 @@ export function AcademyCoachPanel({
 
   return (
     <div className="space-y-4">
-      <AcademyVoiceBar step={voice} cloudVoice={cloudVoice} />
+      <AcademyVoiceBar step={voice} cloudVoice={cloudVoice} lessonKey={tieSlug ?? knotSlug ?? ""} />
       <NyxNudeStrip poses={nyxNudes} />
       {nyxPose && (
         <div className="learn-panel rounded-xl border border-border bg-surface p-4">
