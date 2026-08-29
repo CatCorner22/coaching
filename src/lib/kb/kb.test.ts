@@ -11,6 +11,7 @@ import {
   TIES,
   articleExcerpts,
   getAcademyKnot,
+  getAcademyTie,
   getKnot,
   getTie,
   getArticleEvidence,
@@ -1662,5 +1663,40 @@ test("every step declares a controllable demonstration slot, not an autoplay loo
     // Distinct paths, or one clip would silently serve both modes.
     assert.notEqual(demos[0]!.src, loops[0]!.src, `${label} demo and loop must not share a path`);
     assert.match(demos[0]!.src, /\/demo-\d+\.webm$/u, `${label} demo path is not on the demo namespace`);
+  }
+});
+
+test("authored wrap coordinates are body-space fractions clear of the head", () => {
+  // The figure renderer treats a coordinate < 2 as a fraction of the figure
+  // and anything >= 2 as raw viewBox units. Percentages authored as 30/45/60
+  // therefore rendered as raw units — the karada's "breastbone" knot drew on
+  // the figure's face (the head spans 18-66 of 420). Every authored
+  // coordinate must be a fraction, and band/diamond/x centres must sit below
+  // the shoulder arc: this catalog never draws rope at the head or neck,
+  // matching the locked-no neck row. Stems are exempt from the shoulder bound
+  // only because a stem legitimately hangs from the shoulders.
+  const SHOULDER = 0.24; // 0.24 * 420 ≈ 101, just under the 86-96 shoulder arc
+  for (const t of TIES) {
+    const academy = getAcademyTie(t.slug);
+    if (!academy) continue;
+    for (const [i, step] of academy.steps.entries()) {
+      for (const wrap of step.wraps) {
+        const spec = wrap as Record<string, unknown>;
+        for (const key of ["y", "cy", "y1", "y2", "x"] as const) {
+          const value = spec[key];
+          if (typeof value !== "number") continue;
+          assert.ok(
+            value > 0 && value < 2,
+            `${t.slug} step ${i}: ${wrap.kind}.${key}=${value} must be an authored fraction, not raw units`,
+          );
+          if (key !== "x" && wrap.kind !== "stem") {
+            assert.ok(
+              value >= SHOULDER,
+              `${t.slug} step ${i}: ${wrap.kind}.${key}=${value} sits on the head or neck`,
+            );
+          }
+        }
+      }
+    }
   }
 });

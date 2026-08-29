@@ -4,6 +4,7 @@ import { normalizeNegotiationItems, type NegItem, type Rank } from "@/lib/stores
 import {
   buildStudioNegotiationPolicy,
   mediaAuthorizationWasRevoked,
+  missingTieLimits,
   studioPolicySignature,
 } from "./negotiation.ts";
 
@@ -161,4 +162,35 @@ test("studioPolicySignature changes only for gating policy, not unrelated writes
   );
   // Missing/unknown flags are treated as off rather than throwing.
   assert.equal(typeof studioPolicySignature(base, {}), "string");
+});
+
+test("missingTieLimits names the unagreed rows a guided tie waits for, fail-closed", () => {
+  // The tie page's half of the README promise "blocked in Studio and on the
+  // tie page". An empty store — unhydrated, or a fresh browser — blocks like
+  // an unagreed limit does, and normalization supplies the canonical row and
+  // its canonical label, so the blocked card names the real negotiation row.
+  assert.deepEqual(missingTieLimits("karada", []), [
+    { id: "torso", label: "Chest / karada harnesses" },
+  ]);
+
+  // A maybe is not a yes.
+  assert.equal(missingTieLimits("karada", [item("torso", "maybe")]).length, 1);
+
+  // A yes opens the tie.
+  assert.deepEqual(missingTieLimits("karada", [item("torso", "yes")]), []);
+
+  // Entries that map to no rows — prop drills — never block.
+  assert.deepEqual(missingTieLimits("hex-net", []), []);
+  assert.deepEqual(missingTieLimits(undefined, []), []);
+
+  // The locked-no rows can never open what they gate, however the list is
+  // edited: a forged yes on the neck row is normalized back to no.
+  assert.equal(missingTieLimits("kubi-nawa", [item("neck", "yes")]).length, 1);
+
+  // Multi-limit ties report every missing row, not just the first.
+  assert.deepEqual(
+    missingTieLimits("waki-shibari", [item("arms", "yes")]).map((row) => row.id),
+    ["torso"],
+  );
+  assert.equal(missingTieLimits("waki-shibari", []).length, 2);
 });

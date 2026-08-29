@@ -14,16 +14,24 @@ export function useAcademyAutoVoice(
   cloudVoice: boolean,
   enabled: boolean,
 ) {
-  const spokeRef = useRef(-1);
+  // The callers rebuild the step object every render, so the effect must not
+  // key on its identity: when it did, the first re-render after narration
+  // began ran the cleanup (stopping the voice mid-sentence) and the
+  // spoke-once guard then refused to restart the step — auto-read only ever
+  // survived on a page that happened not to re-render. The latest input rides
+  // in a ref; the effect keys on the transitions that should actually restart
+  // speech: the step, the voice, and the toggle.
+  const inputRef = useRef(input);
+  inputRef.current = input;
+  const stepIndex = input ? input.stepIndex : -1;
 
   useEffect(() => {
-    if (!enabled || !input) return;
-    if (spokeRef.current === input.stepIndex) return;
-    spokeRef.current = input.stepIndex;
-    const script = buildAcademyVoiceScript(input);
-    void playCoachVoice(script, cloudVoice);
+    if (!enabled || stepIndex < 0) return;
+    const current = inputRef.current;
+    if (!current) return;
+    void playCoachVoice(buildAcademyVoiceScript(current), cloudVoice);
     return () => stopCoachVoice();
-  }, [enabled, input, cloudVoice]);
+  }, [enabled, stepIndex, cloudVoice]);
 }
 
 export function readAcademyStep(input: VoiceStepInput, cloudVoice: boolean) {

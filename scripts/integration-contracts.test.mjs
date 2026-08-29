@@ -665,3 +665,31 @@ test("the consent gate names where Analyze sends stills", () => {
   assert.match(gate, /sends your selected stills to xAI only when you\s+tap it/);
   assert.match(gate, /never in the background/);
 });
+
+test("tie page gates guided steps behind negotiated limits; auto-voice survives re-renders", () => {
+  const tiePage = read("src/routes/tie.$slug.tsx");
+  // README: a guided tie "stays blocked — in Studio and on the tie page —
+  // until that limit is set to yes". tieLimitIds' docstring promised this
+  // call site from the start; the page had never wired it in, so the karada
+  // taught in full with torso at no.
+  assert.match(tiePage, /shape === "guided" \? missingTieLimits\(slug, negotiationItems\) : \[\]/);
+  // Blocked state withholds the steps AND the coach panel (practice cam).
+  assert.match(tiePage, /\{limitsAgreed && </);
+  assert.match(tiePage, /!limitsAgreed \? null :/);
+  // The blocked card routes to the fix rather than just refusing.
+  assert.match(tiePage, /to="\/negotiate"/);
+
+  // Auto-read narration keys on real transitions (step, voice, toggle) — not
+  // on the identity of a step object rebuilt every render, which ran the
+  // cleanup on the first re-render and stopped the voice mid-sentence with
+  // no restart.
+  const voice = read("src/components/learn/use-academy-voice.ts");
+  assert.match(voice, /\}, \[enabled, stepIndex, cloudVoice\]\);/);
+  assert.doesNotMatch(voice, /\}, \[enabled, input, cloudVoice\]\);/);
+
+  // Stem x follows the same fraction-or-raw convention as the y axes: the
+  // stem drill authors x: 0.5 meaning centred, which used to draw at the
+  // figure's far-left edge.
+  const figure = read("src/components/rope-figure.tsx");
+  assert.match(figure, /rawX < 2 \? rawX \* \(floor \? 400 : 200\) : rawX/);
+});

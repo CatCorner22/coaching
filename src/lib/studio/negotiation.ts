@@ -97,6 +97,24 @@ export function tieLimitIds(slug: string | undefined): readonly string[] {
 }
 
 /**
+ * The rows a tie still needs before its taught steps open, with labels for
+ * saying so. Fail-closed on every edge: a maybe is not a yes, and a required
+ * row missing from the list entirely (an unhydrated store, an edited list)
+ * counts as missing rather than as approved.
+ */
+export function missingTieLimits(
+  slug: string | undefined,
+  items: readonly NegItem[],
+): { id: string; label: string }[] {
+  const required = tieLimitIds(slug);
+  if (required.length === 0) return [];
+  const byId = new Map(normalizeNegotiationItems(items).map((item) => [item.id, item]));
+  return required
+    .filter((id) => byId.get(id)?.rank !== "yes")
+    .map((id) => ({ id, label: byId.get(id)?.label ?? id }));
+}
+
+/**
  * Media cleanup is required only after an approval that was already active is
  * lost. An initial blocked hydration snapshot is not a revocation: treating it
  * as one lets a stale passive effect erase a newer action-first answer after
