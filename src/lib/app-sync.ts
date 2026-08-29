@@ -1,6 +1,6 @@
-import { useNegotiate } from "@/lib/stores/negotiate";
+import { normalizeNegotiationItems, useNegotiate } from "@/lib/stores/negotiate";
 import { useChecklist } from "@/lib/stores/checklist";
-import { useSettings } from "@/lib/stores/settings";
+import { useSettings, type Settings } from "@/lib/stores/settings";
 
 export type AppSyncBundle = {
   version: 1;
@@ -58,9 +58,37 @@ export function parseAppSyncBundle(text: string): AppSyncBundle | null {
 }
 
 export function applyAppSyncBundle(bundle: AppSyncBundle): void {
-  useSettings.getState().set(bundle.settings);
-  useNegotiate.setState({ items: bundle.negotiate });
-  useChecklist.setState({ done: bundle.checklist });
+  // Only the fields the export writes, each type-checked — never the object
+  // as parsed. `settings.set` merges every key it is handed, so an edited
+  // file could otherwise set the consent-bearing flags (consented, adults,
+  // voice, listen, consentVersion) without the gate ever being shown. Sync
+  // moves preferences between devices; consent is asked for on each device.
+  const raw = bundle.settings as Partial<Record<keyof AppSyncBundle["settings"], unknown>>;
+  const picked: Partial<Settings> = {};
+  for (const key of [
+    "riggerName",
+    "bottomName",
+    "honorific",
+    "safeword",
+    "yellowWord",
+    "greenWord",
+  ] as const) {
+    if (typeof raw[key] === "string") picked[key] = raw[key];
+  }
+  if (raw.style === "peer" || raw.style === "ds") picked.style = raw.style;
+  if (typeof raw.circulationMins === "number") picked.circulationMins = raw.circulationMins;
+  useSettings.getState().set(picked);
+
+  // Normalized, not raw: the same pass the store applies on rehydration, so a
+  // file cannot show a locked-no row as yes even transiently, and malformed
+  // rows never reach the UI.
+  useNegotiate.setState({ items: normalizeNegotiationItems(bundle.negotiate) });
+
+  const done: Record<string, boolean> = {};
+  for (const [key, value] of Object.entries(bundle.checklist)) {
+    if (typeof value === "boolean") done[key] = value;
+  }
+  useChecklist.setState({ done });
 }
 
 export function appSyncFilename(exportedAt: number): string {

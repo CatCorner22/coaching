@@ -225,8 +225,15 @@ export const CameraCapture = memo(function CameraCapture({
     if (!studioConsented || disabled || batchCommitted) return;
     if (Object.values(permissionsRef.current).every(Boolean)) return;
     armBatchPermissions();
+    // permissionExpiresAt: the 1-hour window expiring with no committed batch
+    // used to change nothing this effect keys on (batchCommitted was already
+    // false), so the cleared permissions were never re-armed and every capture
+    // control stayed dead until remount — while the hint said to start a
+    // fresh capture. Expiry nulls permissionExpiresAt, so keying on it
+    // re-arms a fresh window; the guards above still keep a disabled or
+    // committed panel untouched.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [studioConsented, disabled, batchCommitted]);
+  }, [studioConsented, disabled, batchCommitted, permissionExpiresAt]);
 
   useEffect(() => {
     mountedRef.current = true;
