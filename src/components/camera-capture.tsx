@@ -34,7 +34,7 @@ import {
   validateMediaSignature,
   type ProcessedMediaFrame,
 } from "@/lib/media";
-import { mediaUploadScope } from "@/lib/media-scope";
+import { mediaUploadScope, uploadScopeCapturePreference } from "@/lib/media-scope";
 import { observeFrame } from "@/lib/ml/detect";
 import type { FrameObservation } from "@/lib/ml/types";
 import { cn } from "@/lib/utils";
@@ -1224,10 +1224,12 @@ export const CameraCapture = memo(function CameraCapture({
         </label>
       )}
       {/* The one-hour batch window was invisible until it expired and silently
-          discarded the batch. Show when it runs out. */}
+          discarded the batch. Show when it runs out. README: "The capture
+          panel states the setting in force" — the scope line must appear on
+          every batch, not only on /settings and /login. */}
       {permissionsReady && permissionExpiresAt !== null && (
         <p className="text-xs text-muted">
-          This capture window closes at{" "}
+          {uploadScopeCapturePreference(scope)} This capture window closes at{" "}
           {new Date(permissionExpiresAt).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",

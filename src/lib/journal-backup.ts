@@ -68,16 +68,27 @@ export function parseJournalBackup(text: string): JournalBackup | null {
   };
 }
 
-/** What an import did, so the screen can report it rather than claiming success. */
-export type ImportSummary = { added: number; alreadyPresent: number; skippedDeleted: number };
+/** What an import actually did, so the screen can report it rather than claiming success. */
+export type ImportSummary = {
+  added: number;
+  alreadyPresent: number;
+  skippedDeleted: number;
+  /** Imported entries the journal cap discarded — older rows that did not fit. */
+  notKept: number;
+  /** Existing entries the same cap pushed out to make room. */
+  displaced: number;
+};
 
 /**
- * Count what a merge would change, given what is already on this device.
- *
- * Deliberately mirrors `mergeJournalEntriesById`: an id in either side's
- * tombstones stays deleted, and an id already present is not duplicated.
+ * Derived from the merge RESULT, not from intent. The previous version
+ * mirrored the merge's tombstone and dedup rules but not its newest-first
+ * cap, so with a full journal it reported "Added 20." while zero of the
+ * twenty survived the slice — and said nothing when the same merge pushed
+ * out existing entries, which the restore screen promises never happens
+ * silently.
  */
 export function summarizeImport(
+  merged: readonly { id?: unknown }[],
   incoming: readonly { id?: unknown }[],
   existing: readonly { id?: unknown }[],
   existingRemoved: readonly string[],
@@ -86,10 +97,13 @@ export function summarizeImport(
   const removed = new Set<string>([...existingRemoved, ...incomingRemoved]);
   const have = new Set<string>();
   for (const entry of existing) if (typeof entry?.id === "string") have.add(entry.id);
+  const kept = new Set<string>();
+  for (const entry of merged) if (typeof entry?.id === "string") kept.add(entry.id);
 
   let added = 0;
   let alreadyPresent = 0;
   let skippedDeleted = 0;
+  let notKept = 0;
   const seen = new Set<string>();
   for (const entry of incoming) {
     const id = entry?.id;
@@ -98,9 +112,12 @@ export function summarizeImport(
     seen.add(id);
     if (removed.has(id)) skippedDeleted += 1;
     else if (have.has(id)) alreadyPresent += 1;
-    else added += 1;
+    else if (kept.has(id)) added += 1;
+    else notKept += 1;
   }
-  return { added, alreadyPresent, skippedDeleted };
+  let displaced = 0;
+  for (const id of have) if (!kept.has(id) && !removed.has(id)) displaced += 1;
+  return { added, alreadyPresent, skippedDeleted, notKept, displaced };
 }
 
 /** `knotty-journal-2026-08-23.knotty` — sorts by date and says nothing else. */

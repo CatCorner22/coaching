@@ -74,13 +74,15 @@ export function JournalBackupPanel() {
         });
         return;
       }
-      const { added, alreadyPresent, skippedDeleted } = importEntries(
+      const { added, alreadyPresent, skippedDeleted, notKept, displaced } = importEntries(
         backup.entries,
         backup.removedIds,
       );
       const parts = [`Added ${added}.`];
       if (alreadyPresent > 0) parts.push(`${alreadyPresent} already here.`);
       if (skippedDeleted > 0) parts.push(`${skippedDeleted} left deleted.`);
+      if (notKept > 0) parts.push(`${notKept} did not fit the 80-entry journal.`);
+      if (displaced > 0) parts.push(`${displaced} oldest made room.`);
       setStatus({ tone: "ok", message: parts.join(" ") });
     } catch (error) {
       setStatus({ tone: "error", message: vaultErrorMessage(error) });

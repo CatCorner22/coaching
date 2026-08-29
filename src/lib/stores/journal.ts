@@ -113,12 +113,6 @@ export const useJournal = create<JournalState>()(
       importEntries: (incoming, incomingRemoved) => {
         const existing = get().entries;
         const existingRemoved = get().removedIds;
-        const summary = summarizeImport(
-          incoming as readonly { id?: unknown }[],
-          existing,
-          existingRemoved,
-          incomingRemoved,
-        );
         const normalized = incoming
           .map(normalizeJournalEntry)
           .filter((entry): entry is JournalEntry => entry !== null);
@@ -128,7 +122,18 @@ export const useJournal = create<JournalState>()(
           incomingRemoved,
           existingRemoved,
         );
-        if (!merged) return { added: 0, alreadyPresent: 0, skippedDeleted: 0 };
+        if (!merged) {
+          return { added: 0, alreadyPresent: 0, skippedDeleted: 0, notKept: 0, displaced: 0 };
+        }
+        // Summarized from the merge result, so the report reflects what the
+        // cap actually kept — not what the file intended.
+        const summary = summarizeImport(
+          merged.entries as readonly { id?: unknown }[],
+          normalized,
+          existing,
+          existingRemoved,
+          incomingRemoved,
+        );
         const entries = merged.entries as JournalEntry[];
         set({
           entries,

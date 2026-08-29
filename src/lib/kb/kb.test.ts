@@ -1700,3 +1700,16 @@ test("authored wrap coordinates are body-space fractions clear of the head", () 
     }
   }
 });
+
+test("getAcademyTie keeps every authored goal", () => {
+  // The no-TIE_ACADEMY early return derived a goal from `why`
+  // unconditionally, silently replacing the per-drill goal all twelve prop
+  // drills author beside their steps — unlike the reconciled branch, which
+  // always respected `base.goal ??`.
+  for (const t of TIES) {
+    if (!t.goal) continue;
+    const academy = getAcademyTie(t.slug);
+    assert.ok(academy, t.slug);
+    assert.equal(academy.goal, t.goal, `${t.slug}: authored goal was replaced`);
+  }
+});

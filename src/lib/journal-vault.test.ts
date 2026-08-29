@@ -195,19 +195,47 @@ test("a payload that is not a backup is null rather than a partial restore", () 
   }
 });
 
-test("an import reports what it will change, and never resurrects a deletion", () => {
+test("an import reports what it actually changed, and never resurrects a deletion", () => {
   const incoming = [{ id: "new" }, { id: "have" }, { id: "deleted" }, { id: "new" }, {}];
   const existing = [{ id: "have" }];
-  const summary = summarizeImport(incoming, existing, ["deleted"], []);
+  const merged = [{ id: "have" }, { id: "new" }];
+  const summary = summarizeImport(merged, incoming, existing, ["deleted"], []);
   // "new" counted once despite appearing twice; the id-less row is ignored.
-  assert.deepEqual(summary, { added: 1, alreadyPresent: 1, skippedDeleted: 1 });
+  assert.deepEqual(summary, {
+    added: 1,
+    alreadyPresent: 1,
+    skippedDeleted: 1,
+    notKept: 0,
+    displaced: 0,
+  });
 
   // A tombstone from the *file* also applies, so restoring an old backup on top
   // of a newer one cannot bring back what the newer one deleted.
-  assert.deepEqual(
-    summarizeImport([{ id: "x" }], [], [], ["x"]),
-    { added: 0, alreadyPresent: 0, skippedDeleted: 1 },
-  );
+  assert.deepEqual(summarizeImport([], [{ id: "x" }], [], [], ["x"]), {
+    added: 0,
+    alreadyPresent: 0,
+    skippedDeleted: 1,
+    notKept: 0,
+    displaced: 0,
+  });
+});
+
+test("the import report reflects the cap: dropped imports and displaced entries are named", () => {
+  // A full journal (the cap keeps newest-first) restores a backup of two old
+  // entries: one fits, one does not, and one existing entry is pushed out.
+  // The old pre-merge summary reported both as "added" and the displacement
+  // not at all.
+  const existing = [{ id: "e1" }, { id: "e2" }, { id: "e3" }];
+  const incoming = [{ id: "b1" }, { id: "b2" }];
+  const merged = [{ id: "e1" }, { id: "e2" }, { id: "b1" }];
+  const summary = summarizeImport(merged, incoming, existing, [], []);
+  assert.deepEqual(summary, {
+    added: 1,
+    alreadyPresent: 0,
+    skippedDeleted: 0,
+    notKept: 1,
+    displaced: 1,
+  });
 });
 
 test("the filename dates the backup and says nothing else about it", () => {

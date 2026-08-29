@@ -768,3 +768,11 @@ test("every persisted store has crash-safe storage and consent survives stale ta
   const persist = read("src/lib/stores/persist.ts");
   assert.match(persist, /export function settingsConsentMergingStorage/);
 });
+
+test("the capture panel states the upload scope in force on every batch", () => {
+  // README §Upload scope: "The capture panel states the setting in force."
+  // The scope strings existed and were referenced only by tests; the panel
+  // itself never told the user what this deployment's batch may contain.
+  const camera = read("src/components/camera-capture.tsx");
+  assert.match(camera, /\{uploadScopeCapturePreference\(scope\)\}/);
+});
