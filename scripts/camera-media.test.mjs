@@ -9,6 +9,7 @@ import {
   processMediaFrame,
   validateMediaFile,
   validateMediaSignature,
+  softwareCropRect,
 } from "../src/lib/media.ts";
 import {
   applyFocus,
@@ -1142,3 +1143,53 @@ function installFakeVideoDom({ duration, silentLoad = false, onSeek = undefined 
     },
   };
 }
+
+test("softwareCropRect crops to the centered 1/zoom region the preview showed", () => {
+  // Software zoom scales only the preview element, so a capture that draws
+  // the full frame includes everything the user framed out. The crop rect is
+  // the contract that stills match the preview; pin its math.
+  assert.deepEqual(softwareCropRect(1280, 960, 2), { sx: 320, sy: 240, sw: 640, sh: 480 });
+  // Non-integer zoom rounds, stays centered within a pixel.
+  const r = softwareCropRect(1920, 1080, 2.4);
+  assert.equal(r.sw, 800);
+  assert.equal(r.sh, 450);
+  assert.equal(r.sx, Math.floor((1920 - 800) / 2));
+  assert.equal(r.sy, Math.floor((1080 - 450) / 2));
+  // zoom <= 1, NaN, and Infinity are identity — never an enlargement or crash.
+  assert.deepEqual(softwareCropRect(640, 480, 1), { sx: 0, sy: 0, sw: 640, sh: 480 });
+  assert.deepEqual(softwareCropRect(640, 480, 0.5), { sx: 0, sy: 0, sw: 640, sh: 480 });
+  assert.deepEqual(softwareCropRect(640, 480, NaN), { sx: 0, sy: 0, sw: 640, sh: 480 });
+  // Extreme zoom bottoms out at one pixel, not zero.
+  const tiny = softwareCropRect(640, 480, 10_000);
+  assert.equal(tiny.sw, 1);
+  assert.equal(tiny.sh, 1);
+});
+
+test("the capture surface honours software zoom, resets it for clips, and scopes shortcuts", () => {
+  const capture = readFileSync(new URL("../src/components/camera-capture.tsx", import.meta.url), "utf8");
+
+  // Burst stills pass the software-zoom crop into processMediaFrame. Without
+  // this a 2.4x "zoomed" capture transmitted the full wide scene.
+  assert.match(capture, /softwareZoom = !zoomCaps && zoom > 1 \? zoom : undefined/);
+  assert.match(capture, /processMediaFrame\(v, 1600, 240, 0\.82, null, softwareZoom\)/);
+
+  // A clip records the raw stream; recording under a CSS-only zoom is the
+  // same lie in video form. The record path resets to 1x and says why.
+  assert.match(capture, /if \(!zoomCaps && zoom > 1\) \{\s*\n\s*setZoom\(1\);/);
+  assert.match(capture, /clip records the camera's full frame, so zoom was reset/);
+
+  // The 3s timer waits real seconds and cannot leave a stuck countdown: the
+  // overlay clears in a finally, and a flip/close mid-count aborts via the
+  // camera-request token instead of snapping from the wrong camera.
+  assert.match(capture, /setTimeout\(resolve, 1000\)/);
+  assert.doesNotMatch(capture, /setTimeout\(resolve, 450\)/);
+  assert.match(capture, /const request = cameraRequestRef\.current;\s*\n\s*try \{/);
+  assert.match(capture, /\} finally \{\s*\n\s*if \(mountedRef\.current\) setCountdown\(null\);/);
+
+  // Space/R fire only from non-interactive targets. On a focused control the
+  // key keeps its normal meaning instead of consuming the one-use batch.
+  assert.match(
+    capture,
+    /closest\("button, a, input, textarea, select, \[role='slider'\], \[contenteditable\]"\)/,
+  );
+});

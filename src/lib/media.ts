@@ -396,6 +396,45 @@ export async function loadImage(src: string | Blob): Promise<HTMLImageElement> {
   }
 }
 
+/**
+ * Centered source rectangle for a software (CSS-preview) zoom. The preview
+ * scales the <video> element, so what the user sees at zoom z is the middle
+ * 1/z of each axis; a capture that draws the full frame silently includes
+ * everything the user believed they had framed out — surroundings, faces,
+ * identifying detail. Pure math so the invariant is unit-testable.
+ */
+export function softwareCropRect(
+  iw: number,
+  ih: number,
+  zoom: number,
+): { sx: number; sy: number; sw: number; sh: number } {
+  const z = Number.isFinite(zoom) && zoom > 1 ? zoom : 1;
+  const sw = Math.max(1, Math.round(iw / z));
+  const sh = Math.max(1, Math.round(ih / z));
+  return { sx: Math.floor((iw - sw) / 2), sy: Math.floor((ih - sh) / 2), sw, sh };
+}
+
+export function drawContainRegion(
+  img: CanvasImageSource,
+  maxEdge: number,
+  sx: number,
+  sy: number,
+  sw: number,
+  sh: number,
+): HTMLCanvasElement {
+  assertPixelBudget(sw, sh);
+  const scale = Math.min(1, maxEdge / Math.max(sw, sh, 1));
+  const w = Math.max(1, Math.round(sw * scale));
+  const h = Math.max(1, Math.round(sh * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("No canvas");
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+  return canvas;
+}
+
 export function drawContain(
   img: CanvasImageSource,
   maxEdge: number,
@@ -429,14 +468,16 @@ async function canvasFromSource(
   src: Blob | HTMLImageElement | HTMLVideoElement,
   maxEdge: number,
   knownDimensions?: { width: number; height: number } | null,
+  centerCropZoom?: number,
 ): Promise<HTMLCanvasElement> {
   if (typeof HTMLVideoElement !== "undefined" && src instanceof HTMLVideoElement) {
-    return drawContain(
-      src,
-      maxEdge,
-      src.videoWidth || 640,
-      src.videoHeight || 480,
-    );
+    const iw = src.videoWidth || 640;
+    const ih = src.videoHeight || 480;
+    if (centerCropZoom && centerCropZoom > 1) {
+      const { sx, sy, sw, sh } = softwareCropRect(iw, ih, centerCropZoom);
+      return drawContainRegion(src, maxEdge, sx, sy, sw, sh);
+    }
+    return drawContain(src, maxEdge, iw, ih);
   } else if (typeof HTMLImageElement !== "undefined" && src instanceof HTMLImageElement) {
     return drawContain(src, maxEdge, src.naturalWidth, src.naturalHeight);
   } else if (typeof createImageBitmap === "function") {
@@ -554,8 +595,9 @@ export async function processMediaFrame(
   analysisEdge = 240,
   quality = 0.72,
   knownDimensions?: { width: number; height: number } | null,
+  centerCropZoom?: number,
 ): Promise<ProcessedMediaFrame> {
-  const preview = await canvasFromSource(src, previewEdge, knownDimensions);
+  const preview = await canvasFromSource(src, previewEdge, knownDimensions, centerCropZoom);
   const analysis = drawContain(preview, analysisEdge, preview.width, preview.height);
   const ctx = analysis.getContext("2d", { willReadFrequently: true });
   if (!ctx) throw new Error("No canvas");

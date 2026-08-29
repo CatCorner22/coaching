@@ -564,9 +564,16 @@ export const CameraCapture = memo(function CameraCapture({
     const { signal } = operation;
     try {
       const frames: ProcessedMediaFrame[] = [];
+      // Software zoom scales only the preview element; hardware zoom changed
+      // the stream itself. Capturing the raw frame under software zoom kept
+      // everything the user had framed out of view — surroundings, faces,
+      // identifying detail — which on this app is a privacy defect, not a
+      // framing nit. Crop each still to the same centered region the preview
+      // showed.
+      const softwareZoom = !zoomCaps && zoom > 1 ? zoom : undefined;
       for (let i = 0; i < BURST_FRAME_COUNT; i++) {
         signal.throwIfAborted();
-        frames.push(await processMediaFrame(v, 1600, 240, 0.82));
+        frames.push(await processMediaFrame(v, 1600, 240, 0.82, null, softwareZoom));
         await new Promise((r) => setTimeout(r, 70));
       }
       const observed = frames.map((frame) => ({
@@ -619,6 +626,16 @@ export const CameraCapture = memo(function CameraCapture({
       if (!hasCurrentBatchPermissions()) return;
       try {
         setError(null);
+        // A clip records the camera's raw stream; a CSS-only zoom cannot crop
+        // it. Recording while the preview shows a tighter frame than the file
+        // will contain is the zoom privacy bug in video form, so drop back to
+        // 1x — preview and recording agree again — and say why.
+        if (!zoomCaps && zoom > 1) {
+          setZoom(1);
+          setHint(
+            "Digital zoom applies to stills only — the clip records the camera's full frame, so zoom was reset before recording.",
+          );
+        }
         setVideoFrames([]);
         setSelectedFrames([]);
         const handle = startClip(stream);
@@ -844,12 +861,38 @@ export const CameraCapture = memo(function CameraCapture({
       await snapBurst();
       return;
     }
-    for (let n = 3; n >= 1; n--) {
-      if (!mountedRef.current || disabledRef.current) return;
-      setCountdown(n);
-      await new Promise((resolve) => window.setTimeout(resolve, 450));
+    // The control says 3s, so each displayed count holds for a real second —
+    // it used to wait 450ms per step and fire after ~1.35s, photographing
+    // people who were still positioning the camera. The countdown is bound to
+    // this camera session: Close or Flip mid-count aborts rather than letting
+    // the pending sleeps resume and snap from whichever camera is live now.
+    // Every exit clears the overlay; an aborted count used to leave a stale
+    // number on screen with the capture button disabled until stopLive ran.
+    const request = cameraRequestRef.current;
+    try {
+      for (let n = 3; n >= 1; n--) {
+        if (
+          !mountedRef.current ||
+          disabledRef.current ||
+          request !== cameraRequestRef.current ||
+          !streamRef.current
+        ) {
+          return;
+        }
+        setCountdown(n);
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+      }
+      if (
+        !mountedRef.current ||
+        disabledRef.current ||
+        request !== cameraRequestRef.current ||
+        !streamRef.current
+      ) {
+        return;
+      }
+    } finally {
+      if (mountedRef.current) setCountdown(null);
     }
-    setCountdown(null);
     await snapBurst();
   }
 
@@ -894,7 +937,15 @@ export const CameraCapture = memo(function CameraCapture({
   useEffect(() => {
     if (!live || disabled) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+      // Shortcuts fire only from a non-interactive target (the page body or
+      // the preview). On a focused button, link, or slider the key must keep
+      // its normal meaning — Space on a focused Close used to fire a burst
+      // and consume the one-use batch instead of closing the camera.
+      if (
+        event.target instanceof HTMLElement &&
+        (event.target.isContentEditable ||
+          event.target.closest("button, a, input, textarea, select, [role='slider'], [contenteditable]"))
+      ) {
         return;
       }
       if (event.code === "Space") {
