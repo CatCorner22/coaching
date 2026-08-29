@@ -1004,6 +1004,12 @@ export const CameraCapture = memo(function CameraCapture({
       ) {
         return;
       }
+      // A held modifier means the key is a browser or OS chord, not this
+      // panel's shortcut — Ctrl/Cmd+R is a page refresh, and swallowing it
+      // to start a recording hijacks a navigation the user asked for.
+      if (event.ctrlKey || event.metaKey || event.altKey) {
+        return;
+      }
       if (event.code === "Space") {
         event.preventDefault();
         void snapWithOptionalTimerRef.current();

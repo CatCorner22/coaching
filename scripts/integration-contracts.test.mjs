@@ -111,6 +111,8 @@ test("studio burst waits for distinct frames, matches digital zoom, and does not
     camera,
     /closest\(\s*\n?\s*"button, a, input, textarea, select, summary, label, \[role='button'\], \[role='slider'\], \[contenteditable\]",?\s*\n?\s*\)/,
   );
+  // Ctrl/Cmd+R must stay a refresh, not a recording.
+  assert.match(camera, /event\.ctrlKey \|\| event\.metaKey \|\| event\.altKey/);
 });
 
 test("a cancelled photo import cannot commit after its decoder resolves", () => {
