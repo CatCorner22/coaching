@@ -752,3 +752,19 @@ test("the banned-output scrub guards model text, not reviewed catalog narration"
   assert.match(read("src/routes/tie.$slug.tsx"), /tieStepVoiceInput\(s, step, tie\.steps\.length\)/);
   assert.match(read("src/routes/knot.$slug.tsx"), /knotStepVoiceInput\(s, step, knot\.steps\.length\)/);
 });
+
+test("every persisted store has crash-safe storage and consent survives stale tabs", () => {
+  // learn-progress was the one store on zustand's default storage, so a
+  // quota-exhausted save threw out of markStepComplete/setLast and crashed
+  // the lesson route without ever reaching the persist-failure banner.
+  const learn = read("src/lib/stores/learn-progress.ts");
+  assert.match(learn, /storage: safeJsonStorage<LearnProgressState>\(\)/);
+
+  // The consent-bearing settings flags move as one stamped unit through a
+  // write-merge, like negotiation ranks and journal entries already do.
+  const settings = read("src/lib/stores/settings.ts");
+  assert.match(settings, /storage: settingsConsentMergingStorage<SettingsState>\("knotty-settings"\)/);
+  assert.match(settings, /consentStamp: nextConsentStamp\(s\)/);
+  const persist = read("src/lib/stores/persist.ts");
+  assert.match(persist, /export function settingsConsentMergingStorage/);
+});

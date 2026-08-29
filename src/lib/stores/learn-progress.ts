@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { adoptPersistKey } from "./persist";
+import { adoptPersistKey, safeJsonStorage } from "./persist";
 
 export type LessonKind = "knot" | "tie";
 
@@ -51,7 +51,14 @@ export const useLearnProgress = create<LearnProgressState>()(
         return Math.round((done / totalSteps) * 100);
       },
     }),
-    { name: "knotty-learn", merge: (persisted, current) => {
+    {
+      name: "knotty-learn",
+      // Like every other persisted store: zustand's default storage lets a
+      // quota-exhausted setItem throw straight out of store actions, so
+      // marking a step complete or the setLast effect crashed the lesson
+      // route — and the failure never reached the persist-failure banner.
+      storage: safeJsonStorage<LearnProgressState>(),
+      merge: (persisted, current) => {
       const p = (persisted ?? {}) as Partial<LearnProgressState>;
       return {
         ...current,

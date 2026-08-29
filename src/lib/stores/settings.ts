@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { adoptPersistKey, safeJsonStorage, syncPersistedAcrossTabs } from "./persist";
+import { adoptPersistKey, settingsConsentMergingStorage, syncPersistedAcrossTabs } from "./persist";
 
 export type Settings = {
   consentVersion: number;
@@ -18,6 +18,13 @@ export type Settings = {
   voice: boolean;
   listen: boolean;
   circulationMins: number;
+  /**
+   * Monotonic stamp on the last consent decision (enter, resetConsent, or a
+   * voice/listen toggle). The write-merge in settingsConsentMergingStorage
+   * compares it so a stale tab's unrelated save cannot resurrect withdrawn
+   * consent — the same protection negotiation ranks already have.
+   */
+  consentStamp: number;
 };
 
 const defaults: Settings = {
@@ -36,6 +43,7 @@ const defaults: Settings = {
   voice: false,
   listen: false,
   circulationMins: 4,
+  consentStamp: 0,
 };
 
 const RESERVED = new Set(["next", "analyze", "hands", "stop", "pause", "release"]);
@@ -52,6 +60,11 @@ function clampWord(v: unknown, fallback: string) {
   if (!/\p{L}{2}/u.test(s)) return fallback;
   if (/[^\p{L}\p{M}\s'’-]/u.test(s)) return fallback;
   return s;
+}
+
+/** Strictly increasing even against a backward wall-clock correction. */
+function nextConsentStamp(s: Settings): number {
+  return Math.max(Date.now(), (s.consentStamp || 0) + 1);
 }
 
 type SettingsState = Settings & {
@@ -85,6 +98,7 @@ export function normalizePersistedSettings(persisted: unknown, current: Settings
     greenWord: clampWord(p.greenWord, current.greenWord),
     voice: consented && p.voice === true,
     listen: consented && p.listen === true,
+    consentStamp: Math.max(0, Number(p.consentStamp) || 0),
     circulationMins: Math.min(
       12,
       Math.max(2, Number(p.circulationMins) || current.circulationMins),
@@ -101,6 +115,12 @@ export const useSettings = create<SettingsState>()(
       set: (p) =>
         set((s) => ({
           ...p,
+          // The same clamps hydration applies, so the live value never differs
+          // from what will survive the next reload — an unclamped name showed
+          // in full until reload, then silently changed to its truncation.
+          riggerName: p.riggerName !== undefined ? String(p.riggerName).slice(0, 40) : s.riggerName,
+          bottomName: p.bottomName !== undefined ? String(p.bottomName).slice(0, 40) : s.bottomName,
+          honorific: p.honorific !== undefined ? String(p.honorific).slice(0, 24) : s.honorific,
           safeword: p.safeword !== undefined ? clampWord(p.safeword, s.safeword) : s.safeword,
           yellowWord: p.yellowWord !== undefined ? clampWord(p.yellowWord, s.yellowWord) : s.yellowWord,
           greenWord: p.greenWord !== undefined ? clampWord(p.greenWord, s.greenWord) : s.greenWord,
@@ -108,23 +128,34 @@ export const useSettings = create<SettingsState>()(
             p.circulationMins !== undefined
               ? Math.min(12, Math.max(2, Number(p.circulationMins) || s.circulationMins))
               : s.circulationMins,
+          consentStamp:
+            p.voice !== undefined || p.listen !== undefined
+              ? nextConsentStamp(s)
+              : s.consentStamp,
         })),
       enter: () =>
-        set({
+        set((s) => ({
           consentVersion: CURRENT_CONSENT_VERSION,
           consented: true,
           adults: true,
           shears: true,
           photosOk: true,
-        }),
+          consentStamp: nextConsentStamp(s),
+        })),
       // Withdrawing consent also drops the consent-bearing cloud-voice and mic
       // opt-ins, so the live state matches the hydration invariant (voice and
       // listen require consented) instead of lingering enabled until reload.
-      resetConsent: () => set({ consented: false, voice: false, listen: false }),
+      resetConsent: () =>
+        set((s) => ({
+          consented: false,
+          voice: false,
+          listen: false,
+          consentStamp: nextConsentStamp(s),
+        })),
     }),
     {
       name: "knotty-settings",
-      storage: safeJsonStorage<SettingsState>(),
+      storage: settingsConsentMergingStorage<SettingsState>("knotty-settings"),
       version: 1,
       migrate: (persisted) => persisted as SettingsState,
       merge: (persisted, current) => {
