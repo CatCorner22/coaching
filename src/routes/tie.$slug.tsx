@@ -17,6 +17,7 @@ import {
   type StepConfirm,
 } from "@/components/learn";
 import { bulletsOrFallback } from "@/lib/learn/plain-language";
+import { tieStepVoiceInput } from "@/lib/learn/voice-script";
 import {
   getAcademyTie,
   getKnot,
@@ -25,8 +26,10 @@ import {
   requiresStepConfirmation,
 } from "@/lib/kb";
 import { tieShape, tieShapeBlurb, tieShapeLabel } from "@/lib/kb/tie-factories";
+import { missingTieLimits } from "@/lib/studio/negotiation";
 import { coachVoiceLabel } from "@/lib/voice/coach-profile";
 import { useLearnProgress } from "@/lib/stores/learn-progress";
+import { useNegotiate } from "@/lib/stores/negotiate";
 import { useSettings } from "@/lib/stores/settings";
 import { playCoachVoice } from "@/lib/voice/play";
 
@@ -41,6 +44,7 @@ function TiePage() {
   // throw that enrichment away.
   const tie = useMemo(() => getAcademyTie(slug), [slug]);
   const cloudVoice = useSettings((settings) => settings.voice);
+  const negotiationItems = useNegotiate((s) => s.items);
   const markStepComplete = useLearnProgress((s) => s.markStepComplete);
   const setLast = useLearnProgress((s) => s.setLast);
   const [step, setStep] = useState(0);
@@ -95,26 +99,28 @@ function TiePage() {
   // let it page past the cinch step — the step its own title calls "the step
   // that makes this safe" — without confirming anything.
   const mustConfirm = requiresStepConfirmation(tie);
+  // README: a guided tie "stays blocked — in Studio and on the tie page —
+  // until that limit is set to yes on /negotiate". Studio enforces its side
+  // via the same table (buildStudioNegotiationPolicy); this is the tie page's
+  // side, which had been promised in tieLimitIds' docstring but never wired
+  // in. Fail-closed: an unhydrated store blocks like an unagreed limit does.
+  const missingLimits = shape === "guided" ? missingTieLimits(slug, negotiationItems) : [];
+  const limitsAgreed = missingLimits.length === 0;
   const voiceLabel = coachVoiceLabel(cloudVoice);
   const bottomLines = bulletsOrFallback(s.bottomBullets, s.bottom);
-  const voiceStep = {
-    stepIndex: step,
-    totalSteps: tie.steps.length,
-    title: s.title,
-    stepGoal: s.goal,
-    doText: s.rigger,
-    checkText: s.check,
-    doBullets: s.riggerBullets,
-    checkBullets: s.checkBullets,
-    speak: s.speak,
-  };
+  // Shared builder, not an inline literal: the server's reviewed-speech
+  // allowlist composes the same narration through this function, and a page
+  // that drifts by one word loses cloud voice for every step.
+  const voiceStep = tieStepVoiceInput(s, step, tie.steps.length);
 
   function goNext() {
     markStepComplete("tie", slug, step);
     setStep((n) => n + 1);
   }
 
-  const coachPanel = (
+  // The coach panel carries the practice cam and step narration, so it is
+  // part of what the limit gate holds back, not chrome around it.
+  const coachPanel = !limitsAgreed ? null : (
     <AcademyCoachPanel
       voice={voiceStep}
       cloudVoice={cloudVoice}
@@ -205,10 +211,47 @@ function TiePage() {
         </p>
       </div>
 
-      <>
+      {!limitsAgreed && (
+        <section className="rounded-lg border border-warn/40 bg-warn/10 px-4 py-5 sm:px-5">
+          <h3 className="font-display text-xl text-fg">This tie waits for a yes</h3>
+          <p className="mt-2 text-base leading-relaxed text-muted">
+            {tie.name} goes on a person, so its steps stay closed until the limit it touches is
+            agreed on the negotiation page — by both of you, before any rope.
+          </p>
+          <ul className="mt-3 space-y-1.5">
+            {missingLimits.map((limit) => (
+              <li key={limit.id} className="flex items-center gap-2 text-base text-fg">
+                <span className="size-1.5 shrink-0 rounded-full bg-warn" aria-hidden />
+                {limit.label}
+              </li>
+            ))}
+          </ul>
+          <Link
+            to="/negotiate"
+            className="mt-4 inline-flex items-center gap-2 rounded-lg border border-accent/50 bg-accent/10 px-4 py-2 font-medium text-accent transition-colors hover:border-accent"
+          >
+            Open the negotiation page
+            <span aria-hidden>→</span>
+          </Link>
+          <p className="mt-3 text-sm leading-relaxed text-muted">
+            The safety notes, stop conditions, and aftercare below stay readable either way.
+          </p>
+        </section>
+      )}
+
+      {limitsAgreed && <>
           <StepProgress step={step} total={tie.steps.length} />
 
-          <StepFilmstrip steps={tie.steps} active={step} onSelect={setStep} />
+          <StepFilmstrip
+            steps={tie.steps}
+            active={step}
+            onSelect={(i) =>
+              // Jumping back to review is free; jumping forward must not
+              // bypass the Do/Check acknowledgement the Next button enforces
+              // (the cinch step and release rehearsal are what it protects).
+              setStep((current) => (mustConfirm && i > current ? current : i))
+            }
+          />
 
           <StepCard
             index={step}
@@ -225,7 +268,7 @@ function TiePage() {
             onConfirmChange={setConfirm}
             requireConfirm={mustConfirm}
             media={stepFigure}
-            onSpeak={() => void playCoachVoice(s.speak, cloudVoice)}
+            onSpeak={() => void playCoachVoice(s.speak, cloudVoice, { reviewed: true })}
           />
 
           <aside className="rounded-lg border border-border bg-surface px-4 py-4 sm:px-5">
@@ -248,7 +291,7 @@ function TiePage() {
             nextLabel="Next section"
             canAdvance={!mustConfirm || (confirm.didDo && confirm.didCheck)}
           />
-        </>
+        </>}
 
       <StopStrip items={tie.stop} className="mt-4 rounded-xl border border-danger/20 bg-danger/5 p-5" />
 

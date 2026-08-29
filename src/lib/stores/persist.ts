@@ -236,6 +236,15 @@ export function mergeNegotiationItemsByStamp(
       merged.push(itemStamp(other) > itemStamp(item) ? { ...item, updatedAt: other.updatedAt } : item);
       continue;
     }
+    if (itemStamp(other) > itemStamp(item)) {
+      // Mirror quadrant of the first branch: the stored side is more
+      // permissive AND strictly newer — a genuine later re-approval from
+      // another tab. The documented rule already says it wins; without this
+      // branch the fallthrough wrote the stale older 'no' over it and
+      // regressed the stored stamp, so the re-approval silently flipped back.
+      merged.push({ ...item, rank: other.rank, updatedAt: other.updatedAt });
+      continue;
+    }
     merged.push(item);
   }
 
@@ -326,6 +335,57 @@ export function mergeJournalEntriesById(
 }
 
 /** Storage for the journal that unions entries on WRITE. */
+/**
+ * Write-merge for the consent-bearing settings flags, which move as one
+ * stamped unit (consented, voice, listen, consentVersion, consentStamp).
+ *
+ * The settings blob was whole-blob last-writer-wins with only the storage
+ * event rehydrate to repair it, so a stale tab's unrelated save — a name
+ * keystroke — landing before its rehydrate resurrected consent withdrawn in
+ * another tab, persistently and in both tabs. The same class negotiate and
+ * journal already fixed. A newer stored consent decision survives a stale
+ * write in either direction (a withdrawal cannot be resurrected, a genuine
+ * re-consent cannot be un-done by an older withdrawal blob); everything else
+ * in the blob stays last-write-wins.
+ */
+export function settingsConsentMergingStorage<State>(name: string): PersistStorage<State> {
+  const base = safeJsonStorage<State>();
+  return {
+    ...base,
+    setItem: (key, value) => {
+      if (key !== name) return base.setItem(key, value);
+      try {
+        const raw = safeBrowserStorage().getItem(key);
+        if (raw) {
+          type ConsentSlice = {
+            consented?: unknown;
+            voice?: unknown;
+            listen?: unknown;
+            consentVersion?: unknown;
+            consentStamp?: unknown;
+          };
+          const existing = (JSON.parse(raw) as { state?: ConsentSlice })?.state;
+          const incoming = (value as { state?: ConsentSlice })?.state;
+          if (
+            incoming &&
+            existing &&
+            (Number(existing.consentStamp) || 0) > (Number(incoming.consentStamp) || 0)
+          ) {
+            incoming.consented = existing.consented;
+            incoming.voice = existing.voice;
+            incoming.listen = existing.listen;
+            incoming.consentVersion = existing.consentVersion;
+            incoming.consentStamp = existing.consentStamp;
+          }
+        }
+      } catch {
+        // A corrupt existing blob is simply replaced by the incoming one.
+      }
+      return base.setItem(key, value);
+    },
+  };
+}
+
 export function journalMergingStorage<State>(name: string): PersistStorage<State> {
   const base = safeJsonStorage<State>();
   return {

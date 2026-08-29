@@ -245,3 +245,27 @@ test("all-data erase detects a storage implementation that silently keeps data",
     else globalThis.BroadcastChannel = previousBroadcastChannel;
   }
 });
+
+test("every persisted store key is covered by the account-boundary erase", async () => {
+  // The login page promises that starting or ending an account session clears
+  // Knotty's local data. knotty-learn and knotty-checklist were left off the
+  // erase list, so which ties someone practised and what they prepared for
+  // crossed account sessions on a shared device. This sweep derives the key
+  // set from the stores themselves so a future store cannot dodge the
+  // boundary by omission.
+  const { readFileSync, readdirSync } = await import("node:fs");
+  const { LOCAL_DATA_KEYS } = await import("../src/lib/privacy/local-data.ts");
+  const covered = new Set(LOCAL_DATA_KEYS);
+  const storeDir = new URL("../src/lib/stores/", import.meta.url);
+  for (const file of readdirSync(storeDir)) {
+    if (!file.endsWith(".ts") || file.endsWith(".test.ts")) continue;
+    const source = readFileSync(new URL(file, storeDir), "utf8");
+    for (const match of source.matchAll(/name: "(knotty-[a-z-]+)"/g)) {
+      assert.ok(covered.has(match[1]), `${file}: persisted key ${match[1]} is not erased at the account boundary`);
+    }
+    for (const match of source.matchAll(/adoptPersistKey\("([a-z-]+)", "([a-z-]+)"\)/g)) {
+      assert.ok(covered.has(match[1]), `${file}: ${match[1]} is not erased at the account boundary`);
+      assert.ok(covered.has(match[2]), `${file}: legacy key ${match[2]} is not erased at the account boundary`);
+    }
+  }
+});

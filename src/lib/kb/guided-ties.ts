@@ -197,6 +197,11 @@ export const GUIDED_TIES: Tie[] = [
         speak: "Untie rather than cut. Ask again tomorrow.",
         expected: { wrapBands: 0, pose: "sit", view: "front", handsVisible: true, neckClear: true },
         wraps: [],
+        // An empty `wraps` does not clear the cumulative figure (the route
+        // draws steps.slice(0, i + 1)); the explicit empty media is what
+        // "you have taken it off" should look like — the same override the
+        // prop-drill strip-down step uses.
+        media: [{ kind: "wraps" as const, wraps: [] }],
       },
     ],
   }),
@@ -321,6 +326,11 @@ export const GUIDED_TIES: Tie[] = [
         speak: "Release the cinch before unwrapping. Compare both sides.",
         expected: { wrapBands: 0, pose: "sit", view: "front", handsVisible: true, neckClear: true },
         wraps: [],
+        // An empty `wraps` does not clear the cumulative figure (the route
+        // draws steps.slice(0, i + 1)); the explicit empty media is what
+        // "you have taken it off" should look like — the same override the
+        // prop-drill strip-down step uses.
+        media: [{ kind: "wraps" as const, wraps: [] }],
       },
     ],
   }),
@@ -404,7 +414,7 @@ export const GUIDED_TIES: Tie[] = [
           "The first knot is at the breastbone or lower, and the loop above it sits clear of the throat with room to spare when she looks up and turns her head.",
         speak: "First knot at the breastbone. Lower than you think.",
         expected: { wrapBands: 1, pose: "stand", view: "front", handsVisible: true, neckClear: true },
-        wraps: [{ kind: "diamond", cy: 30 }],
+        wraps: [{ kind: "diamond", cy: 0.3 }],
       },
       {
         title: "3 · A chain of knots down the front",
@@ -416,7 +426,7 @@ export const GUIDED_TIES: Tie[] = [
           "An even chain of knots running from breastbone to hips, no twists in the rope between them, and no knot sitting anywhere she has flagged.",
         speak: "Even spacing, hand's width apart, down to the hips.",
         expected: { wrapBands: 3, pose: "stand", view: "front", handsVisible: true, neckClear: true },
-        wraps: [{ kind: "diamond", cy: 45 }, { kind: "diamond", cy: 60 }],
+        wraps: [{ kind: "diamond", cy: 0.39 }, { kind: "diamond", cy: 0.475 }],
       },
       {
         title: "4 · Anchor at the waist",
@@ -428,7 +438,7 @@ export const GUIDED_TIES: Tie[] = [
           "The waist wrap holds the chain in place, a full breath in and out feels entirely normal, and the rope sits on the waist rather than up on the ribs.",
         speak: "Waist wrap, snug not tight. Take a full breath.",
         expected: { wrapBands: 4, pose: "stand", view: "front", handsVisible: true, neckClear: true },
-        wraps: [{ kind: "band", y: 68 }],
+        wraps: [{ kind: "band", y: 0.49 }],
       },
       {
         title: "5 · Optional — pass between the legs, if that has its own yes",
@@ -440,7 +450,7 @@ export const GUIDED_TIES: Tie[] = [
           "Either this step was skipped, or it was separately agreed just now, is visibly loose, and she has reported no pressure or altered sensation.",
         speak: "Separate yes for this, or skip it. Loose if it goes on.",
         expected: { wrapBands: 5, pose: "stand", view: "front", handsVisible: true, neckClear: true },
-        wraps: [{ kind: "stem", y1: 68, y2: 82 }],
+        wraps: [{ kind: "stem", y1: 0.49, y2: 0.62 }],
       },
       {
         title: "6 · Join the knots into diamonds",
@@ -452,7 +462,7 @@ export const GUIDED_TIES: Tie[] = [
           "The diamonds are even, the chain still runs down the centre, and nothing has migrated upward towards the throat.",
         speak: "Even tension both sides, or the pattern goes crooked.",
         expected: { wrapBands: 6, pose: "stand", view: "front", handsVisible: true, neckClear: true },
-        wraps: [{ kind: "diamond", cy: 38 }, { kind: "diamond", cy: 53 }],
+        wraps: [{ kind: "diamond", cy: 0.345 }, { kind: "diamond", cy: 0.435 }],
       },
       {
         title: "7 · Tie off, then have her move in it",
@@ -477,6 +487,11 @@ export const GUIDED_TIES: Tie[] = [
         speak: "Cut between knots if it needs to be fast.",
         expected: { wrapBands: 0, pose: "stand", view: "front", handsVisible: true, neckClear: true },
         wraps: [],
+        // An empty `wraps` does not clear the cumulative figure (the route
+        // draws steps.slice(0, i + 1)); the explicit empty media is what
+        // "you have taken it off" should look like — the same override the
+        // prop-drill strip-down step uses.
+        media: [{ kind: "wraps" as const, wraps: [] }],
       },
     ],
   }),

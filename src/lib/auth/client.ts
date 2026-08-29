@@ -1,4 +1,5 @@
 import { genericOAuthClient } from "better-auth/client/plugins";
+import { randomId } from "@/lib/random-id";
 import { createAuthClient } from "better-auth/react";
 import {
   runPreSignInSignOut,
@@ -233,7 +234,7 @@ export async function signIn(
  */
 function openSignInPopup(providerId: string): PopupAttempt | null {
   const origin = window.location.origin;
-  const nonce = crypto.randomUUID().replaceAll("-", "");
+  const nonce = randomId().replaceAll("-", "");
   const oauthUrl = `${origin}/auth/popup?providerId=${encodeURIComponent(providerId)}&nonce=${encodeURIComponent(nonce)}`;
   const pendingUrl = `${origin}/auth/popup?pending=1&nonce=${encodeURIComponent(nonce)}`;
   // Unique name per attempt so a prior attempt stuck on the SPA is not reused.

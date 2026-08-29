@@ -22,10 +22,18 @@ type NyxNudePanelProps = {
   photoPose?: NyxPhotoNudePose | null;
 };
 
-function captionFor(pose: NyxNudePose | NyxPhotoNudePose, photoPose: NyxPhotoNudePose | null) {
-  if (photoPose) return nyxPhotoNudeCaption(photoPose);
-  if (isNyxPhotoNudePose(pose)) return nyxPhotoNudeCaption(pose);
-  return nyxNudeCaption(pose as NyxNudePose);
+function captionFor(
+  pose: NyxNudePose | NyxPhotoNudePose,
+  photoPose: NyxPhotoNudePose | null,
+  showPhoto: boolean,
+) {
+  // Caption what is actually on screen: with no photo file present the panel
+  // renders the illustration, and captioning it "Photo — …" mislabels every
+  // drawing in the gallery.
+  if (showPhoto && photoPose) return nyxPhotoNudeCaption(photoPose);
+  return nyxNudeCaption(
+    (isNyxPhotoNudePose(pose) ? (illustratedPoseForPhoto(pose) ?? "standFront") : pose) as NyxNudePose,
+  );
 }
 
 /** One nude study — real photo when the file exists, illustrated fallback otherwise. */
@@ -38,10 +46,10 @@ export function NyxNudePanel({ pose, className, compact = false, photoPose: phot
     !isPhotoKey ? (pose as NyxNudePose) : (illustratedPoseForPhoto(pose) ?? "standFront")
   ) as NyxNudePose;
   const [photoFailed, setPhotoFailed] = useState(false);
-  const caption = captionFor(pose, photoPose);
   const showPhoto = Boolean(
     photoPose && nyxPhotoNudeAvailable(photoPose) && !photoFailed,
   );
+  const caption = captionFor(pose, photoPose, showPhoto);
 
   return (
     <figure

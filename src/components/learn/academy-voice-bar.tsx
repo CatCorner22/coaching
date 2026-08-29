@@ -12,14 +12,16 @@ import { coachVoiceLabel } from "@/lib/voice/coach-profile";
 import { cn } from "@/lib/utils";
 
 type AcademyVoiceBarProps = {
+  /** The lesson's slug — step titles repeat across instructor routes. */
+  lessonKey?: string;
   step: VoiceStepInput;
   cloudVoice: boolean;
   className?: string;
 };
 
-export function AcademyVoiceBar({ step, cloudVoice, className }: AcademyVoiceBarProps) {
+export function AcademyVoiceBar({ step, cloudVoice, className, lessonKey }: AcademyVoiceBarProps) {
   const [autoRead, setAutoRead] = useAutoReadEnabled();
-  useAcademyAutoVoice(step, cloudVoice, autoRead);
+  useAcademyAutoVoice(step, cloudVoice, autoRead, lessonKey);
 
   const voiceLabel = coachVoiceLabel(cloudVoice);
   const segments = academyStepSegments(step);

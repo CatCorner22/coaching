@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { randomId } from "@/lib/random-id";
 import { persist } from "zustand/middleware";
 import type { Disposition, SourceId } from "@/lib/observation/report";
 import { SAFETY_SOURCE_IDS } from "@/lib/kb/sources";
@@ -83,7 +84,7 @@ export const useJournal = create<JournalState>()(
       removedIds: [],
       nerveHits: 0,
       add: (e) => {
-        const id = crypto.randomUUID();
+        const id = randomId();
         const nerve = e.flags.some((f) => /nerve|radial|numb/i.test(f)) ? 1 : 0;
         set({
           entries: [{ id, at: Date.now(), ...e, notes: String(e.notes ?? "").slice(0, 400) }, ...get().entries].slice(0, 80),
@@ -113,12 +114,6 @@ export const useJournal = create<JournalState>()(
       importEntries: (incoming, incomingRemoved) => {
         const existing = get().entries;
         const existingRemoved = get().removedIds;
-        const summary = summarizeImport(
-          incoming as readonly { id?: unknown }[],
-          existing,
-          existingRemoved,
-          incomingRemoved,
-        );
         const normalized = incoming
           .map(normalizeJournalEntry)
           .filter((entry): entry is JournalEntry => entry !== null);
@@ -128,7 +123,18 @@ export const useJournal = create<JournalState>()(
           incomingRemoved,
           existingRemoved,
         );
-        if (!merged) return { added: 0, alreadyPresent: 0, skippedDeleted: 0 };
+        if (!merged) {
+          return { added: 0, alreadyPresent: 0, skippedDeleted: 0, notKept: 0, displaced: 0 };
+        }
+        // Summarized from the merge result, so the report reflects what the
+        // cap actually kept — not what the file intended.
+        const summary = summarizeImport(
+          merged.entries as readonly { id?: unknown }[],
+          normalized,
+          existing,
+          existingRemoved,
+          incomingRemoved,
+        );
         const entries = merged.entries as JournalEntry[];
         set({
           entries,

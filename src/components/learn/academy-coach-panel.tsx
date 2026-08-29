@@ -47,9 +47,15 @@ export function AcademyCoachPanel({
   knotSlug,
   nyxNudes: nyxNudesProp,
 }: AcademyCoachPanelProps) {
+  // `??` swallowed an explicit null: instructor routes pass nyxPose={null}
+  // precisely to keep the demonstration model off entries the app refuses to
+  // teach, and the fallback re-derived a pose for them anyway.
   const nyxPose =
-    nyxPoseProp ??
-    (tieSlug ? nyxPoseForTieStep(tieSlug, stepIndex) : null);
+    nyxPoseProp !== undefined
+      ? nyxPoseProp
+      : tieSlug
+        ? nyxPoseForTieStep(tieSlug, stepIndex)
+        : null;
   const nyxNudes =
     nyxNudesProp ??
     (tieSlug
@@ -60,7 +66,7 @@ export function AcademyCoachPanel({
 
   return (
     <div className="space-y-4">
-      <AcademyVoiceBar step={voice} cloudVoice={cloudVoice} />
+      <AcademyVoiceBar step={voice} cloudVoice={cloudVoice} lessonKey={tieSlug ?? knotSlug ?? ""} />
       <NyxNudeStrip poses={nyxNudes} />
       {nyxPose && (
         <div className="learn-panel rounded-xl border border-border bg-surface p-4">

@@ -20,7 +20,7 @@ test("cloud voice is fail-closed and route controls pass the saved opt-in", () =
   for (const path of ["src/routes/tie.$slug.tsx", "src/routes/knot.$slug.tsx"]) {
     const route = read(path);
     assert.match(route, /useSettings\(\(settings\) => settings\.voice\)/, path);
-    assert.match(route, /playCoachVoice\([^\n]+, cloudVoice\)/, path);
+    assert.match(route, /playCoachVoice\([^\n]+, cloudVoice, \{ reviewed: true \}\)/, path);
     assert.match(route, /coachVoiceLabel\(cloudVoice\)/, path);
   }
 
@@ -228,6 +228,19 @@ test("Studio requires yes for negotiated actions and blocks every voice path", (
 
 test("non-none triage invalidates stale visual coaching before rendering or journaling", () => {
   const studio = read("src/routes/studio.tsx");
+  // Truth in labelling: commit 80d27d8 removed the triage radio inputs (the
+  // "removed Studio triage gate" item awaiting the owner's decision), so
+  // today NO call site sets triage to a non-none value and the effect below
+  // is dead code held in reserve. This test keeps pinning the invalidation
+  // logic so the gate can return intact — and pins the dead state itself, so
+  // it flags for re-review if either the entry path returns or the reserved
+  // logic gets deleted as "unused".
+  const nonNoneSetters = (studio.match(/setTriage\((?!"none")/g) ?? []).length;
+  assert.equal(
+    nonNoneSetters,
+    0,
+    "a triage entry path returned — re-review this pin and the triage gate decision",
+  );
   const triageEffect = between(
     studio,
     'if (triage === "none") return;',
@@ -664,4 +677,182 @@ test("the consent gate names where Analyze sends stills", () => {
   const gate = read("src/components/consent-gate.tsx");
   assert.match(gate, /sends your selected stills to xAI only when you\s+tap it/);
   assert.match(gate, /never in the background/);
+});
+
+test("tie page gates guided steps behind negotiated limits; auto-voice survives re-renders", () => {
+  const tiePage = read("src/routes/tie.$slug.tsx");
+  // README: a guided tie "stays blocked — in Studio and on the tie page —
+  // until that limit is set to yes". tieLimitIds' docstring promised this
+  // call site from the start; the page had never wired it in, so the karada
+  // taught in full with torso at no.
+  assert.match(tiePage, /shape === "guided" \? missingTieLimits\(slug, negotiationItems\) : \[\]/);
+  // Blocked state withholds the steps AND the coach panel (practice cam).
+  assert.match(tiePage, /\{limitsAgreed && </);
+  assert.match(tiePage, /!limitsAgreed \? null :/);
+  // The blocked card routes to the fix rather than just refusing.
+  assert.match(tiePage, /to="\/negotiate"/);
+
+  // Auto-read narration keys on real transitions (step, voice, toggle) — not
+  // on the identity of a step object rebuilt every render, which ran the
+  // cleanup on the first re-render and stopped the voice mid-sentence with
+  // no restart.
+  const voice = read("src/components/learn/use-academy-voice.ts");
+  assert.match(voice, /\}, \[enabled, narrationKey, cloudVoice\]\);/);
+  assert.doesNotMatch(voice, /\}, \[enabled, input, cloudVoice\]\);/);
+
+  // Stem x follows the same fraction-or-raw convention as the y axes: the
+  // stem drill authors x: 0.5 meaning centred, which used to draw at the
+  // figure's far-left edge.
+  const figure = read("src/components/rope-figure.tsx");
+  assert.match(figure, /rawX < 2 \? rawX \* \(floor \? 400 : 200\) : rawX/);
+});
+
+test("hard-no lines share one bound end to end; the stop banner names every reason", () => {
+  const studio = read("src/routes/studio.tsx");
+  const analyze = read("src/lib/ai/analyze.ts");
+  // One constant governs the client's construction, the schema's admission,
+  // and the server's sanitize pass. The old 80/24 pair rejected the client's
+  // own "<uuid>: <label>" lines (stranding one-use batches) and silently
+  // dropped entries past 24 of a possible 64.
+  assert.match(studio, /`\$\{item\.id\}: \$\{item\.label\}`\.slice\(0, MAX_HARD_NO_LENGTH\)/);
+  assert.match(analyze, /z\.array\(z\.string\(\)\.max\(MAX_HARD_NO_LENGTH\)\)\.max\(MAX_HARD_NOS\)/);
+  assert.match(analyze, /sanitizeQuestion\(value, MAX_HARD_NO_LENGTH\)/);
+  assert.match(analyze, /\.slice\(0, MAX_HARD_NOS\)/);
+  assert.doesNotMatch(analyze, /\.slice\(0, 24\)/);
+
+  // A triage, observation, or check-in stop must not read "Stopped manually"
+  // at exactly the moment the reason matters.
+  for (const reason of ["observation", "medical-emergency", "medical", "checkin-concern", "consent"]) {
+    assert.match(studio, new RegExp(`stopReason === "${reason}"`), `banner must map ${reason}`);
+  }
+});
+
+test("the banned-output scrub guards model text, not reviewed catalog narration", () => {
+  // Authored safety copy legitimately names dangers to warn against them
+  // ("never let it run away into a noose", the neck-lock notices). The scrub
+  // swapped those lines for the generic refusal paragraph, spoken aloud
+  // mid-lesson. Reviewed provenance is declared at the call site; the
+  // server's exact-string allowlist stays the control for cloud TTS.
+  const play = read("src/lib/voice/play.ts");
+  assert.match(play, /options\?: \{ reviewed\?: boolean \}/);
+  assert.match(play, /const key = !reviewed && textIsBanned\(text\) \? scrubBannedAnswer\(text\) : text\.trim\(\);/);
+
+  // Catalog narration call sites declare provenance; the model-report paths
+  // (coach panel, studio report speak) deliberately do not.
+  const voiceHook = read("src/components/learn/use-academy-voice.ts");
+  assert.equal((voiceHook.match(/\{ reviewed: true \}/g) ?? []).length, 3);
+  assert.match(read("src/routes/tie.$slug.tsx"), /playCoachVoice\(s\.speak, cloudVoice, \{ reviewed: true \}\)/);
+  assert.match(read("src/routes/knot.$slug.tsx"), /playCoachVoice\(s\.speak, cloudVoice, \{ reviewed: true \}\)/);
+  const coachPanel = read("src/components/coach-panel.tsx");
+  assert.doesNotMatch(coachPanel, /reviewed: true/);
+  const studio = read("src/routes/studio.tsx");
+  assert.doesNotMatch(studio, /playCoachVoice\(res\.report\.final\.speak, true, \{ reviewed: true \}\)/);
+
+  // Server side: the allowlist is the sole gate — no scrub ahead of it that
+  // could mangle a reviewed line out of the set — and the input slice admits
+  // the longest composed narration.
+  const voiceFn = read("src/lib/ai/voice.ts");
+  assert.doesNotMatch(voiceFn, /scrubBannedAnswer/);
+  assert.match(voiceFn, /\.slice\(0, MAX_REVIEWED_SPEECH_LENGTH\)/);
+  assert.match(voiceFn, /isReviewedCoachSpeech/);
+
+  // The lesson pages and the allowlist compose narration through the same
+  // builders, so they cannot drift apart.
+  const reviewed = read("src/lib/voice/reviewed.server.ts");
+  for (const builder of ["tieStepVoiceInput", "knotStepVoiceInput", "buildAcademyVoiceScript", "buildAcademyVoiceSegments"]) {
+    assert.match(reviewed, new RegExp(builder), `allowlist must use ${builder}`);
+  }
+  assert.match(read("src/routes/tie.$slug.tsx"), /tieStepVoiceInput\(s, step, tie\.steps\.length\)/);
+  assert.match(read("src/routes/knot.$slug.tsx"), /knotStepVoiceInput\(s, step, knot\.steps\.length\)/);
+});
+
+test("every persisted store has crash-safe storage and consent survives stale tabs", () => {
+  // learn-progress was the one store on zustand's default storage, so a
+  // quota-exhausted save threw out of markStepComplete/setLast and crashed
+  // the lesson route without ever reaching the persist-failure banner.
+  const learn = read("src/lib/stores/learn-progress.ts");
+  assert.match(learn, /storage: safeJsonStorage<LearnProgressState>\(\)/);
+
+  // The consent-bearing settings flags move as one stamped unit through a
+  // write-merge, like negotiation ranks and journal entries already do.
+  const settings = read("src/lib/stores/settings.ts");
+  assert.match(settings, /storage: settingsConsentMergingStorage<SettingsState>\("knotty-settings"\)/);
+  assert.match(settings, /consentStamp: nextConsentStamp\(s\)/);
+  const persist = read("src/lib/stores/persist.ts");
+  assert.match(persist, /export function settingsConsentMergingStorage/);
+});
+
+test("the capture panel states the upload scope in force on every batch", () => {
+  // README §Upload scope: "The capture panel states the setting in force."
+  // The scope strings existed and were referenced only by tests; the panel
+  // itself never told the user what this deployment's batch may contain.
+  const camera = read("src/components/camera-capture.tsx");
+  assert.match(camera, /\{uploadScopeCapturePreference\(scope\)\}/);
+});
+
+test("go-live hardening holds: preload, sw deadline, safe ids, pool guard, lesson honesty", () => {
+  // Offline resilience: chunks preload while the network is up, the
+  // emergency route is resident before it is needed, and the worker's
+  // network-first attempt is bounded so a stalled network cannot withhold
+  // the cached card.
+  assert.match(read("src/router.tsx"), /defaultPreload: "viewport"/);
+  assert.match(read("src/components/app-shell.tsx"), /preloadRoute\(\{ to: "\/emergency" \}\)/);
+  const sw = read("public/sw.js");
+  assert.match(sw, /fetchWithDeadline\(request, 3000\)/);
+  assert.match(sw, /refillPrecacheIfMissing/);
+  assert.match(sw, /refreshPrecache/);
+
+  // Ops: an idle pooled client error is logged, not a process crash.
+  assert.match(read("src/lib/db.ts"), /pool\.on\("error"/);
+
+  // Insecure contexts (http LAN dev) mint ids through the fallback helper.
+  for (const path of [
+    "src/components/camera-capture.tsx",
+    "src/lib/stores/negotiate.ts",
+    "src/lib/stores/checkin.ts",
+    "src/lib/stores/journal.ts",
+    "src/lib/auth/client.ts",
+  ]) {
+    assert.doesNotMatch(read(path), /crypto\.randomUUID/, path);
+  }
+
+  // Lesson honesty and safety UX.
+  assert.match(read("src/components/learn/academy-coach-panel.tsx"), /nyxPoseProp !== undefined/);
+  assert.match(read("src/routes/tie.$slug.tsx"), /mustConfirm && i > current \? current : i/);
+  assert.match(read("src/routes/studio.tsx"), /if \(modelStatus !== "not_requested"\) return;/);
+  assert.match(
+    read("src/components/learn/academy-observe-panel.tsx"),
+    /extractVideoFrames\(file, 3, undefined, 3\)/,
+  );
+  assert.match(
+    read("src/components/camera-capture.tsx"),
+    /if \(busyEpochRef\.current === epoch\) setBusyState\(false\);/,
+  );
+  assert.match(read("src/lib/voice/play.ts"), /if \(generation !== playbackGeneration\) return;/);
+});
+
+test("review round: narration keys on lesson identity, shared voice loads survive, imports outstamp", () => {
+  const voice = read("src/components/learn/use-academy-voice.ts");
+  // Lesson navigation at the same step index must restart narration — the
+  // route component is reused, so a bare stepIndex key missed it.
+  assert.match(voice, /\}, \[enabled, narrationKey, cloudVoice\]\);/);
+  assert.match(voice, /`\$\{lessonKey\}:\$\{input\.stepIndex\}\/\$\{input\.totalSteps\}:\$\{input\.title\}`/);
+  // The slug must actually reach the hook: one-step instructor routes share
+  // an identical step title, so a content-only key missed lesson changes.
+  assert.match(read("src/components/learn/academy-coach-panel.tsx"), /lessonKey=\{tieSlug \?\? knotSlug \?\? ""\}/);
+
+  // A shared in-flight voice load is judged by cache lifetime, not by its
+  // creator's playback generation — two simultaneous auto-reads no longer
+  // discard the response they share and fall back to browser speech.
+  const play = read("src/lib/voice/play.ts");
+  assert.match(play, /let cacheEpoch = 0;/);
+  assert.match(play, /if \(epoch !== cacheEpoch\) return null;/);
+  assert.match(play, /cacheEpoch \+= 1;\s*\n\s*stopCoachVoice\(\);/);
+  assert.doesNotMatch(play, /loadVoice\(key, cacheKey, generation\)/);
+
+  // Imported negotiation decisions carry import-time stamps so the write
+  // merger and a reload cannot silently reverse the import.
+  const sync = read("src/lib/app-sync.ts");
+  assert.match(sync, /nextNegotiationStamp\(existingStamps\)/);
+  assert.match(sync, /updatedAt: importStamp \+ index,/);
 });

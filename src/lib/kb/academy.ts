@@ -649,7 +649,10 @@ export function getAcademyTie(slug: string): Tie | undefined {
   const base = getTie(slug);
   if (!base) return undefined;
   const academy = TIE_ACADEMY[slug];
-  if (!academy) return { ...base, goal: base.why.split(".")[0] + "." };
+  // Authored goal first, like the reconciled branch below: the twelve prop
+  // drills author a per-drill goal beside their steps, and unconditionally
+  // deriving one from `why` here silently replaced every one of them.
+  if (!academy) return { ...base, goal: base.goal ?? base.why.split(".")[0] + "." };
 
   // TIE_ACADEMY enriches; it does not replace. It was written when every tie in
   // the catalog carried exactly one step, so replacing `base.steps` with it was

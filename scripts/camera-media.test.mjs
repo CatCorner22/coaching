@@ -1197,6 +1197,11 @@ test("the capture surface honours digital zoom, resets it for clips, and scopes 
     capture,
     /closest\(\s*\n?\s*"button, a, input, textarea, select, summary, label, \[role='button'\], \[role='slider'\], \[contenteditable\]",?\s*\n?\s*\)/,
   );
+  // Batch-window expiry with no committed batch must re-arm rather than
+  // leaving every capture control dead until remount: the re-arm effect keys
+  // on permissionExpiresAt, which expiry nulls.
+  assert.match(capture, /\}, \[studioConsented, disabled, batchCommitted, permissionExpiresAt\]\);/);
+
   // Modifier chords keep their browser meaning: Ctrl/Cmd+R used to swallow
   // the refresh and start a recording, and Shift+Space fired a burst instead
   // of scrolling the page up.

@@ -102,3 +102,66 @@ test("a safeword the microphone could never hear falls back to the default", asy
     );
   }
 });
+
+test("a stale tab's blob cannot resurrect withdrawn consent (stamped write-merge)", async () => {
+  const { settingsConsentMergingStorage } = await import("./persist.ts");
+  const storage = settingsConsentMergingStorage<Record<string, unknown>>("test-consent-merge");
+  // Another tab withdrew consent at stamp 3000 (stored). This tab, holding
+  // the pre-withdrawal state at stamp 2000, saves a name keystroke: the
+  // consent unit must come from the newer stored decision, the name from the
+  // incoming write.
+  localStorage.setItem(
+    "test-consent-merge",
+    JSON.stringify({
+      state: { consented: false, voice: false, listen: false, consentVersion: 5, consentStamp: 3000, riggerName: "old" },
+      version: 1,
+    }),
+  );
+  storage.setItem("test-consent-merge", {
+    state: { consented: true, voice: true, listen: true, consentVersion: 5, consentStamp: 2000, riggerName: "new" },
+    version: 1,
+  } as never);
+  const written = JSON.parse(localStorage.getItem("test-consent-merge") ?? "{}") as {
+    state: Record<string, unknown>;
+  };
+  assert.equal(written.state.consented, false, "withdrawal survives the stale save");
+  assert.equal(written.state.voice, false);
+  assert.equal(written.state.listen, false);
+  assert.equal(written.state.consentStamp, 3000);
+  assert.equal(written.state.riggerName, "new", "unrelated fields stay last-write-wins");
+
+  // The other direction: a genuine newer re-consent is not undone by an
+  // older withdrawal blob.
+  localStorage.setItem(
+    "test-consent-merge",
+    JSON.stringify({
+      state: { consented: true, voice: false, listen: false, consentVersion: 5, consentStamp: 5000 },
+      version: 1,
+    }),
+  );
+  storage.setItem("test-consent-merge", {
+    state: { consented: false, voice: false, listen: false, consentVersion: 5, consentStamp: 4000 },
+    version: 1,
+  } as never);
+  const rewritten = JSON.parse(localStorage.getItem("test-consent-merge") ?? "{}") as {
+    state: Record<string, unknown>;
+  };
+  assert.equal(rewritten.state.consented, true, "newer re-consent survives");
+  localStorage.removeItem("test-consent-merge");
+});
+
+test("consent actions stamp the decision and set() clamps names live", async () => {
+  const { useSettings } = await import("./settings.ts");
+  const before = useSettings.getState().consentStamp;
+  useSettings.getState().enter();
+  const afterEnter = useSettings.getState().consentStamp;
+  assert.ok(afterEnter > before, "enter() must bump the consent stamp");
+  useSettings.getState().resetConsent();
+  assert.ok(useSettings.getState().consentStamp > afterEnter, "resetConsent() must bump it");
+
+  // Live set() applies the same clamps hydration does, so what the user sees
+  // is what survives reload.
+  useSettings.getState().set({ riggerName: "R".repeat(60), honorific: "H".repeat(40) });
+  assert.equal(useSettings.getState().riggerName.length, 40);
+  assert.equal(useSettings.getState().honorific.length, 24);
+});

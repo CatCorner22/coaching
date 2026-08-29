@@ -171,9 +171,32 @@ export async function runMigrations({
   }
 }
 
+/**
+ * Whether a missing DATABASE_URL may be skipped quietly, or is a release
+ * mistake that must fail the job. A production, auth-enabled release REQUIRES
+ * the database (assertProductionAuthEnvironment refuses to serve without it),
+ * and release steps often run with a different environment than the deployed
+ * function — so a silent exit-0 skip here deployed an unmigrated auth schema
+ * whose failures only surfaced as runtime 500s on auth requests.
+ */
+export function missingDatabaseUrlDisposition(env) {
+  const authOn = env.VITE_AUTH_ENABLED?.trim() !== "false";
+  if (env.NODE_ENV === "production" && authOn) return "fail";
+  return "skip";
+}
+
 async function main() {
   const databaseUrl = process.env.DATABASE_URL?.trim();
   if (!databaseUrl) {
+    if (missingDatabaseUrlDisposition(process.env) === "fail") {
+      console.error(
+        "[migrate] DATABASE_URL is not set, but this is a production, auth-enabled release — " +
+          "the auth schema would go unmigrated and every auth request would fail at runtime. " +
+          "Set DATABASE_URL in the release environment, or set VITE_AUTH_ENABLED=false for the no-auth shape.",
+      );
+      process.exitCode = 1;
+      return;
+    }
     console.log(
       "[migrate] DATABASE_URL not set — skipping (production DB use requires Postgres; vite dev migrates PGLite itself).",
     );

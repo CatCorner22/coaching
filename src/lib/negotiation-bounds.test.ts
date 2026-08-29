@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { MAX_HARD_NOS, MAX_NEGOTIATION_ITEMS } from "./negotiation-bounds.ts";
+import { MAX_HARD_NO_LENGTH, MAX_HARD_NOS, MAX_NEGOTIATION_ITEMS } from "./negotiation-bounds.ts";
 import { normalizeNegotiationItems } from "./stores/negotiate.ts";
 import { buildStudioNegotiationPolicy } from "./studio/negotiation.ts";
 
@@ -66,5 +66,25 @@ test("the hard-no list is never silently shortened", () => {
     operationalLimits.map((item) => item.id),
     expected.map((item) => item.id),
     "the unapproved set must be reported in full",
+  );
+});
+
+test("every constructible hard-no line fits the shared per-element bound", () => {
+  // Studio sends `"<id>: <label>"`, and normalization clamps both ids and
+  // labels to 80 — a persisted or imported custom row can carry an 80-char
+  // id, not just a 36-char UUID. The bound must fit the WORST normalized
+  // construction: anything shorter silently drops the tail of a long custom
+  // hard-no (the first bound, 80, instead rejected the client's own lines
+  // and stranded one-use batches).
+  const items = normalizeNegotiationItems([
+    { id: "i".repeat(200), label: "x".repeat(200), rank: "no" },
+  ]);
+  const worst = items.find((item) => item.id.startsWith("iii"));
+  assert.ok(worst, "the custom row must survive normalization");
+  const line = `${worst.id}: ${worst.label}`;
+  assert.equal(line.length, 162, "the normalized worst case is 80 + 2 + 80");
+  assert.ok(
+    line.length <= MAX_HARD_NO_LENGTH,
+    `longest constructible line (${line.length}) must fit MAX_HARD_NO_LENGTH (${MAX_HARD_NO_LENGTH})`,
   );
 });

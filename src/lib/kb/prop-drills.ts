@@ -428,7 +428,7 @@ const PROP_DRILLS: Record<string, PropDrillContent> = {
           "The band lies level, the same height at the back as at the front, with no twist along it, and one flat half-knot sits at front centre with both strands leaving it downward, side by side and uncrossed.",
         speak: "Band level front and back. One flat half-knot at front centre.",
         expected: {"wrapBands":1,"pose":"stand","view":"front","handsVisible":true,"neckClear":true},
-        wraps: [{"kind":"band","y":0.2}],
+        wraps: [{"kind":"band","y":0.25}],
       },
       {
         title: "2 · Make a gauge, split the pair, join at the back",

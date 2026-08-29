@@ -218,7 +218,10 @@ export function AcademyObservePanel({
       const res = await fetch(clipUrl);
       const blob = await res.blob();
       const file = new File([blob], "practice.webm", { type: blob.type || "video/webm" });
-      const frames = await extractVideoFrames(file, 3);
+      // MediaRecorder WebM reports Infinity duration with no seekable range on
+      // Chromium; without the hint every clip analysis threw. The panel
+      // records a fixed 3-second clip (the timeout above), so say so.
+      const frames = await extractVideoFrames(file, 3, undefined, 3);
       if (!frames.length) throw new Error("No frames from clip.");
       const observations = frames.map((f) => observeFrame(f.imageData));
       const det = buildDeterministic(observations);

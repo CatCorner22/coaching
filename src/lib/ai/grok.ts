@@ -52,6 +52,9 @@ export async function grokChat(opts: {
     };
   }
   if (!(await verifyGrokZeroDataRetentionForRequest(apiKey, opts.signal))) {
+    // Operator-visible: a flipped console setting fails every analysis with
+    // the same user-facing line; the log is the only place to see why.
+    console.error("[grok] ZDR preflight failed — provider did not confirm zero data retention");
     return {
       ok: false,
       error: GROK_ZDR_ERROR,
@@ -105,6 +108,7 @@ export async function grokChat(opts: {
     });
     if (!responseConfirmsZeroDataRetention(res)) {
       await res.body?.cancel().catch(() => undefined);
+      console.error("[grok] response did not confirm zero data retention — result discarded");
       return {
         ok: false,
         error: GROK_ZDR_RESPONSE_ERROR,

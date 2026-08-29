@@ -315,3 +315,42 @@ test("journal entries survive a cross-tab write, and deleted ones stay deleted",
   assert.equal(mergeJournalEntriesById(null, [], [], []), null);
   assert.equal(mergeJournalEntriesById([], "junk", [], []), null);
 });
+
+test("a stale tab's old revocation cannot erase a strictly newer re-approval", async () => {
+  const { mergeNegotiationItemsByStamp } = await import("./persist.ts");
+  // Tab B re-approved photos (yes@3000, stored). Tab A, still holding the old
+  // no@2000, saves an unrelated keystroke. The documented rule — restrictive
+  // wins unless the permissive side is strictly newer — must hold in this
+  // quadrant too: the fallthrough used to write no@2000 over yes@3000, and
+  // the regression to an older stamp meant every later merge kept the loss.
+  const staleIncoming = [{ id: "photos", label: "Photos", rank: "no", updatedAt: 2000 }];
+  const newerExisting = [{ id: "photos", label: "Photos", rank: "yes", updatedAt: 3000 }];
+  const merged = mergeNegotiationItemsByStamp(staleIncoming, newerExisting) as Array<{
+    rank: string;
+    updatedAt: number;
+  }>;
+  assert.equal(merged[0]!.rank, "yes");
+  assert.equal(merged[0]!.updatedAt, 3000);
+
+  // The revocation-wins direction is unchanged: a stale yes cannot undo a
+  // newer stored no, and an equal-stamp tie resolves to the restriction.
+  const staleYes = [{ id: "photos", label: "Photos", rank: "yes", updatedAt: 2000 }];
+  const newerNo = [{ id: "photos", label: "Photos", rank: "no", updatedAt: 3000 }];
+  assert.equal(
+    (mergeNegotiationItemsByStamp(staleYes, newerNo) as Array<{ rank: string }>)[0]!.rank,
+    "no",
+  );
+  const tieYes = [{ id: "photos", label: "Photos", rank: "yes", updatedAt: 3000 }];
+  assert.equal(
+    (mergeNegotiationItemsByStamp(tieYes, newerNo) as Array<{ rank: string }>)[0]!.rank,
+    "no",
+  );
+  // And a STALE more-restrictive incoming with an equal stamp still wins
+  // (restriction wins ties in both directions).
+  const tieNo = [{ id: "photos", label: "Photos", rank: "no", updatedAt: 3000 }];
+  const equalYes = [{ id: "photos", label: "Photos", rank: "yes", updatedAt: 3000 }];
+  assert.equal(
+    (mergeNegotiationItemsByStamp(tieNo, equalYes) as Array<{ rank: string }>)[0]!.rank,
+    "no",
+  );
+});

@@ -237,3 +237,23 @@ test("only an actually missing migration directory is treated as empty", async (
     0,
   );
 });
+
+test("a production auth-on release without DATABASE_URL fails instead of skipping", async () => {
+  const { missingDatabaseUrlDisposition } = await import("./migrate.mjs");
+  // Release steps often run with a different environment than the deployed
+  // function; a silent exit-0 skip deployed an unmigrated auth schema whose
+  // failures only surfaced as runtime 500s.
+  assert.equal(missingDatabaseUrlDisposition({ NODE_ENV: "production" }), "fail");
+  assert.equal(
+    missingDatabaseUrlDisposition({ NODE_ENV: "production", VITE_AUTH_ENABLED: "true" }),
+    "fail",
+  );
+  // The two quiet shapes stay quiet: the no-auth production build has no DB,
+  // and local/dev invocations migrate PGLite through the dev server instead.
+  assert.equal(
+    missingDatabaseUrlDisposition({ NODE_ENV: "production", VITE_AUTH_ENABLED: "false" }),
+    "skip",
+  );
+  assert.equal(missingDatabaseUrlDisposition({}), "skip");
+  assert.equal(missingDatabaseUrlDisposition({ NODE_ENV: "development" }), "skip");
+});

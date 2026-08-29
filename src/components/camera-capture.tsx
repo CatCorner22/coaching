@@ -34,7 +34,8 @@ import {
   validateMediaSignature,
   type ProcessedMediaFrame,
 } from "@/lib/media";
-import { mediaUploadScope } from "@/lib/media-scope";
+import { mediaUploadScope, uploadScopeCapturePreference } from "@/lib/media-scope";
+import { randomId } from "@/lib/random-id";
 import { observeFrame } from "@/lib/ml/detect";
 import type { FrameObservation } from "@/lib/ml/types";
 import { cn } from "@/lib/utils";
@@ -184,7 +185,13 @@ export const CameraCapture = memo(function CameraCapture({
   permissionsRef.current = permissions;
   const studioConsented = useSettings((s) => s.consented);
 
+  // Each busy=true is an epoch; an async path that set busy may clear it
+  // only while its epoch is still the latest, so an abandoned operation
+  // resolving late cannot clobber the flag a newer operation now owns.
+  const busyEpochRef = useRef(0);
+
   function setBusyState(next: boolean) {
+    if (next) busyEpochRef.current += 1;
     busyRef.current = next;
     setBusy(next);
   }
@@ -225,8 +232,15 @@ export const CameraCapture = memo(function CameraCapture({
     if (!studioConsented || disabled || batchCommitted) return;
     if (Object.values(permissionsRef.current).every(Boolean)) return;
     armBatchPermissions();
+    // permissionExpiresAt: the 1-hour window expiring with no committed batch
+    // used to change nothing this effect keys on (batchCommitted was already
+    // false), so the cleared permissions were never re-armed and every capture
+    // control stayed dead until remount — while the hint said to start a
+    // fresh capture. Expiry nulls permissionExpiresAt, so keying on it
+    // re-arms a fresh window; the guards above still keep a disabled or
+    // committed panel untouched.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [studioConsented, disabled, batchCommitted]);
+  }, [studioConsented, disabled, batchCommitted, permissionExpiresAt]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -267,9 +281,15 @@ export const CameraCapture = memo(function CameraCapture({
       // the rest of the teardown. Say so instead of leaving the capture area
       // blank with no explanation of where the import went.
       const hadMediaOperation = mediaOperationActiveRef.current;
+      const wasRecording = clipRef.current !== null;
       stopLive();
-      if (hadMediaOperation) {
-        setHint("Processing stopped when the app went to the background. Choose the file again.");
+      if (wasRecording) {
+        setHint("Recording stopped when the app went to the background. Reopen the camera to record again.");
+      } else if (hadMediaOperation) {
+        // Burst frames and clip finalization run through the same operation
+        // guard as a file import, but "choose the file again" only describes
+        // the import.
+        setHint("Processing stopped when the app went to the background. Capture or choose the file again.");
       }
     };
     const onVisibility = () => {
@@ -568,7 +588,7 @@ export const CameraCapture = memo(function CameraCapture({
         recording: true,
         upload: true,
         output: true,
-        batchId: crypto.randomUUID(),
+        batchId: randomId(),
         confirmedAt,
       },
     });
@@ -892,6 +912,7 @@ export const CameraCapture = memo(function CameraCapture({
     const request = cameraRequestRef.current;
     if (useTimer) {
       setBusyState(true);
+      const epoch = busyEpochRef.current;
       try {
         for (let n = 3; n >= 1; n--) {
           // The control says 3s, so each displayed count holds a real second —
@@ -909,20 +930,25 @@ export const CameraCapture = memo(function CameraCapture({
           setCountdownState(n);
           await new Promise((resolve) => window.setTimeout(resolve, 1000));
         }
+        if (
+          !mountedRef.current ||
+          disabledRef.current ||
+          request !== cameraRequestRef.current ||
+          !streamRef.current
+        ) {
+          return;
+        }
+        await snapBurst();
       } finally {
         setCountdownState(null);
-        if (!mountedRef.current || request !== cameraRequestRef.current) {
-          setBusyState(false);
-        }
+        // Ownership-scoped: an abandoned countdown resolving after Close used
+        // to force busy=false over a newer operation's flag, and a dead
+        // stream (or a snapBurst that bailed before taking over) used to
+        // leave busy stranded true with every control disabled. If snapBurst
+        // ran, it owns a newer epoch and this clear is a no-op.
+        if (busyEpochRef.current === epoch) setBusyState(false);
       }
-      if (
-        !mountedRef.current ||
-        disabledRef.current ||
-        request !== cameraRequestRef.current ||
-        !streamRef.current
-      ) {
-        return;
-      }
+      return;
     }
     await snapBurst();
   }
@@ -1217,10 +1243,12 @@ export const CameraCapture = memo(function CameraCapture({
         </label>
       )}
       {/* The one-hour batch window was invisible until it expired and silently
-          discarded the batch. Show when it runs out. */}
+          discarded the batch. Show when it runs out. README: "The capture
+          panel states the setting in force" — the scope line must appear on
+          every batch, not only on /settings and /login. */}
       {permissionsReady && permissionExpiresAt !== null && (
         <p className="text-xs text-muted">
-          This capture window closes at{" "}
+          {uploadScopeCapturePreference(scope)} This capture window closes at{" "}
           {new Date(permissionExpiresAt).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",

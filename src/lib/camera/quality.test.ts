@@ -37,7 +37,16 @@ test("textured dark fiber and dark jute count without treating a flat dark field
   assert.ok(ropeHint(uniformFiber) < 0.05, `uniform=${ropeHint(uniformFiber)}`);
   assert.ok(ropeHint(fiber) > 0.35, `fiber=${ropeHint(fiber)}`);
   assert.ok(ropeHint(jute) > 0.35, `jute=${ropeHint(jute)}`);
-  assert.equal(scoreFrame(fiber).notes.some((note) => /get closer/i.test(note)), false);
+  // Every note must be one of the three phrasings the scorer can actually
+  // produce — the old assertion matched "get closer", text no code path
+  // emits, so it held vacuously whatever the notes said.
+  for (const note of scoreFrame(fiber).notes) {
+    assert.match(
+      note,
+      /^(Hold the camera steady and retake|Add neutral light without revealing|Keep the relevant equipment visible)/,
+      note,
+    );
+  }
 });
 
 test("skin tone is not scored as rope", () => {

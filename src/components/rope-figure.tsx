@@ -194,10 +194,14 @@ function Wrap({
     );
   }
   if (spec.kind === "stem") {
+    // x follows the same fraction-or-raw convention as every y: an authored
+    // 0.5 means centred, not five units from the left edge.
+    const rawX = spec.x ?? (floor ? 200 : 100);
+    const x = rawX < 2 ? rawX * (floor ? 400 : 200) : rawX;
     return (
       <path
         className={cls}
-        d={`M${spec.x ?? (floor ? 200 : 100)} ${spec.y1 < 2 ? spec.y1 * 420 : spec.y1} L${spec.x ?? (floor ? 200 : 100)} ${spec.y2 < 2 ? spec.y2 * 420 : spec.y2}`}
+        d={`M${x} ${spec.y1 < 2 ? spec.y1 * 420 : spec.y1} L${x} ${spec.y2 < 2 ? spec.y2 * 420 : spec.y2}`}
         stroke={stroke}
         strokeWidth={sw}
         fill="none"
