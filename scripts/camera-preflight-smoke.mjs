@@ -63,9 +63,34 @@ try {
       }
     };
 
+    // Every negotiated row starts at no, and the Studio camera is gated on
+    // `photos`. Agree to it first, the way a couple does, or the whole capture
+    // surface is correctly inert.
+    const agreeToPhotos = async () => {
+      const negotiateResponse = await page.goto(new URL("/negotiate", baseUrl).href, {
+        waitUntil: "domcontentloaded",
+        timeout: 45_000,
+      });
+      if (negotiateResponse?.status() !== 200)
+        throw new Error(`${viewport.name}: /negotiate HTTP ${negotiateResponse?.status() ?? 0}`);
+      const photosRow = page.locator("li", { hasText: "Photos / video for coaching" }).first();
+      const yes = photosRow.getByRole("button", { name: "yes", exact: true });
+      await yes.waitFor({ state: "visible", timeout: 15_000 });
+      await yes.click();
+      await yes.and(page.locator('[aria-pressed="true"]')).waitFor({ timeout: 5_000 });
+    };
+
     const response = await page.goto(studioUrl, { waitUntil: "domcontentloaded", timeout: 45_000 });
     if (response?.status() !== 200)
       throw new Error(`${viewport.name}: HTTP ${response?.status() ?? 0}`);
+    await waitForConsentReady();
+    await agreeToPhotos();
+    const studioAgain = await page.goto(studioUrl, {
+      waitUntil: "domcontentloaded",
+      timeout: 45_000,
+    });
+    if (studioAgain?.status() !== 200)
+      throw new Error(`${viewport.name}: HTTP ${studioAgain?.status() ?? 0}`);
     await waitForConsentReady();
 
     const openLiveCamera = page.getByRole("button", { name: "Open live camera", exact: true });
