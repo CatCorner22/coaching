@@ -255,7 +255,9 @@ export const analyzeRope = createServerFn({ method: "POST" })
         return {
           ok: false,
           error:
-            "No media was sent to xAI. This deployment did not accept the request (origin or sign-in). Nothing was used from this batch.",
+            error instanceof AiRequestDeniedError
+              ? `No media was sent to xAI. ${error.message}`
+              : "No media was sent to xAI. This deployment did not accept the request (sign-in). Nothing was used from this batch.",
           providerAttempted: false,
           code: "AI_REQUEST_FORBIDDEN",
           status: 403,

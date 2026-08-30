@@ -669,6 +669,20 @@ function StudioPage() {
         <div className="flex items-center gap-3 text-sm">
           <Badge variant="danger">{settings.safeword}</Badge>
           <SessionClock limitSec={settings.circulationMins * 60} />
+          {/* The clock starts the moment the page opens, so time spent reading
+              or laying out rope was already on it when the tie began. */}
+          {!stopped && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                startSession();
+                useSession.getState().checked();
+              }}
+            >
+              Restart clock
+            </Button>
+          )}
           {/* Same session, same store — this only strips the chrome so the
               clock and the stop control are readable at arm's length. */}
           <Button asChild variant="outline" size="sm">
@@ -677,10 +691,20 @@ function StudioPage() {
         </div>
       </div>
       {operationalLimits.length > 0 && (
-        <p className="mt-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger-text">
-          Not approved (no or unresolved maybe):{" "}
-          {operationalLimits.map((item) => `${item.label} (${item.rank})`).join(" · ")}
-        </p>
+        // Everything starts at no, so this listed forty red lines in one
+        // paragraph on first run and nothing in it could be read or acted on.
+        <details className="mt-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger-text">
+          <summary className="cursor-pointer">
+            {operationalLimits.length} not approved (no or unresolved maybe) — this session stays
+            inside what you have agreed.{" "}
+            <Link to="/negotiate" className="underline underline-offset-2">
+              Open Negotiate
+            </Link>
+          </summary>
+          <p className="mt-2 leading-relaxed">
+            {operationalLimits.map((item) => `${item.label} (${item.rank})`).join(" · ")}
+          </p>
+        </details>
       )}
       {settings.listen && !stopped && (
         <div className="mt-3 rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted">

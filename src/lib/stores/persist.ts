@@ -191,13 +191,28 @@ export function negotiationMergingStorage<State>(
       try {
         const raw = safeBrowserStorage().getItem(key);
         if (raw) {
-          type Blob = { state?: { items?: unknown; notes?: unknown; notesUpdatedAt?: unknown } };
+          type Blob = {
+            state?: {
+              items?: unknown;
+              notes?: unknown;
+              notesUpdatedAt?: unknown;
+              removedIds?: unknown;
+            };
+          };
           const existing = JSON.parse(raw) as Blob;
           const incoming = value as Blob;
+          // A row removed in either tab stays removed: the item union below
+          // keeps anything present on one side, so without the tombstones a
+          // deleted custom line reappeared on the next write from the other tab.
+          const removedIds = unionRemovedIds(
+            incoming?.state?.removedIds,
+            existing?.state?.removedIds,
+          );
+          (value as { state: { removedIds: unknown } }).state.removedIds = removedIds;
           const merged = mergeNegotiationItemsByStamp(
             incoming?.state?.items,
             existing?.state?.items,
-          );
+          )?.filter((item) => !removedIds.includes(String((item as StampedItem).id)));
           if (merged) {
             diverged = negotiationItemsDiffer(incoming?.state?.items, merged);
             (value as { state: { items: unknown } }).state.items = merged;
@@ -233,6 +248,18 @@ export function negotiationMergingStorage<State>(
       return result;
     },
   };
+}
+
+/** Removal tombstones for custom negotiation rows, from both tabs. */
+export function unionRemovedIds(...sides: unknown[]): string[] {
+  const ids = new Set<string>();
+  for (const side of sides) {
+    if (!Array.isArray(side)) continue;
+    for (const id of side) {
+      if (typeof id === "string" && id) ids.add(id.slice(0, 80));
+    }
+  }
+  return [...ids].slice(0, MERGED_ITEM_CAP);
 }
 
 /** Whether the merge changed any rank the writing tab was holding. */

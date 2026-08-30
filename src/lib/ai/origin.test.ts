@@ -70,3 +70,15 @@ test("wildcard host matching requires a real subdomain", () => {
   assert.equal(matchesHostPattern("example.com", "example.com"), true);
   assert.equal(matchesHostPattern("sub.example.com", "example.com"), false);
 });
+
+test("the dev server trusts the LAN address it binds, and only in development", () => {
+  // npm run dev binds 0.0.0.0:8080 so the phone in the room can load it, but
+  // every AI call from http://192.168.x.x:8080 was refused as an untrusted
+  // origin, with no documentation saying so.
+  for (const origin of ["http://192.168.1.50:8080", "http://10.0.0.4:8080", "http://172.16.3.9:8080"]) {
+    assert.equal(isTrustedAppOrigin(origin, { allowLoopback: true }), true, origin);
+    assert.equal(isTrustedAppOrigin(origin, {}), false, `${origin} is not trusted when deployed`);
+  }
+  assert.equal(isTrustedAppOrigin("http://172.32.0.1:8080", { allowLoopback: true }), false);
+  assert.equal(isTrustedAppOrigin("http://11.0.0.1:8080", { allowLoopback: true }), false);
+});

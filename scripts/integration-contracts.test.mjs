@@ -170,7 +170,7 @@ test("Studio requires yes for negotiated actions and blocks every voice path", (
   assert.match(policy, /mediaBlocked: !approvedIds\.has\("photos"\)/);
   assert.match(policy, /voiceBlocked: !approvedIds\.has\("voice"\)/);
   assert.match(policy, /negotiationKey: JSON\.stringify\(negotiationEntries\)/);
-  assert.match(store, /export function normalizeNegotiationItems\(value: unknown\)/);
+  assert.match(store, /export function normalizeNegotiationItems\(\s*value: unknown/);
   assert.match(
     store,
     /matches\.length === 1 && matches\[0\]\.label && !LOCKED_NO\.has\(seed\.id\)/,

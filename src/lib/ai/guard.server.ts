@@ -1,5 +1,5 @@
 import { getRequest } from "@tanstack/react-start/server";
-import { isTrustedAppOrigin } from "./origin";
+import { isPrivateNetworkHostname, isTrustedAppOrigin } from "./origin";
 import { DEV_USER_ID, UnauthorizedError, requireUserId } from "@/lib/auth/verify.server";
 import { viteDevServer } from "@/lib/runtime-mode";
 
@@ -15,12 +15,10 @@ export class AiRequestDeniedError extends Error {
 
 function trustedDevelopmentHost(hostname: string): boolean {
   const host = hostname.toLowerCase();
-  return (
-    host === "localhost" ||
-    host === "127.0.0.1" ||
-    host === "::1" ||
-    host.endsWith(".grok-sandbox.com")
-  );
+  // The LAN address counts: `npm run dev` binds 0.0.0.0:8080 precisely so the
+  // phone in the room can load it, and refusing that origin denied every
+  // analysis on the device the couple actually uses.
+  return isPrivateNetworkHostname(host) || host.endsWith(".grok-sandbox.com");
 }
 
 /** Authenticate cost-bearing endpoints and reject cross-site browser calls. */
@@ -60,7 +58,9 @@ export async function authorizeAiRequest(verifiedUserId?: string): Promise<{ use
 
   if (userId === DEV_USER_ID) {
     if (process.env.ALLOW_DEV_AI?.trim().toLowerCase() !== "true") {
-      throw new AiRequestDeniedError("Development AI is disabled");
+      throw new AiRequestDeniedError(
+        "Development AI is disabled. Set ALLOW_DEV_AI=true alongside XAI_API_KEY to allow cloud analysis from the local dev server.",
+      );
     }
     // Judged on the Origin the browser sent, which the checks above have already
     // matched against configuration, rather than on the request's own Host.

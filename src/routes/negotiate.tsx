@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { useNegotiate, LOCKED_NO, type Rank } from "@/lib/stores/negotiate";
+import { useNegotiate, LOCKED_NO, STARTER_IDS, type Rank } from "@/lib/stores/negotiate";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/negotiate")({
@@ -15,6 +15,7 @@ function NegotiatePage() {
   const notes = useNegotiate((s) => s.notes);
   const setNotes = useNegotiate((s) => s.setNotes);
   const add = useNegotiate((s) => s.add);
+  const removeItem = useNegotiate((s) => s.remove);
   const [label, setLabel] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
   const nos = items.filter((i) => i.rank === "no");
@@ -72,6 +73,16 @@ function NegotiatePage() {
                   </button>
                 );
               })}
+              {!STARTER_IDS.has(i.id) && (
+                <button
+                  type="button"
+                  onClick={() => removeItem(i.id)}
+                  aria-label={`Remove ${i.label}`}
+                  className="min-h-11 min-w-11 cursor-pointer rounded-full px-2 text-[11px] uppercase tracking-wide text-muted"
+                >
+                  remove
+                </button>
+              )}
             </div>
           </li>
         ))}
@@ -107,7 +118,7 @@ function NegotiatePage() {
             const after = useNegotiate.getState().items;
             if (after.length === beforeItems.length && !after.some((item) => item.label === next)) {
               setAddError(
-                "This list is full, so that limit was not added. Remove or reword an existing line, and say it out loud regardless.",
+                "This list is full, so that limit was not added. Remove one of the lines you added yourself, or reword this into an existing line — and say it out loud regardless.",
               );
               return;
             }
