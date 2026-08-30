@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { analyzeRope } from "@/lib/ai/analyze";
 import { analyzeErrorMessage, analyzeThrownMessage } from "@/lib/ai/analyze-errors";
-import { aiVisionAvailability } from "@/lib/ai/availability";
+import { aiVisionAvailability, type AiVisionAvailability } from "@/lib/ai/availability";
 import { providerFailureMessage } from "@/lib/ai/provider-failure";
 import { captureReadinessForAnalyze } from "@/lib/camera/capture-readiness";
 import { authEnabled } from "@/lib/auth/client";
@@ -105,7 +105,7 @@ function StudioPage() {
   const [triage, setTriage] = useState<TriageState>("none");
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [providerFailure, setProviderFailure] = useState<string | null>(null);
-  const [cloudVision, setCloudVision] = useState<boolean | null>(null);
+  const [cloudVision, setCloudVision] = useState<AiVisionAvailability | null>(null);
   const [refusal, setRefusal] = useState(false);
   const [savedReportRevision, setSavedReportRevision] = useState<string | null>(null);
   const [savedEntryId, setSavedEntryId] = useState<string | null>(null);
@@ -139,7 +139,7 @@ function StudioPage() {
     let live = true;
     void aiVisionAvailability()
       .then((result) => {
-        if (live) setCloudVision(result.configured);
+        if (live) setCloudVision(result);
       })
       .catch(() => {
         if (live) setCloudVision(null);
@@ -914,10 +914,11 @@ function StudioPage() {
               {analysisError}
             </p>
           )}
-          {cloudVision === false && (
+          {cloudVision && !cloudVision.configured && (
             <p className="text-xs text-muted">
-              Cloud analysis is switched off for this app, so stills stay on this device and you get
-              the local read only.
+              {cloudVision.reason === "no_database"
+                ? "This deployment has no database, so a batch cannot be reserved and nothing can be sent for cloud analysis. Stills stay on this device and you get the local read only."
+                : "Cloud analysis is switched off for this app, so stills stay on this device and you get the local read only."}
             </p>
           )}
           <div className="flex flex-wrap gap-2">

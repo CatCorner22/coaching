@@ -157,8 +157,20 @@ export function renderInstallPageHtml(template, { host, url } = {}) {
     .replaceAll("{{APP_URL}}", escapeHtml(stripInstallParams(url)));
 }
 
-export function renderWebManifest(hostHeader) {
-  const name = appNameFromHost(hostHeader);
+/**
+ * The installed app's manifest.
+ *
+ * The published `*.grok.me` host still names the app, but every other host —
+ * LAN, preview, a self-hosted domain — used to put "Grok App" and a placeholder
+ * icon on the home screen. The site identity the repo already carries names it
+ * instead, and its own favicon is offered alongside the platform icon.
+ */
+export function renderWebManifest(hostHeader, site = {}) {
+  const fromHost = appNameFromHost(hostHeader);
+  const siteTitle = String(site?.title ?? "").trim();
+  const name = fromHost === DEFAULT_APP_NAME && siteTitle ? siteTitle : fromHost;
+  const color = placeholderCardColor(site);
+  const themeColor = color ? `#${color}` : "#000000";
   return JSON.stringify(
     {
       name,
@@ -167,9 +179,14 @@ export function renderWebManifest(hostHeader) {
       start_url: "/",
       scope: "/",
       display: "standalone",
-      background_color: "#000000",
-      theme_color: "#000000",
+      background_color: themeColor,
+      theme_color: themeColor,
       icons: [
+        {
+          src: "/favicon.svg",
+          sizes: "any",
+          type: "image/svg+xml",
+        },
         {
           src: "/__grok/icon-180.png",
           sizes: "180x180",

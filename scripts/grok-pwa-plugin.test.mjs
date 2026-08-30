@@ -477,7 +477,25 @@ test("renders the manifest with the per-app name", () => {
   const manifest = JSON.parse(renderWebManifest("wild-race.grok.me"));
   assert.equal(manifest.name, "Wild Race");
   assert.equal(manifest.short_name, "Wild Race");
-  assert.equal(manifest.icons[0].src, "/__grok/icon-180.png");
+  assert.equal(
+    manifest.icons.some((icon) => icon.src === "/__grok/icon-180.png"),
+    true,
+  );
+});
+
+test("off the published host the manifest uses this app's own identity", () => {
+  // Installed from a LAN address or a self-hosted domain, the home screen said
+  // "Grok App" with the placeholder icon — the one artifact that stays on the
+  // phone was the one piece of branding the app never supplied.
+  const site = { title: "Knotty", color: "#0b0a09" };
+  const manifest = JSON.parse(renderWebManifest("192.168.1.50:8080", site));
+  assert.equal(manifest.name, "Knotty");
+  assert.equal(manifest.short_name, "Knotty");
+  assert.equal(manifest.theme_color, "#0b0a09");
+  assert.equal(manifest.icons[0].src, "/favicon.svg");
+  // The published host still wins, and a site with no identity is unchanged.
+  assert.equal(JSON.parse(renderWebManifest("wild-race.grok.me", site)).name, "Wild Race");
+  assert.equal(JSON.parse(renderWebManifest("localhost:8080", {})).name, "Grok App");
 });
 
 // Tripwires: the deployed-app path only works if Nitro scans server/ — an

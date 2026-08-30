@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -8,9 +8,12 @@ import { promisify } from "node:util";
 import {
   APP_ENV_REL_PATH,
   mergeAppEnv,
+  nodeVersionProblem,
   parseAppEnv,
+  parseAppEnvReport,
   projectRoot,
   readAppEnv,
+  readAppEnvReport,
 } from "./with-app-env.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -141,4 +144,37 @@ test("the CLI still runs when invoked through a symlinked path", async () => {
     PRINT_FLAG,
   ]);
   assert.equal(stdout, expectedWrappedAuthEnabled());
+});
+
+test("a present but unusable app-env file says so instead of reverting silently", () => {
+  // A stray trailing comma or a nested { env: {...} } shape used to be
+  // swallowed, so the operator got the built-in default — the opposite of what
+  // they wrote — with nothing printed anywhere.
+  assert.match(parseAppEnvReport('{"VITE_AUTH_ENABLED":"true",}').problems[0], /not valid JSON/);
+  assert.match(
+    parseAppEnvReport('{"env":{"VITE_AUTH_ENABLED":"true"}}').problems[0],
+    /only VITE_\* keys are read/,
+  );
+  assert.match(parseAppEnvReport('{"VITE_AUTH_ENABLED":false}').problems[0], /quoted string/);
+  assert.match(parseAppEnvReport("[]").problems[0], /must be a JSON object/);
+  assert.deepEqual(parseAppEnvReport('{"VITE_AUTH_ENABLED":"true"}').problems, []);
+
+  // An absent file is not a problem; a broken one is, and a build refuses it.
+  assert.deepEqual(readAppEnvReport(makeWorkspace()).problems, []);
+  const broken = makeWorkspace('{"VITE_AUTH_ENABLED":"true",}');
+  assert.equal(readAppEnvReport(broken).problems.length, 1);
+  // …and a build refuses to run on a file it could not honour.
+  assert.match(
+    readFileSync(join(projectRoot(), "scripts/with-app-env.mjs"), "utf8"),
+    /refusing to build with an unusable/,
+  );
+});
+
+test("an unsupported Node version is named before anything else runs", () => {
+  // The build died with `node: bad option: --experimental-strip-types`, which
+  // mentions neither Node 22 nor the engines field.
+  assert.match(nodeVersionProblem("v20.18.1"), /needs Node 22/);
+  assert.match(nodeVersionProblem("v20.18.1"), /v20\.18\.1/);
+  assert.equal(nodeVersionProblem("v22.12.0"), null);
+  assert.equal(nodeVersionProblem("nonsense"), null);
 });

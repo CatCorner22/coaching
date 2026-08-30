@@ -52,29 +52,75 @@ const DEFAULT_APP_ENV = Object.freeze({
  * Parse an app-env document, keeping only `VITE_`-prefixed string entries.
  */
 export function parseAppEnv(text) {
+  return parseAppEnvReport(text).env;
+}
+
+/**
+ * Parse an app-env document, reporting what was discarded.
+ *
+ * A stray trailing comma or a nested `{ "env": {...} }` shape used to be
+ * swallowed, so the file silently did nothing and the operator got the opposite
+ * of the value they wrote. Anything dropped is named.
+ */
+export function parseAppEnvReport(text) {
   let parsed;
   try {
     parsed = JSON.parse(text);
-  } catch {
-    return {};
+  } catch (error) {
+    return { env: {}, problems: [`${APP_ENV_REL_PATH} is not valid JSON: ${error.message}`] };
   }
-  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return {
+      env: {},
+      problems: [`${APP_ENV_REL_PATH} must be a JSON object of VITE_ keys to string values`],
+    };
+  }
   const env = {};
+  const problems = [];
   for (const [key, value] of Object.entries(parsed)) {
-    if (!key.startsWith(VITE_PREFIX)) continue;
-    if (typeof value !== "string") continue;
+    if (!key.startsWith(VITE_PREFIX)) {
+      problems.push(`${APP_ENV_REL_PATH}: ignored "${key}" — only ${VITE_PREFIX}* keys are read`);
+      continue;
+    }
+    if (typeof value !== "string") {
+      problems.push(`${APP_ENV_REL_PATH}: ignored "${key}" — the value must be a quoted string`);
+      continue;
+    }
     env[key] = value;
   }
-  return env;
+  return { env, problems };
+}
+
+/**
+ * The app env recorded under `root`, with a safe standalone auth-off default,
+ * plus anything wrong with the file. An absent file is not a problem; a file
+ * that is present and unusable is.
+ */
+export function readAppEnvReport(root) {
+  let text;
+  try {
+    text = readFileSync(join(root, APP_ENV_REL_PATH), "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") return { env: { ...DEFAULT_APP_ENV }, problems: [] };
+    return {
+      env: { ...DEFAULT_APP_ENV },
+      problems: [`${APP_ENV_REL_PATH} could not be read: ${error?.message || error}`],
+    };
+  }
+  const report = parseAppEnvReport(text);
+  return { env: { ...DEFAULT_APP_ENV, ...report.env }, problems: report.problems };
 }
 
 /** The app env recorded under `root`, with a safe standalone auth-off default. */
 export function readAppEnv(root) {
-  try {
-    return { ...DEFAULT_APP_ENV, ...parseAppEnv(readFileSync(join(root, APP_ENV_REL_PATH), "utf8")) };
-  } catch {
-    return { ...DEFAULT_APP_ENV };
-  }
+  return readAppEnvReport(root).env;
+}
+
+/** Refuse to run under a Node that cannot execute the scripts this repo ships. */
+export function nodeVersionProblem(version, range = "22") {
+  const major = Number(/^v?(\d+)/.exec(version)?.[1]);
+  if (!Number.isFinite(major) || String(major) === range) return null;
+  return `This project needs Node ${range} (package.json engines: node >=22 <23). You are running ${version}. With nvm: nvm install 22 && nvm use 22.`;
 }
 
 /** File values under the process environment: an explicit override wins. */
@@ -127,10 +173,21 @@ function main(argv) {
     console.error("usage: node scripts/with-app-env.mjs <command> [args…]");
     process.exit(2);
   }
-  const env = mergeAppEnv(readAppEnv(projectRoot()), process.env);
+  const versionProblem = nodeVersionProblem(process.version);
+  if (versionProblem) {
+    console.error(`[with-app-env] ${versionProblem}`);
+    process.exit(1);
+  }
+  const appEnv = readAppEnvReport(projectRoot());
+  for (const problem of appEnv.problems) console.error(`[with-app-env] ${problem}`);
+  const env = mergeAppEnv(appEnv.env, process.env);
   const isProductionBuild =
     command.endsWith("vite") && args.some((arg) => arg === "build" || arg.startsWith("build"));
   if (isProductionBuild) {
+    if (appEnv.problems.length > 0) {
+      console.error(`[with-app-env] refusing to build with an unusable ${APP_ENV_REL_PATH}`);
+      process.exit(1);
+    }
     const deployCheck = checkDeployAuthConfig(env);
     if (deployCheck.status === "misconfigured") {
       console.error(deployCheck.message);
