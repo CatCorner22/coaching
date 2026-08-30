@@ -22,7 +22,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { pendingMigrations } from "./migration-plan.mjs";
-import { isMainModule } from "./with-app-env.mjs";
+import { AUTH_FLAG_DEFAULTED, isMainModule } from "./with-app-env.mjs";
 
 const DEFAULT_MIGRATIONS_DIR = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -184,7 +184,12 @@ export function missingDatabaseUrlDisposition(env, argv = []) {
   // release step that simply forgot to set NODE_ENV=production got a green
   // "skipping" line and an unmigrated database.
   if (argv.includes("--allow-skip")) return "skip";
-  if (env.VITE_AUTH_ENABLED?.trim() === "false") return "skip";
+  // Only an operator's own no-auth flag authorizes a skip. `npm run db:migrate`
+  // goes through scripts/with-app-env.mjs, whose standalone default is auth
+  // off — accepting that would let a release that merely forgot DATABASE_URL
+  // exit 0 with the auth schema unmigrated.
+  const authFlagDefaulted = env[AUTH_FLAG_DEFAULTED] === "1";
+  if (!authFlagDefaulted && env.VITE_AUTH_ENABLED?.trim() === "false") return "skip";
   return "fail";
 }
 

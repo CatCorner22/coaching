@@ -18,9 +18,20 @@ type SyncStateStorage = {
  */
 export type PersistFailure = { key: string; reason: "quota" | "blocked" };
 
-let lastPersistFailure: PersistFailure | null = null;
+/**
+ * Outstanding failures, per storage key. Recovery is per key: a settings write
+ * landing says nothing about whether the negotiation blob was ever saved.
+ */
+const outstandingFailures = new Map<string, PersistFailure>();
 const persistFailureListeners = new Set<(failure: PersistFailure) => void>();
 const persistStatusListeners = new Set<(failure: PersistFailure | null) => void>();
+
+/** The most recently reported failure that is still outstanding. */
+function currentFailure(): PersistFailure | null {
+  let latest: PersistFailure | null = null;
+  for (const failure of outstandingFailures.values()) latest = failure;
+  return latest;
+}
 
 function announcePersistStatus(failure: PersistFailure | null) {
   for (const listener of persistStatusListeners) {
@@ -38,7 +49,9 @@ function reportPersistFailure(key: string, error: unknown) {
     key,
     reason: /quota|QuotaExceeded|NS_ERROR_DOM_QUOTA/i.test(name) ? "quota" : "blocked",
   };
-  lastPersistFailure = failure;
+  // Re-insert so this key sorts last: the banner names the newest problem.
+  outstandingFailures.delete(key);
+  outstandingFailures.set(key, failure);
   for (const listener of persistFailureListeners) {
     try {
       listener(failure);
@@ -56,15 +69,19 @@ function reportPersistFailure(key: string, error: unknown) {
  * later save looking unsaved, which trains people to ignore the one warning
  * that matters.
  */
-function notePersistSuccess() {
-  if (lastPersistFailure === null) return;
-  lastPersistFailure = null;
-  announcePersistStatus(null);
+function notePersistSuccess(key: string) {
+  if (!outstandingFailures.delete(key)) return;
+  announcePersistStatus(currentFailure());
 }
 
 /** Most recent failed write, or null if every write so far has landed. */
 export function getPersistFailure(): PersistFailure | null {
-  return lastPersistFailure;
+  return currentFailure();
+}
+
+/** Whether the last write to this specific key failed. */
+export function persistFailureFor(key: string): PersistFailure | null {
+  return outstandingFailures.get(key) ?? null;
 }
 
 /** Subscribe to failed writes. Returns an unsubscribe function. */
@@ -86,7 +103,7 @@ export function onPersistStatus(
 
 /** Test seam. */
 export function resetPersistFailure() {
-  lastPersistFailure = null;
+  outstandingFailures.clear();
 }
 
 /**
@@ -119,7 +136,7 @@ export function safeBrowserStorage(): SyncStateStorage {
       setItem: (name, value) => {
         try {
           storage.setItem(name, value);
-          notePersistSuccess();
+          notePersistSuccess(name);
         } catch (error) {
           // The live store keeps working from memory, but the change is NOT
           // saved. Say so rather than letting the tab look correct until reload.
@@ -256,10 +273,17 @@ export function unionRemovedIds(...sides: unknown[]): string[] {
   for (const side of sides) {
     if (!Array.isArray(side)) continue;
     for (const id of side) {
-      if (typeof id === "string" && id) ids.add(id.slice(0, 80));
+      if (typeof id === "string" && id) {
+        // Re-insert so the newest deletion sorts last: the cap below keeps the
+        // most recent tombstones, and dropping a fresh one lets a stale tab
+        // resurrect a limit the couple just removed.
+        const bounded = id.slice(0, 80);
+        ids.delete(bounded);
+        ids.add(bounded);
+      }
     }
   }
-  return [...ids].slice(0, MERGED_ITEM_CAP);
+  return [...ids].slice(-MERGED_ITEM_CAP);
 }
 
 /** Whether the merge changed any rank the writing tab was holding. */

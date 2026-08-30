@@ -16,6 +16,7 @@ import {
   type TriageState,
 } from "@/lib/observation/report";
 import { UnauthorizedError } from "@/lib/auth/verify.server";
+import { PRE_DISPATCH_MARKER } from "./analyze-errors";
 import { AiRequestDeniedError, authorizeAiRequest } from "./guard.server";
 import { buildSystemPrompt, verifyBatchConsentScope } from "./analyze-consent";
 import { grokChat, grokProviderConfigured, parseStrictJson } from "./grok";
@@ -196,6 +197,54 @@ const analyzeInputSchema = z
 export const analyzeRope = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: unknown) => {
+    try {
+      return validateAnalyzeInput(input);
+    } catch (error) {
+      // A validator failure is thrown, not returned, so the client only sees
+      // an error string and has to assume the one-use batch may already have
+      // been reserved. Nothing runs before this, so mark it as provably
+      // pre-dispatch and let the client reopen the batch.
+      const message = error instanceof Error ? error.message : "Invalid request";
+      throw new Error(`${PRE_DISPATCH_MARKER} ${message}`);
+    }
+  })
+  .handler(async ({ data, context }): Promise<AnalyzeResult> => {
+    try {
+      return await runAnalyzeRequest(data, context);
+    } catch (error) {
+      // Admission failures used to escape as thrown errors, which the client
+      // could only render as raw text and which left the one-use batch closed
+      // even though nothing was ever reserved. They are ordinary results.
+      if (error instanceof AiRequestDeniedError || error instanceof UnauthorizedError) {
+        return {
+          ok: false,
+          error:
+            error instanceof AiRequestDeniedError
+              ? `No media was sent to xAI. ${error.message}`
+              : "No media was sent to xAI. This deployment did not accept the request (sign-in). Nothing was used from this batch.",
+          providerAttempted: false,
+          code: "AI_REQUEST_FORBIDDEN",
+          status: 403,
+          retryableBeforeProvider: true,
+        };
+      }
+      if (error instanceof AnalyzeRequestError) {
+        return {
+          ok: false,
+          error: error.message,
+          providerAttempted: false,
+          code: "AI_REQUEST_INVALID",
+          status: 400,
+          retryableBeforeProvider: true,
+        };
+      }
+      throw error;
+    }
+  });
+
+// Split out of the validator so every throw inside can be tagged as
+// happening before any reservation or dispatch.
+function validateAnalyzeInput(input: unknown) {
     // A ZodError serializes its whole issue array as the thrown message, and
     // the Studio prints thrown messages verbatim: a single mistyped field used
     // to render as a kilobyte of JSON in the error banner.
@@ -243,40 +292,7 @@ export const analyzeRope = createServerFn({ method: "POST" })
       media: parsed.media,
       consent: parsed.consent,
     };
-  })
-  .handler(async ({ data, context }): Promise<AnalyzeResult> => {
-    try {
-      return await runAnalyzeRequest(data, context);
-    } catch (error) {
-      // Admission failures used to escape as thrown errors, which the client
-      // could only render as raw text and which left the one-use batch closed
-      // even though nothing was ever reserved. They are ordinary results.
-      if (error instanceof AiRequestDeniedError || error instanceof UnauthorizedError) {
-        return {
-          ok: false,
-          error:
-            error instanceof AiRequestDeniedError
-              ? `No media was sent to xAI. ${error.message}`
-              : "No media was sent to xAI. This deployment did not accept the request (sign-in). Nothing was used from this batch.",
-          providerAttempted: false,
-          code: "AI_REQUEST_FORBIDDEN",
-          status: 403,
-          retryableBeforeProvider: true,
-        };
-      }
-      if (error instanceof AnalyzeRequestError) {
-        return {
-          ok: false,
-          error: error.message,
-          providerAttempted: false,
-          code: "AI_REQUEST_INVALID",
-          status: 400,
-          retryableBeforeProvider: true,
-        };
-      }
-      throw error;
-    }
-  });
+}
 
 class AnalyzeRequestError extends Error {
   constructor(message: string) {

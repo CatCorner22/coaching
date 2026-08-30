@@ -252,4 +252,17 @@ test("a release without DATABASE_URL fails unless the skip is asked for", async 
   // --allow-skip says the operator meant it.
   assert.equal(missingDatabaseUrlDisposition({ VITE_AUTH_ENABLED: "false" }), "skip");
   assert.equal(missingDatabaseUrlDisposition({ NODE_ENV: "production" }, ["--allow-skip"]), "skip");
+  // …but the wrapper's own standalone default is not an operator choice: a
+  // release that only forgot DATABASE_URL must not inherit a silent skip.
+  assert.equal(
+    missingDatabaseUrlDisposition({ VITE_AUTH_ENABLED: "false", APP_ENV_AUTH_DEFAULTED: "1" }),
+    "fail",
+  );
+  assert.equal(
+    missingDatabaseUrlDisposition(
+      { VITE_AUTH_ENABLED: "false", APP_ENV_AUTH_DEFAULTED: "1" },
+      ["--allow-skip"],
+    ),
+    "skip",
+  );
 });

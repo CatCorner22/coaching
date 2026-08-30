@@ -7,7 +7,11 @@ import { CoachPanel } from "@/components/coach-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { analyzeRope } from "@/lib/ai/analyze";
-import { analyzeErrorMessage, analyzeThrownMessage } from "@/lib/ai/analyze-errors";
+import {
+  analyzeErrorMessage,
+  analyzeThrownBeforeDispatch,
+  analyzeThrownMessage,
+} from "@/lib/ai/analyze-errors";
 import { aiVisionAvailability, type AiVisionAvailability } from "@/lib/ai/availability";
 import { providerFailureMessage } from "@/lib/ai/provider-failure";
 import { captureReadinessForAnalyze } from "@/lib/camera/capture-readiness";
@@ -524,6 +528,9 @@ function StudioPage() {
         // closed: it may already have been reserved. Only the message can
         // improve, and it must never be a raw framework or validator string.
         setAnalysisError(analyzeThrownMessage(cause));
+        // The one exception: the server tags request-validation failures,
+        // which run before the handler and so before any reservation.
+        if (analyzeThrownBeforeDispatch(cause)) setAnalysisConsumed(false);
       }
     } finally {
       if (mountedRef.current && request === analysisRequestRef.current) setPending(false);

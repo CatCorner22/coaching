@@ -1,12 +1,30 @@
 import type { AnalyzeResult } from "./schema";
 
 /**
+ * Prefix on every message the analyze validator throws.
+ *
+ * The validator runs before the handler, so its failures cannot become an
+ * `AnalyzeResult` with `retryableBeforeProvider` — they arrive at the client as
+ * thrown errors, indistinguishable from a failure after the batch was already
+ * reserved. Since the validator provably runs before any reservation or
+ * dispatch, marking its messages is what lets the client reopen the batch for
+ * exactly that case.
+ */
+export const PRE_DISPATCH_MARKER = "[pre-dispatch]";
+
+/** True when the failure provably happened before anything was reserved or sent. */
+export function analyzeThrownBeforeDispatch(cause: unknown): boolean {
+  return cause instanceof Error && cause.message.includes(PRE_DISPATCH_MARKER);
+}
+
+/**
  * A thrown analyze failure never carries the server's structured result, so
  * everything it could once print — a serialized Zod issue array, an HTML error
  * page, a framework stack — was raw internals in the reader's error banner.
  */
 export function analyzeThrownMessage(cause: unknown): string {
-  const raw = cause instanceof Error ? cause.message.trim() : "";
+  const raw =
+    cause instanceof Error ? cause.message.replaceAll(PRE_DISPATCH_MARKER, "").trim() : "";
   if (requestNeverReachedProvider(cause)) {
     return "The app could not reach the server, so nothing was sent. Check the connection and press Analyze again.";
   }

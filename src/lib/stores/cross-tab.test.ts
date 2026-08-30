@@ -60,3 +60,58 @@ test("a removed custom limit stays removed when the other tab writes", () => {
     true,
   );
 });
+
+test("the tombstone cap keeps the newest removals", async () => {
+  const { unionRemovedIds } = await import("./persist.ts");
+  // The cap used to drop the tail, i.e. the most recent deletions, so a stale
+  // tab could resurrect a limit the couple had just removed.
+  const many = Array.from({ length: 400 }, (_, index) => `custom-${index}`);
+  const capped = unionRemovedIds(many, ["custom-just-removed"]);
+  assert.ok(capped.includes("custom-just-removed"));
+  assert.equal(capped.at(-1), "custom-just-removed");
+  // A repeat of an older id moves it to the newest position rather than
+  // leaving it in line to be evicted.
+  const refreshed = unionRemovedIds(["custom-0", "custom-1"], ["custom-0"]);
+  assert.deepEqual(refreshed, ["custom-1", "custom-0"]);
+});
+
+test("one key saving does not clear another key's storage warning", async () => {
+  const { safeBrowserStorage, getPersistFailure, persistFailureFor, resetPersistFailure } =
+    await import("./persist.ts");
+  resetPersistFailure();
+  const blocked = new Set(["knotty-negotiate"]);
+  const backing = new Map<string, string>();
+  const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (name: string) => backing.get(name) ?? null,
+      setItem: (name: string, value: string) => {
+        if (blocked.has(name)) throw new DOMException("quota", "QuotaExceededError");
+        backing.set(name, value);
+      },
+      removeItem: (name: string) => void backing.delete(name),
+    },
+  });
+  try {
+    const storage = safeBrowserStorage();
+    storage.setItem("knotty-negotiate", "{}");
+    assert.ok(persistFailureFor("knotty-negotiate"));
+    // Recovery is per key: a settings write landing says nothing about
+    // whether the negotiated limits were ever saved, and clearing the banner
+    // on it hid a limit that only existed in memory.
+    storage.setItem("knotty-settings", "{}");
+    assert.equal(persistFailureFor("knotty-settings"), null);
+    assert.ok(persistFailureFor("knotty-negotiate"));
+    assert.ok(getPersistFailure());
+    // Once the blocked key itself lands, the warning clears.
+    blocked.clear();
+    storage.setItem("knotty-negotiate", "{}");
+    assert.equal(persistFailureFor("knotty-negotiate"), null);
+    assert.equal(getPersistFailure(), null);
+  } finally {
+    if (original) Object.defineProperty(globalThis, "localStorage", original);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+    resetPersistFailure();
+  }
+});

@@ -68,3 +68,22 @@ test("an unverified ZDR response never claims nothing was sent or invites a re-t
   assert.match(unverified, /one-use batch stays closed/i);
   assert.match(unverified, /capture a new batch/i);
 });
+
+test("a validator failure is reported as pre-dispatch, and its marker never reaches the reader", async () => {
+  const { analyzeThrownBeforeDispatch, analyzeThrownMessage, PRE_DISPATCH_MARKER } = await import(
+    "./analyze-errors.ts"
+  );
+  // The validator runs before the handler, so nothing was reserved and the
+  // one-use batch can be reopened — but the failure arrives as a thrown error
+  // with no server verdict, so the marker is the only way to know that.
+  const thrown = new Error(
+    `${PRE_DISPATCH_MARKER} Media permissions must be reconfirmed for this batch`,
+  );
+  assert.equal(analyzeThrownBeforeDispatch(thrown), true);
+  assert.equal(
+    analyzeThrownMessage(thrown),
+    "Media permissions must be reconfirmed for this batch",
+  );
+  // Anything else stays closed.
+  assert.equal(analyzeThrownBeforeDispatch(new Error("the provider timed out")), false);
+});

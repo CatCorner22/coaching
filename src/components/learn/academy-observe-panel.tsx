@@ -176,7 +176,12 @@ export function AcademyObservePanel({
       setFacing(nextFacing);
       setCameraOn(true);
     } catch (e) {
-      if (request === cameraRequestRef.current) setError(cameraErrorMessage(e));
+      // openRopeCamera can succeed and the preview still fail to play, which
+      // left the lens open behind a panel showing no Stop button.
+      if (request === cameraRequestRef.current) {
+        stopCamera();
+        setError(cameraErrorMessage(e));
+      }
     } finally {
       if (request === cameraRequestRef.current) {
         setBusy(false);

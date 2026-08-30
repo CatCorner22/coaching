@@ -7,6 +7,8 @@ import { test } from "node:test";
 import { promisify } from "node:util";
 import {
   APP_ENV_REL_PATH,
+  AUTH_FLAG_DEFAULTED,
+  authFlagIsWrapperDefault,
   mergeAppEnv,
   nodeVersionProblem,
   parseAppEnv,
@@ -177,4 +179,19 @@ test("an unsupported Node version is named before anything else runs", () => {
   assert.match(nodeVersionProblem("v20.18.1"), /v20\.18\.1/);
   assert.equal(nodeVersionProblem("v22.12.0"), null);
   assert.equal(nodeVersionProblem("nonsense"), null);
+});
+
+test("the wrapper's own auth default is marked as a default, not an operator choice", () => {
+  // db:migrate runs through this wrapper. Treating the standalone auth-off
+  // default as an explicit no-auth deployment let a release that only forgot
+  // DATABASE_URL skip migrations and ship an unmigrated auth schema.
+  assert.equal(AUTH_FLAG_DEFAULTED, "APP_ENV_AUTH_DEFAULTED");
+  assert.equal(authFlagIsWrapperDefault({}, {}), true);
+  assert.equal(authFlagIsWrapperDefault({ VITE_AUTH_ENABLED: "false" }, {}), false);
+  assert.equal(authFlagIsWrapperDefault({}, { VITE_AUTH_ENABLED: "true" }), false);
+  // The file's own entries are reported apart from the defaults it fills in.
+  assert.deepEqual(readAppEnvReport(makeWorkspace()).fileEnv, {});
+  assert.deepEqual(readAppEnvReport(makeWorkspace('{"VITE_AUTH_ENABLED":"true"}')).fileEnv, {
+    VITE_AUTH_ENABLED: "true",
+  });
 });

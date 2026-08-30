@@ -10,6 +10,8 @@ export const LOCAL_DATA_KEYS = [
   // sessions on a shared device when these two were left off this list.
   "knotty-learn",
   "knotty-checklist",
+  // The live session record: which tie, when it started, and any called stop.
+  "knotty-session",
   "musubi-settings",
   "musubi-negotiate",
   "musubi-plan",

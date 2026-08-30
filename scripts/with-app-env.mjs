@@ -101,14 +101,21 @@ export function readAppEnvReport(root) {
   try {
     text = readFileSync(join(root, APP_ENV_REL_PATH), "utf8");
   } catch (error) {
-    if (error?.code === "ENOENT") return { env: { ...DEFAULT_APP_ENV }, problems: [] };
+    if (error?.code === "ENOENT") return { env: { ...DEFAULT_APP_ENV }, fileEnv: {}, problems: [] };
     return {
       env: { ...DEFAULT_APP_ENV },
+      fileEnv: {},
       problems: [`${APP_ENV_REL_PATH} could not be read: ${error?.message || error}`],
     };
   }
   const report = parseAppEnvReport(text);
-  return { env: { ...DEFAULT_APP_ENV, ...report.env }, problems: report.problems };
+  return {
+    env: { ...DEFAULT_APP_ENV, ...report.env },
+    // The file's own entries, so callers can tell an operator's choice from a
+    // DEFAULT_APP_ENV fallback.
+    fileEnv: report.env,
+    problems: report.problems,
+  };
 }
 
 /** The app env recorded under `root`, with a safe standalone auth-off default. */
@@ -126,6 +133,22 @@ export function nodeVersionProblem(version, range = "22") {
 /** File values under the process environment: an explicit override wins. */
 export function mergeAppEnv(appEnv, processEnv) {
   return { ...appEnv, ...processEnv };
+}
+
+/**
+ * Marker naming the auth flag as this wrapper's own standalone default rather
+ * than something an operator chose. Without it a release step that only forgot
+ * DATABASE_URL inherited `VITE_AUTH_ENABLED=false` from DEFAULT_APP_ENV and
+ * read as a deliberate no-auth deploy, so `db:migrate` skipped and shipped an
+ * unmigrated auth schema.
+ */
+export const AUTH_FLAG_DEFAULTED = "APP_ENV_AUTH_DEFAULTED";
+
+/** Whether the merged auth flag came only from DEFAULT_APP_ENV. */
+export function authFlagIsWrapperDefault(fileEnv, processEnv) {
+  return (
+    fileEnv?.VITE_AUTH_ENABLED === undefined && processEnv?.VITE_AUTH_ENABLED === undefined
+  );
 }
 
 /**
@@ -181,6 +204,7 @@ function main(argv) {
   const appEnv = readAppEnvReport(projectRoot());
   for (const problem of appEnv.problems) console.error(`[with-app-env] ${problem}`);
   const env = mergeAppEnv(appEnv.env, process.env);
+  if (authFlagIsWrapperDefault(appEnv.fileEnv, process.env)) env[AUTH_FLAG_DEFAULTED] = "1";
   const isProductionBuild =
     command.endsWith("vite") && args.some((arg) => arg === "build" || arg.startsWith("build"));
   if (isProductionBuild) {

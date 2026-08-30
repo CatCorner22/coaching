@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist, type PersistStorage } from "zustand/middleware";
-import { safeJsonStorage, syncPersistedAcrossTabs } from "./persist";
+import { persistFailureFor, safeJsonStorage, syncPersistedAcrossTabs } from "./persist";
 
 const SESSION_KEY = "knotty-session";
 
@@ -32,6 +32,7 @@ type PersistedSession = Pick<
   | "lastCheckAt"
   | "stopped"
   | "stopReason"
+  | "stoppedAt"
   | "yellowAt"
 >;
 
@@ -40,7 +41,7 @@ type PersistedSession = Pick<
  * state every second; without this the store rewrote (and cross-tab
  * broadcast) an unchanged blob at 1 Hz for the whole scene.
  */
-function unchangedWriteSkippingStorage<State>(): PersistStorage<State> {
+export function unchangedWriteSkippingStorage<State>(): PersistStorage<State> {
   const base = safeJsonStorage<State>();
   let lastWritten: string | null = null;
   return {
@@ -53,8 +54,12 @@ function unchangedWriteSkippingStorage<State>(): PersistStorage<State> {
         serialized = null;
       }
       if (serialized !== null && serialized === lastWritten) return;
-      lastWritten = serialized;
-      return base.setItem(key, value);
+      const result = base.setItem(key, value);
+      // Only remember a payload the storage actually took. Caching it first
+      // meant a write that failed once was skipped forever after, so a stop
+      // called during a quota error never reached disk.
+      lastWritten = persistFailureFor(key) === null ? serialized : null;
+      return result;
     },
     removeItem: (key) => {
       lastWritten = null;
@@ -63,8 +68,8 @@ function unchangedWriteSkippingStorage<State>(): PersistStorage<State> {
   };
 }
 
-function withinSessionWindow(snapshot: Partial<PersistedSession>): boolean {
-  const marks = [snapshot.startedAt, snapshot.lastCheckAt, snapshot.yellowAt];
+export function withinSessionWindow(snapshot: Partial<PersistedSession>): boolean {
+  const marks = [snapshot.startedAt, snapshot.lastCheckAt, snapshot.yellowAt, snapshot.stoppedAt];
   const newest = marks.reduce<number>(
     (best, mark) => (typeof mark === "number" && Number.isFinite(mark) && mark > best ? mark : best),
     0,
@@ -86,6 +91,8 @@ type SessionState = {
   listening: boolean;
   stopped: boolean;
   stopReason?: string;
+  /** When the stop was called, so a fresh stop dates a long-running session. */
+  stoppedAt: number | null;
   /**
    * A yellow signal is not a stop. The knowledge base is explicit that red ends
    * the night and yellow changes it, so yellow raises this flag and the session
@@ -116,6 +123,7 @@ export const useSession = create<SessionState>()(
       elapsed: 0,
       listening: false,
       stopped: false,
+      stoppedAt: null,
       yellowAt: null,
       setTie: (slug) => {
         if (get().stopped) return;
@@ -147,7 +155,8 @@ export const useSession = create<SessionState>()(
         set({ elapsed: next });
       },
       checked: () => set({ lastCheckAt: Date.now() }),
-      stop: (reason) => set({ stopped: true, stopReason: reason, yellowAt: null }),
+      stop: (reason) =>
+        set({ stopped: true, stopReason: reason, stoppedAt: Date.now(), yellowAt: null }),
       flagYellow: () => {
         // A stop already supersedes it, and re-flagging while one stands must not
         // restart the clock on a check-in that has not happened yet.
@@ -165,6 +174,7 @@ export const useSession = create<SessionState>()(
           elapsed: 0,
           stopped: false,
           stopReason: undefined,
+          stoppedAt: null,
           yellowAt: null,
         });
       },
@@ -181,6 +191,7 @@ export const useSession = create<SessionState>()(
         lastCheckAt: state.lastCheckAt,
         stopped: state.stopped,
         stopReason: state.stopReason,
+        stoppedAt: state.stoppedAt,
         yellowAt: state.yellowAt,
       }),
       merge: (persisted, current) => {
@@ -209,6 +220,10 @@ export const useSession = create<SessionState>()(
           elapsed: startedAt === null ? 0 : Math.max(0, Math.floor((Date.now() - startedAt) / 1000)),
           stopped: snapshot.stopped === true,
           stopReason: typeof snapshot.stopReason === "string" ? snapshot.stopReason : undefined,
+          stoppedAt:
+            typeof snapshot.stoppedAt === "number" && Number.isFinite(snapshot.stoppedAt)
+              ? snapshot.stoppedAt
+              : null,
           yellowAt:
             typeof snapshot.yellowAt === "number" && Number.isFinite(snapshot.yellowAt)
               ? snapshot.yellowAt

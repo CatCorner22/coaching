@@ -304,7 +304,22 @@ test("only verified pre-reservation admission denials reopen a batch", () => {
     /if \(res\.retryableBeforeProvider && res\.providerAttempted === false\) \{\s*setAnalysisConsumed\(false\)/,
   );
   const caught = between(studio, "} catch (cause) {", "} finally {");
-  assert.doesNotMatch(caught, /setAnalysisConsumed\(false\)/);
+  // A thrown failure carries no server verdict, so the batch stays closed —
+  // with one proven exception. The request validator runs before the handler,
+  // and therefore before any reservation or dispatch, so the server tags its
+  // messages and only that tag may reopen the batch.
+  assert.match(
+    caught,
+    /if \(analyzeThrownBeforeDispatch\(cause\)\) setAnalysisConsumed\(false\)/,
+  );
+  assert.doesNotMatch(
+    caught.replace(/if \(analyzeThrownBeforeDispatch\(cause\)\) setAnalysisConsumed\(false\);/, ""),
+    /setAnalysisConsumed\(false\)/,
+  );
+  // The tag is applied where it is provable: the validator, and nowhere else.
+  const validator = between(analyze, ".validator((input: unknown) => {", ".handler(async");
+  assert.match(validator, /PRE_DISPATCH_MARKER/);
+  assert.equal(analyze.slice(analyze.indexOf(".handler(async")).includes("PRE_DISPATCH_MARKER"), false);
 });
 
 test("instructor-only entries cannot route into Studio", () => {
