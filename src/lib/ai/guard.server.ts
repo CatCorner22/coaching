@@ -44,6 +44,9 @@ export async function authorizeAiRequest(verifiedUserId?: string): Promise<{ use
     !isTrustedAppOrigin(origin, {
       configuredOrigin: process.env.BETTER_AUTH_URL,
       allowLoopback: viteDevServer,
+      // The LAN address the phone loaded the app from, and only that one: the
+      // private range at large is not this app.
+      devHost: request.headers.get("host"),
       // The shared preview domain is a trusted origin only where the live
       // preview is actually wired up: the dev server, or a deployment holding
       // the preview OAuth client secret. A production app on its own domain

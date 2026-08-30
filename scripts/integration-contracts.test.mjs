@@ -209,7 +209,7 @@ test("Studio requires yes for negotiated actions and blocks every voice path", (
   assert.match(studio, /if \(!studioVoice\) stopCoachVoice\(\)/);
   assert.match(studio, /voice=\{studioVoice\}/);
   assert.match(studio, /voice=\{studioVoice && !micArmed\}/);
-  assert.match(studio, /disabled=\{stopped \|\| !studioVoice\}/);
+  assert.match(studio, /disabled=\{stopped \|\| !studioVoice \|\| stepBlocked\}/);
   assert.match(studio, /disabled=\{cameraGateReason !== "enabled"\}/);
   assert.match(studio, /Export report/);
   assert.match(consentGate, /Step inside/);
@@ -320,6 +320,22 @@ test("only verified pre-reservation admission denials reopen a batch", () => {
   const validator = between(analyze, ".validator((input: unknown) => {", ".handler(async");
   assert.match(validator, /PRE_DISPATCH_MARKER/);
   assert.equal(analyze.slice(analyze.indexOf(".handler(async")).includes("PRE_DISPATCH_MARKER"), false);
+});
+
+test("a step's own limit gates Studio, not only the lesson page", () => {
+  // Karada negotiates `torso` and then teaches an optional pass between the
+  // legs, which is what the `crotch` row is for. The lesson page enforced it;
+  // Studio still rendered and spoke the step.
+  const studio = read("src/routes/studio.tsx");
+  assert.match(studio, /missingStepLimits\(currentStep, items\)/);
+  assert.match(
+    studio,
+    /const stepBlocked =[\s\S]*?!negotiationReady \|\| missingStepRows\.length > 0/,
+  );
+  // Not shown, not spoken automatically, and not speakable on demand.
+  assert.match(studio, /if \(stopped \|\| stepBlocked\) return;/);
+  assert.match(studio, /disabled=\{stopped \|\| !studioVoice \|\| stepBlocked\}/);
+  assert.match(studio, /\{stepBlocked \?/);
 });
 
 test("instructor-only entries cannot route into Studio", () => {

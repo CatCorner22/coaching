@@ -26,6 +26,7 @@ import { useSession } from "@/lib/stores/session";
 import { useSettings } from "@/lib/stores/settings";
 import {
   buildStudioNegotiationPolicy,
+  missingStepLimits,
   policyRestrictionIncreased,
   studioPolicySignature,
 } from "@/lib/studio/negotiation";
@@ -128,6 +129,14 @@ function StudioPage() {
   const tieBlocked = negotiationPolicy.isTieBlocked(tieSlug);
   const furnitureBlocked = negotiationPolicy.isFurnitureBlocked(furnitureSlug);
   const studioVoice = settings.voice && !voiceBlocked;
+  const currentStep = tie?.steps[stepIndex];
+  // A step can carry its own limit on top of its tie's — karada's optional pass
+  // between the legs needs the `crotch` row, not just `torso`. The lesson page
+  // enforced this and Studio did not, so the step was still shown and spoken.
+  // Fail closed until the negotiation store has hydrated.
+  const missingStepRows = missingStepLimits(currentStep, items);
+  const stepBlocked =
+    (currentStep?.limitIds?.length ?? 0) > 0 && (!negotiationReady || missingStepRows.length > 0);
   // The `photos` limit gates every lens, this one included. Fail closed until
   // the persisted negotiation snapshot has hydrated: the pre-hydration store is
   // the empty default, which would read as "nothing agreed" and then flip open,
@@ -579,10 +588,10 @@ function StudioPage() {
     }
     if (spoke.current === stepIndex) return;
     spoke.current = stepIndex;
-    if (stopped) return;
+    if (stopped || stepBlocked) return;
     const line = tie?.steps[stepIndex]?.speak;
     if (line && studioVoice && !micArmed) void playCoachVoice(line, studioVoice);
-  }, [stepIndex, stopped, tie, studioVoice, micArmed]);
+  }, [stepIndex, stopped, stepBlocked, tie, studioVoice, micArmed]);
 
   const captureReadiness = capture ? captureReadinessForAnalyze(capture.quality) : null;
 
@@ -835,9 +844,9 @@ function StudioPage() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  disabled={stopped || !studioVoice}
+                  disabled={stopped || !studioVoice || stepBlocked}
                   onClick={() => {
-                    if (useSession.getState().stopped || !studioVoice) return;
+                    if (useSession.getState().stopped || !studioVoice || stepBlocked) return;
                     micArmedRef.current = false;
                     setMicArmed(false);
                     setMicStatus("idle");
@@ -848,18 +857,33 @@ function StudioPage() {
                   {voiceBlocked ? "Speak step — not approved" : "Speak step"}
                 </Button>
               </div>
-              <p className="mt-2 text-sm leading-relaxed text-fg">{tie.steps[stepIndex]?.rigger}</p>
-              <p className="mt-1 text-xs text-muted">Check. {tie.steps[stepIndex]?.check}</p>
-              <div className="mx-auto mt-3 h-64 w-36">
-                <RopeFigure
-                  pose={tie.steps[stepIndex]?.expected.pose}
-                  view={tie.steps[stepIndex]?.expected.view}
-                  wraps={tie.steps.slice(0, stepIndex + 1).flatMap((x) => x.wraps)}
-                  nerves={tie.nerves}
-                  compact
-                  className="text-muted"
-                />
-              </div>
+              {stepBlocked ? (
+                <div className="mt-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-3 text-sm">
+                  <p className="font-medium text-fg">This step needs its own yes.</p>
+                  <p className="mt-1 leading-relaxed text-muted">
+                    {missingStepRows.length > 0
+                      ? `${missingStepRows.map((row) => row.label).join(", ")} is not agreed, so this step is not shown or spoken here. Skip it with Next, or set it to yes on the negotiation page together.`
+                      : "Loading the negotiated limits for this step."}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p className="mt-2 text-sm leading-relaxed text-fg">
+                    {tie.steps[stepIndex]?.rigger}
+                  </p>
+                  <p className="mt-1 text-xs text-muted">Check. {tie.steps[stepIndex]?.check}</p>
+                  <div className="mx-auto mt-3 h-64 w-36">
+                    <RopeFigure
+                      pose={tie.steps[stepIndex]?.expected.pose}
+                      view={tie.steps[stepIndex]?.expected.view}
+                      wraps={tie.steps.slice(0, stepIndex + 1).flatMap((x) => x.wraps)}
+                      nerves={tie.nerves}
+                      compact
+                      className="text-muted"
+                    />
+                  </div>
+                </>
+              )}
               {det && (
                 <p className="text-center text-xs tabular-nums text-subtle">
                   Image heuristic marked {det.wrapCount} possible horizontal rope-like feature

@@ -63,6 +63,14 @@ export function isTrustedAppOrigin(
     configuredOrigin?: string | null;
     allowLoopback?: boolean;
     /**
+     * The `Host` this request was served on. A private-network origin is
+     * accepted only when it names that same host: `npm run dev` binds
+     * 0.0.0.0:8080 so the phone in the room can load the app, but the whole
+     * private range is not the app — without this, any other LAN page could
+     * spend the owner's xAI quota through the dev server.
+     */
+    devHost?: string | null;
+    /**
      * Accept the shared live-preview host patterns. Only the caller knows
      * whether this deployment actually serves the live preview (the preview
      * OAuth client secret is configured, or this is the dev server).
@@ -97,12 +105,16 @@ export function isTrustedAppOrigin(
 
   // Loopback and the LAN are a development convenience and must never widen a
   // deployed app.
-  if (
-    options.allowLoopback &&
-    ((LOCAL_DEV_ORIGINS as readonly string[]).includes(url.origin) ||
-      isPrivateNetworkHostname(url.hostname))
-  ) {
-    return true;
+  if (options.allowLoopback) {
+    if ((LOCAL_DEV_ORIGINS as readonly string[]).includes(url.origin)) return true;
+    const devHost = options.devHost?.trim().toLowerCase();
+    if (
+      isPrivateNetworkHostname(url.hostname) &&
+      devHost &&
+      url.host.toLowerCase() === devHost
+    ) {
+      return true;
+    }
   }
 
   return false;

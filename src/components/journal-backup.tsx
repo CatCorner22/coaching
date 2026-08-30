@@ -8,7 +8,7 @@ import {
   vaultErrorMessage,
 } from "@/lib/journal-vault";
 import { useJournal } from "@/lib/stores/journal";
-import { getPersistFailure } from "@/lib/stores/persist";
+import { persistFailureFor } from "@/lib/stores/persist";
 
 type Status = { tone: "ok" | "error"; message: string } | null;
 
@@ -121,7 +121,7 @@ export function JournalBackupPanel() {
       if (displaced > 0) parts.push(`${displaced} oldest made room.`);
       // The merge happens in memory and the write is reported separately, so
       // without this a restore that could not be saved still read as success.
-      const failure = getPersistFailure();
+      const failure = persistFailureFor("knotty-journal");
       if (failure) {
         setStatus({
           tone: "error",

@@ -12,9 +12,24 @@ import type { AnalyzeResult } from "./schema";
  */
 export const PRE_DISPATCH_MARKER = "[pre-dispatch]";
 
-/** True when the failure provably happened before anything was reserved or sent. */
+/**
+ * True when the failure provably happened before anything was reserved or sent.
+ *
+ * Two cases qualify. The validator marks its own messages. An expired sign-in
+ * is the other: `authMiddleware` rejects ahead of the handler, so no batch was
+ * reserved and no media left the browser — closing the batch there would cost
+ * a capture for signing in again.
+ */
 export function analyzeThrownBeforeDispatch(cause: unknown): boolean {
-  return cause instanceof Error && cause.message.includes(PRE_DISPATCH_MARKER);
+  if (!(cause instanceof Error)) return false;
+  if (cause.message.includes(PRE_DISPATCH_MARKER)) return true;
+  return authenticationRejected(cause);
+}
+
+/** An auth rejection, which happens in middleware before the handler runs. */
+function authenticationRejected(error: Error): boolean {
+  if ((error as { status?: unknown }).status === 401) return true;
+  return error.name === "UnauthorizedError" || /^unauthorized\b/i.test(error.message.trim());
 }
 
 /**
@@ -27,6 +42,9 @@ export function analyzeThrownMessage(cause: unknown): string {
     cause instanceof Error ? cause.message.replaceAll(PRE_DISPATCH_MARKER, "").trim() : "";
   if (requestNeverReachedProvider(cause)) {
     return "The app could not reach the server, so nothing was sent. Check the connection and press Analyze again.";
+  }
+  if (cause instanceof Error && authenticationRejected(cause)) {
+    return "Nothing was sent: this deployment did not accept the request (sign-in). Sign in again and press Analyze — this capture is still usable.";
   }
   // Server sentences are written for this banner and start with the outcome.
   // Anything else — JSON, HTML, a stack — is internals, not an explanation.

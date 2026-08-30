@@ -1,6 +1,11 @@
 import { create } from "zustand";
 import { persist, type PersistStorage } from "zustand/middleware";
-import { persistFailureFor, safeJsonStorage, syncPersistedAcrossTabs } from "./persist";
+import {
+  persistFailureFor,
+  safeBrowserStorage,
+  safeJsonStorage,
+  syncPersistedAcrossTabs,
+} from "./persist";
 
 const SESSION_KEY = "knotty-session";
 
@@ -64,6 +69,76 @@ export function unchangedWriteSkippingStorage<State>(): PersistStorage<State> {
     removeItem: (key) => {
       lastWritten = null;
       return base.removeItem(key);
+    },
+  };
+}
+
+const numberOr = (value: unknown, fallback: number | null): number | null =>
+  typeof value === "number" && Number.isFinite(value) ? value : fallback;
+
+/**
+ * Keep the newest safety event across tabs.
+ *
+ * The store writes the whole blob on every set(), so a tab that had not yet
+ * heard about a stop — a tick, a check-in, a step change — persisted
+ * `stopped: false` straight over it and the red state vanished everywhere.
+ * A stop is only superseded by a session that provably began after it, which
+ * is what reset() does when the couple starts again.
+ */
+export function mergeSessionSafety(
+  incoming: Partial<PersistedSession>,
+  existing: Partial<PersistedSession> | null,
+): Partial<PersistedSession> {
+  if (!existing?.stopped) return incoming;
+  const stoppedAt = numberOr(existing.stoppedAt, 0) ?? 0;
+  // This tab already knows about a stop at least as new: nothing to restore.
+  if (incoming.stopped === true && (numberOr(incoming.stoppedAt, 0) ?? 0) >= stoppedAt) {
+    return incoming;
+  }
+  const restartedAt = numberOr(incoming.startedAt, 0) ?? 0;
+  const restarted = incoming.stopped !== true && restartedAt > stoppedAt;
+  if (restarted) return incoming;
+  return {
+    ...incoming,
+    stopped: true,
+    stopReason: existing.stopReason,
+    stoppedAt: existing.stoppedAt ?? null,
+    yellowAt: null,
+  };
+}
+
+/**
+ * `unchangedWriteSkippingStorage`, plus the stop merge above. `onStoredStop`
+ * fires when storage knew about a stop this tab did not, so the writing tab
+ * can rehydrate instead of continuing to show a running session it just
+ * failed to overwrite.
+ */
+function sessionStorage(onStoredStop: () => void): PersistStorage<PersistedSession> {
+  const base = unchangedWriteSkippingStorage<PersistedSession>();
+  return {
+    ...base,
+    setItem: (key, value) => {
+      let diverged = false;
+      try {
+        const raw = safeBrowserStorage().getItem(key);
+        if (raw) {
+          const existing = (JSON.parse(raw) as { state?: Partial<PersistedSession> })?.state ?? null;
+          const merged = mergeSessionSafety(value.state, existing);
+          diverged = merged !== value.state;
+          if (diverged) value.state = merged as PersistedSession;
+        }
+      } catch {
+        // A corrupt stored blob is simply replaced by the incoming one.
+      }
+      const result = base.setItem(key, value);
+      if (diverged) {
+        try {
+          onStoredStop();
+        } catch {
+          // Self-repair is best effort; storage already holds the stop.
+        }
+      }
+      return result;
     },
   };
 }
@@ -182,7 +257,10 @@ export const useSession = create<SessionState>()(
     }),
     {
       name: SESSION_KEY,
-      storage: unchangedWriteSkippingStorage<PersistedSession>(),
+      storage: sessionStorage(() => {
+        // Deferred: rehydrate() reads the store that is mid-write here.
+        queueMicrotask(() => void useSession.persist.rehydrate());
+      }),
       partialize: (state): PersistedSession => ({
         tieSlug: state.tieSlug,
         furnitureSlug: state.furnitureSlug,
