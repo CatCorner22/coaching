@@ -30,7 +30,15 @@ export const APP_ENV_REL_PATH = ".grok/app-env.json";
 
 const VITE_PREFIX = "VITE_";
 const DEFAULT_APP_ENV = Object.freeze({
-  VITE_AUTH_ENABLED: "true",
+  // Auth off is the standalone default, which is what the README promises for a
+  // clone and a Replit import: no accounts, the embedded dev database, and the
+  // AI endpoints accepting the development identity. Shipping "true" here meant
+  // a fresh checkout ran an auth stack it had no database or secrets for, so
+  // `npm run preview` answered 500 on every route. A deployment sets
+  // VITE_AUTH_ENABLED itself and a real process.env entry always wins, so
+  // production is unaffected; `checkDeployAuthConfig` still refuses a build
+  // that pairs a DATABASE_URL with auth off.
+  VITE_AUTH_ENABLED: "false",
   // This deployment's owner set the upload scope, having accepted that the
   // provider's Acceptable Use Policy is the governing document and that this
   // repository cannot verify it. See "Upload scope" in the README to change it.

@@ -174,10 +174,18 @@ test("torch helpers are capability-gated and fail closed", async () => {
   assert.equal(torch.track.stopped, false);
 
   // A device that accepts the capability but rejects the constraint leaves an
-  // unknown torch state; the camera closes rather than guessing.
+  // unknown torch state. The toggle reports failure and the lamp is driven
+  // back off, but the capture survives: closing a working camera over a light
+  // is the worse outcome mid-session.
   const refuses = fakeStream(fakeTrack({ torch: true }, true));
   assert.equal(await setTorch(refuses, true), false);
-  assert.equal(refuses.track.stopped, true, "failure must stop the stream, not leave it ambiguous");
+  assert.equal(refuses.track.stopped, false, "a torch failure must not close the camera");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(
+    refuses.track.appliedConstraints.at(-1),
+    { advanced: [{ torch: false }] },
+    "an unconfirmed torch-on is followed by an off",
+  );
 });
 
 // ---------------------------------------------------------------------------

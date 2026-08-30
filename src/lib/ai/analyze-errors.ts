@@ -1,6 +1,29 @@
 import type { AnalyzeResult } from "./schema";
 
 /**
+ * A thrown analyze failure never carries the server's structured result, so
+ * everything it could once print — a serialized Zod issue array, an HTML error
+ * page, a framework stack — was raw internals in the reader's error banner.
+ */
+export function analyzeThrownMessage(cause: unknown): string {
+  const raw = cause instanceof Error ? cause.message.trim() : "";
+  if (requestNeverReachedProvider(cause)) {
+    return "The app could not reach the server, so nothing was sent. Check the connection and press Analyze again.";
+  }
+  // Server sentences are written for this banner and start with the outcome.
+  // Anything else — JSON, HTML, a stack — is internals, not an explanation.
+  if (raw && raw.length <= 240 && !/[{}<>[\]]|\n/.test(raw)) return raw;
+  return "The analysis could not be completed. Capture a new batch and try again — nothing below came from a cloud read.";
+}
+
+/** True when the request demonstrably never left the browser. */
+export function requestNeverReachedProvider(cause: unknown): boolean {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
+  if (cause instanceof TypeError) return true;
+  return cause instanceof Error && /failed to fetch|networkerror|load failed/i.test(cause.message);
+}
+
+/**
  * Turn server analyze failures into short, actionable Studio copy.
  *
  * The server's own sentences lead with the outcome that matters most — "No

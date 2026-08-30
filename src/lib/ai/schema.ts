@@ -32,6 +32,20 @@ export type AnalyzeInput = {
   };
 };
 
+/**
+ * Why remote classification did not complete, when the call still returns a
+ * locally built report. Without it a rate limit, a timeout and "the model saw
+ * nothing notable" all render as the same quiet insufficient-view result.
+ */
+export type ProviderFailure =
+  | "rate_limited"
+  | "timed_out"
+  | "http_error"
+  | "contract"
+  | "incomplete"
+  | "unavailable"
+  | "refused";
+
 export type AnalyzeResult =
   | {
       ok: true;
@@ -46,6 +60,10 @@ export type AnalyzeResult =
       modelStatus: ModelStatus;
       report: CoachReport;
       observationReport: ObservationReport;
+      /** Absent when the model answered inside the contract. */
+      providerFailure?: ProviderFailure;
+      /** Provider-declared wait after a rate limit. */
+      retryAfterMs?: number;
     }
   | {
       ok: false;
@@ -56,10 +74,13 @@ export type AnalyzeResult =
         | "AI_PROVIDER_UNAVAILABLE"
         | "AI_PRIVACY_UNAVAILABLE"
         | "AI_PRIVACY_RESPONSE_UNVERIFIED"
+        | "AI_TRANSPORT_FAILED"
+        | "AI_REQUEST_FORBIDDEN"
+        | "AI_REQUEST_INVALID"
         | "AI_RATE_LIMITED"
         | "MEDIA_BATCH_REPLAYED"
         | "MEDIA_BATCH_RESERVATION_UNCERTAIN";
-      status: 409 | 429 | 502 | 503;
+      status: 400 | 403 | 409 | 429 | 502 | 503;
       /** True only when a denial happened before a durable one-use reservation. */
       retryableBeforeProvider: boolean;
       retryAfterMs?: number;

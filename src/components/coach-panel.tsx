@@ -18,6 +18,7 @@ export const CoachPanel = memo(function CoachPanel({
   refusal,
   halted,
   captureQuality,
+  providerNote,
 }: {
   report: CoachReport | null;
   observationReport: ObservationReport | null;
@@ -27,6 +28,8 @@ export const CoachPanel = memo(function CoachPanel({
   refusal?: boolean;
   halted?: boolean;
   captureQuality?: FrameQuality | null;
+  /** Why the cloud read did not happen, when a local report is shown anyway. */
+  providerNote?: string | null;
 }) {
   if (!report && !observationReport && pending) {
     return (
@@ -48,9 +51,9 @@ export const CoachPanel = memo(function CoachPanel({
   const statusLabel: Record<ModelStatus, string> = {
     not_requested: "local report · model not requested",
     completed: "xAI categories · closed schema",
-    refused: "xAI declined · insufficient view",
+    refused: "xAI declined · local report",
     unavailable: "xAI unavailable · local report",
-    failed: "xAI contract failure · conservative report",
+    failed: "xAI did not answer · local report",
   };
   return (
     <div className="space-y-3 rounded-lg border border-border bg-elevated p-4">
@@ -67,7 +70,12 @@ export const CoachPanel = memo(function CoachPanel({
           {statusLabel[modelStatus]}
         </span>
       </div>
-      {refusal && (
+      {providerNote && (
+        <p className="rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-fg" role="status">
+          {providerNote}
+        </p>
+      )}
+      {refusal && !providerNote && (
         <p className="text-xs text-muted">
           The vision model declined the still. Only limited local image observations are shown.
         </p>

@@ -19,6 +19,17 @@ export type PersistFailure = { key: string; reason: "quota" | "blocked" };
 
 let lastPersistFailure: PersistFailure | null = null;
 const persistFailureListeners = new Set<(failure: PersistFailure) => void>();
+const persistStatusListeners = new Set<(failure: PersistFailure | null) => void>();
+
+function announcePersistStatus(failure: PersistFailure | null) {
+  for (const listener of persistStatusListeners) {
+    try {
+      listener(failure);
+    } catch {
+      // A broken listener must not stop the others from hearing about it.
+    }
+  }
+}
 
 function reportPersistFailure(key: string, error: unknown) {
   const name = (error as { name?: string })?.name ?? "";
@@ -34,6 +45,20 @@ function reportPersistFailure(key: string, error: unknown) {
       // A broken listener must not stop the others from hearing about it.
     }
   }
+  announcePersistStatus(failure);
+}
+
+/**
+ * A write landed.
+ *
+ * Without this the banner was permanent: one transient quota error left every
+ * later save looking unsaved, which trains people to ignore the one warning
+ * that matters.
+ */
+function notePersistSuccess() {
+  if (lastPersistFailure === null) return;
+  lastPersistFailure = null;
+  announcePersistStatus(null);
 }
 
 /** Most recent failed write, or null if every write so far has landed. */
@@ -47,14 +72,33 @@ export function onPersistFailure(listener: (failure: PersistFailure) => void): (
   return () => persistFailureListeners.delete(listener);
 }
 
+/**
+ * Subscribe to whether writes are landing, failures and recoveries alike.
+ * Returns an unsubscribe function.
+ */
+export function onPersistStatus(
+  listener: (failure: PersistFailure | null) => void,
+): () => void {
+  persistStatusListeners.add(listener);
+  return () => persistStatusListeners.delete(listener);
+}
+
 /** Test seam. */
 export function resetPersistFailure() {
   lastPersistFailure = null;
 }
 
+/**
+ * Storage that cannot store.
+ *
+ * A browser with storage switched off entirely (private mode, site data
+ * blocked) never reaches a throwing setItem — `localStorage` is simply absent —
+ * so the app used to run write-only-to-memory with nothing on screen saying so.
+ * Every write here is reported as blocked, which is exactly what it is.
+ */
 const UNAVAILABLE_STORAGE: SyncStateStorage = {
   getItem: () => null,
-  setItem: () => undefined,
+  setItem: (name) => reportPersistFailure(name, { name: "StorageUnavailable" }),
   removeItem: () => undefined,
 };
 
@@ -74,6 +118,7 @@ export function safeBrowserStorage(): SyncStateStorage {
       setItem: (name, value) => {
         try {
           storage.setItem(name, value);
+          notePersistSuccess();
         } catch (error) {
           // The live store keeps working from memory, but the change is NOT
           // saved. Say so rather than letting the tab look correct until reload.
@@ -125,12 +170,23 @@ export function safeJsonStorage<State>(): PersistStorage<State> {
  * outcome independent of write order, while still allowing a later
  * re-approval to win.
  */
-export function negotiationMergingStorage<State>(name: string): PersistStorage<State> {
+export function negotiationMergingStorage<State>(
+  name: string,
+  /**
+   * Called after a write whose merge overrode what the writing tab held —
+   * i.e. storage already knew something this tab does not. The merge protected
+   * storage; without this the writing tab kept offering, from memory, a tie or
+   * a camera the persisted policy had already revoked, until something else
+   * happened to rehydrate it.
+   */
+  onStoredPolicyDiverged?: () => void,
+): PersistStorage<State> {
   const base = safeJsonStorage<State>();
   return {
     ...base,
     setItem: (key, value) => {
       if (key !== name) return base.setItem(key, value);
+      let diverged = false;
       try {
         const raw = safeBrowserStorage().getItem(key);
         if (raw) {
@@ -142,6 +198,7 @@ export function negotiationMergingStorage<State>(name: string): PersistStorage<S
             existing?.state?.items,
           );
           if (merged) {
+            diverged = negotiationItemsDiffer(incoming?.state?.items, merged);
             (value as { state: { items: unknown } }).state.items = merged;
           }
           // Notes were whole-blob last-writer-wins, so a stale tab erased what
@@ -164,9 +221,33 @@ export function negotiationMergingStorage<State>(name: string): PersistStorage<S
       } catch {
         // A corrupt existing blob is simply replaced by the incoming one.
       }
-      return base.setItem(key, value);
+      const result = base.setItem(key, value);
+      if (diverged && onStoredPolicyDiverged) {
+        try {
+          onStoredPolicyDiverged();
+        } catch {
+          // Self-repair is best effort; the stored policy is already correct.
+        }
+      }
+      return result;
     },
   };
+}
+
+/** Whether the merge changed any rank the writing tab was holding. */
+function negotiationItemsDiffer(incoming: unknown, merged: readonly unknown[]): boolean {
+  if (!Array.isArray(incoming)) return true;
+  if (incoming.length !== merged.length) return true;
+  const byId = new Map<string, string>();
+  for (const item of incoming as StampedItem[]) {
+    if (item && typeof item.id === "string") byId.set(item.id, String(item.rank));
+  }
+  return (merged as StampedItem[]).some(
+    (item) =>
+      !!item &&
+      typeof item.id === "string" &&
+      (!byId.has(item.id) || byId.get(item.id) !== String(item.rank)),
+  );
 }
 
 type StampedItem = { id?: unknown; rank?: unknown; updatedAt?: unknown };
@@ -437,14 +518,25 @@ export function storageEventTargetsKey(eventKey: string | null, name: string): b
  */
 export function syncPersistedAcrossTabs(name: string, rehydrate: () => void): void {
   if (typeof window === "undefined" || typeof window.addEventListener !== "function") return;
-  window.addEventListener("storage", (event) => {
-    if (!storageEventTargetsKey(event.key, name)) return;
+  const reread = () => {
     try {
       rehydrate();
     } catch {
       // Best effort: a failed rehydrate leaves the current in-memory state.
     }
+  };
+  window.addEventListener("storage", (event) => {
+    if (!storageEventTargetsKey(event.key, name)) return;
+    reread();
   });
+  // A backgrounded or frozen tab never receives the `storage` event, so coming
+  // back to it would otherwise show a policy that was revoked while it slept.
+  window.addEventListener("focus", reread);
+  if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") reread();
+    });
+  }
 }
 
 /** Copy a legacy persisted blob to its current key without overwriting newer data. */

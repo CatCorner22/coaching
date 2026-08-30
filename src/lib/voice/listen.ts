@@ -54,8 +54,6 @@ export function listenForWords(
   // Two words of room around the safeword covers how it is actually said —
   // "red", "red red red", "ok red", "im calling red" — while a sentence that
   // merely contains it does not fire.
-  const UTTERANCE_SLACK_WORDS = 2;
-  const wordCount = (value: string) => (value.match(/[a-z0-9]+/gu) ?? []).length;
   // Recognizers are inconsistent about apostrophes and hyphens: the same word
   // arrives as "don't" or "dont", "co-signed" or "co signed". Normalise both
   // sides identically so a safeword spelled either way still matches.
@@ -65,6 +63,35 @@ export function listenForWords(
       .replace(/['’]/gu, "")
       .replace(/[-–—]/gu, " ")
       .replace(/\s+/gu, " ");
+  const UTTERANCE_SLACK_WORDS = 2;
+  const wordsIn = (value: string): string[] => value.match(/[a-z0-9]+/gu) ?? [];
+  const wordCount = (value: string) => wordsIn(value).length;
+  // Two words of room is too tight for how a safeword is actually called under
+  // stress — "red stop now please" and "wait wait red red red stop" are both
+  // real calls and both were silently discarded. So a longer utterance still
+  // counts as a call when everything around the safeword is call-out language:
+  // the words below plus the configured safewords themselves. Deliberately no
+  // nouns, so "hand me the red rope" and "her marks are going red" stay quiet.
+  const CALLOUT_WORDS = new Set([
+    "a", "again", "all", "alright", "am", "and", "call", "calling", "cut", "done",
+    "down", "enough", "get", "go", "hey", "hold", "i", "im", "is", "it", "let",
+    "me", "my", "need", "no", "now", "off", "ok", "okay", "on", "out", "please",
+    "really", "right", "safeword", "say", "saying", "seriously", "stop",
+    "stopping", "this", "to", "up", "wait", "yes",
+  ]);
+  // Past this a transcript is a paragraph of scene talk, not a call, whatever
+  // it is made of.
+  const MAX_CALLOUT_WORDS = 12;
+  const isCallOut = (transcript: string, needle: string, allWords: string[]) => {
+    const tokens = wordsIn(transcript);
+    if (tokens.length > MAX_CALLOUT_WORDS) return false;
+    const safewordTokens = new Set(allWords.flatMap((word) => wordsIn(spoken(word))));
+    const needleTokens = wordsIn(needle);
+    return tokens.every(
+      (token) =>
+        needleTokens.includes(token) || safewordTokens.has(token) || CALLOUT_WORDS.has(token),
+    );
+  };
   rec.onresult = (ev: unknown) => {
     // Browsers can flush a final result after stop(). Without this, taking the
     // mic off and then being overheard saying the safeword stopped a session
@@ -83,7 +110,11 @@ export function listenForWords(
         if (!needle) continue;
         const re = new RegExp(`(?:^|[^a-z0-9])${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:[^a-z0-9]|$)`);
         if (!re.test(t)) continue;
-        if (wordCount(t) > wordCount(needle) + UTTERANCE_SLACK_WORDS) continue;
+        if (
+          wordCount(t) > wordCount(needle) + UTTERANCE_SLACK_WORDS &&
+          !isCallOut(t, needle, words)
+        )
+          continue;
         if ((last.get(w) ?? 0) + 2500 > now) continue;
         last.set(w, now);
         onHit(w);

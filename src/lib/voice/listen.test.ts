@@ -267,3 +267,44 @@ test("a safeword mentioned inside a sentence does not stop the scene", async () 
     h.restore();
   }
 });
+
+test("a safeword called out in a longer sentence is still heard", async () => {
+  // Two words of slack around the safeword discarded the way it actually gets
+  // called under stress. These are calls, not conversation.
+  const h = harness();
+  try {
+    const { listenForWords } = await import("./listen.ts");
+    const hits: string[] = [];
+    listenForWords(["red", "yellow"], (word) => hits.push(word));
+    await h.flush();
+    const rec = FakeRecognition.instances[0]!;
+
+    for (const utterance of [
+      "red stop now please",
+      "wait wait red red red stop",
+      "ok ok red i need to get out",
+      "stop stop stop red",
+    ]) {
+      hits.length = 0;
+      h.advance(3_000);
+      rec.speak(utterance);
+      await h.flush();
+      assert.deepEqual(hits, ["red"], `"${utterance}" must be heard`);
+    }
+
+    // The rule is "everything around it is call-out language", not "longer is
+    // fine": scene talk of the same length must still stay quiet.
+    for (const sentence of [
+      "the red rope needs to go up on the hook",
+      "her shoulder is going red where the wrap sits",
+    ]) {
+      hits.length = 0;
+      h.advance(3_000);
+      rec.speak(sentence);
+      await h.flush();
+      assert.deepEqual(hits, [], `"${sentence}" must not stop the scene`);
+    }
+  } finally {
+    h.restore();
+  }
+});

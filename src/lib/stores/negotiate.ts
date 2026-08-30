@@ -214,7 +214,13 @@ export const useNegotiate = create<State>()(
     }),
     {
       name: "knotty-negotiate",
-      storage: negotiationMergingStorage<State>("knotty-negotiate"),
+      storage: negotiationMergingStorage<State>("knotty-negotiate", () => {
+        // The write-merge just kept a stored rank over the one this tab held,
+        // which means memory is more permissive than the persisted policy.
+        // Read it back so the tab stops offering what has been revoked, with
+        // or without a delivered `storage` event.
+        void useNegotiate.persist.rehydrate();
+      }),
       version: 1,
       migrate: (persisted) => persisted as State,
       merge: (persisted, current) => {

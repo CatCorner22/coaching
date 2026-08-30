@@ -449,6 +449,7 @@ export const GUIDED_TIES: Tie[] = [
         check:
           "Either this step was skipped, or it was separately agreed just now, is visibly loose, and she has reported no pressure or altered sensation.",
         speak: "Separate yes for this, or skip it. Loose if it goes on.",
+        limitIds: ["crotch"],
         expected: { wrapBands: 5, pose: "stand", view: "front", handsVisible: true, neckClear: true },
         wraps: [{ kind: "stem", y1: 0.49, y2: 0.62 }],
       },

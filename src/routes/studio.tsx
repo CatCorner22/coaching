@@ -7,7 +7,9 @@ import { CoachPanel } from "@/components/coach-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { analyzeRope } from "@/lib/ai/analyze";
-import { analyzeErrorMessage } from "@/lib/ai/analyze-errors";
+import { analyzeErrorMessage, analyzeThrownMessage } from "@/lib/ai/analyze-errors";
+import { aiVisionAvailability } from "@/lib/ai/availability";
+import { providerFailureMessage } from "@/lib/ai/provider-failure";
 import { captureReadinessForAnalyze } from "@/lib/camera/capture-readiness";
 import { authEnabled } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
@@ -20,6 +22,7 @@ import { useSession } from "@/lib/stores/session";
 import { useSettings } from "@/lib/stores/settings";
 import {
   buildStudioNegotiationPolicy,
+  policyRestrictionIncreased,
   studioPolicySignature,
 } from "@/lib/studio/negotiation";
 import { MAX_HARD_NO_LENGTH } from "@/lib/negotiation-bounds";
@@ -89,6 +92,7 @@ function StudioPage() {
   const {
     operationalLimits,
     negotiationKey,
+    mediaBlocked,
     voiceBlocked,
   } = negotiationPolicy;
   const captureContextKey = `${tieSlug ?? ""}|${stepIndex}|${furnitureSlug ?? ""}|${negotiationKey}`;
@@ -100,6 +104,8 @@ function StudioPage() {
   const [analysisConsumed, setAnalysisConsumed] = useState(false);
   const [triage, setTriage] = useState<TriageState>("none");
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [providerFailure, setProviderFailure] = useState<string | null>(null);
+  const [cloudVision, setCloudVision] = useState<boolean | null>(null);
   const [refusal, setRefusal] = useState(false);
   const [savedReportRevision, setSavedReportRevision] = useState<string | null>(null);
   const [savedEntryId, setSavedEntryId] = useState<string | null>(null);
@@ -118,7 +124,30 @@ function StudioPage() {
   const tieBlocked = negotiationPolicy.isTieBlocked(tieSlug);
   const furnitureBlocked = negotiationPolicy.isFurnitureBlocked(furnitureSlug);
   const studioVoice = settings.voice && !voiceBlocked;
-  const cameraGateReason = stopped ? "session-stopped" : "enabled";
+  // The `photos` limit gates every lens, this one included. Fail closed until
+  // the persisted negotiation snapshot has hydrated: the pre-hydration store is
+  // the empty default, which would read as "nothing agreed" and then flip open,
+  // or — worse, if the default ever gains a yes — open before the real answer
+  // arrives.
+  const cameraGateReason = stopped
+    ? "session-stopped"
+    : !negotiationReady || mediaBlocked
+      ? "photos-not-agreed"
+      : "enabled";
+
+  useEffect(() => {
+    let live = true;
+    void aiVisionAvailability()
+      .then((result) => {
+        if (live) setCloudVision(result.configured);
+      })
+      .catch(() => {
+        if (live) setCloudVision(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
 
   useEffect(() => {
     const api = useNegotiate.persist;
@@ -129,9 +158,16 @@ function StudioPage() {
   }, []);
 
   useEffect(() => {
-    const signature = () =>
-      studioPolicySignature(useNegotiate.getState().items, useSettings.getState());
+    const snapshot = () => ({
+      items: useNegotiate.getState().items,
+      flags: useSettings.getState(),
+    });
+    const signature = () => {
+      const { items, flags } = snapshot();
+      return studioPolicySignature(items, flags);
+    };
     let lastSignature = signature();
+    let lastSnapshot = snapshot();
     let pending: ReturnType<typeof setTimeout> | null = null;
     const invalidateAcrossTabs = (event: StorageEvent) => {
       if (event.key !== null && event.key !== "knotty-negotiate" && event.key !== "knotty-settings")
@@ -145,11 +181,27 @@ function StudioPage() {
         pending = null;
         const next = signature();
         if (next === lastSignature) return;
+        const previousSnapshot = lastSnapshot;
+        const nextSnapshot = snapshot();
         lastSignature = next;
-        // Never reload out of a stop. The session store is memory-only, so a
-        // reload clears `stopped` along with the red alert, the report and the
-        // triage answer, and the page comes back looking like a fresh, running
-        // session. A limit revoked in another tab must never do that: a stopped
+        lastSnapshot = nextSnapshot;
+        // Only a change that takes something away justifies throwing the page
+        // away with it. An approval added in the other tab re-derives through
+        // the store subscription this route already has, so reloading for it
+        // only destroys a running scene's clock, step and pending capture.
+        if (
+          !policyRestrictionIncreased(
+            previousSnapshot.items,
+            nextSnapshot.items,
+            previousSnapshot.flags,
+            nextSnapshot.flags,
+          )
+        )
+          return;
+        // Never reload out of a stop. The persisted session keeps `stopped`,
+        // but the red alert's report and the triage answer are route state and
+        // a reload discards them mid-stop. A limit revoked in another tab must
+        // never do that: a stopped
         // session already blocks every action, which is stricter than anything
         // the new policy could impose, and the gating re-derives from the store
         // on the next render once the session is reset.
@@ -260,6 +312,7 @@ function StudioPage() {
       setReport(null);
       setObservationReport(null);
       setModelStatus("not_requested");
+      setProviderFailure(null);
       setAnalysisConsumed(false);
       setTriage("none");
     }
@@ -433,6 +486,11 @@ function StudioPage() {
       )
         return;
       if (res.ok) {
+        setProviderFailure(
+          res.providerFailure
+            ? providerFailureMessage(res.providerFailure, res.retryAfterMs)
+            : null,
+        );
         setRefusal(res.refusal);
         setReport(res.report);
         setObservationReport(res.observationReport);
@@ -451,6 +509,7 @@ function StudioPage() {
           void playCoachVoice(res.report.final.speak, true);
         }
       } else {
+        setProviderFailure(null);
         setAnalysisError(analyzeErrorMessage(res));
         // Only a server-declared retryable admission denial before durable
         // reservation can reopen this batch. Never reopen after reservation,
@@ -461,9 +520,10 @@ function StudioPage() {
       }
     } catch (cause) {
       if (mountedRef.current && request === analysisRequestRef.current) {
-        setAnalysisError(
-          cause instanceof Error ? cause.message : "The analysis could not be completed.",
-        );
+        // A thrown failure carries no server verdict, so the batch stays
+        // closed: it may already have been reserved. Only the message can
+        // improve, and it must never be a raw framework or validator string.
+        setAnalysisError(analyzeThrownMessage(cause));
       }
     } finally {
       if (mountedRef.current && request === analysisRequestRef.current) setPending(false);
@@ -476,6 +536,7 @@ function StudioPage() {
     captureContextAtCommitRef.current = currentContextRef.current;
     setPending(false);
     setAnalysisError(null);
+    setProviderFailure(null);
     setRefusal(false);
     setReport(null);
     setObservationReport(null);
@@ -493,6 +554,7 @@ function StudioPage() {
     captureContextAtCommitRef.current = null;
     setPending(false);
     setAnalysisError(null);
+    setProviderFailure(null);
     setRefusal(false);
     setReport(null);
     setObservationReport(null);
@@ -775,6 +837,18 @@ function StudioPage() {
               )}
             </div>
           )}
+          {cameraGateReason === "photos-not-agreed" && (
+            <div className="mt-4 rounded-lg border border-warn/40 bg-warn/10 px-3 py-3 text-sm">
+              <p className="font-medium text-fg">The camera waits on a negotiated limit.</p>
+              <p className="mt-1 leading-relaxed text-muted">
+                Photos and video for coaching is not agreed yet, so no lens opens here — the
+                practice cam on a lesson page waits on the same line.
+              </p>
+              <Button asChild size="sm" variant="outline" className="mt-2">
+                <Link to="/negotiate">Open the negotiated limits</Link>
+              </Button>
+            </div>
+          )}
           <div className="mt-4">
             <CameraCapture
               key={captureContextKey}
@@ -809,10 +883,17 @@ function StudioPage() {
             refusal={refusal}
             halted={stopped}
             captureQuality={capture && captureMatchesContext ? capture.quality : null}
+            providerNote={captureMatchesContext ? providerFailure : null}
           />
           {analysisError && (
             <p className="text-sm text-danger-text" role="alert">
               {analysisError}
+            </p>
+          )}
+          {cloudVision === false && (
+            <p className="text-xs text-muted">
+              Cloud analysis is switched off for this app, so stills stay on this device and you get
+              the local read only.
             </p>
           )}
           <div className="flex flex-wrap gap-2">

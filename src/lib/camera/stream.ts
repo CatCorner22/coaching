@@ -303,23 +303,49 @@ function settleWithin(promise: Promise<unknown>, timeoutMs: number): Promise<boo
   });
 }
 
+/**
+ * Lamps are slow. A one-second budget shared with focus setup made a phone
+ * that simply takes its time look like a failure.
+ */
+export const TORCH_TIMEOUT_MS = 5_000;
+
+/**
+ * Toggle the torch. Resolves false when the lamp state could not be confirmed.
+ *
+ * A failure used to stop the whole stream, so a slow-but-successful lamp on a
+ * mid-range phone closed a working camera mid-session. Ending the capture is a
+ * heavier consequence than an unconfirmed light: leave the camera up, drive
+ * the lamp back off in the background, and let the caller report the toggle
+ * failed.
+ */
 export async function setTorch(stream: MediaStream, on: boolean) {
   try {
     const track = stream.getVideoTracks()[0];
     if (!track) return false;
     const caps = (track.getCapabilities?.() ?? {}) as { torch?: boolean };
     if (!caps.torch) return false;
-    const applied = await settleWithin(
-      track.applyConstraints({
-        advanced: [{ torch: on } as MediaTrackConstraintSet],
-      }),
-      FOCUS_SETUP_TIMEOUT_MS,
-    );
-    if (!applied) stopStream(stream);
+    const pending = track.applyConstraints({
+      advanced: [{ torch: on } as MediaTrackConstraintSet],
+    });
+    const applied = await settleWithin(pending, TORCH_TIMEOUT_MS);
+    if (!applied && on) void extinguishTorch(track, pending);
     return applied;
   } catch {
-    stopStream(stream);
     return false;
+  }
+}
+
+/** Best-effort: put the lamp back to a known-off state after an unclear on. */
+async function extinguishTorch(track: MediaStreamTrack, pending: Promise<unknown>) {
+  try {
+    await pending.catch(() => undefined);
+    if (track.readyState === "ended") return;
+    await settleWithin(
+      track.applyConstraints({ advanced: [{ torch: false } as MediaTrackConstraintSet] }),
+      TORCH_TIMEOUT_MS,
+    );
+  } catch {
+    // The lamp is the device's to own from here; the camera still works.
   }
 }
 

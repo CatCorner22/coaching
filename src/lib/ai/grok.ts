@@ -23,6 +23,23 @@ export function zeroDataRetentionRequired(): boolean {
   return process.env.XAI_REQUIRE_ZERO_DATA_RETENTION?.trim().toLowerCase() === "true";
 }
 
+/**
+ * Retry-After as milliseconds, in both documented forms (delta-seconds and an
+ * HTTP date). The provider's own wait is better guidance than a guess.
+ */
+function retryAfterFrom(res: Response): { retryAfterMs?: number } {
+  if (res.status !== 429) return {};
+  const header = res.headers.get("retry-after")?.trim();
+  if (!header) return {};
+  const seconds = Number(header);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return { retryAfterMs: Math.min(60 * 60_000, Math.round(seconds * 1000)) };
+  }
+  const at = Date.parse(header);
+  if (!Number.isFinite(at)) return {};
+  return { retryAfterMs: Math.max(0, Math.min(60 * 60_000, at - Date.now())) };
+}
+
 export async function grokChat(opts: {
   messages: unknown[];
   max_tokens?: number;
@@ -38,6 +55,15 @@ export async function grokChat(opts: {
       refused?: boolean;
       providerAttempted: boolean;
       privacyFailure?: "preflight" | "response";
+      /**
+       * Set when the request never produced a response: the caller aborted,
+       * the 45s deadline elapsed, or the connection failed. Distinct from
+       * `privacyFailure: "response"`, which means a response did arrive
+       * without the zero-data-retention header.
+       */
+      transportFailure?: "aborted" | "timeout" | "network";
+      /** Provider-declared wait, parsed from Retry-After on a 429. */
+      retryAfterMs?: number;
     }
 > {
   // One immutable credential snapshot is used for the fixed text-only probe
@@ -92,6 +118,7 @@ export async function grokChat(opts: {
   const stopRelaying = relayAbort(opts.signal, controller);
   const timeout = setTimeout(() => controller.abort(), 45_000);
   let mediaDispatched = false;
+  let responseReceived = false;
   let zeroDataRetentionConfirmed = false;
   try {
     mediaDispatched = true;
@@ -106,6 +133,7 @@ export async function grokChat(opts: {
       body: requestBody,
       signal: controller.signal,
     });
+    responseReceived = true;
     if (!responseConfirmsZeroDataRetention(res)) {
       await res.body?.cancel().catch(() => undefined);
       console.error("[grok] response did not confirm zero data retention — result discarded");
@@ -132,6 +160,7 @@ export async function grokChat(opts: {
         status: res.status,
         refused,
         providerAttempted: true,
+        ...retryAfterFrom(res),
       };
     }
     const contentType = res.headers.get("content-type")?.toLowerCase() ?? "";
@@ -189,7 +218,13 @@ export async function grokChat(opts: {
     if (!text.trim()) return { ok: false, error: "empty", providerAttempted: true };
     return { ok: true, text, providerAttempted: true };
   } catch {
-    if (mediaDispatched && !zeroDataRetentionConfirmed) {
+    // Our own cancellations — the caller's abort and this function's deadline —
+    // are not evidence about the provider's privacy posture, and reporting them
+    // as one sent the reader to the xAI console over a closed tab. Every other
+    // post-dispatch failure still fails closed: media left the machine and
+    // nothing confirmed zero data retention.
+    const cancelledByUs = opts.signal?.aborted || (controller.signal.aborted && !responseReceived);
+    if (mediaDispatched && !zeroDataRetentionConfirmed && !cancelledByUs) {
       return {
         ok: false,
         error: GROK_ZDR_RESPONSE_ERROR,
@@ -198,15 +233,21 @@ export async function grokChat(opts: {
         privacyFailure: "response",
       };
     }
+    const transportFailure = opts.signal?.aborted
+      ? ("aborted" as const)
+      : controller.signal.aborted
+        ? ("timeout" as const)
+        : ("network" as const);
     return {
       ok: false,
       error:
-        opts.signal?.aborted
+        transportFailure === "aborted"
           ? "xAI request cancelled"
-          : controller.signal.aborted
+          : transportFailure === "timeout"
             ? "xAI request timed out"
             : "xAI response failed",
       providerAttempted: mediaDispatched,
+      ...(mediaDispatched ? { transportFailure } : {}),
     };
   } finally {
     stopRelaying();

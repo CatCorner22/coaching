@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ConsentGate } from "@/components/consent-gate";
 import { subscribeToLocalDataErase } from "@/lib/privacy/local-data";
 import { registerEmergencyWorker } from "@/lib/offline-emergency";
-import { getPersistFailure, onPersistFailure, type PersistFailure } from "@/lib/stores/persist";
+import { getPersistFailure, onPersistStatus, type PersistFailure } from "@/lib/stores/persist";
 import { authEnabled } from "@/lib/auth/client";
 import { SignedIn, SignedOut, UserButton } from "@/lib/auth/gates";
 import { isActive, MORE, NAV, routeTitle } from "@/lib/nav";
@@ -275,7 +275,9 @@ function PersistFailureBanner() {
   const [persistFailure, setPersistFailure] = useState<PersistFailure | null>(() =>
     getPersistFailure(),
   );
-  useEffect(() => onPersistFailure(setPersistFailure), []);
+  // Status, not just failures: the banner has to come down again once a write
+  // lands, or a single transient error leaves it up for the rest of the scene.
+  useEffect(() => onPersistStatus(setPersistFailure), []);
   if (!persistFailure) return null;
   return (
     <div

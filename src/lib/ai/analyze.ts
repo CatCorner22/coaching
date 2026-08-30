@@ -15,12 +15,26 @@ import {
   type ModelStatus,
   type TriageState,
 } from "@/lib/observation/report";
-import { authorizeAiRequest } from "./guard.server";
+import { UnauthorizedError } from "@/lib/auth/verify.server";
+import { AiRequestDeniedError, authorizeAiRequest } from "./guard.server";
 import { buildSystemPrompt, verifyBatchConsentScope } from "./analyze-consent";
 import { grokChat, grokProviderConfigured, parseStrictJson } from "./grok";
 import { MediaBatchReplayError, MediaBatchReservationError } from "./media-replay-core";
 import { RateLimitError } from "./rate-limit-core";
-import type { AnalyzeResult } from "./schema";
+import type { AnalyzeInput, AnalyzeResult, ProviderFailure } from "./schema";
+
+type AnalyzeHandlerInput = {
+  images: string[];
+  frameLabels: string[];
+  hardNos: string[];
+  deterministic: DeterministicReport;
+  stepIndex: number;
+  elapsedSec: number;
+  tieSlug: string | undefined;
+  triage: (typeof triageValues)[number];
+  media: AnalyzeInput["media"];
+  consent: AnalyzeInput["consent"];
+};
 
 const triageValues = [
   "none",
@@ -182,7 +196,16 @@ const analyzeInputSchema = z
 export const analyzeRope = createServerFn({ method: "POST" })
   .middleware([authMiddleware])
   .validator((input: unknown) => {
-    const parsed = analyzeInputSchema.parse(input);
+    // A ZodError serializes its whole issue array as the thrown message, and
+    // the Studio prints thrown messages verbatim: a single mistyped field used
+    // to render as a kilobyte of JSON in the error banner.
+    const validated = analyzeInputSchema.safeParse(input);
+    if (!validated.success) {
+      throw new AnalyzeRequestError(
+        "This capture could not be submitted: the request did not match what the server expects. Discard the batch and capture again.",
+      );
+    }
+    const parsed = validated.data;
     for (const image of parsed.images) {
       if (!isCameraDataUrl(image))
         throw new Error("Stills must be camera captures, not remote URLs");
@@ -222,6 +245,49 @@ export const analyzeRope = createServerFn({ method: "POST" })
     };
   })
   .handler(async ({ data, context }): Promise<AnalyzeResult> => {
+    try {
+      return await runAnalyzeRequest(data, context);
+    } catch (error) {
+      // Admission failures used to escape as thrown errors, which the client
+      // could only render as raw text and which left the one-use batch closed
+      // even though nothing was ever reserved. They are ordinary results.
+      if (error instanceof AiRequestDeniedError || error instanceof UnauthorizedError) {
+        return {
+          ok: false,
+          error:
+            "No media was sent to xAI. This deployment did not accept the request (origin or sign-in). Nothing was used from this batch.",
+          providerAttempted: false,
+          code: "AI_REQUEST_FORBIDDEN",
+          status: 403,
+          retryableBeforeProvider: true,
+        };
+      }
+      if (error instanceof AnalyzeRequestError) {
+        return {
+          ok: false,
+          error: error.message,
+          providerAttempted: false,
+          code: "AI_REQUEST_INVALID",
+          status: 400,
+          retryableBeforeProvider: true,
+        };
+      }
+      throw error;
+    }
+  });
+
+class AnalyzeRequestError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AnalyzeRequestError";
+  }
+}
+
+async function runAnalyzeRequest(
+  data: AnalyzeHandlerInput,
+  context: { userId?: string },
+): Promise<AnalyzeResult> {
+  {
     // This bounded admission result cannot send media, consume quota, or touch
     // per-user state. authMiddleware has already applied the auth-mode and
     // same-site checks; returning here also lets an auth-off production preview
@@ -247,6 +313,8 @@ export const analyzeRope = createServerFn({ method: "POST" })
     const triage = data.triage as TriageState;
     const effectiveDet = triage === "none" ? det : triageStopReport(det, triage);
     let modelStatus: ModelStatus = "not_requested";
+    let providerFailure: ProviderFailure | undefined;
+    let providerRetryAfterMs: number | undefined;
     let refusal = false;
     let matches: ModelCategoryMatch[] = [];
     let selfAudit = {
@@ -345,6 +413,21 @@ export const analyzeRope = createServerFn({ method: "POST" })
           retryableBeforeProvider: false,
         };
       }
+      if (!grok.ok && grok.transportFailure) {
+        return {
+          ok: false,
+          error:
+            grok.transportFailure === "timeout"
+              ? "The selected stills were sent but xAI did not answer within 45 seconds, so this one-use batch is closed. Check the connection, then capture and confirm a new batch."
+              : grok.transportFailure === "aborted"
+                ? "The request was cancelled before xAI answered, so this one-use batch is closed. Capture and confirm a new batch when you are ready."
+                : "The connection to xAI dropped before an answer arrived, so this one-use batch is closed. Check the network, then capture and confirm a new batch.",
+          providerAttempted: true,
+          code: "AI_TRANSPORT_FAILED",
+          status: 502,
+          retryableBeforeProvider: false,
+        };
+      }
       if (!grok.ok && grok.privacyFailure === "response") {
         return {
           ok: false,
@@ -364,12 +447,25 @@ export const analyzeRope = createServerFn({ method: "POST" })
             : refusal
               ? "refused"
               : "failed";
+        providerFailure = refusal
+          ? "refused"
+          : modelStatus === "unavailable"
+            ? "unavailable"
+            : grok.status === 429
+              ? "rate_limited"
+              : typeof grok.status === "number"
+                ? "http_error"
+                : grok.error === "xAI returned an incomplete response"
+                  ? "incomplete"
+                  : "contract";
+        providerRetryAfterMs = grok.retryAfterMs;
         selfAudit.note = `Remote classification ${modelStatus}.`;
       } else {
         const candidate = parseStrictJson<unknown>(grok.text);
         const parsed = modelResponseSchema.safeParse(candidate);
         if (!parsed.success) {
           modelStatus = "failed";
+          providerFailure = "contract";
           selfAudit.hardLimit = true;
           selfAudit.note = "Remote output failed the closed schema and was discarded.";
         } else {
@@ -431,8 +527,11 @@ export const analyzeRope = createServerFn({ method: "POST" })
       modelStatus,
       report,
       observationReport,
+      ...(providerFailure ? { providerFailure } : {}),
+      ...(providerRetryAfterMs !== undefined ? { retryAfterMs: providerRetryAfterMs } : {}),
     };
-  });
+  }
+}
 
 function closeClientHeuristic(det: DeterministicReport): DeterministicReport {
   const stop = det.recommend === "stop" || det.flags.some((flag) => flag.severity === "stop");

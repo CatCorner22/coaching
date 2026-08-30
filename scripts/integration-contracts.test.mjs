@@ -182,7 +182,7 @@ test("Studio requires yes for negotiated actions and blocks every voice path", (
   // safeJsonStorage: it must still never throw on a corrupt blob, and it must
   // additionally resolve per item on write so a stale tab cannot resurrect a
   // revoked rank.
-  assert.match(store, /storage: negotiationMergingStorage<State>\("knotty-negotiate"\)/);
+  assert.match(store, /storage: negotiationMergingStorage<State>\("knotty-negotiate"/);
   const persistModule = read("src/lib/stores/persist.ts");
   assert.match(persistModule, /export function negotiationMergingStorage/);
   assert.match(persistModule, /const base = safeJsonStorage<State>\(\);/);

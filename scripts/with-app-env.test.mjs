@@ -46,9 +46,11 @@ test("drops non-VITE keys, non-string values and malformed documents", () => {
   assert.deepEqual(parseAppEnv("null"), {});
 });
 
-test("a missing app-env.json uses the couple-studio default", () => {
+test("a missing app-env.json uses the standalone default", () => {
+  // A clone has no .grok/app-env.json, and the README promises that clone runs
+  // without accounts, secrets or a database.
   assert.deepEqual(readAppEnv(makeWorkspace()), {
-    VITE_AUTH_ENABLED: "true",
+    VITE_AUTH_ENABLED: "false",
     VITE_MEDIA_UPLOAD_SCOPE: "adult_nudity",
   });
 });
@@ -70,9 +72,9 @@ test("an explicit process-env override wins over the file", () => {
   assert.equal(merged.PATH, "/usr/bin");
 });
 
-test("the template ships auth on for this couple studio and records the upload scope", () => {
+test("the template ships auth off for a standalone run and records the upload scope", () => {
   assert.deepEqual(readAppEnv(projectRoot()), {
-    VITE_AUTH_ENABLED: "true",
+    VITE_AUTH_ENABLED: "false",
     VITE_MEDIA_UPLOAD_SCOPE: "adult_nudity",
   });
 });
