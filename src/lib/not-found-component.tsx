@@ -9,7 +9,7 @@ import { Compass } from "lucide-react";
  */
 export function AppNotFoundComponent() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-bg px-6 text-center text-fg">
+    <section className="flex min-h-[60vh] flex-col items-center justify-center gap-3 bg-bg px-6 text-center text-fg">
       <span className="text-muted" aria-hidden="true">
         <Compass className="size-10" strokeWidth={2} />
       </span>
@@ -29,6 +29,6 @@ export function AppNotFoundComponent() {
           Emergency card
         </Link>
       </div>
-    </main>
+    </section>
   );
 }

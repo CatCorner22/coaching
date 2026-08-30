@@ -951,7 +951,7 @@ function StudioPage() {
             <Button
               variant="danger"
               aria-label={`Stop the session now (safeword: ${settings.safeword})`}
-              onClick={() => stopSession("manual")}
+              onClick={() => stopSession("safeword")}
             >
               {settings.safeword}
             </Button>

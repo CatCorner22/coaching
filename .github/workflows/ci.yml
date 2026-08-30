@@ -234,7 +234,30 @@ jobs:
             /workspace/screenshots/camera-preflight.png
 
       - name: Check the dev and build auth flags agree
-        run: npm run check:auth
+        shell: bash
+        # check:auth reads the flag the *running dev server* resolved, so the
+        # dev server has to be up: with nothing on :8080 it can only report
+        # "could not observe" and exits 2.
+        run: |
+          npm run dev > "${RUNNER_TEMP}/dev-server.log" 2>&1 &
+          dev_pid=$!
+          trap 'kill "$dev_pid" 2>/dev/null || true' EXIT
+
+          ready=false
+          for attempt in $(seq 1 60); do
+            if curl --silent --show-error --fail http://127.0.0.1:8080/__app-env > /dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [[ "$ready" != "true" ]]; then
+            echo "Dev server did not become healthy within 60 seconds."
+            sed -n '1,60p' "${RUNNER_TEMP}/dev-server.log"
+            exit 1
+          fi
+
+          npm run check:auth
 
       - name: Smoke-test the configuration a fresh clone actually gets
         shell: bash
