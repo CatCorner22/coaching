@@ -69,7 +69,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     mainRef.current?.focus({ preventScroll: true });
   }, [pathname]);
   if (pathname === "/emergency" || pathname === "/login") {
-    return <div className="min-h-dvh bg-bg text-fg">{children}</div>;
+    return (
+      <div className="min-h-dvh bg-bg text-fg">
+        <div className="px-4 pt-4">
+          <PersistFailureBanner />
+        </div>
+        {children}
+      </div>
+    );
   }
   // Rig Mode is the arm's-length scene view. It drops the sidebar, header and
   // bottom bar on purpose, so nothing competes with the clock and the stop

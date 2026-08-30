@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { safeJsonStorage } from "./persist";
+import { safeJsonStorage, syncPersistedAcrossTabs } from "./persist";
 
 type Kit = {
   eights: number;
@@ -62,3 +62,9 @@ export const useKit = create<Kit>()(
     },
   ),
 );
+
+// Last-write-wins is fine for counts, but only with a rehydrate listener: a
+// stale tab used to restore its own rope counts over the other tab's edit.
+syncPersistedAcrossTabs("knotty-kit", () => {
+  void useKit.persist.rehydrate();
+});

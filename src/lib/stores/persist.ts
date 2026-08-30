@@ -1,3 +1,4 @@
+import { MAX_NEGOTIATION_ITEMS } from "@/lib/negotiation-bounds";
 import { createJSONStorage, type PersistStorage } from "zustand/middleware";
 
 type SyncStateStorage = {
@@ -341,7 +342,11 @@ export function mergeNegotiationItemsByStamp(
   return merged;
 }
 
-const MERGED_ITEM_CAP = 80;
+// Matches what the read path keeps. When the write cap was the larger of the
+// two, rows the merge deliberately preserved were dropped on the next
+// rehydrate, so the merger's promise that neither tab loses a row was not
+// honoured end to end.
+const MERGED_ITEM_CAP = MAX_NEGOTIATION_ITEMS;
 
 /**
  * A stamp strictly greater than every stamp already recorded, so ordering does
@@ -385,8 +390,10 @@ export function mergeJournalEntriesById(
 ): { entries: unknown[]; removedIds: string[] } | null {
   if (!Array.isArray(incoming) || !Array.isArray(existing)) return null;
 
+  // Existing first, incoming last: the cap below keeps the tail, and dropping
+  // the file's fresh tombstones let a deletion undo itself on the next reload.
   const removed = new Set<string>();
-  for (const list of [incomingRemoved, existingRemoved]) {
+  for (const list of [existingRemoved, incomingRemoved]) {
     if (!Array.isArray(list)) continue;
     for (const id of list) if (typeof id === "string") removed.add(id);
   }
@@ -409,9 +416,19 @@ export function mergeJournalEntriesById(
   const merged = [...byId.values(), ...anonymous];
   // Newest first, matching how the store writes them.
   merged.sort((a, b) => Number((b as { at?: unknown }).at ?? 0) - Number((a as { at?: unknown }).at ?? 0));
+  // A tombstone whose entry is still present on one side is the only thing
+  // suppressing that entry, so it is evicted last.
+  const contested = new Set<string>();
+  for (const list of [incoming, existing]) {
+    for (const entry of list as IdentifiedEntry[]) {
+      const id = entry && typeof entry === "object" ? entry.id : undefined;
+      if (typeof id === "string" && removed.has(id)) contested.add(id);
+    }
+  }
+  const ordered = [...removed].filter((id) => !contested.has(id)).concat([...contested]);
   return {
     entries: merged.slice(0, JOURNAL_ENTRY_CAP),
-    removedIds: [...removed].slice(-JOURNAL_TOMBSTONE_CAP),
+    removedIds: ordered.slice(-JOURNAL_TOMBSTONE_CAP),
   };
 }
 

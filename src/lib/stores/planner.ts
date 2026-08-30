@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { SEQUENCES } from "@/lib/kb";
-import { adoptPersistKey, safeJsonStorage } from "./persist";
+import { adoptPersistKey, safeJsonStorage, syncPersistedAcrossTabs } from "./persist";
 
 type PlannerState = {
   slugs: string[];
@@ -65,3 +65,7 @@ export const usePlanner = create<PlannerState>()(
     },
   ),
 );
+
+syncPersistedAcrossTabs("knotty-plan", () => {
+  void usePlanner.persist.rehydrate();
+});
