@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { tieShape, tieShapeLabel } from "@/lib/kb/tie-factories";
+import { tieShape, tieShapeLabel, tieThumbnailStep } from "@/lib/kb/tie-factories";
 import { MiniTie } from "@/components/rope-figure";
 import { TIES, type Level } from "@/lib/kb";
 
@@ -69,8 +69,8 @@ function LibraryPage() {
                   className="flex min-w-0 max-w-full gap-4 overflow-hidden rounded-lg border border-border bg-surface p-3 hover:border-border-strong"
                 >
                   <MiniTie
-                    wraps={t.steps.at(-1)?.wraps ?? []}
-                    pose={t.steps.at(-1)?.expected.pose}
+                    wraps={tieThumbnailStep(t.steps)?.wraps ?? []}
+                    pose={tieThumbnailStep(t.steps)?.expected.pose}
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">

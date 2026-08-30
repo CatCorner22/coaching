@@ -25,18 +25,33 @@ function CalcPage() {
         Lengths from the library, plus 15% waste for tails and a second staff. Jute is sold in
         eights for a reason.
       </p>
-      <p className="mt-6 font-display text-5xl tabular-nums">{result.totalWithWaste}m</p>
-      <p className="text-sm text-muted">
-        {result.eights} × 8m staffs for the current plan
-        {plan.length ? "" : " (add ties below, or load a scene in Plan)"}. That is{" "}
-        {result.total}m of listed rope plus 15% waste. You have {eights} × 8m and {fours} × 4m, so{" "}
-        {coverage.meters}m.{" "}
-        {coverage.enough
-          ? "Enough, including waste."
-          : coverage.eightsShort > 0 && coverage.metersShort === 0
-            ? `You have the metres but ${coverage.eightsShort} too few 8m staffs — a tie that wants an 8m rope cannot be tied from two 4m ones.`
-            : `Short by ${coverage.metersShort}m. Add rope or cut the scene.`}
+      <p className="mt-6 font-display text-5xl tabular-nums">
+        {result.nothingEstimable ? "No estimate" : `${result.totalWithWaste}m`}
       </p>
+      {result.nothingEstimable ? (
+        <p className="text-sm text-muted">
+          Nothing in this plan lists a rope length — instructor routes are taught in person and
+          carry no spec, so this is not a zero-rope plan, it is an unestimated one. Add a tie with
+          a listed length to get a number.
+        </p>
+      ) : (
+        <p className="text-sm text-muted">
+          {result.eights} × 8m staffs for the current plan
+          {plan.length ? "" : " (add ties below, or load a scene in Plan)"}. That is{" "}
+          {result.total}m of listed rope plus 15% waste. You have {eights} × 8m and {fours} × 4m,
+          so {coverage.meters}m.{" "}
+          {coverage.enough
+            ? "Enough, including waste."
+            : coverage.eightsShort > 0 && coverage.metersShort === 0
+              ? `You have the metres but ${coverage.eightsShort} too few 8m staffs — a tie that wants an 8m rope cannot be tied from two 4m ones.`
+              : `Short by ${coverage.metersShort}m. Add rope or cut the scene.`}
+        </p>
+      )}
+      {!result.nothingEstimable && result.rows.some((r) => !r.estimable) && (
+        <p className="mt-2 text-sm text-muted">
+          Entries marked “not estimated” list no rope length and add nothing to the total.
+        </p>
+      )}
       {result.unknownSlugs.length > 0 && (
         <p className="mt-2 text-sm text-warn">
           {result.unknownSlugs.length} entr{result.unknownSlugs.length === 1 ? "y is" : "ies are"}{" "}
@@ -75,7 +90,9 @@ function CalcPage() {
               {r.name}
               {!r.known && <span className="ml-2 text-xs text-warn">not in the library</span>}
             </span>
-            <span className="tabular-nums text-muted">{r.meters}m</span>
+            <span className="tabular-nums text-muted">
+              {r.estimable ? `${r.meters}m` : "not estimated"}
+            </span>
           </li>
         ))}
       </ul>
@@ -129,7 +146,9 @@ function CalcPage() {
         {catalog.map((c) => (
           <li key={c.slug} className="flex justify-between text-muted">
             <span>{c.name}</span>
-            <span className="tabular-nums">{c.meters}m</span>
+            <span className="tabular-nums">
+              {c.ropes.length > 0 ? `${c.meters}m` : "not estimated"}
+            </span>
           </li>
         ))}
       </ul>

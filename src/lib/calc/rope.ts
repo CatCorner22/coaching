@@ -14,6 +14,8 @@ export type RopeRow = {
   ropes: readonly { lengthM: number; count: number }[];
   /** False when the slug is not in the library and `meters` is a guess. */
   known: boolean;
+  /** False when the entry carries no rope spec at all (instructor routes). */
+  estimable: boolean;
 };
 
 export type RopeEstimate = {
@@ -26,6 +28,8 @@ export type RopeEstimate = {
   eights: number;
   /** Slugs that were not in the library, so the total is an estimate. */
   unknownSlugs: string[];
+  /** True when nothing in the plan carries a length, so 0m means "unknown". */
+  nothingEstimable: boolean;
 };
 
 const round1 = (value: number) => Math.round(value * 10) / 10;
@@ -48,6 +52,7 @@ export function metersFor(slugs: string[]): RopeEstimate {
         meters: UNKNOWN_TIE_METERS,
         ropes: [{ lengthM: UNKNOWN_TIE_METERS, count: 1 }],
         known: false,
+        estimable: true,
       };
     }
     return {
@@ -56,6 +61,9 @@ export function metersFor(slugs: string[]): RopeEstimate {
       meters: tie.ropes.reduce((n, r) => n + r.lengthM * r.count, 0),
       ropes: tie.ropes,
       known: true,
+      // Most instructor routes list no rope at all. Folding them in as 0 made
+      // an all-instructor plan read as a checked "0m, enough" requirement.
+      estimable: tie.ropes.length > 0,
     };
   });
   const total = round1(rows.reduce((n, r) => n + r.meters, 0));
@@ -66,6 +74,7 @@ export function metersFor(slugs: string[]): RopeEstimate {
     totalWithWaste,
     eights: Math.ceil(totalWithWaste / STAFF_METERS),
     unknownSlugs: rows.filter((r) => !r.known).map((r) => r.slug),
+    nothingEstimable: rows.length > 0 && rows.every((r) => !r.estimable),
   };
 }
 

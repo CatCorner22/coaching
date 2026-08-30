@@ -51,3 +51,29 @@ test("an empty plan needs nothing", () => {
   );
   assert.equal(kitCoverage(estimate, 0, 0).enough, true);
 });
+
+test("a plan of entries with no rope spec is unestimated, not zero", () => {
+  const noSpec = TIES.filter((tie) => tie.ropes.length === 0).slice(0, 2);
+  assert.ok(noSpec.length > 0, "the catalog has entries with no rope spec");
+  const estimate = metersFor(noSpec.map((tie) => tie.slug));
+  assert.equal(estimate.nothingEstimable, true);
+  assert.deepEqual(
+    estimate.rows.map((row) => row.estimable),
+    noSpec.map(() => false),
+  );
+  const withRope = TIES.find((tie) => tie.ropes.length > 0)!;
+  const mixed = metersFor([noSpec[0]!.slug, withRope.slug]);
+  assert.equal(mixed.nothingEstimable, false, "one estimable row is still an estimate");
+});
+
+test("a card thumbnail draws the last step that has rope on it", async () => {
+  const { tieThumbnailStep } = await import("@/lib/kb/tie-factories");
+  for (const tie of TIES) {
+    const step = tieThumbnailStep(tie.steps);
+    const anyWraps = tie.steps.some((s) => (s.wraps?.length ?? 0) > 0);
+    // Every authored tie ends in a removal step that clears the figure, so
+    // `steps.at(-1)` rendered a ropeless body on every card in the app.
+    if (anyWraps) assert.ok((step?.wraps?.length ?? 0) > 0, `${tie.slug} thumbnail has no rope`);
+    else assert.equal(step, tie.steps.at(-1));
+  }
+});

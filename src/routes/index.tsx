@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MiniTie } from "@/components/rope-figure";
 import { SEQUENCES, TIES, kbStats } from "@/lib/kb";
+import { tieShape, tieShapeLabel, tieThumbnailStep } from "@/lib/kb/tie-factories";
 
 export const Route = createFileRoute("/")({ component: Home });
 
@@ -140,11 +141,22 @@ function Home() {
               params={{ slug: t.slug }}
               className="flex min-w-0 max-w-full gap-4 overflow-hidden rounded-lg border border-border bg-surface p-3 hover:border-border-strong"
             >
-              <MiniTie wraps={t.steps.at(-1)?.wraps ?? []} pose={t.steps.at(-1)?.expected.pose} />
+              <MiniTie
+                wraps={tieThumbnailStep(t.steps)?.wraps ?? []}
+                pose={tieThumbnailStep(t.steps)?.expected.pose}
+              />
               <div className="min-w-0">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <p className="min-w-0 wrap-anywhere font-display text-2xl">{t.name}</p>
                   <Badge className="shrink-0">{t.level}</Badge>
+                  {/* Four of the six featured entries are instructor routes;
+                      with only a level badge they read as lessons. */}
+                  <Badge
+                    className="shrink-0"
+                    variant={tieShape(t) === "guided" ? "accent" : "default"}
+                  >
+                    {tieShapeLabel(tieShape(t))}
+                  </Badge>
                 </div>
                 <p className="text-xs text-subtle">{t.jp}</p>
                 <p className="mt-2 line-clamp-3 text-sm text-muted">{t.summary}</p>

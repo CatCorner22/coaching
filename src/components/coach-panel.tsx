@@ -5,7 +5,12 @@ import { Button } from "@/components/ui/button";
 import { SourceEvidence } from "@/components/source-evidence";
 import type { CoachReport } from "@/lib/ml/types";
 import type { FrameQuality } from "@/lib/camera/quality";
-import type { ModelStatus, ObservationReport } from "@/lib/observation/report";
+import type {
+  ActionId,
+  Disposition,
+  ModelStatus,
+  ObservationReport,
+} from "@/lib/observation/report";
 import { playCoachVoice } from "@/lib/voice/play";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +52,34 @@ export const CoachPanel = memo(function CoachPanel({
     );
   }
   const disposition = observationReport?.disposition ?? "insufficient_view";
+  // The report was rendered as its own enum ids: a naked "C2" with no legend on
+  // the page, and a next action reading "lower consequence only".
+  const dispositionLabel: Record<Disposition, string> = {
+    stop_now: "Stop now",
+    do_not_proceed: "Do not proceed",
+    pause_and_correct: "Pause and correct",
+    insufficient_view: "Not enough view to say",
+    lower_consequence_learning_only: "Learning only — nothing decided here",
+    no_visible_concern_not_clearance: "Nothing visible — not a clearance",
+  };
+  const actionLabel: Record<ActionId, string> = {
+    stop_now: "Stop and release now.",
+    do_not_proceed: "Do not go further with this.",
+    pause_and_correct_while_unrestrained: "Pause and correct it with nobody in rope.",
+    obtain_lower_sensitivity_view: "Take a clearer, less sensitive view and look again.",
+    lower_consequence_only: "Keep to lower-consequence practice for now.",
+    qualified_instructor: "Take this to a qualified instructor in person.",
+    prompt_medical_assessment: "Get a medical assessment promptly.",
+    emergency_services: "Call emergency services.",
+    direct_nonvisual_check: "Check directly with the person, not from the picture.",
+    no_action_from_image: "No action can be taken from this picture.",
+  };
+  const bandLabel: Record<string, string> = {
+    C1: "C1 · lowest consequence",
+    C2: "C2 · elevated consequence",
+    C3: "C3 · instructor-only",
+    C4: "C4 · stop",
+  };
   const urgent = observationReport?.urgent_stop || disposition === "stop_now" || disposition === "do_not_proceed";
   const statusLabel: Record<ModelStatus, string> = {
     not_requested: "local report · model not requested",
@@ -63,9 +96,7 @@ export const CoachPanel = memo(function CoachPanel({
         </p>
       )}
       <div className="flex items-center justify-between gap-2">
-        <Badge variant={urgent ? "danger" : "warn"}>
-          {disposition.replaceAll("_", " ")}
-        </Badge>
+        <Badge variant={urgent ? "danger" : "warn"}>{dispositionLabel[disposition]}</Badge>
         <span className="text-[11px] uppercase tracking-wide text-subtle">
           {statusLabel[modelStatus]}
         </span>
@@ -91,7 +122,7 @@ export const CoachPanel = memo(function CoachPanel({
       {observationReport && (
         <p className="text-sm text-muted">
           <span className="text-fg">Next action. </span>
-          {observationReport.next_step_id.replaceAll("_", " ")}.
+          {actionLabel[observationReport.next_step_id]}
         </p>
       )}
       {observationReport && observationReport.nonvisual_checks.length > 0 && (
@@ -127,6 +158,21 @@ export const CoachPanel = memo(function CoachPanel({
           ))}
         </ul>
       )}
+      {observationReport && observationReport.observations.length > 0 && (
+        <div>
+          <p className="text-[11px] uppercase tracking-wide text-subtle">What the picture showed</p>
+          <ul className="mt-1 space-y-1.5">
+            {observationReport.observations.map((observation, index) => (
+              <li key={`${observation.frame_id}-${index}`} className="text-xs text-muted">
+                <span className="text-fg">{observation.visible_fact}</span>{" · "}
+                {observation.visibility} view, {observation.confidence} confidence
+                <br />
+                <span className="text-subtle">{observation.why_it_matters}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {observationReport && observationReport.recognized_categories.length > 0 && (
         <div>
           <p className="text-[11px] uppercase tracking-wide text-subtle">Broad categories</p>
@@ -134,7 +180,9 @@ export const CoachPanel = memo(function CoachPanel({
             {observationReport.recognized_categories.map((category) => (
               <li key={category.canonical_id} className="text-xs text-muted">
                 <span className="text-fg">{category.canonical_id.replaceAll("_", " ")}</span>
-                {" · "}{category.evidence_state}{" · "}{category.consequence_band.split("_")[0]}
+                {" · "}{category.evidence_state}{" · "}
+                {bandLabel[category.consequence_band.split("_")[0] ?? ""] ??
+                  category.consequence_band.split("_")[0]}
                 <br />
                 <span className="text-subtle">
                   Confounders: {category.confounders_considered.join("; ")}

@@ -89,7 +89,10 @@ function JournalPage() {
                 />
               </div>
               <p className="text-xs text-subtle">
-                {new Date(e.at).toLocaleString()} · {e.minutes} min
+                {/* A capture-and-stop rounds to zero minutes, and "0 min" read
+                    as an empty or failed entry rather than a short one. */}
+                {new Date(e.at).toLocaleString()} ·{" "}
+                {e.minutes === 0 ? "under a minute" : `${e.minutes} min`}
               </p>
               <p className="mt-2 text-sm text-fg">{e.notes}</p>
               <p className="mt-1 text-xs text-muted">

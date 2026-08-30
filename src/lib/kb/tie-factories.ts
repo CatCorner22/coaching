@@ -424,3 +424,21 @@ export function tieShapeBlurb(shape: TieShape): string {
       return "Named here with its risk family so you can recognise it and ask about it. This app does not teach its construction, and no photo, timer or result clears it.";
   }
 }
+
+/**
+ * The step a card thumbnail should draw.
+ *
+ * Cards drew `steps.at(-1)`, and every authored tie ends in a removal step that
+ * deliberately clears the figure — so all 63 thumbnails rendered a ropeless
+ * body. Take the last step that actually has wraps, and fall back to the final
+ * step's pose for entries that author none.
+ */
+export function tieThumbnailStep<S extends { wraps?: readonly unknown[] }>(
+  steps: readonly S[],
+): S | undefined {
+  for (let i = steps.length - 1; i >= 0; i -= 1) {
+    const step = steps[i];
+    if (step && (step.wraps?.length ?? 0) > 0) return step;
+  }
+  return steps.at(-1);
+}

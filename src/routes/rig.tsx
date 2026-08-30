@@ -110,28 +110,42 @@ function RigPage() {
     if (!running) return;
     let disposed = false;
     let handle: WakeLockHandle | null = null;
+    // Serialised. `handle` was only assigned after the await, so two overlapping
+    // requests each took a sentinel and all but the last were dropped without
+    // release — the screen stayed awake after the session ended, on the phone
+    // the couple is relying on.
+    let inFlight: Promise<WakeLockHandle | null> | null = null;
+    const release = async () => {
+      const held = handle;
+      handle = null;
+      if (held) await held.release().catch(() => undefined);
+      if (!disposed) setWakeHeld(false);
+    };
     const take = async () => {
-      if (disposed || handle || document.visibilityState !== "visible") return;
-      handle = await acquireWakeLock();
-      if (disposed) {
-        void handle?.release();
-        handle = null;
+      if (disposed || handle || inFlight || document.visibilityState !== "visible") return;
+      inFlight = acquireWakeLock();
+      const next = await inFlight;
+      inFlight = null;
+      if (disposed || !next) {
+        if (next) await next.release().catch(() => undefined);
         return;
       }
-      setWakeHeld(handle !== null);
+      handle = next;
+      setWakeHeld(true);
     };
     const onVisible = () => {
-      if (document.visibilityState === "visible") {
-        handle = null;
-        void take();
-      }
+      // Hidden releases explicitly rather than trusting the platform's implicit
+      // drop, so the held/`not held` indicator matches reality either way.
+      if (document.visibilityState === "visible") void take();
+      else void release();
     };
     void take();
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       disposed = true;
       document.removeEventListener("visibilitychange", onVisible);
-      void handle?.release();
+      void release();
+      void inFlight?.then((late) => late?.release().catch(() => undefined));
       setWakeHeld(false);
     };
   }, [running]);

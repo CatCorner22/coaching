@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { SEQUENCES, TIES, getTie } from "@/lib/kb";
+import { tieShape, tieShapeLabel } from "@/lib/kb/tie-factories";
 import { usePlanner } from "@/lib/stores/planner";
 
 export const Route = createFileRoute("/plan")({
@@ -44,9 +45,16 @@ function PlanPage() {
               key={slug + i}
               className="flex items-center justify-between rounded-md border border-border bg-surface px-3 py-2"
             >
-              <Link to="/tie/$slug" params={{ slug }} className="font-display text-xl">
-                {t?.name ?? slug}
-              </Link>
+              <span className="min-w-0">
+                <Link to="/tie/$slug" params={{ slug }} className="font-display text-xl">
+                  {t?.name ?? slug}
+                </Link>
+                {/* An instructor route queued next to a lesson looked like a
+                    lesson until the Studio button turned out disabled. */}
+                {t && (
+                  <span className="block text-xs text-subtle">{tieShapeLabel(tieShape(t))}</span>
+                )}
+              </span>
               <button
                 type="button"
                 aria-label={`Remove ${t?.name ?? slug} from the plan`}
@@ -76,7 +84,7 @@ function PlanPage() {
         <option value="">Add a library entry</option>
         {TIES.map((t) => (
           <option key={t.slug} value={t.slug}>
-            {t.name}
+            {tieShapeLabel(tieShape(t))} · {t.name}
           </option>
         ))}
       </select>
