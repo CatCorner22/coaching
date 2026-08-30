@@ -79,6 +79,12 @@ export function listenForWords(
     "really", "right", "safeword", "say", "saying", "seriously", "stop",
     "stopping", "this", "to", "up", "wait", "yes",
   ]);
+  // Filler alone is not a call. "is red on it" and "red is on this" are made
+  // entirely of allowlisted words, so a longer utterance also has to carry
+  // stop intent — one of these words, or the safeword said more than once.
+  const CALLOUT_INTENT = new Set([
+    "call", "calling", "cut", "done", "enough", "off", "out", "safeword", "stop", "stopping",
+  ]);
   // Past this a transcript is a paragraph of scene talk, not a call, whatever
   // it is made of.
   const MAX_CALLOUT_WORDS = 12;
@@ -87,10 +93,13 @@ export function listenForWords(
     if (tokens.length > MAX_CALLOUT_WORDS) return false;
     const safewordTokens = new Set(allWords.flatMap((word) => wordsIn(spoken(word))));
     const needleTokens = wordsIn(needle);
-    return tokens.every(
+    const onlyCallLanguage = tokens.every(
       (token) =>
         needleTokens.includes(token) || safewordTokens.has(token) || CALLOUT_WORDS.has(token),
     );
+    if (!onlyCallLanguage) return false;
+    const repeated = tokens.filter((token) => needleTokens.includes(token)).length > 1;
+    return repeated || tokens.some((token) => CALLOUT_INTENT.has(token));
   };
   rec.onresult = (ev: unknown) => {
     // Browsers can flush a final result after stop(). Without this, taking the

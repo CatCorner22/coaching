@@ -322,6 +322,19 @@ test("only verified pre-reservation admission denials reopen a batch", () => {
   assert.equal(analyze.slice(analyze.indexOf(".handler(async")).includes("PRE_DISPATCH_MARKER"), false);
 });
 
+test("the availability probe answers only this app's own signed-in caller", () => {
+  // It reports whether this deployment has a database and a provider, which is
+  // nobody else's business — but authMiddleware rejects everyone in the
+  // shipped accounts-off-with-a-database mode, so it guards directly.
+  const availability = read("src/lib/ai/availability.ts");
+  assert.match(availability, /assertSameSiteRequest\(\);/);
+  assert.match(
+    availability,
+    /if \(authConfigured && !\(await getSessionUser\(\)\)\) throw new UnauthorizedError\(\);/,
+  );
+  assert.doesNotMatch(availability, /\.middleware\(/);
+});
+
 test("a step's own limit gates Studio, not only the lesson page", () => {
   // Karada negotiates `torso` and then teaches an optional pass between the
   // legs, which is what the `crotch` row is for. The lesson page enforced it;

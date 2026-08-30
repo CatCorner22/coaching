@@ -297,6 +297,11 @@ test("a safeword called out in a longer sentence is still heard", async () => {
     for (const sentence of [
       "the red rope needs to go up on the hook",
       "her shoulder is going red where the wrap sits",
+      // Built entirely from allowlisted filler, with no stop intent and the
+      // safeword said once: ordinary talk, not a call.
+      "is red on it",
+      "red is on this",
+      "yes it is right on my red",
     ]) {
       hits.length = 0;
       h.advance(3_000);
