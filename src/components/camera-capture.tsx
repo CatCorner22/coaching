@@ -1,6 +1,7 @@
 import { Camera, Crosshair, Flashlight, ImagePlus, SwitchCamera, Timer, Video } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { cameraErrorMessage } from "@/lib/camera/error-message";
 import {
   applyZoom,
   BURST_FRAME_COUNT,
@@ -634,6 +635,7 @@ export const CameraCapture = memo(function CameraCapture({
       const best = pickBest(
         observed.map(({ frame, observation }) => ({
           data: frame.imageData,
+          detail: frame.detailData,
           item: { ...frame, observation },
           neck: observation.neckRope,
           paleness: observation.paleness,
@@ -875,9 +877,9 @@ export const CameraCapture = memo(function CameraCapture({
   async function toggleTorch() {
     const stream = streamRef.current;
     if (!stream) return;
-    // setTorch tears the stream down itself when a constraint fails or times
-    // out, so a second concurrent call from a double-tap could kill a stream
-    // the first call had already applied successfully. One at a time.
+    // A second concurrent call from a double-tap would race the first over the
+    // same lamp constraint and land on a state neither call reported. One at a
+    // time.
     if (torchBusyRef.current) return;
     torchBusyRef.current = true;
     const request = cameraRequestRef.current;
@@ -898,9 +900,11 @@ export const CameraCapture = memo(function CameraCapture({
     )
       return;
     if (!ok) {
-      stopLive();
+      setTorchOn(false);
       setError(
-        "Torch could not be applied safely, so the camera was closed. Reopen it to continue without torch.",
+        next
+          ? "The torch did not respond, so it was left off. The camera is still running."
+          : "The torch did not respond. Close and reopen the camera if it stays lit.",
       );
       return;
     }
@@ -1483,21 +1487,6 @@ function permissionCopy(state: CameraCapabilityReport["permission"]): string {
     return "Browser reports denied; live capture appears blocked, but file selection may still work.";
   }
   return "Unknown: this browser did not report camera-permission state.";
-}
-
-function cameraErrorMessage(cause: unknown): string {
-  if (typeof DOMException !== "undefined" && cause instanceof DOMException) {
-    if (cause.name === "NotAllowedError" || cause.name === "SecurityError") {
-      return "Camera access was blocked. Allow camera permission or choose a photo or video.";
-    }
-    if (cause.name === "NotFoundError" || cause.name === "OverconstrainedError") {
-      return "No compatible camera was found. Choose a photo or video instead.";
-    }
-    if (cause.name === "NotReadableError" || cause.name === "AbortError") {
-      return "The camera is busy in another app. Close it there and try again.";
-    }
-  }
-  return cause instanceof Error ? cause.message : "Could not open the camera.";
 }
 
 function ThirdsGrid() {

@@ -16,6 +16,7 @@ function JournalPage() {
   const entries = useJournal((s) => s.entries);
   const remove = useJournal((s) => s.remove);
   const [purgeStatus, setPurgeStatus] = useState<string | null>(null);
+  const [plainStatus, setPlainStatus] = useState<string | null>(null);
   return (
     <div className="mx-auto max-w-2xl px-5 py-10">
       <p className="text-xs uppercase tracking-[0.22em] text-muted">Log</p>
@@ -41,21 +42,38 @@ function JournalPage() {
       {purgeStatus && <p className="mt-2 text-xs text-muted" role="status">{purgeStatus}</p>}
       <JournalBackupPanel />
       {entries.length > 0 && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="mt-3 px-0"
-          onClick={() => {
-            const blob = new Blob([JSON.stringify(entries, null, 2)], { type: "application/json" });
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob);
-            a.download = "knotty-journal.json";
-            a.click();
-            window.setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-          }}
-        >
-          Export unencrypted notes instead
-        </Button>
+        <>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-3 px-0"
+            onClick={() => {
+              try {
+                const blob = new Blob([JSON.stringify(entries, null, 2)], {
+                  type: "application/json",
+                });
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = "knotty-journal.json";
+                a.click();
+                window.setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+                setPlainStatus("Saved knotty-journal.json — readable by anyone who opens it.");
+              } catch {
+                setPlainStatus("This browser would not save the readable copy.");
+              }
+            }}
+          >
+            Export a readable copy (cannot be restored)
+          </Button>
+          <p className="text-xs text-subtle">
+            Plain JSON for reading or printing. Restore only accepts the encrypted backup above.
+          </p>
+          {plainStatus && (
+            <p className="mt-1 text-xs text-muted" role="status">
+              {plainStatus}
+            </p>
+          )}
+        </>
       )}
       {entries.length === 0 ? (
         <p className="mt-10 text-sm text-muted">No text summaries saved on this device.</p>
@@ -71,7 +89,10 @@ function JournalPage() {
                 />
               </div>
               <p className="text-xs text-subtle">
-                {new Date(e.at).toLocaleString()} · {e.minutes} min
+                {/* A capture-and-stop rounds to zero minutes, and "0 min" read
+                    as an empty or failed entry rather than a short one. */}
+                {new Date(e.at).toLocaleString()} ·{" "}
+                {e.minutes === 0 ? "under a minute" : `${e.minutes} min`}
               </p>
               <p className="mt-2 text-sm text-fg">{e.notes}</p>
               <p className="mt-1 text-xs text-muted">

@@ -1,16 +1,21 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
 import {
   APP_ENV_REL_PATH,
+  AUTH_FLAG_DEFAULTED,
+  authFlagIsWrapperDefault,
   mergeAppEnv,
+  nodeVersionProblem,
   parseAppEnv,
+  parseAppEnvReport,
   projectRoot,
   readAppEnv,
+  readAppEnvReport,
 } from "./with-app-env.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -46,9 +51,11 @@ test("drops non-VITE keys, non-string values and malformed documents", () => {
   assert.deepEqual(parseAppEnv("null"), {});
 });
 
-test("a missing app-env.json uses the couple-studio default", () => {
+test("a missing app-env.json uses the standalone default", () => {
+  // A clone has no .grok/app-env.json, and the README promises that clone runs
+  // without accounts, secrets or a database.
   assert.deepEqual(readAppEnv(makeWorkspace()), {
-    VITE_AUTH_ENABLED: "true",
+    VITE_AUTH_ENABLED: "false",
     VITE_MEDIA_UPLOAD_SCOPE: "adult_nudity",
   });
 });
@@ -70,9 +77,9 @@ test("an explicit process-env override wins over the file", () => {
   assert.equal(merged.PATH, "/usr/bin");
 });
 
-test("the template ships auth on for this couple studio and records the upload scope", () => {
+test("the template ships auth off for a standalone run and records the upload scope", () => {
   assert.deepEqual(readAppEnv(projectRoot()), {
-    VITE_AUTH_ENABLED: "true",
+    VITE_AUTH_ENABLED: "false",
     VITE_MEDIA_UPLOAD_SCOPE: "adult_nudity",
   });
 });
@@ -139,4 +146,52 @@ test("the CLI still runs when invoked through a symlinked path", async () => {
     PRINT_FLAG,
   ]);
   assert.equal(stdout, expectedWrappedAuthEnabled());
+});
+
+test("a present but unusable app-env file says so instead of reverting silently", () => {
+  // A stray trailing comma or a nested { env: {...} } shape used to be
+  // swallowed, so the operator got the built-in default — the opposite of what
+  // they wrote — with nothing printed anywhere.
+  assert.match(parseAppEnvReport('{"VITE_AUTH_ENABLED":"true",}').problems[0], /not valid JSON/);
+  assert.match(
+    parseAppEnvReport('{"env":{"VITE_AUTH_ENABLED":"true"}}').problems[0],
+    /only VITE_\* keys are read/,
+  );
+  assert.match(parseAppEnvReport('{"VITE_AUTH_ENABLED":false}').problems[0], /quoted string/);
+  assert.match(parseAppEnvReport("[]").problems[0], /must be a JSON object/);
+  assert.deepEqual(parseAppEnvReport('{"VITE_AUTH_ENABLED":"true"}').problems, []);
+
+  // An absent file is not a problem; a broken one is, and a build refuses it.
+  assert.deepEqual(readAppEnvReport(makeWorkspace()).problems, []);
+  const broken = makeWorkspace('{"VITE_AUTH_ENABLED":"true",}');
+  assert.equal(readAppEnvReport(broken).problems.length, 1);
+  // …and a build refuses to run on a file it could not honour.
+  assert.match(
+    readFileSync(join(projectRoot(), "scripts/with-app-env.mjs"), "utf8"),
+    /refusing to build with an unusable/,
+  );
+});
+
+test("an unsupported Node version is named before anything else runs", () => {
+  // The build died with `node: bad option: --experimental-strip-types`, which
+  // mentions neither Node 22 nor the engines field.
+  assert.match(nodeVersionProblem("v20.18.1"), /needs Node 22/);
+  assert.match(nodeVersionProblem("v20.18.1"), /v20\.18\.1/);
+  assert.equal(nodeVersionProblem("v22.12.0"), null);
+  assert.equal(nodeVersionProblem("nonsense"), null);
+});
+
+test("the wrapper's own auth default is marked as a default, not an operator choice", () => {
+  // db:migrate runs through this wrapper. Treating the standalone auth-off
+  // default as an explicit no-auth deployment let a release that only forgot
+  // DATABASE_URL skip migrations and ship an unmigrated auth schema.
+  assert.equal(AUTH_FLAG_DEFAULTED, "APP_ENV_AUTH_DEFAULTED");
+  assert.equal(authFlagIsWrapperDefault({}, {}), true);
+  assert.equal(authFlagIsWrapperDefault({ VITE_AUTH_ENABLED: "false" }, {}), false);
+  assert.equal(authFlagIsWrapperDefault({}, { VITE_AUTH_ENABLED: "true" }), false);
+  // The file's own entries are reported apart from the defaults it fills in.
+  assert.deepEqual(readAppEnvReport(makeWorkspace()).fileEnv, {});
+  assert.deepEqual(readAppEnvReport(makeWorkspace('{"VITE_AUTH_ENABLED":"true"}')).fileEnv, {
+    VITE_AUTH_ENABLED: "true",
+  });
 });

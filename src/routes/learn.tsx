@@ -12,7 +12,12 @@ import {
   getKnot,
   getTie,
 } from "@/lib/kb";
-import { tieShape, tieShapeBlurb, tieShapeLabel } from "@/lib/kb/tie-factories";
+import {
+  tieShape,
+  tieShapeBlurb,
+  tieShapeLabel,
+  tieThumbnailStep,
+} from "@/lib/kb/tie-factories";
 import { NYX_SHIBARI, NYX_SHIBARI_POSES } from "@/lib/learn/nyx-model";
 import { NYX_NUDE_POSES, nyxPhotoGalleryPoses } from "@/lib/learn/nyx-nudes";
 
@@ -27,7 +32,16 @@ function LearnPage() {
   const shapes = ties.map((tie) => tieShape(tie));
   const drills = shapes.filter((shape) => shape === "practice").length;
   const guided = shapes.filter((shape) => shape === "guided").length;
-  const tieHint = `${drills} prop drill${drills === 1 ? "" : "s"} · ${guided} taught step by step`;
+  const routes = shapes.filter((shape) => shape === "instructor").length;
+  // The hint counted drills and taught ties only, so it accounted for 3 of 6
+  // and the card's own arithmetic did not close.
+  const tieHint = [
+    drills > 0 ? `${drills} prop drill${drills === 1 ? "" : "s"}` : null,
+    guided > 0 ? `${guided} taught step by step` : null,
+    routes > 0 ? `${routes} instructor route${routes === 1 ? "" : "s"}` : null,
+  ]
+    .filter((part) => part !== null)
+    .join(" · ");
 
   return (
     <div className="academy-hub easy-read mx-auto max-w-5xl px-5 py-10">
@@ -191,9 +205,9 @@ function LearnPage() {
               >
                 <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-border bg-elevated">
                   <RopeFigure
-                    pose={academy.steps.at(-1)?.expected.pose ?? "stand"}
-                    view={academy.steps.at(-1)?.expected.view ?? "front"}
-                    wraps={academy.steps.at(-1)?.wraps ?? []}
+                    pose={tieThumbnailStep(academy.steps)?.expected.pose ?? "stand"}
+                    view={tieThumbnailStep(academy.steps)?.expected.view ?? "front"}
+                    wraps={tieThumbnailStep(academy.steps)?.wraps ?? []}
                     compact
                     className="h-full w-full text-rope"
                   />

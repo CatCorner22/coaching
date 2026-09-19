@@ -48,7 +48,25 @@ const DISPOSITIONS = new Set<Disposition>([
 ]);
 const SOURCE_IDS = new Set<SourceId>(SAFETY_SOURCE_IDS);
 
-function normalizeJournalEntry(value: unknown, index: number): JournalEntry | null {
+/**
+ * A stable id for a row that has none.
+ *
+ * The old fallback was the row's position in the file, so the first id-less row
+ * of every file collided: a second file's entry was silently dropped as
+ * "already here". Content decides identity instead, so the same row imported
+ * twice still dedupes and two different rows do not.
+ */
+function contentId(row: Partial<JournalEntry>, at: number): string {
+  const material = `${at}|${row.minutes ?? ""}|${String(row.notes ?? "")}|${row.tieSlug ?? ""}`;
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < material.length; i += 1) {
+    hash ^= material.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return `legacy-${hash.toString(36)}-${material.length}`;
+}
+
+function normalizeJournalEntry(value: unknown): JournalEntry | null {
   if (!value || typeof value !== "object") return null;
   const row = value as Partial<JournalEntry>;
   const at = Number(row.at);
@@ -57,7 +75,10 @@ function normalizeJournalEntry(value: unknown, index: number): JournalEntry | nu
     ? (row.disposition as Disposition)
     : "insufficient_view";
   return {
-    id: typeof row.id === "string" && row.id ? row.id.slice(0, 100) : `legacy-${index}-${Number.isFinite(at) ? at : 0}`,
+    id:
+      typeof row.id === "string" && row.id
+        ? row.id.slice(0, 100)
+        : contentId(row, Number.isFinite(at) ? at : 0),
     at: Number.isFinite(at) && at > 0 ? at : Date.now(),
     tieSlug: typeof row.tieSlug === "string" ? row.tieSlug.slice(0, 100) : undefined,
     minutes: Number.isFinite(minutes) ? Math.max(0, Math.min(24 * 60, Math.round(minutes))) : 0,
@@ -124,7 +145,7 @@ export const useJournal = create<JournalState>()(
           existingRemoved,
         );
         if (!merged) {
-          return { added: 0, alreadyPresent: 0, skippedDeleted: 0, notKept: 0, displaced: 0 };
+          return { added: 0, alreadyPresent: 0, skippedDeleted: 0, notKept: 0, displaced: 0, deletedByFile: 0 };
         }
         // Summarized from the merge result, so the report reflects what the
         // cap actually kept — not what the file intended.
@@ -153,18 +174,31 @@ export const useJournal = create<JournalState>()(
       storage: journalMergingStorage<JournalState>("knotty-journal"),
       merge: (persisted, current) => {
         const snapshot = (persisted ?? {}) as Partial<JournalState>;
-        const entries = Array.isArray(snapshot.entries)
+        const stored = Array.isArray(snapshot.entries)
           ? snapshot.entries
               .slice(0, 80)
               .map(normalizeJournalEntry)
               .filter((entry): entry is JournalEntry => entry !== null)
-          : current.entries;
+          : [];
+        // Rehydrate is a union, like the write path. Taking storage verbatim
+        // destroyed an entry that only exists in this tab's memory — exactly
+        // the entry whose write was blocked or over quota — the moment another
+        // tab saved anything.
+        const merged = mergeJournalEntriesById(
+          stored,
+          current.entries,
+          snapshot.removedIds,
+          current.removedIds,
+        );
+        const entries = (merged?.entries as JournalEntry[]) ?? stored;
         return {
           ...current,
           entries,
-          removedIds: Array.isArray(snapshot.removedIds)
-            ? snapshot.removedIds.filter((id): id is string => typeof id === "string").slice(-200)
-            : current.removedIds,
+          removedIds: merged
+            ? merged.removedIds
+            : Array.isArray(snapshot.removedIds)
+              ? snapshot.removedIds.filter((id): id is string => typeof id === "string").slice(-200)
+              : current.removedIds,
           nerveHits: entries.reduce(
             (count, entry) => count + (entry.flags.some((flag) => /nerve|radial|numb/i.test(flag)) ? 1 : 0),
             0,

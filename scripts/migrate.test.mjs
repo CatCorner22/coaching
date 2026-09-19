@@ -238,22 +238,31 @@ test("only an actually missing migration directory is treated as empty", async (
   );
 });
 
-test("a production auth-on release without DATABASE_URL fails instead of skipping", async () => {
+test("a release without DATABASE_URL fails unless the skip is asked for", async () => {
   const { missingDatabaseUrlDisposition } = await import("./migrate.mjs");
   // Release steps often run with a different environment than the deployed
   // function; a silent exit-0 skip deployed an unmigrated auth schema whose
-  // failures only surfaced as runtime 500s.
+  // failures only surfaced as runtime 500s. Inferring the skip from NODE_ENV
+  // meant forgetting NODE_ENV=production was enough to get the silent version.
   assert.equal(missingDatabaseUrlDisposition({ NODE_ENV: "production" }), "fail");
+  assert.equal(missingDatabaseUrlDisposition({}), "fail");
+  assert.equal(missingDatabaseUrlDisposition({ NODE_ENV: "development" }), "fail");
+  // The two quiet shapes stay quiet, but both are now explicit: the no-auth
+  // build has no DB (and the app-env wrapper supplies that flag locally), and
+  // --allow-skip says the operator meant it.
+  assert.equal(missingDatabaseUrlDisposition({ VITE_AUTH_ENABLED: "false" }), "skip");
+  assert.equal(missingDatabaseUrlDisposition({ NODE_ENV: "production" }, ["--allow-skip"]), "skip");
+  // …but the wrapper's own standalone default is not an operator choice: a
+  // release that only forgot DATABASE_URL must not inherit a silent skip.
   assert.equal(
-    missingDatabaseUrlDisposition({ NODE_ENV: "production", VITE_AUTH_ENABLED: "true" }),
+    missingDatabaseUrlDisposition({ VITE_AUTH_ENABLED: "false", APP_ENV_AUTH_DEFAULTED: "1" }),
     "fail",
   );
-  // The two quiet shapes stay quiet: the no-auth production build has no DB,
-  // and local/dev invocations migrate PGLite through the dev server instead.
   assert.equal(
-    missingDatabaseUrlDisposition({ NODE_ENV: "production", VITE_AUTH_ENABLED: "false" }),
+    missingDatabaseUrlDisposition(
+      { VITE_AUTH_ENABLED: "false", APP_ENV_AUTH_DEFAULTED: "1" },
+      ["--allow-skip"],
+    ),
     "skip",
   );
-  assert.equal(missingDatabaseUrlDisposition({}), "skip");
-  assert.equal(missingDatabaseUrlDisposition({ NODE_ENV: "development" }), "skip");
 });

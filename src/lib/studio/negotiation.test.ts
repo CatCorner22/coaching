@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { tieShape } from "@/lib/kb/tie-factories";
+import { TIES } from "@/lib/kb/ties";
 import { normalizeNegotiationItems, type NegItem, type Rank } from "@/lib/stores/negotiate";
 import {
   buildStudioNegotiationPolicy,
   mediaAuthorizationWasRevoked,
+  missingStepLimits,
   missingTieLimits,
+  policyRestrictionIncreased,
   studioPolicySignature,
+  tieLimitIds,
 } from "./negotiation.ts";
 
 function item(id: string, rank: Rank): NegItem {
@@ -193,4 +198,69 @@ test("missingTieLimits names the unagreed rows a guided tie waits for, fail-clos
     ["torso"],
   );
   assert.equal(missingTieLimits("waki-shibari", []).length, 2);
+});
+
+test("no unoccupied prop drill is gated behind a body limit", () => {
+  // A prop drill puts rope on a dress form. Gating one behind `torso` made the
+  // couple answer a question about her chest to time a drill on nobody, and it
+  // dead-ended the drill's own tie page, which teaches every step ungated and
+  // then links to a Studio option the deep-link validator discards.
+  const gated = TIES.filter(
+    (tie) => tieShape(tie) === "practice" && tieLimitIds(tie.slug).length > 0,
+  ).map((tie) => tie.slug);
+  assert.deepEqual(gated, []);
+});
+
+test("guided ties that go on a person keep their limit", () => {
+  const guided = TIES.filter((tie) => tieShape(tie) === "guided");
+  assert.ok(guided.length > 0);
+  for (const tie of guided) {
+    assert.ok(
+      tieLimitIds(tie.slug).length > 0,
+      `${tie.slug} is taught for use on a person and must map to a negotiated row`,
+    );
+  }
+});
+
+test("only a narrowing policy change is treated as restriction-increasing", () => {
+  const flags = { consented: true, voice: false, listen: false };
+  const before = [item("cuffs", "no"), item("photos", "yes")];
+
+  // An approval added in the other tab is not a reason to throw a scene away.
+  assert.equal(
+    policyRestrictionIncreased(before, [item("cuffs", "yes"), item("photos", "yes")], flags, flags),
+    false,
+  );
+  // A revocation is.
+  assert.equal(
+    policyRestrictionIncreased(before, [item("cuffs", "no"), item("photos", "no")], flags, flags),
+    true,
+  );
+  // Downgrading a yes to a maybe takes permission away too.
+  assert.equal(
+    policyRestrictionIncreased(before, [item("cuffs", "no"), item("photos", "maybe")], flags, flags),
+    true,
+  );
+  // Withdrawn consent counts however the rows read.
+  assert.equal(
+    policyRestrictionIncreased(before, before, flags, { ...flags, consented: false }),
+    true,
+  );
+  assert.equal(policyRestrictionIncreased(before, before, flags, flags), false);
+});
+
+test("a step can require its own limit on top of the tie's", () => {
+  // Karada negotiates `torso`; its optional crotch pass does not inherit that.
+  const karada = TIES.find((tie) => tie.slug === "karada")!;
+  const crotchStep = karada.steps.find((step) => step.limitIds?.includes("crotch"));
+  assert.ok(crotchStep, "karada must mark its between-the-legs step");
+  assert.deepEqual(missingStepLimits(crotchStep, [item("torso", "yes")]).map((row) => row.id), [
+    "crotch",
+  ]);
+  assert.deepEqual(missingStepLimits(crotchStep, [item("crotch", "maybe")]).map((row) => row.id), [
+    "crotch",
+  ]);
+  assert.deepEqual(missingStepLimits(crotchStep, [item("crotch", "yes")]), []);
+  // Every other step of the tie is governed by the tie limit alone.
+  assert.deepEqual(missingStepLimits(karada.steps[0], []), []);
 });

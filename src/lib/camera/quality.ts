@@ -204,9 +204,14 @@ function finite01(value: unknown): number {
 }
 
 export function pickBest<T>(
-  items: { data: ImageData; item: T; neck?: number; paleness?: number }[],
+  items: { data: ImageData; item: T; detail?: ImageData; neck?: number; paleness?: number }[],
   keep = 3,
 ): T[] {
+  // `detail` is the native-scale centre crop. Ranking on the 240px analysis
+  // copy alone was ranking on a low-pass filter: it erases exactly the
+  // frequencies camera shake destroys, so five burst frames ~150 ms apart
+  // scored identically and "keeps the sharpest stills" degraded to "keeps the
+  // first three" — including when every one of those three was shaken.
   // `paleness` is intentionally not used. The current color heuristic has no
   // validated hand/body localization, so elevating it can select a pale wall
   // over a usable subject frame. Keep the field temporarily for call-site
@@ -220,7 +225,7 @@ export function pickBest<T>(
   return pool
     .map((entry) => ({
       entry,
-      score: scoreFrame(entry.data).score + neckScore(entry) * 0.8,
+      score: scoreFrame(entry.data, entry.detail).score + neckScore(entry) * 0.8,
     }))
     .sort((a, b) => b.score - a.score)
     .slice(0, Number.isFinite(keep) ? Math.max(0, Math.floor(keep)) : 3)

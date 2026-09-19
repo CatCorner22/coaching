@@ -236,17 +236,22 @@ export async function decryptVault(
   if (!passphrase) throw new VaultError("empty_passphrase", "A passphrase is required.");
   const vault = parseVault(value);
   const crypto = requireCrypto(host);
+  // Decoded before the catch below, which speaks only for a failed
+  // authentication tag: a file damaged in transit used to be reported as a
+  // wrong passphrase, sending people hunting for a passphrase that was right.
+  const iv = fromBase64(vault.iv);
+  const ciphertext = fromBase64(vault.ciphertext);
   const key = await deriveKey(crypto, passphrase, fromBase64(vault.salt), vault.iterations);
   let plaintext: ArrayBuffer;
   try {
     plaintext = await crypto.subtle.decrypt(
       {
         name: "AES-GCM",
-        iv: fromBase64(vault.iv) as unknown as BufferSource,
+        iv: iv as unknown as BufferSource,
         additionalData: headerBytes(vault) as unknown as BufferSource,
       },
       key,
-      fromBase64(vault.ciphertext) as unknown as BufferSource,
+      ciphertext as unknown as BufferSource,
     );
   } catch {
     // AES-GCM cannot tell a wrong key from an altered file: both are a failed

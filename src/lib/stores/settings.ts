@@ -62,6 +62,22 @@ function clampWord(v: unknown, fallback: string) {
   return s;
 }
 
+/**
+ * Why a spoken word was refused, for the field that offered it.
+ *
+ * The clamp silently reverted to the previous word, so a rejected safeword read
+ * as the text box "not saving" with nothing said about the rule.
+ */
+export function safewordRejection(value: string): string | null {
+  const s = value.trim().slice(0, 24);
+  if (s.length < 2) return "Kept the previous word: a spoken word needs at least two characters.";
+  if (RESERVED.has(s.toLowerCase()))
+    return `Kept the previous word: “${s}” is a command word this app already listens for.`;
+  if (!/\p{L}{2}/u.test(s) || /[^\p{L}\p{M}\s'’-]/u.test(s))
+    return "Kept the previous word: use letters, so speech recognition can actually hear it.";
+  return null;
+}
+
 /** Strictly increasing even against a backward wall-clock correction. */
 function nextConsentStamp(s: Settings): number {
   return Math.max(Date.now(), (s.consentStamp || 0) + 1);

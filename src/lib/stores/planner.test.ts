@@ -281,6 +281,51 @@ test("a write that cannot be persisted is reported instead of swallowed", async 
   }
 });
 
+test("storage that is switched off entirely is reported, and a recovery clears it", async () => {
+  const { safeBrowserStorage, onPersistStatus, getPersistFailure, resetPersistFailure } =
+    await import("./persist.ts");
+  const originalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  try {
+    resetPersistFailure();
+    const seen: Array<{ key: string; reason: string } | null> = [];
+    const off = onPersistStatus((failure) => seen.push(failure));
+
+    // Site data blocked: localStorage is absent rather than throwing, which
+    // used to mean every write vanished with nothing on screen saying so.
+    delete (globalThis as { localStorage?: unknown }).localStorage;
+    safeBrowserStorage().setItem("knotty-negotiate", "{}");
+    assert.deepEqual(getPersistFailure(), { key: "knotty-negotiate", reason: "blocked" });
+
+    // Storage comes back — the warning must come down, or it is noise for the
+    // rest of the session.
+    const written: Record<string, string> = {};
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: (name: string) => written[name] ?? null,
+        setItem: (name: string, value: string) => {
+          written[name] = value;
+        },
+        removeItem: (name: string) => {
+          delete written[name];
+        },
+      },
+    });
+    safeBrowserStorage().setItem("knotty-negotiate", "{}");
+    assert.equal(getPersistFailure(), null);
+    assert.deepEqual(seen, [{ key: "knotty-negotiate", reason: "blocked" }, null]);
+
+    // A landing write with nothing wrong must not re-announce anything.
+    safeBrowserStorage().setItem("knotty-negotiate", "{}");
+    assert.equal(seen.length, 2);
+    off();
+    resetPersistFailure();
+  } finally {
+    if (originalStorage) Object.defineProperty(globalThis, "localStorage", originalStorage);
+    else delete (globalThis as { localStorage?: unknown }).localStorage;
+  }
+});
+
 test("journal entries survive a cross-tab write, and deleted ones stay deleted", async () => {
   const { mergeJournalEntriesById } = await import("./persist.ts");
 
@@ -353,4 +398,28 @@ test("a stale tab's old revocation cannot erase a strictly newer re-approval", a
     (mergeNegotiationItemsByStamp(tieNo, equalYes) as Array<{ rank: string }>)[0]!.rank,
     "no",
   );
+});
+
+test("a write whose merge is overridden asks the tab to re-read storage", async () => {
+  const { negotiationMergingStorage } = await import("./persist.ts");
+  const key = "knotty-negotiate-repair";
+  let repairs = 0;
+  const storage = negotiationMergingStorage<{ items: unknown[] }>(key, () => {
+    repairs += 1;
+  });
+  const blob = (rank: string, updatedAt: number) => ({
+    state: { items: [{ id: "photos", label: "Photos", rank, updatedAt }] },
+    version: 1,
+  });
+
+  // Another tab revoked `photos` at stamp 2.
+  globalThis.localStorage.setItem(key, JSON.stringify(blob("no", 2)));
+  // This tab still holds the older yes and saves something.
+  storage.setItem(key, blob("yes", 1) as never);
+  assert.equal(repairs, 1, "the tab must be told its memory is stale");
+  assert.match(globalThis.localStorage.getItem(key) ?? "", /"rank":"no"/);
+
+  // A write that storage agrees with is not a divergence.
+  storage.setItem(key, blob("no", 2) as never);
+  assert.equal(repairs, 1);
 });

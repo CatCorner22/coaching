@@ -7,6 +7,7 @@ import {
   negotiationMergingStorage,
   nextNegotiationStamp,
   syncPersistedAcrossTabs,
+  unionRemovedIds,
 } from "./persist";
 
 // Re-exported: the ceiling is shared with the analyze request schema, which
@@ -124,7 +125,8 @@ function parseCandidate(value: unknown): NegItem | null {
  * policy. Missing or duplicated canonical rows revert to no; locked rows can
  * never be restored as yes. Custom rows are retained once by ID.
  */
-export function normalizeNegotiationItems(value: unknown): NegItem[] {
+export function normalizeNegotiationItems(value: unknown, removedIds: readonly string[] = []): NegItem[] {
+  const removed = new Set(removedIds);
   const candidates = Array.isArray(value)
     ? value.slice(0, MAX_NEGOTIATION_ITEMS).map(parseCandidate).filter((item): item is NegItem => item !== null)
     : [];
@@ -149,6 +151,7 @@ export function normalizeNegotiationItems(value: unknown): NegItem[] {
   const customIds = new Set<string>();
   for (const candidate of candidates) {
     if (!candidate.label || starterIds.has(candidate.id) || customIds.has(candidate.id)) continue;
+    if (removed.has(candidate.id)) continue;
     const matches = matchesById.get(candidate.id) ?? [];
     normalized.push({
       ...candidate,
@@ -163,12 +166,17 @@ export function normalizeNegotiationItems(value: unknown): NegItem[] {
 type State = {
   negotiationVersion: number;
   items: NegItem[];
+  /** Custom rows the couple deleted. Starter rows are never removable. */
+  removedIds: string[];
   notes: string;
   notesUpdatedAt?: number;
   setRank: (id: string, rank: Rank) => void;
   setNotes: (n: string) => void;
   add: (label: string) => void;
+  remove: (id: string) => void;
 };
+
+export const STARTER_IDS: ReadonlySet<string> = new Set(STARTER.map((item) => item.id));
 
 adoptPersistKey("knotty-negotiate", "musubi-negotiate");
 
@@ -177,6 +185,7 @@ export const useNegotiate = create<State>()(
     (set, get) => ({
       negotiationVersion: 2,
       items: normalizeNegotiationItems(STARTER),
+      removedIds: [],
       notes: "",
       setRank: (id, rank) => {
         // Monotonic, so a backward clock correction cannot stamp a fresh
@@ -211,23 +220,39 @@ export const useNegotiate = create<State>()(
           ]),
         });
       },
+      remove: (id) => {
+        if (STARTER_IDS.has(id)) return;
+        if (!get().items.some((item) => item.id === id)) return;
+        set({
+          items: get().items.filter((item) => item.id !== id),
+          removedIds: unionRemovedIds(get().removedIds, [id]),
+        });
+      },
     }),
     {
       name: "knotty-negotiate",
-      storage: negotiationMergingStorage<State>("knotty-negotiate"),
+      storage: negotiationMergingStorage<State>("knotty-negotiate", () => {
+        // The write-merge just kept a stored rank over the one this tab held,
+        // which means memory is more permissive than the persisted policy.
+        // Read it back so the tab stops offering what has been revoked, with
+        // or without a delivered `storage` event.
+        void useNegotiate.persist.rehydrate();
+      }),
       version: 1,
       migrate: (persisted) => persisted as State,
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<State>;
         const currentPolicy = p.negotiationVersion === 2;
+        const removedIds = unionRemovedIds(p.removedIds, current.removedIds);
         const items =
           currentPolicy && Array.isArray(p.items)
-            ? normalizeNegotiationItems(p.items)
-            : current.items;
+            ? normalizeNegotiationItems(p.items, removedIds)
+            : current.items.filter((item) => !removedIds.includes(item.id));
         return {
           ...current,
           negotiationVersion: 2,
           items,
+          removedIds,
           notes: typeof p.notes === "string" ? p.notes.slice(0, 600) : current.notes,
           notesUpdatedAt: Number(p.notesUpdatedAt) || current.notesUpdatedAt,
         };

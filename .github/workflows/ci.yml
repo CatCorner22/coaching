@@ -233,6 +233,65 @@ jobs:
             http://127.0.0.1:8081/ \
             /workspace/screenshots/camera-preflight.png
 
+      - name: Check the dev and build auth flags agree
+        shell: bash
+        # check:auth reads the flag the *running dev server* resolved, so the
+        # dev server has to be up: with nothing on :8080 it can only report
+        # "could not observe" and exits 2.
+        run: |
+          npm run dev > "${RUNNER_TEMP}/dev-server.log" 2>&1 &
+          dev_pid=$!
+          trap 'kill "$dev_pid" 2>/dev/null || true' EXIT
+
+          ready=false
+          for attempt in $(seq 1 60); do
+            if curl --silent --show-error --fail http://127.0.0.1:8080/__app-env > /dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [[ "$ready" != "true" ]]; then
+            echo "Dev server did not become healthy within 60 seconds."
+            sed -n '1,60p' "${RUNNER_TEMP}/dev-server.log"
+            exit 1
+          fi
+
+          npm run check:auth
+
+      - name: Smoke-test the configuration a fresh clone actually gets
+        shell: bash
+        # Every other step pins VITE_AUTH_ENABLED=false, so the shipped
+        # defaults — whatever scripts/with-app-env.mjs decides with no override
+        # and no database — were the one configuration CI never served. That is
+        # exactly the configuration that once answered HTTP 500 on every route.
+        env:
+          VITE_AUTH_ENABLED: ""
+          DATABASE_URL: ""
+        run: |
+          unset VITE_AUTH_ENABLED
+          npm run preview > "${RUNNER_TEMP}/default-preview.log" 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+
+          ready=false
+          for attempt in $(seq 1 60); do
+            if curl --silent --show-error --fail http://127.0.0.1:8081/ > /dev/null; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [[ "$ready" != "true" ]]; then
+            echo "Preview with the shipped defaults did not become healthy within 60 seconds."
+            sed -n '1,60p' "${RUNNER_TEMP}/default-preview.log"
+            exit 1
+          fi
+
+          for route in / /studio /emergency; do
+            curl --silent --show-error --fail "http://127.0.0.1:8081${route}" > /dev/null
+          done
+
       - name: Upload production smoke evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

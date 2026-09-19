@@ -68,3 +68,36 @@ test("an unverified ZDR response never claims nothing was sent or invites a re-t
   assert.match(unverified, /one-use batch stays closed/i);
   assert.match(unverified, /capture a new batch/i);
 });
+
+test("a validator failure is reported as pre-dispatch, and its marker never reaches the reader", async () => {
+  const { analyzeThrownBeforeDispatch, analyzeThrownMessage, PRE_DISPATCH_MARKER } = await import(
+    "./analyze-errors.ts"
+  );
+  // The validator runs before the handler, so nothing was reserved and the
+  // one-use batch can be reopened — but the failure arrives as a thrown error
+  // with no server verdict, so the marker is the only way to know that.
+  const thrown = new Error(
+    `${PRE_DISPATCH_MARKER} Media permissions must be reconfirmed for this batch`,
+  );
+  assert.equal(analyzeThrownBeforeDispatch(thrown), true);
+  assert.equal(
+    analyzeThrownMessage(thrown),
+    "Media permissions must be reconfirmed for this batch",
+  );
+  // Anything else stays closed.
+  assert.equal(analyzeThrownBeforeDispatch(new Error("the provider timed out")), false);
+});
+
+test("an expired sign-in reopens the batch, because middleware rejects before the handler", async () => {
+  const { analyzeThrownBeforeDispatch, analyzeThrownMessage } = await import("./analyze-errors.ts");
+  // authMiddleware runs ahead of the handler, so no batch was reserved and no
+  // media left the browser: signing in again must not cost the capture.
+  const unauthorized = Object.assign(new Error("Unauthorized"), { name: "UnauthorizedError" });
+  assert.equal(analyzeThrownBeforeDispatch(unauthorized), true);
+  const withStatus = Object.assign(new Error("boom"), { status: 401 });
+  assert.equal(analyzeThrownBeforeDispatch(withStatus), true);
+  const message = analyzeThrownMessage(unauthorized);
+  assert.match(message, /nothing was sent/i);
+  assert.match(message, /sign in again/i);
+  assert.notEqual(message.trim(), "Unauthorized");
+});

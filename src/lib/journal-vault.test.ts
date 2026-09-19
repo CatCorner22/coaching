@@ -207,6 +207,7 @@ test("an import reports what it actually changed, and never resurrects a deletio
     skippedDeleted: 1,
     notKept: 0,
     displaced: 0,
+    deletedByFile: 0,
   });
 
   // A tombstone from the *file* also applies, so restoring an old backup on top
@@ -217,6 +218,18 @@ test("an import reports what it actually changed, and never resurrects a deletio
     skippedDeleted: 1,
     notKept: 0,
     displaced: 0,
+    deletedByFile: 0,
+  });
+
+  // A file that records a local entry as deleted removes it, and the summary
+  // says so instead of reporting only what it added.
+  assert.deepEqual(summarizeImport([{ id: "new" }], [{ id: "new" }], [{ id: "shared" }], [], ["shared"]), {
+    added: 1,
+    alreadyPresent: 0,
+    skippedDeleted: 0,
+    notKept: 0,
+    displaced: 0,
+    deletedByFile: 1,
   });
 });
 
@@ -235,6 +248,7 @@ test("the import report reflects the cap: dropped imports and displaced entries 
     skippedDeleted: 0,
     notKept: 1,
     displaced: 1,
+    deletedByFile: 0,
   });
 });
 

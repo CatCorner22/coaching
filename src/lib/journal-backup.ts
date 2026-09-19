@@ -77,6 +77,12 @@ export type ImportSummary = {
   notKept: number;
   /** Existing entries the same cap pushed out to make room. */
   displaced: number;
+  /**
+   * Entries on this device the file records as deleted, and which the restore
+   * therefore removed. The screen used to report these as nothing at all,
+   * while promising a restore never deletes.
+   */
+  deletedByFile: number;
 };
 
 /**
@@ -117,7 +123,10 @@ export function summarizeImport(
   }
   let displaced = 0;
   for (const id of have) if (!kept.has(id) && !removed.has(id)) displaced += 1;
-  return { added, alreadyPresent, skippedDeleted, notKept, displaced };
+  const fileRemoved = new Set<string>(incomingRemoved);
+  let deletedByFile = 0;
+  for (const id of have) if (fileRemoved.has(id) && !kept.has(id)) deletedByFile += 1;
+  return { added, alreadyPresent, skippedDeleted, notKept, displaced, deletedByFile };
 }
 
 /** `knotty-journal-2026-08-23.knotty` — sorts by date and says nothing else. */

@@ -643,14 +643,14 @@ test("torch capability races fail closed instead of throwing", () => {
   );
 });
 
-test("torch track lookup races close the stream instead of rejecting", async () => {
+test("torch track lookup races report failure instead of rejecting", async () => {
   let stopped = 0;
   const stream = {
     getVideoTracks: () => { throw new DOMException("ended", "InvalidStateError"); },
     getTracks: () => [{ stop: () => { stopped += 1; } }],
   };
   assert.equal(await setTorch(stream, true), false);
-  assert.equal(stopped, 1);
+  assert.equal(stopped, 0, "a lamp that cannot be addressed does not end the capture");
 });
 
 test("torch application is bounded when device constraints never settle", async (t) => {
@@ -681,22 +681,31 @@ test("torch application is bounded when device constraints never settle", async 
     }],
   };
   assert.equal(await setTorch(stream, true), false);
-  assert.equal(stopped, 1);
+  assert.equal(stopped, 0, "a slow lamp must not tear down a working camera");
 });
 
-test("torch constraint rejection stops the whole stream fail closed", async () => {
+// The lamp is not the capture. An unconfirmed torch used to stop every track,
+// so a phone whose flash simply answers slowly lost the live session it was
+// lighting. Report the toggle failed, drive the lamp back off, keep filming.
+test("torch constraint rejection keeps the camera and drives the lamp off", async () => {
   let stopped = 0;
+  const applied = [];
   const track = {
     stop: () => { stopped += 1; },
     getCapabilities: () => ({ torch: true }),
-    applyConstraints: async () => { throw new DOMException("ended", "InvalidStateError"); },
+    applyConstraints: async (constraints) => {
+      applied.push(constraints);
+      throw new DOMException("ended", "InvalidStateError");
+    },
   };
   const stream = {
     getTracks: () => [track, { stop: () => { stopped += 1; } }],
     getVideoTracks: () => [track],
   };
   assert.equal(await setTorch(stream, true), false);
-  assert.equal(stopped, 2);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(stopped, 0);
+  assert.deepEqual(applied.at(-1), { advanced: [{ torch: false }] });
 });
 
 test("camera capture closes media on both visibility loss and pagehide", () => {

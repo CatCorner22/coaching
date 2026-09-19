@@ -70,3 +70,34 @@ test("wildcard host matching requires a real subdomain", () => {
   assert.equal(matchesHostPattern("example.com", "example.com"), true);
   assert.equal(matchesHostPattern("sub.example.com", "example.com"), false);
 });
+
+test("the dev server trusts the LAN address it binds, and only in development", () => {
+  // npm run dev binds 0.0.0.0:8080 so the phone in the room can load it, but
+  // every AI call from http://192.168.x.x:8080 was refused as an untrusted
+  // origin, with no documentation saying so.
+  for (const origin of ["http://192.168.1.50:8080", "http://10.0.0.4:8080", "http://172.16.3.9:8080"]) {
+    const host = new URL(origin).host;
+    assert.equal(isTrustedAppOrigin(origin, { allowLoopback: true, devHost: host }), true, origin);
+    assert.equal(isTrustedAppOrigin(origin, { devHost: host }), false, `${origin} is not trusted when deployed`);
+    // Another page on the same LAN is not this app, and must not be able to
+    // spend the owner's xAI quota through the dev server.
+    assert.equal(
+      isTrustedAppOrigin(origin, { allowLoopback: true, devHost: "192.168.1.99:8080" }),
+      false,
+      `${origin} from a different LAN host`,
+    );
+    assert.equal(isTrustedAppOrigin(origin, { allowLoopback: true }), false, `${origin} with no host`);
+  }
+  assert.equal(
+    isTrustedAppOrigin("http://nas.local:8080", { allowLoopback: true, devHost: "192.168.1.50:8080" }),
+    false,
+  );
+  assert.equal(
+    isTrustedAppOrigin("http://172.32.0.1:8080", { allowLoopback: true, devHost: "172.32.0.1:8080" }),
+    false,
+  );
+  assert.equal(
+    isTrustedAppOrigin("http://11.0.0.1:8080", { allowLoopback: true, devHost: "11.0.0.1:8080" }),
+    false,
+  );
+});

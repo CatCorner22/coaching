@@ -267,3 +267,75 @@ test("a safeword mentioned inside a sentence does not stop the scene", async () 
     h.restore();
   }
 });
+
+test("a safeword called out in a longer sentence is still heard", async () => {
+  // Two words of slack around the safeword discarded the way it actually gets
+  // called under stress. These are calls, not conversation.
+  const h = harness();
+  try {
+    const { listenForWords } = await import("./listen.ts");
+    const hits: string[] = [];
+    listenForWords(["red", "yellow"], (word) => hits.push(word));
+    await h.flush();
+    const rec = FakeRecognition.instances[0]!;
+
+    for (const utterance of [
+      "red stop now please",
+      "wait wait red red red stop",
+      "ok ok red i need to get out",
+      "stop stop stop red",
+    ]) {
+      hits.length = 0;
+      h.advance(3_000);
+      rec.speak(utterance);
+      await h.flush();
+      assert.deepEqual(hits, ["red"], `"${utterance}" must be heard`);
+    }
+
+    // The rule is "everything around it is call-out language", not "longer is
+    // fine": scene talk of the same length must still stay quiet.
+    for (const sentence of [
+      "the red rope needs to go up on the hook",
+      "her shoulder is going red where the wrap sits",
+      // Built entirely from allowlisted filler, with no stop intent and the
+      // safeword said once: ordinary talk, not a call.
+      "is red on it",
+      "red is on this",
+      "yes it is right on my red",
+    ]) {
+      hits.length = 0;
+      h.advance(3_000);
+      rec.speak(sentence);
+      await h.flush();
+      assert.deepEqual(hits, [], `"${sentence}" must not stop the scene`);
+    }
+  } finally {
+    h.restore();
+  }
+});
+
+test("a multi-word safeword said once is not a repeat", async () => {
+  const h = harness();
+  try {
+    const { listenForWords } = await import("./listen.ts");
+    const hits: string[] = [];
+    listenForWords(["banana split"], (word) => hits.push(word));
+    await h.flush();
+    const rec = FakeRecognition.instances[0]!;
+
+    // Its two component words are not two utterances of the safeword.
+    rec.speak("is banana split on it");
+    await h.flush();
+    assert.deepEqual(hits, [], "a single mention inside filler must stay quiet");
+
+    for (const utterance of ["banana split banana split", "ok banana split stop"]) {
+      hits.length = 0;
+      h.advance(3_000);
+      rec.speak(utterance);
+      await h.flush();
+      assert.deepEqual(hits, ["banana split"], `"${utterance}" must be heard`);
+    }
+  } finally {
+    h.restore();
+  }
+});

@@ -26,7 +26,7 @@ import {
   requiresStepConfirmation,
 } from "@/lib/kb";
 import { tieShape, tieShapeBlurb, tieShapeLabel } from "@/lib/kb/tie-factories";
-import { missingTieLimits } from "@/lib/studio/negotiation";
+import { missingStepLimits, missingTieLimits } from "@/lib/studio/negotiation";
 import { coachVoiceLabel } from "@/lib/voice/coach-profile";
 import { useLearnProgress } from "@/lib/stores/learn-progress";
 import { useNegotiate } from "@/lib/stores/negotiate";
@@ -106,6 +106,10 @@ function TiePage() {
   // in. Fail-closed: an unhydrated store blocks like an unagreed limit does.
   const missingLimits = shape === "guided" ? missingTieLimits(slug, negotiationItems) : [];
   const limitsAgreed = missingLimits.length === 0;
+  // Karada's optional pass between the legs is a second, separate limit that
+  // the step's own copy insists on and nothing used to check.
+  const missingStep = missingStepLimits(s, negotiationItems);
+  const stepAgreed = missingStep.length === 0;
   const voiceLabel = coachVoiceLabel(cloudVoice);
   const bottomLines = bulletsOrFallback(s.bottomBullets, s.bottom);
   // Shared builder, not an inline literal: the server's reviewed-speech
@@ -253,6 +257,32 @@ function TiePage() {
             }
           />
 
+          {!stepAgreed ? (
+            <section className="rounded-lg border border-warn/40 bg-warn/10 px-4 py-5 sm:px-5">
+              <h3 className="font-display text-xl text-fg">
+                Step {step + 1} waits for its own yes
+              </h3>
+              <p className="mt-2 text-base leading-relaxed text-muted">
+                {s.title.replace(/^\d+\s*·\s*/u, "")} needs a limit the rest of this tie did not
+                cover. Skip it and the tie still works; the next step carries on from here.
+              </p>
+              <ul className="mt-3 space-y-1.5">
+                {missingStep.map((limit) => (
+                  <li key={limit.id} className="flex items-center gap-2 text-base text-fg">
+                    <span className="size-1.5 shrink-0 rounded-full bg-warn" aria-hidden />
+                    {limit.label}
+                  </li>
+                ))}
+              </ul>
+              <Link
+                to="/negotiate"
+                className="mt-4 inline-flex items-center gap-2 rounded-lg border border-accent/50 bg-accent/10 px-4 py-2 font-medium text-accent transition-colors hover:border-accent"
+              >
+                Open the negotiation page
+                <span aria-hidden>→</span>
+              </Link>
+            </section>
+          ) : (
           <StepCard
             index={step}
             total={tie.steps.length}
@@ -270,6 +300,7 @@ function TiePage() {
             media={stepFigure}
             onSpeak={() => void playCoachVoice(s.speak, cloudVoice, { reviewed: true })}
           />
+          )}
 
           <aside className="rounded-lg border border-border bg-surface px-4 py-4 sm:px-5">
             <h3 className="text-base font-medium text-fg">Remember</h3>
@@ -288,8 +319,8 @@ function TiePage() {
             total={tie.steps.length}
             onBack={() => setStep((n) => n - 1)}
             onNext={goNext}
-            nextLabel="Next section"
-            canAdvance={!mustConfirm || (confirm.didDo && confirm.didCheck)}
+            nextLabel={stepAgreed ? "Next section" : "Skip this step"}
+            canAdvance={!stepAgreed || !mustConfirm || (confirm.didDo && confirm.didCheck)}
           />
         </>}
 

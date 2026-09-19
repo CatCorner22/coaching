@@ -8,6 +8,24 @@ export const LOCAL_DEV_ORIGINS = [
 ] as const;
 
 /**
+ * A private-network host the dev server itself is reachable on.
+ *
+ * `npm run dev` binds 0.0.0.0:8080, so the phone in the room loads the app over
+ * the LAN address and every AI call was refused as an untrusted origin.
+ * Development only: a deployed app gets its origin from BETTER_AUTH_URL.
+ */
+export function isPrivateNetworkHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1") return true;
+  if (host.endsWith(".local")) return true;
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!v4) return false;
+  const [a, b] = [Number(v4[1]), Number(v4[2])];
+  if ([a, b, Number(v4[3]), Number(v4[4])].some((part) => part > 255)) return false;
+  return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+}
+
+/**
  * Wildcard host match. The leading dot matters: matching a bare suffix would
  * accept `evilgrok-sandbox.com` for the pattern `*.grok-sandbox.com`.
  */
@@ -45,6 +63,14 @@ export function isTrustedAppOrigin(
     configuredOrigin?: string | null;
     allowLoopback?: boolean;
     /**
+     * The `Host` this request was served on. A private-network origin is
+     * accepted only when it names that same host: `npm run dev` binds
+     * 0.0.0.0:8080 so the phone in the room can load the app, but the whole
+     * private range is not the app — without this, any other LAN page could
+     * spend the owner's xAI quota through the dev server.
+     */
+    devHost?: string | null;
+    /**
      * Accept the shared live-preview host patterns. Only the caller knows
      * whether this deployment actually serves the live preview (the preview
      * OAuth client secret is configured, or this is the dev server).
@@ -77,9 +103,18 @@ export function isTrustedAppOrigin(
     }
   }
 
-  // Loopback is a development convenience and must never widen a deployed app.
-  if (options.allowLoopback && (LOCAL_DEV_ORIGINS as readonly string[]).includes(url.origin)) {
-    return true;
+  // Loopback and the LAN are a development convenience and must never widen a
+  // deployed app.
+  if (options.allowLoopback) {
+    if ((LOCAL_DEV_ORIGINS as readonly string[]).includes(url.origin)) return true;
+    const devHost = options.devHost?.trim().toLowerCase();
+    if (
+      isPrivateNetworkHostname(url.hostname) &&
+      devHost &&
+      url.host.toLowerCase() === devHost
+    ) {
+      return true;
+    }
   }
 
   return false;

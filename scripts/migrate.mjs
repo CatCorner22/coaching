@@ -22,7 +22,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { pendingMigrations } from "./migration-plan.mjs";
-import { isMainModule } from "./with-app-env.mjs";
+import { AUTH_FLAG_DEFAULTED, isMainModule } from "./with-app-env.mjs";
 
 const DEFAULT_MIGRATIONS_DIR = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -179,20 +179,29 @@ export async function runMigrations({
  * function — so a silent exit-0 skip here deployed an unmigrated auth schema
  * whose failures only surfaced as runtime 500s on auth requests.
  */
-export function missingDatabaseUrlDisposition(env) {
-  const authOn = env.VITE_AUTH_ENABLED?.trim() !== "false";
-  if (env.NODE_ENV === "production" && authOn) return "fail";
-  return "skip";
+export function missingDatabaseUrlDisposition(env, argv = []) {
+  // Skipping is now something you ask for. Inferring it from NODE_ENV meant a
+  // release step that simply forgot to set NODE_ENV=production got a green
+  // "skipping" line and an unmigrated database.
+  if (argv.includes("--allow-skip")) return "skip";
+  // Only an operator's own no-auth flag authorizes a skip. `npm run db:migrate`
+  // goes through scripts/with-app-env.mjs, whose standalone default is auth
+  // off — accepting that would let a release that merely forgot DATABASE_URL
+  // exit 0 with the auth schema unmigrated.
+  const authFlagDefaulted = env[AUTH_FLAG_DEFAULTED] === "1";
+  if (!authFlagDefaulted && env.VITE_AUTH_ENABLED?.trim() === "false") return "skip";
+  return "fail";
 }
 
 async function main() {
   const databaseUrl = process.env.DATABASE_URL?.trim();
   if (!databaseUrl) {
-    if (missingDatabaseUrlDisposition(process.env) === "fail") {
+    if (missingDatabaseUrlDisposition(process.env, process.argv.slice(2)) === "fail") {
       console.error(
-        "[migrate] DATABASE_URL is not set, but this is a production, auth-enabled release — " +
-          "the auth schema would go unmigrated and every auth request would fail at runtime. " +
-          "Set DATABASE_URL in the release environment, or set VITE_AUTH_ENABLED=false for the no-auth shape.",
+        "[migrate] DATABASE_URL is not set, so nothing was migrated — an auth-enabled deployment " +
+          "would then fail every auth request at runtime with a 500. Set DATABASE_URL in the " +
+          "release environment, run with VITE_AUTH_ENABLED=false for the no-auth shape, or pass " +
+          "--allow-skip to say the skip is deliberate.",
       );
       process.exitCode = 1;
       return;

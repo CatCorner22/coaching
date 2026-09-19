@@ -116,3 +116,84 @@ test("yellow is information, not a stop", () => {
   assert.equal(useSession.getState().yellowAt, null);
   assert.equal(useSession.getState().stopReason, undefined);
 });
+
+test("a stop called late in a long session survives a reload", async () => {
+  const { withinSessionWindow } = await import("./session.ts");
+  const longAgo = Date.now() - 13 * 60 * 60_000;
+  // Judging the snapshot by its start time alone expired a stop that was
+  // called seconds ago, so a reload came back unstopped mid-scene.
+  assert.equal(
+    withinSessionWindow({ startedAt: longAgo, lastCheckAt: longAgo }),
+    false,
+  );
+  assert.equal(
+    withinSessionWindow({
+      startedAt: longAgo,
+      lastCheckAt: longAgo,
+      stopped: true,
+      stopReason: "safeword",
+      stoppedAt: Date.now() - 5_000,
+    }),
+    true,
+  );
+});
+
+test("a write that storage refused is retried, not cached as saved", async () => {
+  const { unchangedWriteSkippingStorage } = await import("./session.ts");
+  const { resetPersistFailure } = await import("./persist.ts");
+  resetPersistFailure();
+  let blocked = true;
+  const written: string[] = [];
+  const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: () => null,
+      setItem: (_name: string, value: string) => {
+        if (blocked) throw new DOMException("quota", "QuotaExceededError");
+        written.push(value);
+      },
+      removeItem: () => undefined,
+    },
+  });
+  try {
+    const storage = unchangedWriteSkippingStorage<{ state: { stopped: boolean } }>();
+    const payload = { state: { stopped: true }, version: 0 } as never;
+    storage.setItem("knotty-session", payload);
+    assert.deepEqual(written, []);
+    // Same payload, storage recovered: skipping it because the identical write
+    // was "already made" meant a called stop never reached disk.
+    blocked = false;
+    storage.setItem("knotty-session", payload);
+    assert.equal(written.length, 1);
+    // A genuinely unchanged write after a successful one is still skipped.
+    storage.setItem("knotty-session", payload);
+    assert.equal(written.length, 1);
+  } finally {
+    if (original) Object.defineProperty(globalThis, "localStorage", original);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+    resetPersistFailure();
+  }
+});
+
+test("a stale tab cannot erase a stop another tab called", async () => {
+  const { mergeSessionSafety } = await import("./session.ts");
+  const stopped = { stopped: true, stopReason: "safeword", stoppedAt: 5_000, startedAt: 1_000 };
+
+  // The stale tab is still ticking a running session and writes the whole blob.
+  const stale = { stopped: false, stopReason: undefined, stoppedAt: null, startedAt: 1_000 };
+  const merged = mergeSessionSafety(stale, stopped);
+  assert.equal(merged.stopped, true);
+  assert.equal(merged.stopReason, "safeword");
+  assert.equal(merged.stoppedAt, 5_000);
+
+  // A session that provably began after the stop is a restart, and clears it.
+  const restarted = { stopped: false, stopReason: undefined, stoppedAt: null, startedAt: 9_000 };
+  assert.equal(mergeSessionSafety(restarted, stopped).stopped, false);
+
+  // A tab holding the same stop writes its own payload untouched.
+  assert.equal(mergeSessionSafety(stopped, stopped), stopped);
+
+  // Nothing stored, nothing to protect.
+  assert.equal(mergeSessionSafety(stale, null), stale);
+});

@@ -7,7 +7,13 @@ import { CoachPanel } from "@/components/coach-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { analyzeRope } from "@/lib/ai/analyze";
-import { analyzeErrorMessage } from "@/lib/ai/analyze-errors";
+import {
+  analyzeErrorMessage,
+  analyzeThrownBeforeDispatch,
+  analyzeThrownMessage,
+} from "@/lib/ai/analyze-errors";
+import { aiVisionAvailability, type AiVisionAvailability } from "@/lib/ai/availability";
+import { providerFailureMessage } from "@/lib/ai/provider-failure";
 import { captureReadinessForAnalyze } from "@/lib/camera/capture-readiness";
 import { authEnabled } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
@@ -20,6 +26,8 @@ import { useSession } from "@/lib/stores/session";
 import { useSettings } from "@/lib/stores/settings";
 import {
   buildStudioNegotiationPolicy,
+  missingStepLimits,
+  policyRestrictionIncreased,
   studioPolicySignature,
 } from "@/lib/studio/negotiation";
 import { MAX_HARD_NO_LENGTH } from "@/lib/negotiation-bounds";
@@ -89,6 +97,7 @@ function StudioPage() {
   const {
     operationalLimits,
     negotiationKey,
+    mediaBlocked,
     voiceBlocked,
   } = negotiationPolicy;
   const captureContextKey = `${tieSlug ?? ""}|${stepIndex}|${furnitureSlug ?? ""}|${negotiationKey}`;
@@ -100,6 +109,8 @@ function StudioPage() {
   const [analysisConsumed, setAnalysisConsumed] = useState(false);
   const [triage, setTriage] = useState<TriageState>("none");
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [providerFailure, setProviderFailure] = useState<string | null>(null);
+  const [cloudVision, setCloudVision] = useState<AiVisionAvailability | null>(null);
   const [refusal, setRefusal] = useState(false);
   const [savedReportRevision, setSavedReportRevision] = useState<string | null>(null);
   const [savedEntryId, setSavedEntryId] = useState<string | null>(null);
@@ -118,7 +129,38 @@ function StudioPage() {
   const tieBlocked = negotiationPolicy.isTieBlocked(tieSlug);
   const furnitureBlocked = negotiationPolicy.isFurnitureBlocked(furnitureSlug);
   const studioVoice = settings.voice && !voiceBlocked;
-  const cameraGateReason = stopped ? "session-stopped" : "enabled";
+  const currentStep = tie?.steps[stepIndex];
+  // A step can carry its own limit on top of its tie's — karada's optional pass
+  // between the legs needs the `crotch` row, not just `torso`. The lesson page
+  // enforced this and Studio did not, so the step was still shown and spoken.
+  // Fail closed until the negotiation store has hydrated.
+  const missingStepRows = missingStepLimits(currentStep, items);
+  const stepBlocked =
+    (currentStep?.limitIds?.length ?? 0) > 0 && (!negotiationReady || missingStepRows.length > 0);
+  // The `photos` limit gates every lens, this one included. Fail closed until
+  // the persisted negotiation snapshot has hydrated: the pre-hydration store is
+  // the empty default, which would read as "nothing agreed" and then flip open,
+  // or — worse, if the default ever gains a yes — open before the real answer
+  // arrives.
+  const cameraGateReason = stopped
+    ? "session-stopped"
+    : !negotiationReady || mediaBlocked
+      ? "photos-not-agreed"
+      : "enabled";
+
+  useEffect(() => {
+    let live = true;
+    void aiVisionAvailability()
+      .then((result) => {
+        if (live) setCloudVision(result);
+      })
+      .catch(() => {
+        if (live) setCloudVision(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
 
   useEffect(() => {
     const api = useNegotiate.persist;
@@ -129,9 +171,16 @@ function StudioPage() {
   }, []);
 
   useEffect(() => {
-    const signature = () =>
-      studioPolicySignature(useNegotiate.getState().items, useSettings.getState());
+    const snapshot = () => ({
+      items: useNegotiate.getState().items,
+      flags: useSettings.getState(),
+    });
+    const signature = () => {
+      const { items, flags } = snapshot();
+      return studioPolicySignature(items, flags);
+    };
     let lastSignature = signature();
+    let lastSnapshot = snapshot();
     let pending: ReturnType<typeof setTimeout> | null = null;
     const invalidateAcrossTabs = (event: StorageEvent) => {
       if (event.key !== null && event.key !== "knotty-negotiate" && event.key !== "knotty-settings")
@@ -145,11 +194,27 @@ function StudioPage() {
         pending = null;
         const next = signature();
         if (next === lastSignature) return;
+        const previousSnapshot = lastSnapshot;
+        const nextSnapshot = snapshot();
         lastSignature = next;
-        // Never reload out of a stop. The session store is memory-only, so a
-        // reload clears `stopped` along with the red alert, the report and the
-        // triage answer, and the page comes back looking like a fresh, running
-        // session. A limit revoked in another tab must never do that: a stopped
+        lastSnapshot = nextSnapshot;
+        // Only a change that takes something away justifies throwing the page
+        // away with it. An approval added in the other tab re-derives through
+        // the store subscription this route already has, so reloading for it
+        // only destroys a running scene's clock, step and pending capture.
+        if (
+          !policyRestrictionIncreased(
+            previousSnapshot.items,
+            nextSnapshot.items,
+            previousSnapshot.flags,
+            nextSnapshot.flags,
+          )
+        )
+          return;
+        // Never reload out of a stop. The persisted session keeps `stopped`,
+        // but the red alert's report and the triage answer are route state and
+        // a reload discards them mid-stop. A limit revoked in another tab must
+        // never do that: a stopped
         // session already blocks every action, which is stricter than anything
         // the new policy could impose, and the gating re-derives from the store
         // on the next render once the session is reset.
@@ -260,6 +325,7 @@ function StudioPage() {
       setReport(null);
       setObservationReport(null);
       setModelStatus("not_requested");
+      setProviderFailure(null);
       setAnalysisConsumed(false);
       setTriage("none");
     }
@@ -433,6 +499,11 @@ function StudioPage() {
       )
         return;
       if (res.ok) {
+        setProviderFailure(
+          res.providerFailure
+            ? providerFailureMessage(res.providerFailure, res.retryAfterMs)
+            : null,
+        );
         setRefusal(res.refusal);
         setReport(res.report);
         setObservationReport(res.observationReport);
@@ -451,6 +522,7 @@ function StudioPage() {
           void playCoachVoice(res.report.final.speak, true);
         }
       } else {
+        setProviderFailure(null);
         setAnalysisError(analyzeErrorMessage(res));
         // Only a server-declared retryable admission denial before durable
         // reservation can reopen this batch. Never reopen after reservation,
@@ -461,9 +533,13 @@ function StudioPage() {
       }
     } catch (cause) {
       if (mountedRef.current && request === analysisRequestRef.current) {
-        setAnalysisError(
-          cause instanceof Error ? cause.message : "The analysis could not be completed.",
-        );
+        // A thrown failure carries no server verdict, so the batch stays
+        // closed: it may already have been reserved. Only the message can
+        // improve, and it must never be a raw framework or validator string.
+        setAnalysisError(analyzeThrownMessage(cause));
+        // The one exception: the server tags request-validation failures,
+        // which run before the handler and so before any reservation.
+        if (analyzeThrownBeforeDispatch(cause)) setAnalysisConsumed(false);
       }
     } finally {
       if (mountedRef.current && request === analysisRequestRef.current) setPending(false);
@@ -476,6 +552,7 @@ function StudioPage() {
     captureContextAtCommitRef.current = currentContextRef.current;
     setPending(false);
     setAnalysisError(null);
+    setProviderFailure(null);
     setRefusal(false);
     setReport(null);
     setObservationReport(null);
@@ -493,6 +570,7 @@ function StudioPage() {
     captureContextAtCommitRef.current = null;
     setPending(false);
     setAnalysisError(null);
+    setProviderFailure(null);
     setRefusal(false);
     setReport(null);
     setObservationReport(null);
@@ -510,10 +588,10 @@ function StudioPage() {
     }
     if (spoke.current === stepIndex) return;
     spoke.current = stepIndex;
-    if (stopped) return;
+    if (stopped || stepBlocked) return;
     const line = tie?.steps[stepIndex]?.speak;
     if (line && studioVoice && !micArmed) void playCoachVoice(line, studioVoice);
-  }, [stepIndex, stopped, tie, studioVoice, micArmed]);
+  }, [stepIndex, stopped, stepBlocked, tie, studioVoice, micArmed]);
 
   const captureReadiness = capture ? captureReadinessForAnalyze(capture.quality) : null;
 
@@ -607,6 +685,20 @@ function StudioPage() {
         <div className="flex items-center gap-3 text-sm">
           <Badge variant="danger">{settings.safeword}</Badge>
           <SessionClock limitSec={settings.circulationMins * 60} />
+          {/* The clock starts the moment the page opens, so time spent reading
+              or laying out rope was already on it when the tie began. */}
+          {!stopped && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                startSession();
+                useSession.getState().checked();
+              }}
+            >
+              Restart clock
+            </Button>
+          )}
           {/* Same session, same store — this only strips the chrome so the
               clock and the stop control are readable at arm's length. */}
           <Button asChild variant="outline" size="sm">
@@ -615,10 +707,20 @@ function StudioPage() {
         </div>
       </div>
       {operationalLimits.length > 0 && (
-        <p className="mt-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger-text">
-          Not approved (no or unresolved maybe):{" "}
-          {operationalLimits.map((item) => `${item.label} (${item.rank})`).join(" · ")}
-        </p>
+        // Everything starts at no, so this listed forty red lines in one
+        // paragraph on first run and nothing in it could be read or acted on.
+        <details className="mt-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger-text">
+          <summary className="cursor-pointer">
+            {operationalLimits.length} not approved (no or unresolved maybe) — this session stays
+            inside what you have agreed.{" "}
+            <Link to="/negotiate" className="underline underline-offset-2">
+              Open Negotiate
+            </Link>
+          </summary>
+          <p className="mt-2 leading-relaxed">
+            {operationalLimits.map((item) => `${item.label} (${item.rank})`).join(" · ")}
+          </p>
+        </details>
       )}
       {settings.listen && !stopped && (
         <div className="mt-3 rounded-md border border-border bg-surface px-3 py-2 text-xs text-muted">
@@ -742,9 +844,9 @@ function StudioPage() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  disabled={stopped || !studioVoice}
+                  disabled={stopped || !studioVoice || stepBlocked}
                   onClick={() => {
-                    if (useSession.getState().stopped || !studioVoice) return;
+                    if (useSession.getState().stopped || !studioVoice || stepBlocked) return;
                     micArmedRef.current = false;
                     setMicArmed(false);
                     setMicStatus("idle");
@@ -755,24 +857,51 @@ function StudioPage() {
                   {voiceBlocked ? "Speak step — not approved" : "Speak step"}
                 </Button>
               </div>
-              <p className="mt-2 text-sm leading-relaxed text-fg">{tie.steps[stepIndex]?.rigger}</p>
-              <p className="mt-1 text-xs text-muted">Check. {tie.steps[stepIndex]?.check}</p>
-              <div className="mx-auto mt-3 h-64 w-36">
-                <RopeFigure
-                  pose={tie.steps[stepIndex]?.expected.pose}
-                  view={tie.steps[stepIndex]?.expected.view}
-                  wraps={tie.steps.slice(0, stepIndex + 1).flatMap((x) => x.wraps)}
-                  nerves={tie.nerves}
-                  compact
-                  className="text-muted"
-                />
-              </div>
+              {stepBlocked ? (
+                <div className="mt-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-3 text-sm">
+                  <p className="font-medium text-fg">This step needs its own yes.</p>
+                  <p className="mt-1 leading-relaxed text-muted">
+                    {missingStepRows.length > 0
+                      ? `${missingStepRows.map((row) => row.label).join(", ")} is not agreed, so this step is not shown or spoken here. Skip it with Next, or set it to yes on the negotiation page together.`
+                      : "Loading the negotiated limits for this step."}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p className="mt-2 text-sm leading-relaxed text-fg">
+                    {tie.steps[stepIndex]?.rigger}
+                  </p>
+                  <p className="mt-1 text-xs text-muted">Check. {tie.steps[stepIndex]?.check}</p>
+                  <div className="mx-auto mt-3 h-64 w-36">
+                    <RopeFigure
+                      pose={tie.steps[stepIndex]?.expected.pose}
+                      view={tie.steps[stepIndex]?.expected.view}
+                      wraps={tie.steps.slice(0, stepIndex + 1).flatMap((x) => x.wraps)}
+                      nerves={tie.nerves}
+                      compact
+                      className="text-muted"
+                    />
+                  </div>
+                </>
+              )}
               {det && (
                 <p className="text-center text-xs tabular-nums text-subtle">
                   Image heuristic marked {det.wrapCount} possible horizontal rope-like feature
                   {det.wrapCount === 1 ? "" : "s"}. This does not validate the selected tie or step.
                 </p>
               )}
+            </div>
+          )}
+          {cameraGateReason === "photos-not-agreed" && (
+            <div className="mt-4 rounded-lg border border-warn/40 bg-warn/10 px-3 py-3 text-sm">
+              <p className="font-medium text-fg">The camera waits on a negotiated limit.</p>
+              <p className="mt-1 leading-relaxed text-muted">
+                Photos and video for coaching is not agreed yet, so no lens opens here — the
+                practice cam on a lesson page waits on the same line.
+              </p>
+              <Button asChild size="sm" variant="outline" className="mt-2">
+                <Link to="/negotiate">Open the negotiated limits</Link>
+              </Button>
             </div>
           )}
           <div className="mt-4">
@@ -809,10 +938,18 @@ function StudioPage() {
             refusal={refusal}
             halted={stopped}
             captureQuality={capture && captureMatchesContext ? capture.quality : null}
+            providerNote={captureMatchesContext ? providerFailure : null}
           />
           {analysisError && (
             <p className="text-sm text-danger-text" role="alert">
               {analysisError}
+            </p>
+          )}
+          {cloudVision && !cloudVision.configured && (
+            <p className="text-xs text-muted">
+              {cloudVision.reason === "no_database"
+                ? "This deployment has no database, so a batch cannot be reserved and nothing can be sent for cloud analysis. Stills stay on this device and you get the local read only."
+                : "Cloud analysis is switched off for this app, so stills stay on this device and you get the local read only."}
             </p>
           )}
           <div className="flex flex-wrap gap-2">
@@ -845,7 +982,7 @@ function StudioPage() {
             <Button
               variant="danger"
               aria-label={`Stop the session now (safeword: ${settings.safeword})`}
-              onClick={() => stopSession("manual")}
+              onClick={() => stopSession("safeword")}
             >
               {settings.safeword}
             </Button>

@@ -1,3 +1,4 @@
+import { MAX_NEGOTIATION_ITEMS } from "@/lib/negotiation-bounds";
 import { createJSONStorage, type PersistStorage } from "zustand/middleware";
 
 type SyncStateStorage = {
@@ -17,17 +18,23 @@ type SyncStateStorage = {
  */
 export type PersistFailure = { key: string; reason: "quota" | "blocked" };
 
-let lastPersistFailure: PersistFailure | null = null;
+/**
+ * Outstanding failures, per storage key. Recovery is per key: a settings write
+ * landing says nothing about whether the negotiation blob was ever saved.
+ */
+const outstandingFailures = new Map<string, PersistFailure>();
 const persistFailureListeners = new Set<(failure: PersistFailure) => void>();
+const persistStatusListeners = new Set<(failure: PersistFailure | null) => void>();
 
-function reportPersistFailure(key: string, error: unknown) {
-  const name = (error as { name?: string })?.name ?? "";
-  const failure: PersistFailure = {
-    key,
-    reason: /quota|QuotaExceeded|NS_ERROR_DOM_QUOTA/i.test(name) ? "quota" : "blocked",
-  };
-  lastPersistFailure = failure;
-  for (const listener of persistFailureListeners) {
+/** The most recently reported failure that is still outstanding. */
+function currentFailure(): PersistFailure | null {
+  let latest: PersistFailure | null = null;
+  for (const failure of outstandingFailures.values()) latest = failure;
+  return latest;
+}
+
+function announcePersistStatus(failure: PersistFailure | null) {
+  for (const listener of persistStatusListeners) {
     try {
       listener(failure);
     } catch {
@@ -36,9 +43,45 @@ function reportPersistFailure(key: string, error: unknown) {
   }
 }
 
+function reportPersistFailure(key: string, error: unknown) {
+  const name = (error as { name?: string })?.name ?? "";
+  const failure: PersistFailure = {
+    key,
+    reason: /quota|QuotaExceeded|NS_ERROR_DOM_QUOTA/i.test(name) ? "quota" : "blocked",
+  };
+  // Re-insert so this key sorts last: the banner names the newest problem.
+  outstandingFailures.delete(key);
+  outstandingFailures.set(key, failure);
+  for (const listener of persistFailureListeners) {
+    try {
+      listener(failure);
+    } catch {
+      // A broken listener must not stop the others from hearing about it.
+    }
+  }
+  announcePersistStatus(failure);
+}
+
+/**
+ * A write landed.
+ *
+ * Without this the banner was permanent: one transient quota error left every
+ * later save looking unsaved, which trains people to ignore the one warning
+ * that matters.
+ */
+function notePersistSuccess(key: string) {
+  if (!outstandingFailures.delete(key)) return;
+  announcePersistStatus(currentFailure());
+}
+
 /** Most recent failed write, or null if every write so far has landed. */
 export function getPersistFailure(): PersistFailure | null {
-  return lastPersistFailure;
+  return currentFailure();
+}
+
+/** Whether the last write to this specific key failed. */
+export function persistFailureFor(key: string): PersistFailure | null {
+  return outstandingFailures.get(key) ?? null;
 }
 
 /** Subscribe to failed writes. Returns an unsubscribe function. */
@@ -47,14 +90,33 @@ export function onPersistFailure(listener: (failure: PersistFailure) => void): (
   return () => persistFailureListeners.delete(listener);
 }
 
-/** Test seam. */
-export function resetPersistFailure() {
-  lastPersistFailure = null;
+/**
+ * Subscribe to whether writes are landing, failures and recoveries alike.
+ * Returns an unsubscribe function.
+ */
+export function onPersistStatus(
+  listener: (failure: PersistFailure | null) => void,
+): () => void {
+  persistStatusListeners.add(listener);
+  return () => persistStatusListeners.delete(listener);
 }
 
+/** Test seam. */
+export function resetPersistFailure() {
+  outstandingFailures.clear();
+}
+
+/**
+ * Storage that cannot store.
+ *
+ * A browser with storage switched off entirely (private mode, site data
+ * blocked) never reaches a throwing setItem — `localStorage` is simply absent —
+ * so the app used to run write-only-to-memory with nothing on screen saying so.
+ * Every write here is reported as blocked, which is exactly what it is.
+ */
 const UNAVAILABLE_STORAGE: SyncStateStorage = {
   getItem: () => null,
-  setItem: () => undefined,
+  setItem: (name) => reportPersistFailure(name, { name: "StorageUnavailable" }),
   removeItem: () => undefined,
 };
 
@@ -74,6 +136,7 @@ export function safeBrowserStorage(): SyncStateStorage {
       setItem: (name, value) => {
         try {
           storage.setItem(name, value);
+          notePersistSuccess(name);
         } catch (error) {
           // The live store keeps working from memory, but the change is NOT
           // saved. Say so rather than letting the tab look correct until reload.
@@ -125,23 +188,50 @@ export function safeJsonStorage<State>(): PersistStorage<State> {
  * outcome independent of write order, while still allowing a later
  * re-approval to win.
  */
-export function negotiationMergingStorage<State>(name: string): PersistStorage<State> {
+export function negotiationMergingStorage<State>(
+  name: string,
+  /**
+   * Called after a write whose merge overrode what the writing tab held —
+   * i.e. storage already knew something this tab does not. The merge protected
+   * storage; without this the writing tab kept offering, from memory, a tie or
+   * a camera the persisted policy had already revoked, until something else
+   * happened to rehydrate it.
+   */
+  onStoredPolicyDiverged?: () => void,
+): PersistStorage<State> {
   const base = safeJsonStorage<State>();
   return {
     ...base,
     setItem: (key, value) => {
       if (key !== name) return base.setItem(key, value);
+      let diverged = false;
       try {
         const raw = safeBrowserStorage().getItem(key);
         if (raw) {
-          type Blob = { state?: { items?: unknown; notes?: unknown; notesUpdatedAt?: unknown } };
+          type Blob = {
+            state?: {
+              items?: unknown;
+              notes?: unknown;
+              notesUpdatedAt?: unknown;
+              removedIds?: unknown;
+            };
+          };
           const existing = JSON.parse(raw) as Blob;
           const incoming = value as Blob;
+          // A row removed in either tab stays removed: the item union below
+          // keeps anything present on one side, so without the tombstones a
+          // deleted custom line reappeared on the next write from the other tab.
+          const removedIds = unionRemovedIds(
+            incoming?.state?.removedIds,
+            existing?.state?.removedIds,
+          );
+          (value as { state: { removedIds: unknown } }).state.removedIds = removedIds;
           const merged = mergeNegotiationItemsByStamp(
             incoming?.state?.items,
             existing?.state?.items,
-          );
+          )?.filter((item) => !removedIds.includes(String((item as StampedItem).id)));
           if (merged) {
+            diverged = negotiationItemsDiffer(incoming?.state?.items, merged);
             (value as { state: { items: unknown } }).state.items = merged;
           }
           // Notes were whole-blob last-writer-wins, so a stale tab erased what
@@ -164,9 +254,52 @@ export function negotiationMergingStorage<State>(name: string): PersistStorage<S
       } catch {
         // A corrupt existing blob is simply replaced by the incoming one.
       }
-      return base.setItem(key, value);
+      const result = base.setItem(key, value);
+      if (diverged && onStoredPolicyDiverged) {
+        try {
+          onStoredPolicyDiverged();
+        } catch {
+          // Self-repair is best effort; the stored policy is already correct.
+        }
+      }
+      return result;
     },
   };
+}
+
+/** Removal tombstones for custom negotiation rows, from both tabs. */
+export function unionRemovedIds(...sides: unknown[]): string[] {
+  const ids = new Set<string>();
+  for (const side of sides) {
+    if (!Array.isArray(side)) continue;
+    for (const id of side) {
+      if (typeof id === "string" && id) {
+        // Re-insert so the newest deletion sorts last: the cap below keeps the
+        // most recent tombstones, and dropping a fresh one lets a stale tab
+        // resurrect a limit the couple just removed.
+        const bounded = id.slice(0, 80);
+        ids.delete(bounded);
+        ids.add(bounded);
+      }
+    }
+  }
+  return [...ids].slice(-MERGED_ITEM_CAP);
+}
+
+/** Whether the merge changed any rank the writing tab was holding. */
+function negotiationItemsDiffer(incoming: unknown, merged: readonly unknown[]): boolean {
+  if (!Array.isArray(incoming)) return true;
+  if (incoming.length !== merged.length) return true;
+  const byId = new Map<string, string>();
+  for (const item of incoming as StampedItem[]) {
+    if (item && typeof item.id === "string") byId.set(item.id, String(item.rank));
+  }
+  return (merged as StampedItem[]).some(
+    (item) =>
+      !!item &&
+      typeof item.id === "string" &&
+      (!byId.has(item.id) || byId.get(item.id) !== String(item.rank)),
+  );
 }
 
 type StampedItem = { id?: unknown; rank?: unknown; updatedAt?: unknown };
@@ -260,7 +393,11 @@ export function mergeNegotiationItemsByStamp(
   return merged;
 }
 
-const MERGED_ITEM_CAP = 80;
+// Matches what the read path keeps. When the write cap was the larger of the
+// two, rows the merge deliberately preserved were dropped on the next
+// rehydrate, so the merger's promise that neither tab loses a row was not
+// honoured end to end.
+const MERGED_ITEM_CAP = MAX_NEGOTIATION_ITEMS;
 
 /**
  * A stamp strictly greater than every stamp already recorded, so ordering does
@@ -304,8 +441,10 @@ export function mergeJournalEntriesById(
 ): { entries: unknown[]; removedIds: string[] } | null {
   if (!Array.isArray(incoming) || !Array.isArray(existing)) return null;
 
+  // Existing first, incoming last: the cap below keeps the tail, and dropping
+  // the file's fresh tombstones let a deletion undo itself on the next reload.
   const removed = new Set<string>();
-  for (const list of [incomingRemoved, existingRemoved]) {
+  for (const list of [existingRemoved, incomingRemoved]) {
     if (!Array.isArray(list)) continue;
     for (const id of list) if (typeof id === "string") removed.add(id);
   }
@@ -328,9 +467,19 @@ export function mergeJournalEntriesById(
   const merged = [...byId.values(), ...anonymous];
   // Newest first, matching how the store writes them.
   merged.sort((a, b) => Number((b as { at?: unknown }).at ?? 0) - Number((a as { at?: unknown }).at ?? 0));
+  // A tombstone whose entry is still present on one side is the only thing
+  // suppressing that entry, so it is evicted last.
+  const contested = new Set<string>();
+  for (const list of [incoming, existing]) {
+    for (const entry of list as IdentifiedEntry[]) {
+      const id = entry && typeof entry === "object" ? entry.id : undefined;
+      if (typeof id === "string" && removed.has(id)) contested.add(id);
+    }
+  }
+  const ordered = [...removed].filter((id) => !contested.has(id)).concat([...contested]);
   return {
     entries: merged.slice(0, JOURNAL_ENTRY_CAP),
-    removedIds: [...removed].slice(-JOURNAL_TOMBSTONE_CAP),
+    removedIds: ordered.slice(-JOURNAL_TOMBSTONE_CAP),
   };
 }
 
@@ -437,14 +586,25 @@ export function storageEventTargetsKey(eventKey: string | null, name: string): b
  */
 export function syncPersistedAcrossTabs(name: string, rehydrate: () => void): void {
   if (typeof window === "undefined" || typeof window.addEventListener !== "function") return;
-  window.addEventListener("storage", (event) => {
-    if (!storageEventTargetsKey(event.key, name)) return;
+  const reread = () => {
     try {
       rehydrate();
     } catch {
       // Best effort: a failed rehydrate leaves the current in-memory state.
     }
+  };
+  window.addEventListener("storage", (event) => {
+    if (!storageEventTargetsKey(event.key, name)) return;
+    reread();
   });
+  // A backgrounded or frozen tab never receives the `storage` event, so coming
+  // back to it would otherwise show a policy that was revoked while it slept.
+  window.addEventListener("focus", reread);
+  if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") reread();
+    });
+  }
 }
 
 /** Copy a legacy persisted blob to its current key without overwriting newer data. */

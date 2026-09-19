@@ -15,9 +15,6 @@ const TIE_LIMIT_IDS: Readonly<Record<string, readonly string[]>> = {
   matanawa: ["crotch"],
   karada: ["torso"],
   shinju: ["torso"],
-  tasuki: ["torso"],
-  hishi: ["torso"],
-  kikkou: ["torso"],
   "partial-suspension": ["suspension"],
   // These twelve were selectable in Studio with every limit set to no: the map
   // had only ever covered the categories that happened to have an obviously
@@ -36,8 +33,10 @@ const TIE_LIMIT_IDS: Readonly<Record<string, readonly string[]>> = {
   "pole-cuffs": ["pole"],
   "bench-drape": ["bench"],
   // Expanded catalog. A tie maps to every limit its category actually touches,
-  // so an unresolved maybe on any one of them blocks it — an entry that maps to
-  // nothing is open by default, which is only ever right for a prop drill.
+  // so an unresolved maybe on any one of them blocks it. Unoccupied prop drills
+  // (`tasuki`, `hishi`, `kikkou`, `rope-corset`, and the rest) map to nothing
+  // and stay open: they put rope on a dress form, never on a person, so a body
+  // limit is not theirs to ask for.
   "kata-te-kote": ["gote"],
   "yoko-gote": ["gote"],
   teppou: ["arms"],
@@ -47,7 +46,6 @@ const TIE_LIMIT_IDS: Readonly<Record<string, readonly string[]>> = {
   "ushiro-te-shibari": ["arms"],
   "waki-shibari": ["arms", "torso"],
   munenawa: ["torso"],
-  "rope-corset": ["torso"],
   "kubi-nawa": ["neck"],
   "nawa-kutsuwa": ["gag"],
   "m-ji-kaikyaku": ["crotch", "legs"],
@@ -115,6 +113,24 @@ export function missingTieLimits(
 }
 
 /**
+ * The rows a single taught step still needs, on top of its tie's own limit.
+ * Karada negotiates `torso` and then teaches an optional pass between the legs,
+ * which is what the `crotch` row is for; the step said so in prose while
+ * nothing in the code checked it. Fail-closed the same way tie limits are.
+ */
+export function missingStepLimits(
+  step: { limitIds?: readonly string[] } | undefined,
+  items: readonly NegItem[],
+): { id: string; label: string }[] {
+  const required = step?.limitIds ?? [];
+  if (required.length === 0) return [];
+  const byId = new Map(normalizeNegotiationItems(items).map((item) => [item.id, item]));
+  return required
+    .filter((id) => byId.get(id)?.rank !== "yes")
+    .map((id) => ({ id, label: byId.get(id)?.label ?? id }));
+}
+
+/**
  * Media cleanup is required only after an approval that was already active is
  * lost. An initial blocked hydration snapshot is not a revocation: treating it
  * as one lets a stale passive effect erase a newer action-first answer after
@@ -141,6 +157,42 @@ export function studioPolicySignature(
   const { negotiationKey } = buildStudioNegotiationPolicy(items);
   const flag = (value: unknown) => (value === true ? "1" : "0");
   return `${negotiationKey}|${flag(settings.consented)}${flag(settings.voice)}${flag(settings.listen)}`;
+}
+
+const RANK_PERMISSION: Readonly<Record<string, number>> = { no: 0, maybe: 1, yes: 2 };
+
+type PolicyFlags = { consented?: boolean; voice?: boolean; listen?: boolean };
+
+/**
+ * Whether a policy change takes something away.
+ *
+ * Studio reloads itself when another tab changes the policy, which is right for
+ * a revocation and wrong for an approval: approving a limit in the other tab —
+ * exactly what a blocked tie's "This tie waits for a yes" invites — used to
+ * reload a live scene, dropping the circulation-check countdown, the step and
+ * any pending capture. A widening change needs no reload at all, because the
+ * route re-derives its gating from the store on the next render.
+ */
+export function policyRestrictionIncreased(
+  previous: readonly NegItem[],
+  next: readonly NegItem[],
+  previousFlags: PolicyFlags,
+  nextFlags: PolicyFlags,
+): boolean {
+  const permission = (rank: string) => RANK_PERMISSION[rank] ?? 0;
+  const before = new Map(
+    normalizeNegotiationItems(previous).map((item) => [item.id, permission(item.rank)]),
+  );
+  for (const item of normalizeNegotiationItems(next)) {
+    const was = before.get(item.id);
+    if (was !== undefined && permission(item.rank) < was) return true;
+  }
+  // A row that disappeared entirely is a removal of whatever it allowed.
+  const nextIds = new Set(normalizeNegotiationItems(next).map((item) => item.id));
+  for (const [id, was] of before) if (was > 0 && !nextIds.has(id)) return true;
+  return (["consented", "voice", "listen"] as const).some(
+    (flag) => previousFlags[flag] === true && nextFlags[flag] !== true,
+  );
 }
 
 /**

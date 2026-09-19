@@ -1,6 +1,65 @@
 import type { AnalyzeResult } from "./schema";
 
 /**
+ * Prefix on every message the analyze validator throws.
+ *
+ * The validator runs before the handler, so its failures cannot become an
+ * `AnalyzeResult` with `retryableBeforeProvider` — they arrive at the client as
+ * thrown errors, indistinguishable from a failure after the batch was already
+ * reserved. Since the validator provably runs before any reservation or
+ * dispatch, marking its messages is what lets the client reopen the batch for
+ * exactly that case.
+ */
+export const PRE_DISPATCH_MARKER = "[pre-dispatch]";
+
+/**
+ * True when the failure provably happened before anything was reserved or sent.
+ *
+ * Two cases qualify. The validator marks its own messages. An expired sign-in
+ * is the other: `authMiddleware` rejects ahead of the handler, so no batch was
+ * reserved and no media left the browser — closing the batch there would cost
+ * a capture for signing in again.
+ */
+export function analyzeThrownBeforeDispatch(cause: unknown): boolean {
+  if (!(cause instanceof Error)) return false;
+  if (cause.message.includes(PRE_DISPATCH_MARKER)) return true;
+  return authenticationRejected(cause);
+}
+
+/** An auth rejection, which happens in middleware before the handler runs. */
+function authenticationRejected(error: Error): boolean {
+  if ((error as { status?: unknown }).status === 401) return true;
+  return error.name === "UnauthorizedError" || /^unauthorized\b/i.test(error.message.trim());
+}
+
+/**
+ * A thrown analyze failure never carries the server's structured result, so
+ * everything it could once print — a serialized Zod issue array, an HTML error
+ * page, a framework stack — was raw internals in the reader's error banner.
+ */
+export function analyzeThrownMessage(cause: unknown): string {
+  const raw =
+    cause instanceof Error ? cause.message.replaceAll(PRE_DISPATCH_MARKER, "").trim() : "";
+  if (requestNeverReachedProvider(cause)) {
+    return "The app could not reach the server, so nothing was sent. Check the connection and press Analyze again.";
+  }
+  if (cause instanceof Error && authenticationRejected(cause)) {
+    return "Nothing was sent: this deployment did not accept the request (sign-in). Sign in again and press Analyze — this capture is still usable.";
+  }
+  // Server sentences are written for this banner and start with the outcome.
+  // Anything else — JSON, HTML, a stack — is internals, not an explanation.
+  if (raw && raw.length <= 240 && !/[{}<>[\]]|\n/.test(raw)) return raw;
+  return "The analysis could not be completed. Capture a new batch and try again — nothing below came from a cloud read.";
+}
+
+/** True when the request demonstrably never left the browser. */
+export function requestNeverReachedProvider(cause: unknown): boolean {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
+  if (cause instanceof TypeError) return true;
+  return cause instanceof Error && /failed to fetch|networkerror|load failed/i.test(cause.message);
+}
+
+/**
  * Turn server analyze failures into short, actionable Studio copy.
  *
  * The server's own sentences lead with the outcome that matters most — "No

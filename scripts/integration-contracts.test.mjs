@@ -170,7 +170,7 @@ test("Studio requires yes for negotiated actions and blocks every voice path", (
   assert.match(policy, /mediaBlocked: !approvedIds\.has\("photos"\)/);
   assert.match(policy, /voiceBlocked: !approvedIds\.has\("voice"\)/);
   assert.match(policy, /negotiationKey: JSON\.stringify\(negotiationEntries\)/);
-  assert.match(store, /export function normalizeNegotiationItems\(value: unknown\)/);
+  assert.match(store, /export function normalizeNegotiationItems\(\s*value: unknown/);
   assert.match(
     store,
     /matches\.length === 1 && matches\[0\]\.label && !LOCKED_NO\.has\(seed\.id\)/,
@@ -182,7 +182,7 @@ test("Studio requires yes for negotiated actions and blocks every voice path", (
   // safeJsonStorage: it must still never throw on a corrupt blob, and it must
   // additionally resolve per item on write so a stale tab cannot resurrect a
   // revoked rank.
-  assert.match(store, /storage: negotiationMergingStorage<State>\("knotty-negotiate"\)/);
+  assert.match(store, /storage: negotiationMergingStorage<State>\("knotty-negotiate"/);
   const persistModule = read("src/lib/stores/persist.ts");
   assert.match(persistModule, /export function negotiationMergingStorage/);
   assert.match(persistModule, /const base = safeJsonStorage<State>\(\);/);
@@ -209,7 +209,7 @@ test("Studio requires yes for negotiated actions and blocks every voice path", (
   assert.match(studio, /if \(!studioVoice\) stopCoachVoice\(\)/);
   assert.match(studio, /voice=\{studioVoice\}/);
   assert.match(studio, /voice=\{studioVoice && !micArmed\}/);
-  assert.match(studio, /disabled=\{stopped \|\| !studioVoice\}/);
+  assert.match(studio, /disabled=\{stopped \|\| !studioVoice \|\| stepBlocked\}/);
   assert.match(studio, /disabled=\{cameraGateReason !== "enabled"\}/);
   assert.match(studio, /Export report/);
   assert.match(consentGate, /Step inside/);
@@ -304,7 +304,56 @@ test("only verified pre-reservation admission denials reopen a batch", () => {
     /if \(res\.retryableBeforeProvider && res\.providerAttempted === false\) \{\s*setAnalysisConsumed\(false\)/,
   );
   const caught = between(studio, "} catch (cause) {", "} finally {");
-  assert.doesNotMatch(caught, /setAnalysisConsumed\(false\)/);
+  // A thrown failure carries no server verdict, so the batch stays closed —
+  // with one proven exception. The request validator runs before the handler,
+  // and therefore before any reservation or dispatch, so the server tags its
+  // messages and only that tag may reopen the batch.
+  assert.match(
+    caught,
+    /if \(analyzeThrownBeforeDispatch\(cause\)\) setAnalysisConsumed\(false\)/,
+  );
+  assert.doesNotMatch(
+    caught.replace(/if \(analyzeThrownBeforeDispatch\(cause\)\) setAnalysisConsumed\(false\);/, ""),
+    /setAnalysisConsumed\(false\)/,
+  );
+  // The tag is applied where it is provable: the validator, and nowhere else.
+  const validator = between(analyze, ".validator((input: unknown) => {", ".handler(async");
+  assert.match(validator, /PRE_DISPATCH_MARKER/);
+  assert.equal(analyze.slice(analyze.indexOf(".handler(async")).includes("PRE_DISPATCH_MARKER"), false);
+});
+
+test("the availability probe answers only this app's own signed-in caller", () => {
+  // It reports whether this deployment has a database and a provider, which is
+  // nobody else's business — but authMiddleware rejects everyone in the
+  // shipped accounts-off-with-a-database mode, so it guards directly and only
+  // borrows the bearer forwarding so a signed-in live preview is recognised.
+  const availability = read("src/lib/ai/availability.ts");
+  assert.match(availability, /assertSameSiteRequest\(\);/);
+  assert.match(availability, /\.middleware\(\[bearerMiddleware\]\)/);
+  assert.match(
+    availability,
+    /if \(authConfigured && !\(await getSessionUser\(context\.bearerToken\)\)\) \{\s*throw new UnauthorizedError\(\);/,
+  );
+  assert.doesNotMatch(availability, /\[authMiddleware\]/);
+  const middleware = read("src/lib/auth/middleware.ts");
+  assert.match(middleware, /export const bearerMiddleware = createMiddleware\(\{ type: "function" \}\)\.client\(/);
+  assert.match(middleware, /export const authMiddleware = createMiddleware\(\{ type: "function" \}\)\s*\.middleware\(\[bearerMiddleware\]\)/);
+});
+
+test("a step's own limit gates Studio, not only the lesson page", () => {
+  // Karada negotiates `torso` and then teaches an optional pass between the
+  // legs, which is what the `crotch` row is for. The lesson page enforced it;
+  // Studio still rendered and spoke the step.
+  const studio = read("src/routes/studio.tsx");
+  assert.match(studio, /missingStepLimits\(currentStep, items\)/);
+  assert.match(
+    studio,
+    /const stepBlocked =[\s\S]*?!negotiationReady \|\| missingStepRows\.length > 0/,
+  );
+  // Not shown, not spoken automatically, and not speakable on demand.
+  assert.match(studio, /if \(stopped \|\| stepBlocked\) return;/);
+  assert.match(studio, /disabled=\{stopped \|\| !studioVoice \|\| stepBlocked\}/);
+  assert.match(studio, /\{stepBlocked \?/);
 });
 
 test("instructor-only entries cannot route into Studio", () => {

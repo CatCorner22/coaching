@@ -30,7 +30,15 @@ export const APP_ENV_REL_PATH = ".grok/app-env.json";
 
 const VITE_PREFIX = "VITE_";
 const DEFAULT_APP_ENV = Object.freeze({
-  VITE_AUTH_ENABLED: "true",
+  // Auth off is the standalone default, which is what the README promises for a
+  // clone and a Replit import: no accounts, the embedded dev database, and the
+  // AI endpoints accepting the development identity. Shipping "true" here meant
+  // a fresh checkout ran an auth stack it had no database or secrets for, so
+  // `npm run preview` answered 500 on every route. A deployment sets
+  // VITE_AUTH_ENABLED itself and a real process.env entry always wins, so
+  // production is unaffected; `checkDeployAuthConfig` still refuses a build
+  // that pairs a DATABASE_URL with auth off.
+  VITE_AUTH_ENABLED: "false",
   // This deployment's owner set the upload scope, having accepted that the
   // provider's Acceptable Use Policy is the governing document and that this
   // repository cannot verify it. See "Upload scope" in the README to change it.
@@ -44,34 +52,103 @@ const DEFAULT_APP_ENV = Object.freeze({
  * Parse an app-env document, keeping only `VITE_`-prefixed string entries.
  */
 export function parseAppEnv(text) {
+  return parseAppEnvReport(text).env;
+}
+
+/**
+ * Parse an app-env document, reporting what was discarded.
+ *
+ * A stray trailing comma or a nested `{ "env": {...} }` shape used to be
+ * swallowed, so the file silently did nothing and the operator got the opposite
+ * of the value they wrote. Anything dropped is named.
+ */
+export function parseAppEnvReport(text) {
   let parsed;
   try {
     parsed = JSON.parse(text);
-  } catch {
-    return {};
+  } catch (error) {
+    return { env: {}, problems: [`${APP_ENV_REL_PATH} is not valid JSON: ${error.message}`] };
   }
-  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return {
+      env: {},
+      problems: [`${APP_ENV_REL_PATH} must be a JSON object of VITE_ keys to string values`],
+    };
+  }
   const env = {};
+  const problems = [];
   for (const [key, value] of Object.entries(parsed)) {
-    if (!key.startsWith(VITE_PREFIX)) continue;
-    if (typeof value !== "string") continue;
+    if (!key.startsWith(VITE_PREFIX)) {
+      problems.push(`${APP_ENV_REL_PATH}: ignored "${key}" — only ${VITE_PREFIX}* keys are read`);
+      continue;
+    }
+    if (typeof value !== "string") {
+      problems.push(`${APP_ENV_REL_PATH}: ignored "${key}" — the value must be a quoted string`);
+      continue;
+    }
     env[key] = value;
   }
-  return env;
+  return { env, problems };
+}
+
+/**
+ * The app env recorded under `root`, with a safe standalone auth-off default,
+ * plus anything wrong with the file. An absent file is not a problem; a file
+ * that is present and unusable is.
+ */
+export function readAppEnvReport(root) {
+  let text;
+  try {
+    text = readFileSync(join(root, APP_ENV_REL_PATH), "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") return { env: { ...DEFAULT_APP_ENV }, fileEnv: {}, problems: [] };
+    return {
+      env: { ...DEFAULT_APP_ENV },
+      fileEnv: {},
+      problems: [`${APP_ENV_REL_PATH} could not be read: ${error?.message || error}`],
+    };
+  }
+  const report = parseAppEnvReport(text);
+  return {
+    env: { ...DEFAULT_APP_ENV, ...report.env },
+    // The file's own entries, so callers can tell an operator's choice from a
+    // DEFAULT_APP_ENV fallback.
+    fileEnv: report.env,
+    problems: report.problems,
+  };
 }
 
 /** The app env recorded under `root`, with a safe standalone auth-off default. */
 export function readAppEnv(root) {
-  try {
-    return { ...DEFAULT_APP_ENV, ...parseAppEnv(readFileSync(join(root, APP_ENV_REL_PATH), "utf8")) };
-  } catch {
-    return { ...DEFAULT_APP_ENV };
-  }
+  return readAppEnvReport(root).env;
+}
+
+/** Refuse to run under a Node that cannot execute the scripts this repo ships. */
+export function nodeVersionProblem(version, range = "22") {
+  const major = Number(/^v?(\d+)/.exec(version)?.[1]);
+  if (!Number.isFinite(major) || String(major) === range) return null;
+  return `This project needs Node ${range} (package.json engines: node >=22 <23). You are running ${version}. With nvm: nvm install 22 && nvm use 22.`;
 }
 
 /** File values under the process environment: an explicit override wins. */
 export function mergeAppEnv(appEnv, processEnv) {
   return { ...appEnv, ...processEnv };
+}
+
+/**
+ * Marker naming the auth flag as this wrapper's own standalone default rather
+ * than something an operator chose. Without it a release step that only forgot
+ * DATABASE_URL inherited `VITE_AUTH_ENABLED=false` from DEFAULT_APP_ENV and
+ * read as a deliberate no-auth deploy, so `db:migrate` skipped and shipped an
+ * unmigrated auth schema.
+ */
+export const AUTH_FLAG_DEFAULTED = "APP_ENV_AUTH_DEFAULTED";
+
+/** Whether the merged auth flag came only from DEFAULT_APP_ENV. */
+export function authFlagIsWrapperDefault(fileEnv, processEnv) {
+  return (
+    fileEnv?.VITE_AUTH_ENABLED === undefined && processEnv?.VITE_AUTH_ENABLED === undefined
+  );
 }
 
 /**
@@ -119,10 +196,22 @@ function main(argv) {
     console.error("usage: node scripts/with-app-env.mjs <command> [args…]");
     process.exit(2);
   }
-  const env = mergeAppEnv(readAppEnv(projectRoot()), process.env);
+  const versionProblem = nodeVersionProblem(process.version);
+  if (versionProblem) {
+    console.error(`[with-app-env] ${versionProblem}`);
+    process.exit(1);
+  }
+  const appEnv = readAppEnvReport(projectRoot());
+  for (const problem of appEnv.problems) console.error(`[with-app-env] ${problem}`);
+  const env = mergeAppEnv(appEnv.env, process.env);
+  if (authFlagIsWrapperDefault(appEnv.fileEnv, process.env)) env[AUTH_FLAG_DEFAULTED] = "1";
   const isProductionBuild =
     command.endsWith("vite") && args.some((arg) => arg === "build" || arg.startsWith("build"));
   if (isProductionBuild) {
+    if (appEnv.problems.length > 0) {
+      console.error(`[with-app-env] refusing to build with an unusable ${APP_ENV_REL_PATH}`);
+      process.exit(1);
+    }
     const deployCheck = checkDeployAuthConfig(env);
     if (deployCheck.status === "misconfigured") {
       console.error(deployCheck.message);

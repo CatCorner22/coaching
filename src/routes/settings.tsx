@@ -14,7 +14,7 @@ import {
   buildAppSyncBundle,
   parseAppSyncBundle,
 } from "@/lib/app-sync";
-import { useSettings } from "@/lib/stores/settings";
+import { safewordRejection, useSettings } from "@/lib/stores/settings";
 import { clearCoachVoiceCache } from "@/lib/voice/play";
 
 export const Route = createFileRoute("/settings")({
@@ -82,10 +82,23 @@ function SettingsPage() {
           label="Red"
           value={s.safeword}
           onChange={(v) => s.set({ safeword: v })}
-          hint="At least two characters. Command words (next, analyze, hands, stop, pause, release) are rejected and the previous word is kept."
+          rejection={safewordRejection}
+          hint="Letters only, at least two. Command words (next, analyze, hands, stop, pause, release) are rejected and the previous word is kept."
         />
-        <Field label="Yellow" value={s.yellowWord} onChange={(v) => s.set({ yellowWord: v })} />
-        <Field label="Green" value={s.greenWord} onChange={(v) => s.set({ greenWord: v })} />
+        <Field
+          label="Yellow"
+          value={s.yellowWord}
+          onChange={(v) => s.set({ yellowWord: v })}
+          rejection={safewordRejection}
+          hint="Same rule as Red. Yellow raises a check-in; it does not stop the session."
+        />
+        <Field
+          label="Green"
+          value={s.greenWord}
+          onChange={(v) => s.set({ greenWord: v })}
+          rejection={safewordRejection}
+          hint="Same rule as Red."
+        />
         <label className="block text-sm">
           <span className="text-xs uppercase tracking-wide text-subtle">Direct-check reminder (minutes; not a safety interval)</span>
           <NumberField
@@ -327,14 +340,18 @@ function Field({
   value,
   onChange,
   hint,
+  rejection,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   hint?: string;
+  /** Explains why a value was refused, instead of reverting with no word. */
+  rejection?: (draft: string) => string | null;
 }) {
   const [draft, setDraft] = useState(value);
   const [editing, setEditing] = useState(false);
+  const [refused, setRefused] = useState<string | null>(null);
   return (
     <label className="block text-sm">
       <span className="text-xs uppercase tracking-wide text-subtle">{label}</span>
@@ -348,9 +365,15 @@ function Field({
         onChange={(e) => setDraft(e.target.value)}
         onBlur={() => {
           setEditing(false);
+          setRefused(rejection ? rejection(draft) : null);
           onChange(draft);
         }}
       />
+      {refused && (
+        <span className="mt-1 block text-[11px] leading-relaxed text-danger-text" role="alert">
+          {refused}
+        </span>
+      )}
       {hint && <span className="mt-1 block text-[11px] leading-relaxed text-muted">{hint}</span>}
     </label>
   );

@@ -41,6 +41,12 @@ export type TieStep = {
   checkBullets?: string[];
   bottomBullets?: string[];
   media?: LearnMedia[];
+  /**
+   * Negotiated rows this one step needs, over and above the tie's own limit.
+   * Karada's optional crotch pass is the case that exists: the tie negotiates
+   * `torso`, the step puts rope somewhere `torso` never agreed to.
+   */
+  limitIds?: readonly string[];
   expected: {
     wrapBands: number;
     pose: Pose;

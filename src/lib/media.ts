@@ -615,7 +615,12 @@ export async function processMediaFrame(
   digitalZoom = 1,
   previewAspect?: number,
 ): Promise<ProcessedMediaFrame> {
-  const preview = await canvasFromSource(src, previewEdge, knownDimensions, digitalZoom, previewAspect);
+  let preview: HTMLCanvasElement;
+  try {
+    preview = await canvasFromSource(src, previewEdge, knownDimensions, digitalZoom, previewAspect);
+  } catch (cause) {
+    throw (await heicDecodeHint(src, cause)) ?? cause;
+  }
   const analysis = drawContain(preview, analysisEdge, preview.width, preview.height);
   const ctx = analysis.getContext("2d", { willReadFrequently: true });
   if (!ctx) throw new Error("No canvas");
@@ -624,6 +629,29 @@ export async function processMediaFrame(
     imageData: ctx.getImageData(0, 0, analysis.width, analysis.height),
     detailData: centreCrop(preview, DETAIL_CROP_EDGE),
   };
+}
+
+/**
+ * iPhone HEIC passes signature validation but only Safari decodes it. Every
+ * other browser fails somewhere inside `createImageBitmap` with a message
+ * about an unsupported source, which reads as "the app is broken" rather than
+ * "this browser cannot open iPhone photos".
+ */
+async function heicDecodeHint(src: unknown, cause: unknown): Promise<Error | null> {
+  if (typeof Blob === "undefined" || !(src instanceof Blob)) return null;
+  if (cause instanceof Error && cause.name === "AbortError") return null;
+  if (cause instanceof Error && /timed out|too large|still finishing/i.test(cause.message)) return null;
+  try {
+    const bytes = new Uint8Array(await src.slice(0, 32).arrayBuffer());
+    if (!hasIsoBrand(bytes, ["heic", "heix", "hevc", "hevx", "heim", "heis", "mif1", "msf1"])) {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+  return new Error(
+    "This browser cannot open iPhone HEIC photos. On iPhone set Settings → Camera → Formats to Most Compatible, or share the photo as JPEG and choose that.",
+  );
 }
 
 function resizedBitmapOptions(

@@ -15,6 +15,8 @@ import {
   pulse,
   type WakeLockHandle,
 } from "@/lib/rig";
+import { stopReasonLabel } from "@/lib/stop-reason";
+import { listenForWords } from "@/lib/voice/listen";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/rig")({ ssr: false, component: RigPage });
@@ -66,6 +68,41 @@ function RigPage() {
   const cadence = checkCadence(lastCheckAt, now, minutes);
   const running = startedAt !== null && !stopped;
 
+  // Rig Mode runs its own speech listener.
+  //
+  // Only the Studio armed one, and a recognizer belongs to the component that
+  // started it: navigating here unmounted it, so the screen people actually
+  // leave up while someone is tied was the one screen not listening — silently,
+  // with the setting still reading "on". Nothing here replaces a physical
+  // signal; the status line below says plainly whether the mic is hearing.
+  const [micArmed, setMicArmed] = useState(true);
+  const [micStatus, setMicStatus] = useState<
+    "idle" | "starting" | "active" | "error" | "unsupported"
+  >("idle");
+  useEffect(() => {
+    if (!settings.listen || !micArmed || !running) return;
+    return listenForWords(
+      [settings.safeword, settings.yellowWord, "red", "yellow"],
+      (word) => {
+        const heard = word.toLowerCase();
+        if (heard === settings.safeword.toLowerCase() || heard === "red") stop("safeword");
+        else if (heard === settings.yellowWord.toLowerCase() || heard === "yellow") flagYellow();
+      },
+      (status) => {
+        setMicStatus(status);
+        if (status === "error" || status === "unsupported" || status === "idle") setMicArmed(false);
+      },
+    );
+  }, [
+    settings.listen,
+    settings.safeword,
+    settings.yellowWord,
+    micArmed,
+    running,
+    stop,
+    flagYellow,
+  ]);
+
   // Screen wake lock, re-acquired on return to the foreground: a browser drops
   // the lock whenever the tab is hidden and never restores it by itself.
   const [wakeHeld, setWakeHeld] = useState(false);
@@ -73,28 +110,42 @@ function RigPage() {
     if (!running) return;
     let disposed = false;
     let handle: WakeLockHandle | null = null;
+    // Serialised. `handle` was only assigned after the await, so two overlapping
+    // requests each took a sentinel and all but the last were dropped without
+    // release — the screen stayed awake after the session ended, on the phone
+    // the couple is relying on.
+    let inFlight: Promise<WakeLockHandle | null> | null = null;
+    const release = async () => {
+      const held = handle;
+      handle = null;
+      if (held) await held.release().catch(() => undefined);
+      if (!disposed) setWakeHeld(false);
+    };
     const take = async () => {
-      if (disposed || handle || document.visibilityState !== "visible") return;
-      handle = await acquireWakeLock();
-      if (disposed) {
-        void handle?.release();
-        handle = null;
+      if (disposed || handle || inFlight || document.visibilityState !== "visible") return;
+      inFlight = acquireWakeLock();
+      const next = await inFlight;
+      inFlight = null;
+      if (disposed || !next) {
+        if (next) await next.release().catch(() => undefined);
         return;
       }
-      setWakeHeld(handle !== null);
+      handle = next;
+      setWakeHeld(true);
     };
     const onVisible = () => {
-      if (document.visibilityState === "visible") {
-        handle = null;
-        void take();
-      }
+      // Hidden releases explicitly rather than trusting the platform's implicit
+      // drop, so the held/`not held` indicator matches reality either way.
+      if (document.visibilityState === "visible") void take();
+      else void release();
     };
     void take();
     document.addEventListener("visibilitychange", onVisible);
     return () => {
       disposed = true;
       document.removeEventListener("visibilitychange", onVisible);
-      void handle?.release();
+      void release();
+      void inFlight?.then((late) => late?.release().catch(() => undefined));
       setWakeHeld(false);
     };
   }, [running]);
@@ -119,8 +170,11 @@ function RigPage() {
         <div role="alert" className="rounded-lg border border-danger bg-danger/10 p-5">
           <p className="text-xs uppercase tracking-[0.22em] text-danger-text">Session stopped</p>
           <h1 className="mt-2 font-display text-5xl text-danger-text">Release now</h1>
+          <p className="mt-3 text-xs uppercase tracking-wide text-muted">
+            {stopReasonLabel(stopReason)}
+          </p>
           <p className="mt-3 text-sm text-muted">
-            {stopReason ?? "Stopped."} Support the position and release without creating a fall.
+            Support the position and release without creating a fall.
             Then check in directly — this app has not observed anything and cannot tell you it is
             over.
           </p>
@@ -153,6 +207,25 @@ function RigPage() {
           {wakeHeld ? "Screen held awake" : "Screen may sleep"}
         </span>
       </div>
+
+      {settings.listen && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs">
+          <span role="status" aria-live="polite" className="text-muted">
+            {micStatus === "active"
+              ? `Listening for “${settings.safeword}” and “${settings.yellowWord}” — speak, and say it to a person too.`
+              : micStatus === "starting"
+                ? "Starting the microphone…"
+                : micStatus === "unsupported"
+                  ? "This browser cannot listen. Use the buttons below."
+                  : "The microphone is not listening. Use the buttons below."}
+          </span>
+          {micStatus !== "active" && micStatus !== "starting" && micStatus !== "unsupported" && (
+            <Button size="sm" variant="outline" onClick={() => setMicArmed(true)}>
+              Listen again
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Elapsed and cadence, sized to be read across a room. The cadence is a
           reminder the operator set; the copy never calls it a deadline. */}
@@ -189,9 +262,14 @@ function RigPage() {
             cadence.overdue ? "text-warn" : "text-muted",
           )}
         >
-          {cadence.overdue
-            ? `Check reminder elapsed ${formatClock(cadence.overdueSec)} ago`
-            : `Next check reminder in ${formatClock(cadence.remainingSec)}`}
+          {/* Before the clock starts there is no interval running, and a
+              screen counting down to a check nobody is due to make reads as a
+              live scene that is not one. */}
+          {startedAt === null
+            ? `Not started — the ${minutes}-minute check reminder begins with the clock`
+            : cadence.overdue
+              ? `Check reminder elapsed ${formatClock(cadence.overdueSec)} ago`
+              : `Next check reminder in ${formatClock(cadence.remainingSec)}`}
         </p>
         <p className="sr-only" role="status" aria-live="polite">
           {cadenceAnnouncement(cadence)}
@@ -302,7 +380,7 @@ function RigPage() {
           size="lg"
           variant="danger"
           className="h-20 text-lg"
-          onClick={() => stop(`${settings.safeword} called in rig mode`)}
+          onClick={() => stop("safeword")}
         >
           {settings.safeword}
         </Button>

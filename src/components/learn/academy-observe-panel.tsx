@@ -2,7 +2,13 @@ import { Link } from "@tanstack/react-router";
 import { Camera, ExternalLink, SwitchCamera, Video } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { openRopeCamera, startClip, type ClipHandle } from "@/lib/camera/stream";
+import { cameraErrorMessage } from "@/lib/camera/error-message";
+import {
+  openRopeCamera,
+  playCameraPreview,
+  startClip,
+  type ClipHandle,
+} from "@/lib/camera/stream";
 import { buildAcademyFeedback, type AcademyFeedback } from "@/lib/learn/academy-feedback";
 import { extractVideoFrames, processMediaFrame } from "@/lib/media";
 import { buildDeterministic } from "@/lib/ml/predict";
@@ -38,12 +44,8 @@ type AcademyObservePanelProps = {
  * and pinned by integration-contracts — because the two gates answer
  * different questions.
  *
- * The blocked copy deliberately speaks only for this camera. The same
- * revision also removed the Studio's media gate (`cameraGateReason` in
- * src/routes/studio.tsx now reads only `stopped`), so the Studio lens opens
- * regardless of this limit. Until that gate is restored, any wording here
- * promising that every lens waits would be an assurance the app does not
- * honour — a reader could leave this panel, open Studio, and film anyway.
+ * The Studio holds the same line (`cameraGateReason` in src/routes/studio.tsx),
+ * so the blocked copy here can speak for every lens in the app.
  */
 export function AcademyObservePanel({
   tie,
@@ -67,6 +69,7 @@ export function AcademyObservePanel({
   const clipRef = useRef<ClipHandle | null>(null);
   const prevFrameRef = useRef<Uint8ClampedArray | undefined>(undefined);
   const cameraRequestRef = useRef(0);
+  const cameraOpenRef = useRef<AbortController | null>(null);
   const recordTimeoutRef = useRef<number | null>(null);
 
   const [cameraOn, setCameraOn] = useState(false);
@@ -80,6 +83,8 @@ export function AcademyObservePanel({
 
   const stopCamera = useCallback(() => {
     cameraRequestRef.current += 1;
+    cameraOpenRef.current?.abort();
+    cameraOpenRef.current = null;
     if (recordTimeoutRef.current !== null) {
       window.clearTimeout(recordTimeoutRef.current);
       recordTimeoutRef.current = null;
@@ -109,14 +114,36 @@ export function AcademyObservePanel({
     if (hydrated && !photosApproved) stopCamera();
   }, [hydrated, photosApproved, stopCamera]);
 
+  // Backgrounding the tab releases the lens on iOS whether the panel notices
+  // or not. Notice, so the controls do not keep offering to score a frame the
+  // camera can no longer deliver.
+  useEffect(() => {
+    const dropCamera = () => {
+      if (!streamRef.current) return;
+      stopCamera();
+      setError("The camera closed when the app went to the background. Start it again.");
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") dropCamera();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", dropCamera);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", dropCamera);
+    };
+  }, [stopCamera]);
+
   async function startCamera(nextFacing: "environment" | "user" = facing) {
     if (!cameraAllowed) return;
     stopCamera();
     const request = ++cameraRequestRef.current;
+    const controller = new AbortController();
+    cameraOpenRef.current = controller;
     setError(null);
     setBusy(true);
     try {
-      const stream = await openRopeCamera(nextFacing);
+      const stream = await openRopeCamera(nextFacing, { signal: controller.signal });
       if (request !== cameraRequestRef.current) {
         stream.getTracks().forEach((track) => track.stop());
         return;
@@ -124,28 +151,59 @@ export function AcademyObservePanel({
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        await videoRef.current.play();
+        // Bounded and abortable: a bare play() that never settles left every
+        // control, Stop included, disabled behind `busy` with the camera light
+        // on and no way out but a reload.
+        await playCameraPreview(videoRef.current, controller.signal);
       }
       if (request !== cameraRequestRef.current) {
         stream.getTracks().forEach((track) => track.stop());
         if (streamRef.current === stream) streamRef.current = null;
         return;
       }
+      // A track that ends (OS permission revoked, another app took the lens)
+      // leaves the video element at readyState 4 with a frozen last frame, so
+      // nothing downstream can tell the camera died. Listen for it instead.
+      for (const track of stream.getVideoTracks()) {
+        const lost = () => {
+          if (streamRef.current !== stream) return;
+          stopCamera();
+          setError("Camera access was interrupted. Start the camera again.");
+        };
+        track.addEventListener("ended", lost);
+        track.addEventListener("mute", lost);
+      }
       setFacing(nextFacing);
       setCameraOn(true);
     } catch (e) {
+      // openRopeCamera can succeed and the preview still fail to play, which
+      // left the lens open behind a panel showing no Stop button.
       if (request === cameraRequestRef.current) {
-        setError(e instanceof Error ? e.message : "Camera unavailable on this device.");
+        stopCamera();
+        setError(cameraErrorMessage(e));
       }
     } finally {
-      if (request === cameraRequestRef.current) setBusy(false);
+      if (request === cameraRequestRef.current) {
+        setBusy(false);
+        if (cameraOpenRef.current === controller) cameraOpenRef.current = null;
+      }
     }
+  }
+
+  /** Whether the stream behind the preview is still delivering frames. */
+  function cameraIsLive() {
+    return streamRef.current?.getVideoTracks().some((track) => track.readyState === "live") === true;
   }
 
   async function captureAndAnalyze() {
     const v = videoRef.current;
     if (!v || v.readyState < 2) {
       setError("Start the camera first.");
+      return;
+    }
+    if (!cameraIsLive()) {
+      stopCamera();
+      setError("The camera is no longer delivering frames. Start it again.");
       return;
     }
     setBusy(true);
@@ -176,6 +234,11 @@ export function AcademyObservePanel({
     const stream = streamRef.current;
     if (!stream) {
       setError("Start the camera first.");
+      return;
+    }
+    if (!cameraIsLive()) {
+      stopCamera();
+      setError("The camera is no longer delivering frames. Start it again.");
       return;
     }
     setError(null);
@@ -318,7 +381,7 @@ export function AcademyObservePanel({
                   <SwitchCamera className="size-4" aria-hidden />
                   Flip
                 </Button>
-                <Button size="lg" variant="ghost" disabled={busy} onClick={stopCamera}>
+                <Button size="lg" variant="ghost" onClick={stopCamera}>
                   Stop
                 </Button>
               </>

@@ -141,7 +141,10 @@ function KnotPage() {
         total={knot.steps.length}
         title={s.title}
         doText={s.do ?? s.body}
-        checkText={s.check ?? "It looks like the diagram."}
+        checkText={
+          s.check ??
+          "Nothing to check off here: this entry is for recognising the knot, not for clearing your own tying of it."
+        }
         doBullets={s.doBullets}
         checkBullets={s.checkBullets}
         speak={s.speak}
