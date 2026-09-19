@@ -29,8 +29,18 @@ test("every knot carries a usable release plan", () => {
   for (const knot of KNOTS) {
     assert.ok(knot.release.untie.length >= 2, `${knot.slug} needs at least two untie actions`);
     assert.ok(knot.release.cut.trim().length > 0, `${knot.slug} needs a cut rule`);
-    if (!/Recognition only|Object-only|never goes on a body/i.test(knot.release.cut)) {
+    if (knot.release.context === "body") {
       assert.match(knot.release.cut, /shears/i, `${knot.slug} cut rule must name shears`);
+    }
+  }
+});
+
+test("non-body knot release rules avoid the body cut guidance", () => {
+  for (const knot of KNOTS) {
+    if (knot.release.context === "body") continue;
+    assert.doesNotMatch(knot.release.cut, /cut a wrap/i, `${knot.slug} must not use the body cut rule`);
+    if (knot.release.context === "object") {
+      assert.match(knot.release.cut, /tension|strain|load/i, `${knot.slug} must name the object hazard`);
     }
   }
 });

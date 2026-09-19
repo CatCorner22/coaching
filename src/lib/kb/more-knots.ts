@@ -43,6 +43,7 @@ export const MORE_KNOTS: KnotSource[] = [
       "Do not load it, put it on a body, or infer a cutting procedure from this entry.",
     ],
     release: {
+      context: "body",
       untie: [
         "Take all pull off both standing parts.",
         "Push the loop back into the knot so the doubled strands go slack.",
@@ -94,6 +95,7 @@ export const MORE_KNOTS: KnotSource[] = [
       "A name, photo, or apparent grip does not establish capacity, controllability, redundancy, or safe release.",
     ],
     release: {
+      context: "recognition",
       untie: [
         "This app names the prusik for recognition only and does not teach releasing one.",
         "Friction hitches release when unloaded and are learned hands-on with a qualified instructor.",
@@ -141,6 +143,7 @@ export const MORE_KNOTS: KnotSource[] = [
     ],
     watch: ["Visual similarity cannot validate the knot, the rope, or the surrounding system."],
     release: {
+      context: "recognition",
       untie: [
         "This app names the alpine butterfly for recognition only and does not teach untying it.",
         "Release of mid-line loops in loaded systems is learned hands-on with a qualified instructor.",
@@ -230,6 +233,7 @@ export const MORE_KNOTS: KnotSource[] = [
     ],
     watch: ["A daisy that takes load will dump all at once when the lock fails."],
     release: {
+      context: "object",
       untie: [
         "Undo the lock on the final loop first: open the half hitch or pull the working end back out of the last loop.",
         "Pull the working end. Every link opens in turn as the bight before it pulls through.",
@@ -324,6 +328,7 @@ export const MORE_KNOTS: KnotSource[] = [
     ],
     watch: ["Mechanical advantage can create high force before the operator recognizes it."],
     release: {
+      context: "object",
       untie: [
         "Take the strain off by lifting or supporting whatever the line is holding.",
         "Undo the two half hitches at the lock-off.",

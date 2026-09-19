@@ -109,7 +109,16 @@ export type Knot = {
   release: KnotRelease;
 };
 
+/**
+ * Which release rule the page shows under the knot's own instructions.
+ * `body`: the shears rule applies (a wrap on a person). `object`: rope on a
+ * thing, never a person — cutting a tensioned line is the hazard, not the fix.
+ * `recognition`: loaded systems this app does not teach releasing.
+ */
+export type KnotReleaseContext = "body" | "object" | "recognition";
+
 export type KnotRelease = {
+  context: KnotReleaseContext;
   /** Ordered, literal untie sequence — one action per line. */
   untie: string[];
   /**

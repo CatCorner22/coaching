@@ -168,6 +168,7 @@ const CORE_KNOTS: KnotSource[] = [
       "A post drill cannot establish safe placement, pressure, duration, or how the release goes on a person.",
     ],
     release: {
+      context: "body",
       untie: [
         "Take all tension off the standing line.",
         "Push slack from the standing line into the knot so the loop on top of the wraps opens.",
@@ -226,6 +227,7 @@ const CORE_KNOTS: KnotSource[] = [
       "Use only an unoccupied practice object in this app; seek hands-on instruction for body application.",
     ],
     release: {
+      context: "body",
       untie: [
         "Take all pull off both running ends.",
         "Push the two running ends back toward the bight so the bight loosens on the object.",
@@ -283,6 +285,7 @@ const CORE_KNOTS: KnotSource[] = [
       "Do not use this app entry to select or validate a lock for a loaded system.",
     ],
     release: {
+      context: "body",
       untie: [
         "Take the load off the standing part.",
         "Push the working end back toward the hitches so both loops go slack.",
@@ -363,6 +366,7 @@ const CORE_KNOTS: KnotSource[] = [
       "Learn body application, monitoring, and rapid release from a qualified in-person instructor.",
     ],
     release: {
+      context: "body",
       untie: [
         "Take all pull off the standing end.",
         "Push the cinch line back the way it came so it stops biting into the wraps.",
@@ -420,6 +424,7 @@ const CORE_KNOTS: KnotSource[] = [
       "Do not use this entry to choose, back up, or validate any loaded or person-bearing connection.",
     ],
     release: {
+      context: "body",
       untie: [
         "Hold the knot and push both standing parts toward it so it goes slack.",
         "Pull one bight straight back through the other; the knot capsizes and falls apart.",
@@ -546,6 +551,7 @@ const CORE_KNOTS: KnotSource[] = [
       "A reverse tension holds by friction alone, so it can creep when the direction of pull changes. Seeing one hold in a drill says nothing about how it behaves under a pull it has not met.",
     ],
     release: {
+      context: "body",
       untie: [
         "Take the pull off the working pair.",
         "Lift the folded working pair up off the wrap it is pressing on.",
@@ -627,6 +633,7 @@ const CORE_KNOTS: KnotSource[] = [
     ],
     watch: ["Do not use this app entry to select or validate a load-bearing join."],
     release: {
+      context: "object",
       untie: [
         "Take the load off both ropes.",
         "Push the tucked working end back toward the bight so its crossing loosens.",
@@ -676,6 +683,7 @@ const CORE_KNOTS: KnotSource[] = [
     ],
     watch: ["A remote description or image cannot validate a lowering system."],
     release: {
+      context: "recognition",
       untie: [
         "This app does not teach the Munter hitch, so it does not teach releasing one.",
         "Lowering and release of any loaded hitch are learned hands-on from a qualified instructor.",
@@ -753,6 +761,7 @@ const CORE_KNOTS: KnotSource[] = [
     ],
     watch: ["Still not a suspension lock."],
     release: {
+      context: "body",
       untie: [
         "Push both standing parts toward the knot so it goes slack.",
         "Open the single second throw first.",
@@ -805,6 +814,7 @@ const CORE_KNOTS: KnotSource[] = [
       "Do not use this recognition entry to select or build a loaded lock or body-restraint component.",
     ],
     release: {
+      context: "body",
       untie: [
         "Take the pull off the standing part.",
         "Push the working end back toward the hitch so the loop opens.",
@@ -856,12 +866,13 @@ const CORE_KNOTS: KnotSource[] = [
       "A visually similar loop does not establish correct construction, fit, or safe body use.",
     ],
     release: {
+      context: "recognition",
       untie: [
         "This app shows the Portuguese bowline for recognition only and does not teach untying it.",
         "Release of any two-loop knot on a body is learned hands-on with a qualified instructor.",
       ],
       cut:
-        "Recognition only. The general rule still applies to anything on a person: if it is not off in about a minute, or she reports any symptom, cut a wrap with blunt-nosed safety shears rather than keep working at a knot near skin.",
+        "Recognition only. A two-loop knot on a body is exactly the kind of structure that jams under load and needs a rehearsed release plan before it goes on; that plan comes from hands-on instruction, not from this entry. This app does not teach loaded rope.",
     },
   },
   {
@@ -905,6 +916,7 @@ const CORE_KNOTS: KnotSource[] = [
       "Visual similarity cannot validate the knot, rope, connector, anchor, or complete system.",
     ],
     release: {
+      context: "recognition",
       untie: [
         "This app names the figure eight on a bight for recognition only and does not teach untying it.",
         "Release of any loaded loop is learned hands-on with a qualified instructor, and never while it carries a person.",

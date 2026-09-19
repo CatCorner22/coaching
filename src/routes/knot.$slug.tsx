@@ -14,7 +14,7 @@ import {
   type StepConfirm,
 } from "@/components/learn";
 import { getAcademyKnot, isFoundationKnot } from "@/lib/kb";
-import { CUT_RULE } from "@/lib/kb/release";
+import { CUT_RULE, OBJECT_RELEASE_RULE, RECOGNITION_RELEASE_RULE } from "@/lib/kb/release";
 import { nyxPoseForKnotStep } from "@/lib/learn/nyx-model";
 import { knotStepVoiceInput } from "@/lib/learn/voice-script";
 import { coachVoiceLabel } from "@/lib/voice/coach-profile";
@@ -173,24 +173,43 @@ function KnotPage() {
             <li key={action}>{action}</li>
           ))}
         </ol>
-        <div className="mt-5 rounded-xl border border-danger/30 bg-danger/10 px-4 py-5 sm:px-5">
-          <h4 className="font-display text-xl text-danger">{CUT_RULE.title}</h4>
-          <p className="mt-2 text-base leading-relaxed text-fg">{knot.release.cut}</p>
-          <h5 className="mt-5 text-sm font-semibold uppercase tracking-wide text-danger">
-            Any one of these means cut
-          </h5>
-          <ul className="mt-2 list-disc space-y-2 pl-5 text-base leading-relaxed text-muted">
-            {CUT_RULE.when.map((trigger) => (
-              <li key={trigger}>{trigger}</li>
-            ))}
-          </ul>
-          <h5 className="mt-5 text-sm font-semibold uppercase tracking-wide text-danger">How to cut</h5>
-          <ul className="mt-2 list-disc space-y-2 pl-5 text-base leading-relaxed text-muted">
-            {CUT_RULE.how.map((action) => (
-              <li key={action}>{action}</li>
-            ))}
-          </ul>
-        </div>
+        <p className="mt-4 text-base leading-relaxed text-muted">{knot.release.cut}</p>
+        {knot.release.context === "body" ? (
+          <div className="mt-5 rounded-xl border border-danger/30 bg-danger/10 px-4 py-5 sm:px-5">
+            <h4 className="font-display text-xl text-danger">{CUT_RULE.title}</h4>
+            <h5 className="mt-5 text-sm font-semibold uppercase tracking-wide text-danger">
+              Any one of these means cut
+            </h5>
+            <ul className="mt-2 list-disc space-y-2 pl-5 text-base leading-relaxed text-muted">
+              {CUT_RULE.when.map((trigger) => (
+                <li key={trigger}>{trigger}</li>
+              ))}
+            </ul>
+            <h5 className="mt-5 text-sm font-semibold uppercase tracking-wide text-danger">How to cut</h5>
+            <ul className="mt-2 list-disc space-y-2 pl-5 text-base leading-relaxed text-muted">
+              {CUT_RULE.how.map((action) => (
+                <li key={action}>{action}</li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <div className="mt-5 rounded-xl border border-border-strong bg-elevated px-4 py-5 sm:px-5">
+            <h4 className="font-display text-xl text-fg">
+              {(knot.release.context === "object"
+                ? OBJECT_RELEASE_RULE
+                : RECOGNITION_RELEASE_RULE
+              ).title}
+            </h4>
+            <ul className="mt-3 list-disc space-y-2 pl-5 text-base leading-relaxed text-muted">
+              {(knot.release.context === "object"
+                ? OBJECT_RELEASE_RULE
+                : RECOGNITION_RELEASE_RULE
+              ).points.map((point) => (
+                <li key={point}>{point}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
 
       {knot.mistakes.length > 0 && (

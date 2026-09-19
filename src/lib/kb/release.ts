@@ -36,3 +36,28 @@ export const CUT_STOP =
 /** Compact one-line reminder for step text and speech. */
 export const CUT_RULE_SHORT =
   "If she reports numbness, tingling, weakness or pain, asks to be out, or the knot has not given within about a minute: stop untying and cut a wrap with the safety shears.";
+
+/**
+ * Shown instead of `CUT_RULE` on knots that never touch a person. Here the
+ * shears are the hazard: a cut through a tensioned line releases whatever it
+ * was holding, at speed, toward whoever is nearest.
+ */
+export const OBJECT_RELEASE_RULE = {
+  title: "Rope on a thing, not a person",
+  points: [
+    "Never cut a line that is under tension. The cut end snaps back toward the nearest person, and whatever the line was holding drops or swings.",
+    "Take the strain off first: lift, support, or lower the load, then undo the lock and let tension out slowly through the structure.",
+    "Untie last, after the line is slack.",
+    "If this knot has somehow ended up on a person, it is the wrong knot: that is a body cuff situation, and the body cuff rule applies — shears, one wrap, blade flat between rope and skin.",
+  ],
+} as const;
+
+/** Shown on recognition-only entries: loaded systems this app does not teach. */
+export const RECOGNITION_RELEASE_RULE = {
+  title: "Recognition only",
+  points: [
+    "This app does not teach tying or releasing this knot. It is here so you can recognise it in a photo or a class.",
+    "Loaded systems release only after the load is off them. Never cut a line that is carrying weight or a person.",
+    "Learn any loaded or suspension rope hands-on from a qualified instructor.",
+  ],
+} as const;
