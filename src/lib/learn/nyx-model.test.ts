@@ -39,6 +39,8 @@ test("knot lessons rotate slug-specific Nyx stills", () => {
   assert.equal(nyxPoseForKnotStep("somerville-bowline", 0), "ropeHands");
   assert.equal(nyxPoseForKnotStep("somerville-bowline", 1), "wristClose");
   assert.equal(nyxPoseForKnotStep("somerville-bowline", 3), "portrait");
+  assert.equal(nyxPoseForKnotStep("somerville-bowline", 4), "columnClose");
+  assert.equal(nyxPoseForKnotStep("somerville-bowline", 5), "ropeHands");
   assert.equal(nyxPoseForKnotStep("larks-head", 1), "ropeLap");
   assert.equal(nyxPoseForKnotStep("unknown-knot", 2), "wristClose");
 });

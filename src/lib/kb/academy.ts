@@ -44,66 +44,12 @@ type KnotEnrichment = {
 };
 
 const KNOT_ENRICHMENTS: Record<string, KnotEnrichment> = {
+  // Steps intentionally not patched: the catalog entry authors its own do and
+  // check bullets for every step, and an easy-read overlay here once described
+  // a different knot from the one the catalog taught.
   "somerville-bowline": {
-    goal: "Make a knot on a post that does not squeeze shut when you pull the rope.",
-    steps: [
-      {
-        do: "Wrap a folded loop around a smooth post. Leave slack. Keep both rope ends visible.",
-        doBullets: [
-          "Fold the rope to make a loop (called a bight).",
-          "Wrap that loop around a smooth post or chair leg.",
-          "Leave extra slack.",
-          "Keep both rope ends where you can see them.",
-        ],
-        check: "No person is touching the rope. You can see every part of the rope.",
-        checkBullets: [
-          "The post is empty — no person is involved.",
-          "You can see the whole loop and both rope ends.",
-        ],
-        diagramId: "somerville-bowline-0",
-      },
-      {
-        do: "Push the working loop up through the collar from bottom to top.",
-        doBullets: [
-          "Find the loop end you are working with.",
-          "Push it up through the rope collar.",
-          "Go from bottom to top.",
-        ],
-        check: "The collar lies flat. No twists are hidden inside.",
-        checkBullets: [
-          "The rope ring around the post is flat.",
-          "You do not see a hidden twist inside the collar.",
-        ],
-        diagramId: "somerville-bowline-1",
-      },
-      {
-        do: "Take the loop around the standing ropes. Bring it back down through the same hole.",
-        doBullets: [
-          "Wrap the working loop around the two standing rope parts.",
-          "Bring the loop back down through the same opening it came from.",
-        ],
-        check: "The loop went out and came back through the same hole.",
-        checkBullets: [
-          "You used the same opening both times.",
-          "The rope path matches the diagram.",
-        ],
-        diagramId: "somerville-bowline-2",
-      },
-      {
-        do: "Neaten the knot. Pull gently. The loop must not tighten.",
-        doBullets: [
-          "Tidy the knot so the ropes lie flat.",
-          "Pull the standing ropes gently.",
-          "Watch the loop — it should stay open.",
-        ],
-        check: "When you tug, the loop stays open. It does not cinch shut.",
-        checkBullets: [
-          "The loop did not get smaller when you pulled.",
-          "You could fit a finger through the loop easily.",
-        ],
-        diagramId: "somerville-bowline-3",
-      },
-    ],
+    goal: "Make a cuff on a post that does not squeeze shut when you pull the rope, and take it off fast.",
+    steps: [],
   },
   "larks-head": {
     goal: "Tie a lark's head on a post using the middle of the rope.",
@@ -315,12 +261,12 @@ export const TIE_ACADEMY: Record<string, { goal: string; steps: TieStep[] }> = {
         title: "Lock with Somerville bowline",
         goal: "Finish the knot that stays open when you pull.",
         rigger:
-          "Pass the loop through the collar, around the standing ropes, and back down. Watch that the loop does not tighten.",
+          "Make a small loop in the standing rope on top of the wraps. Take the working loop over the X, under all the wraps, and back up through the small loop the same way. Pull the standing rope. Watch that the rings do not tighten.",
         riggerBullets: [
-          "Pass the working loop up through the collar.",
-          "Wrap it around the standing ropes.",
-          "Bring it back down through the same opening.",
-          "Neaten the knot.",
+          "Take the working loop once around the standing rope, then pull it so a small loop forms in the standing rope on top of the wraps.",
+          "Pass the working loop over the X, then under all the wraps.",
+          "Bring it back up through the small loop, same direction as before.",
+          "Pull the standing rope to set it.",
         ],
         bottom: "This checks rope handling — not fit on a body.",
         bottomBullets: ["We are not testing this on a person."],
@@ -335,21 +281,23 @@ export const TIE_ACADEMY: Record<string, { goal: string; steps: TieStep[] }> = {
       },
       {
         title: "Take it off",
-        goal: "Remove all rope from the post.",
-        rigger: "Follow both rope ends. Loosen the knot. Take all rope off the post.",
+        goal: "Remove all rope from the post, fast, without tools.",
+        rigger: "Push slack into the knot so the small loop opens. Pull the working loop back out. Unwind the rope. Time yourself: this should take seconds. If a knot will not open, that is what the shears are for.",
         riggerBullets: [
-          "Find both rope ends.",
-          "Loosen the knot slowly.",
-          "Slide all rope off the post.",
+          "Push slack from the standing rope into the knot.",
+          "Pull the working loop down out of the small loop, then out from under the wraps.",
+          "Unwind. Keep hold of the rope.",
+          "If a knot will not open on a person within about a minute, stop untying and cut a wrap with the safety shears.",
         ],
         bottom: "No person was restrained in this drill.",
         bottomBullets: ["The post should look exactly like before you started."],
-        check: "The post is bare. All rope is off.",
+        check: "The post is bare. All rope is off. It took seconds, not minutes.",
         checkBullets: [
           "No rope is left on the post.",
           "The knot is fully undone.",
+          "You did it in seconds without tools.",
         ],
-        speak: "Remove all rope. Post is clear.",
+        speak: "Open the loop, back the rope out, unwind. Seconds, not minutes.",
         expected: { wrapBands: 0, pose: "stand", view: "front", handsVisible: true, neckClear: true },
         wraps: [],
       },

@@ -164,50 +164,74 @@ function SomervilleBowline({
   ink: string;
   animate: boolean;
 }) {
-  const base = "M 62 68 Q 86 52 100 56 Q 114 52 138 68";
+  const wraps = "M 68 58 Q 100 42 132 58 Q 100 74 68 58 M 68 78 Q 100 62 132 78 Q 100 94 68 78";
+  const standing = "M 132 58 L 154 120";
+  const bight = "M 68 58 L 46 120";
   if (step === 0) {
     return (
       <g>
-        <RopePath d={base} rope={rope} animate={animate} />
-        <RopePath d="M 62 68 L 48 120" rope={rope} animate={animate} dash />
-        <RopePath d="M 138 68 L 152 120" rope={rope} animate={animate} dash />
-        <PulseDot cx={100} cy={56} accent={accent} />
-        <Label x={36} y={40} ink={ink} text="bight" />
+        <RopePath d={wraps} rope={rope} animate={animate} />
+        <RopePath d={bight} rope={rope} animate={animate} dash />
+        <RopePath d={standing} rope={rope} animate={animate} dash />
+        <PulseDot cx={68} cy={58} accent={accent} />
+        <Label x={36} y={38} ink={ink} text="bight" />
+        <Label x={116} y={112} ink={ink} text="two wraps" />
       </g>
     );
   }
   if (step === 1) {
     return (
       <g>
-        <RopePath d={base} rope={rope} animate={animate} />
-        <RopePath d="M 100 56 L 100 92" rope={rope} animate={animate} />
-        <RopePath d="M 62 68 L 48 120" rope={rope} animate={animate} />
-        <RopePath d="M 138 68 L 152 120" rope={rope} animate={animate} />
-        <PulseDot cx={100} cy={92} accent={accent} />
-        <Label x={108} y={78} ink={ink} text="up through" />
+        <RopePath d={wraps} rope={rope} animate={animate} />
+        <RopePath d="M 68 58 L 100 42 Q 132 30 132 58" rope={rope} animate={animate} />
+        <RopePath d={standing} rope={rope} animate={animate} dash />
+        <PulseDot cx={100} cy={56} accent={accent} />
+        <Label x={104} y={30} ink={ink} text="loop on standing line" />
       </g>
     );
   }
   if (step === 2) {
     return (
       <g>
-        <RopePath d={base} rope={rope} animate={animate} />
-        <RopePath d="M 100 56 L 100 92 Q 118 98 128 78 Q 118 58 100 56" rope={rope} animate={animate} />
-        <RopePath d="M 62 68 L 48 120" rope={rope} animate={animate} />
-        <RopePath d="M 138 68 L 152 120" rope={rope} animate={animate} />
-        <PulseDot cx={128} cy={78} accent={accent} />
-        <Label x={132} y={64} ink={ink} text="around" />
+        <RopePath d={wraps} rope={rope} animate={animate} />
+        <RopePath d="M 68 58 L 100 42 Q 132 30 132 58" rope={rope} animate={animate} />
+        <RopePath d="M 68 58 Q 98 86 132 78" rope={rope} animate={animate} />
+        <RopePath d={standing} rope={rope} animate={animate} dash />
+        <PulseDot cx={98} cy={86} accent={accent} />
+        <Label x={24} y={116} ink={ink} text="over X, under all" />
+      </g>
+    );
+  }
+  if (step === 3) {
+    return (
+      <g>
+        <RopePath d={wraps} rope={rope} animate={animate} />
+        <RopePath d="M 68 58 L 100 42 Q 132 30 132 58" rope={rope} animate={animate} />
+        <RopePath d="M 68 58 Q 98 86 132 78 Q 146 68 132 58" rope={rope} animate={animate} />
+        <RopePath d={standing} rope={rope} animate={animate} dash />
+        <PulseDot cx={132} cy={58} accent={accent} />
+        <Label x={30} y={116} ink={ink} text="up through, same way" />
+      </g>
+    );
+  }
+  if (step === 4) {
+    return (
+      <g>
+        <RopePath d={wraps} rope={rope} animate={animate} />
+        <RopePath d="M 68 58 Q 100 86 132 58" rope={rope} animate={animate} />
+        <RopePath d={standing} rope={rope} animate={animate} dash />
+        <circle cx={100} cy={72} r="25" fill="none" stroke={accent} strokeWidth="1.5" strokeDasharray="3 3" opacity="0.7" />
+        <Label x={52} y={124} ink={ink} text="rings unchanged" />
       </g>
     );
   }
   return (
     <g>
-      <RopePath d={base} rope={rope} animate={animate} />
-      <RopePath d="M 100 56 L 100 92 Q 118 98 128 78 Q 118 58 100 56" rope={rope} animate={animate} />
-      <RopePath d="M 62 68 L 48 120" rope={rope} animate={animate} />
-      <RopePath d="M 138 68 L 152 120" rope={rope} animate={animate} />
-      <circle cx={100} cy={74} r="18" fill="none" stroke={accent} strokeWidth="1.5" strokeDasharray="3 3" opacity="0.7" />
-      <Label x={36} y={40} ink={ink} text="non-cinching" />
+      <RopePath d={wraps} rope={rope} animate={animate} />
+      <RopePath d={bight} rope={rope} animate={animate} dash />
+      <RopePath d="M 132 58 Q 156 82 132 108" rope={rope} animate={animate} dash />
+      <PulseDot cx={132} cy={108} accent={accent} />
+      <Label x={28} y={124} ink={ink} text="pull tail / open loop" />
     </g>
   );
 }

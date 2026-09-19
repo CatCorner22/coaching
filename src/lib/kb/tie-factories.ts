@@ -1,4 +1,5 @@
 import type { Tie, TieStep } from "./types";
+import { CUT_STOP } from "./release";
 
 /**
  * The three shapes a catalog tie takes, in one place.
@@ -344,6 +345,13 @@ export type GuidedInput = Pick<
  * has moved somewhere it was not put, and a person who cannot be reached.
  */
 export function guidedPractice(input: GuidedInput): Tie {
+  const stop = [
+    "Numbness, tingling, pins and needles, weakness, a hand or foot that will not grip or move, sharp or shooting pain, or any change in sensation — take the rope off now, before discussing it",
+    "Rope that has moved onto the neck, into an armpit, or anywhere it was not deliberately placed",
+    "Any distress, confusion, faintness, breathing change, or loss of clear communication — and any uncertainty of your own about what you are looking at",
+    ...(input.slug === "single-column" ? [] : [CUT_STOP]),
+    ...(input.stop ?? []),
+  ];
   return {
     slug: input.slug,
     name: input.name,
@@ -359,14 +367,7 @@ export function guidedPractice(input: GuidedInput): Tie {
     intent: [...input.intent, "guided-practice"],
     goal: input.goal,
     why: input.why,
-    stop: [
-      // Universal, first, and identical everywhere. A symptom is not a thing to
-      // finish the wrap and then look at.
-      "Numbness, tingling, pins and needles, weakness, a hand or foot that will not grip or move, sharp or shooting pain, or any change in sensation — take the rope off now, before discussing it",
-      "Rope that has moved onto the neck, into an armpit, or anywhere it was not deliberately placed",
-      "Any distress, confusion, faintness, breathing change, or loss of clear communication — and any uncertainty of your own about what you are looking at",
-      ...(input.stop ?? []),
-    ],
+    stop: [...new Set(stop)],
     steps: input.steps,
     mistakes: [
       ...input.mistakes,

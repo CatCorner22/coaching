@@ -86,7 +86,7 @@ export const NYX_SHIBARI = {
 } as const;
 
 const KNOT_POSE_ROTATION: Record<string, NyxShibariPose[]> = {
-  "somerville-bowline": ["ropeHands", "wristClose", "torsoClose", "portrait"],
+  "somerville-bowline": ["ropeHands", "wristClose", "torsoClose", "portrait", "columnClose", "ropeHands"],
   "larks-head": ["ropeHands", "ropeLap", "walkClose"],
   "half-hitch": ["wristClose", "columnClose"],
   "double-half-hitch": ["ropeHands", "wristClose", "columnClose"],
