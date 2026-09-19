@@ -42,6 +42,16 @@ export const MORE_KNOTS: KnotSource[] = [
       "This structure can jam and is not a rapid-release method.",
       "Do not load it, put it on a body, or infer a cutting procedure from this entry.",
     ],
+    release: {
+      untie: [
+        "Take all pull off both standing parts.",
+        "Push the loop back into the knot so the doubled strands go slack.",
+        "Work the bight back out through the knot with fingers or a fid.",
+        "Pull the bight clear.",
+      ],
+      cut:
+        "An overhand on a bight jams when loaded and is not a rapid-release knot — the karada uses it only as an unloaded decorative stem knot for that reason. If one has been pulled tight on a person and will not open in about a minute, or she reports any symptom, leave the knot alone and cut a wrap of the pattern with the safety shears; the knot goes slack when the rope around it does.",
+    },
   },
   {
     slug: "prusik",
@@ -83,6 +93,14 @@ export const MORE_KNOTS: KnotSource[] = [
     watch: [
       "A name, photo, or apparent grip does not establish capacity, controllability, redundancy, or safe release.",
     ],
+    release: {
+      untie: [
+        "This app names the prusik for recognition only and does not teach releasing one.",
+        "Friction hitches release when unloaded and are learned hands-on with a qualified instructor.",
+      ],
+      cut:
+        "Recognition only. A loaded friction hitch cannot be released until the load comes off it, and cutting a loaded line drops whatever it holds. This app does not teach loaded rope.",
+    },
   },
   {
     slug: "alpine-butterfly",
@@ -122,6 +140,14 @@ export const MORE_KNOTS: KnotSource[] = [
       },
     ],
     watch: ["Visual similarity cannot validate the knot, the rope, or the surrounding system."],
+    release: {
+      untie: [
+        "This app names the alpine butterfly for recognition only and does not teach untying it.",
+        "Release of mid-line loops in loaded systems is learned hands-on with a qualified instructor.",
+      ],
+      cut:
+        "Recognition only. Unload before untying; never cut a line carrying a person. This app does not teach loaded rope.",
+    },
   },
   {
     slug: "daisy-chain",
@@ -203,6 +229,15 @@ export const MORE_KNOTS: KnotSource[] = [
       },
     ],
     watch: ["A daisy that takes load will dump all at once when the lock fails."],
+    release: {
+      untie: [
+        "Undo the lock on the final loop first: open the half hitch or pull the working end back out of the last loop.",
+        "Pull the working end. Every link opens in turn as the bight before it pulls through.",
+        "Keep hold of the rope so the released length does not whip or drop.",
+      ],
+      cut:
+        "A daisy chain never goes on a body and unravels in one pull once the lock is off, so it needs no cutting. The hazard is the reverse: a chain that took load and lost its lock dumps the whole stored length at once. Keep tension off the working end and store slack away from anything that could be pulled.",
+    },
   },
   {
     slug: "truckers-hitch",
@@ -288,5 +323,15 @@ export const MORE_KNOTS: KnotSource[] = [
       },
     ],
     watch: ["Mechanical advantage can create high force before the operator recognizes it."],
+    release: {
+      untie: [
+        "Take the strain off by lifting or supporting whatever the line is holding.",
+        "Undo the two half hitches at the lock-off.",
+        "Let the working end run back through the mid-line loop so the tension bleeds off in a controlled way.",
+        "Untie the mid-line loop last.",
+      ],
+      cut:
+        "Object-only: this hitch never goes near a person in this app. Never release a tensioned line by cutting it — a cut trucker's hitch snaps back toward whoever is holding it. Support the load, then undo the lock-off and let the tension out through the loop.",
+    },
   },
 ];

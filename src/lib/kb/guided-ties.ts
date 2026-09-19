@@ -55,6 +55,9 @@ export const GUIDED_TIES: Tie[] = [
     why: "Every other tie in the vocabulary is single columns and double columns joined together, so this is not a beginner tie you graduate from — it is the thing you will still be doing in ten years. The whole skill is one idea: a cuff that stays the size you made it, no matter which direction the rope is pulled afterwards. A cuff that closes when pulled is the single most common way beginners injure someone, and the difference between the two is entirely in how the rope turns at the end.",
     stop: [
       "The cuff got smaller when you pulled on the standing rope — untie it completely and start again rather than loosening it",
+      "She reports numbness, tingling, pins and needles, weakness, a cold or heavy hand, or shooting pain — rope off first, discussion after",
+      "She says the safeword or asks to be out, for any reason — rope off, no negotiation",
+      "The knot has not opened within about a minute of you working at it, or you cannot find the release — stop untying and cut one wrap with the safety shears, blade flat between rope and skin, away from the knot",
     ],
     mistakes: [
       {
@@ -129,24 +132,24 @@ export const GUIDED_TIES: Tie[] = [
       {
         title: "4 · Take the slack out slowly, and watch her face",
         rigger:
-          "Now draw the wraps in, slowly, a little at a time, keeping them flat and beside each other as they close. Stop as soon as they stay put on their own without being held. That is the correct amount, and it is much less than most people expect — the wraps should still slide a little along the limb if you push them, and there should be visible daylight between rope and skin in places. Watch her face while you do this, not the rope. Faces report discomfort about a second before mouths do.",
+          "Now draw the wraps in, slowly, a little at a time, keeping them flat and beside each other as they close. Stop as soon as they stay put on their own without being held. That is the correct amount, and it is much less than most people expect — the wraps should still slide a little along the limb if you push them, and there should be visible daylight between rope and skin in places. Watch her face while you do this, not the rope. Faces report discomfort about a second before mouths do — but a face is a hint, not a report, and not everyone shows discomfort on their face. So also ask, in words, as the wraps close: \"Tell me one word for how that feels right now.\" Wait for the word before you do anything else.",
         bottom:
           "Say something as it closes. Not \"fine\" — describe it: where you feel it, whether it is even all the way round, whether one wrap bites more than the other. He cannot feel any of this and is entirely dependent on your description. If one wrap is doing all the work, say so now while it is easy to fix.",
         check:
           "The wraps stay in place unheld, still move slightly when pushed along the limb, and she can describe an even pressure rather than a line or a bite.",
-        speak: "Take the slack out slowly. Watch her face, not the rope.",
+        speak: "Take the slack out slowly. Watch her face, and ask for one word.",
         expected: { wrapBands: 2, pose: "sit", view: "front", handsVisible: true, neckClear: true },
         wraps: [],
       },
       {
         title: "5 · The turn that makes it non-cinching",
         rigger:
-          "This step is the whole tie. Everything before it was wrapping; this is what decides whether you have made a cuff or a noose. Pass the bight up underneath the wraps you just laid so it emerges on the far side of them, then bring it back over the top of the wraps and down through the space it came out of — so that the bight is now locked around the wraps themselves rather than around the limb. That is the Somerville bowline, and its point is that pulling the standing rope now pulls on the knot, which is anchored to the wraps, instead of pulling the wraps closed around the limb. Follow the knot entry for the detailed hand movements; what matters here is understanding what it is for.",
+          "This step is the whole tie. Everything before it was wrapping; this is what decides whether you have made a cuff or a noose. Make a small loop in the standing rope so it sits on top of the wraps (take the bight one full turn around the standing rope, then pull the bight so the turn slides onto the standing rope). Pass the bight over the X at the base of that loop, under all the wraps, and back up through the loop the same way it went past it. That is the Somerville bowline, and its point is that pulling the standing rope now closes the loop onto the bight, which is anchored to the wraps, instead of pulling the wraps closed around the limb. Tie it slipped whenever this cuff will be attached to anything: push only a fold of the bight through the loop, leaving a tail, so one pull on the tail releases it even under tension. Follow the knot entry for the detailed hand movements; what matters here is understanding what it is for.",
         bottom:
           "Stay still through this bit. It involves the most fiddling and it is where a rigger concentrating on his hands stops watching your face. If anything changes while he is working — a pinch, a wrap riding up, a sensation that was not there a minute ago — say it immediately, even though it feels like interrupting.",
         check:
           "The knot sits on the wraps, not against skin, and the structure looks like a cuff with a knot on the outside of it.",
-        speak: "The knot locks to the wraps, not around the limb.",
+        speak: "The knot locks to the wraps, not around the limb. Slipped if anything will pull on it.",
         expected: { wrapBands: 2, pose: "sit", view: "front", handsVisible: true, neckClear: true },
         wraps: [],
       },
@@ -189,12 +192,12 @@ export const GUIDED_TIES: Tie[] = [
       {
         title: "9 · Take it off, and check again tomorrow",
         rigger:
-          "Undo it rather than cutting it — that is the whole point of having tied a reversible structure, and untying it is practice at the thing you will need to do quickly one day. Reverse the knot, unwrap, and keep hold of the rope so it does not drop. As it comes off, ask her to move everything that was wrapped and describe how each part feels. Then ask again in an hour, because compression symptoms very often show up late, and again the next morning. Anything still numb, weak, altered or painful the next day is a doctor, not a wait-and-see.",
+          "When nothing is wrong, undo it rather than cutting it — untying is practice at the thing you will one day need to do quickly. Take the tension off the standing rope, push slack into the knot so the loop opens, back the bight out, unwrap, and keep hold of the rope so it does not drop. Say what you are doing as you do it. The rule changes the moment something is wrong: if she reports numbness, tingling, weakness or pain, says the safeword, or the knot is not open within about a minute of you working at it, stop untying. Pick up the shears, say \"I am cutting the rope\", slide the blunt blade flat between skin and one wrap — away from the knot, never at it — and cut. One cut frees the cuff; unwind the rest by hand. Rope is cheap. As it comes off either way, ask her to move everything that was wrapped and describe how each part feels. Ask again in an hour, because compression symptoms very often show up late, and again the next morning. Anything still numb, weak, altered or painful the next day is a doctor, not a wait-and-see.",
         bottom:
           "Move everything deliberately and say what you notice, including things that seem trivial. A patch of skin that feels slightly different, a grip that is slightly weaker, a thumb that tingles — these are the early presentations of the injury that matters here, and they are easy to dismiss on the night and obvious in hindsight a week later.",
         check:
           "The rope is off, she has moved and described every wrapped part, and both of you have agreed to check again tomorrow morning.",
-        speak: "Untie rather than cut. Ask again tomorrow.",
+        speak: "Untie when there is time. Cut a wrap when there is not. Ask again tomorrow.",
         expected: { wrapBands: 0, pose: "sit", view: "front", handsVisible: true, neckClear: true },
         wraps: [],
         // An empty `wraps` does not clear the cumulative figure (the route

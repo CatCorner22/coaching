@@ -23,7 +23,45 @@ import {
 import { SAFETY_SOURCE_IDS, SAFETY_SOURCES, SOURCE_LEDGER_REVISION } from "./sources.ts";
 import { isSayableAloud } from "../learn/plain-language.ts";
 import { buildAcademyVoiceScript, buildAcademyVoiceSegments } from "../learn/voice-script.ts";
-import { defaultKnotStepMedia, defaultTieStepMedia } from "./media-registry.ts";
+import { defaultKnotStepMedia, defaultTieStepMedia, FOUNDATION_DIAGRAM_IDS } from "./media-registry.ts";
+
+test("every knot carries a usable release plan", () => {
+  for (const knot of KNOTS) {
+    assert.ok(knot.release.untie.length >= 2, `${knot.slug} needs at least two untie actions`);
+    assert.ok(knot.release.cut.trim().length > 0, `${knot.slug} needs a cut rule`);
+    if (!/Recognition only|Object-only|never goes on a body/i.test(knot.release.cut)) {
+      assert.match(knot.release.cut, /shears/i, `${knot.slug} cut rule must name shears`);
+    }
+  }
+});
+
+test("body-applied ties carry the shears stop condition", () => {
+  for (const tie of TIES) {
+    if (tie.position === "theory") continue;
+    assert.ok(tie.stop.some((item) => /shears/i.test(item)), `${tie.slug} needs a shears stop entry`);
+  }
+});
+
+test("Somerville Bowline keeps its six authored steps and diagrams", () => {
+  const somerville = KNOTS.find((knot) => knot.slug === "somerville-bowline");
+  assert.ok(somerville);
+  assert.equal(somerville.steps.length, 6);
+  for (const step of somerville.steps) {
+    assert.ok(step.doBullets?.length, "every Somerville step needs do bullets");
+    assert.ok(step.checkBullets?.length, "every Somerville step needs check bullets");
+  }
+  assert.match(somerville.steps[5]?.body ?? "", /slipped/i);
+  const academy = getAcademyKnot("somerville-bowline");
+  assert.ok(academy);
+  for (const [index, step] of somerville.steps.entries()) {
+    assert.deepEqual(academy.steps[index]?.doBullets, step.doBullets);
+    assert.deepEqual(academy.steps[index]?.checkBullets, step.checkBullets);
+  }
+  const diagramIds = new Set<string>(FOUNDATION_DIAGRAM_IDS);
+  for (let index = 0; index <= 5; index += 1) {
+    assert.ok(diagramIds.has(`somerville-bowline-${index}`));
+  }
+});
 
 test("tie slugs are unique and getTie round-trips", () => {
   const slugs = TIES.map((t) => t.slug);

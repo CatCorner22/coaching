@@ -6,6 +6,8 @@ export const FOUNDATION_DIAGRAM_IDS = [
   "somerville-bowline-1",
   "somerville-bowline-2",
   "somerville-bowline-3",
+  "somerville-bowline-4",
+  "somerville-bowline-5",
   "larks-head-0",
   "larks-head-1",
   "double-half-hitch-0",

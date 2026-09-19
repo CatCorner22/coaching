@@ -8,57 +8,176 @@ const CORE_KNOTS: KnotSource[] = [
     name: "Somerville Bowline",
     jp: "非締め付けシングルコラム",
     summary:
-      "The non-cinching single-column knot. Learn the hand movements here as an unoccupied handling drill first; the guided single-column lesson then applies it on a consenting adult once its negotiated limit is agreed, with direct monitoring and rehearsed release.",
+      "The non-cinching single-column knot, and the one knot in this app that goes on a person. Learn it here on a post first, exactly as written; the guided single-column lesson then applies it on a consenting adult with the negotiated limit agreed, direct monitoring, shears in reach, and a rehearsed release. The slipped finish in the last step is the version to use whenever the cuff will be pulled on.",
     cinches: false,
     loadBearing: false,
+    // Sequence follows Topologist's own description of the knot he introduced
+    // (crash-restraint.com, "The Somerville Bowline"): wraps, a loop formed on
+    // the standing line, working bight over the X, under the whole cuff, back
+    // up through the loop in the same direction. An earlier version of this
+    // entry described a different, unverified structure ("up through the
+    // collar, around the standing pair, back down through the same opening");
+    // that is not this knot and was not shown to be non-cinching.
     steps: [
       {
-        title: "Bight around a practice column",
-        body: "Fold a working bight and wrap it around a smooth, unoccupied practice column so the folded end and standing pair sit side by side. Leave visible slack and enough tail to complete the drill.",
-        speak: "Practice on an unoccupied column with visible slack.",
+        title: "1 · Two wraps around the post",
+        body: "Fold the rope in half. The fold is the bight and it is the end you work with; the two long strands running away from it are the standing line. Hold the bight against a smooth post and take the doubled rope around it twice, so two flat rings sit side by side. Finish with the bight and the standing line lying next to each other on the same side of the post, with about a hand's width of bight sticking out.",
+        do: "Wrap the doubled rope twice around the post, flat and side by side, and stop with the bight and standing line next to each other.",
+        doBullets: [
+          "Fold the rope in half. The fold is the bight.",
+          "Hold the bight against the post.",
+          "Wrap the doubled rope around the post two times.",
+          "Lay the second wrap beside the first, not on top of it.",
+          "Stop with the bight and the standing line side by side, a hand's width of bight showing.",
+        ],
+        check: "Two flat rings on the post, not crossed. The bight and the standing line are next to each other. The post is empty of people.",
+        checkBullets: [
+          "Two rings, side by side, no crossing.",
+          "Bight and standing line are next to each other.",
+          "About a hand's width of bight sticks out.",
+          "No person is in the rope.",
+        ],
+        speak: "Two flat wraps. Bight and standing line side by side.",
       },
       {
-        title: "Working bight through",
-        body: "Pass the working bight up through the collar of rope. Keep the collar flat and easy to inspect.",
-        speak: "Pass the working bight up through the collar.",
+        title: "2 · Make a small loop in the standing line",
+        body: "This is the step that makes the knot, and the one people find fiddly. Take the bight once fully around the standing line — a complete circle, in whichever direction feels natural — so the bight has a turn wrapped around the standing line. Now pull gently on the bight while letting the standing line go slack. The turn slides off the bight and onto the standing line, and what you are left with is a small loop in the standing line, sitting on top of the wraps, with an X where the standing line crosses itself at the bottom of the loop. Making the turn on the bight and then transferring it is the reliable way to get the loop the right way round; forming the loop in the standing line by hand often produces the mirror image, which does not lock.",
+        do: "Take the bight one full circle around the standing line, then pull the bight and slacken the standing line so the turn becomes a loop in the standing line.",
+        doBullets: [
+          "Take the bight all the way around the standing line once.",
+          "Hold the bight. Let the standing line go slack.",
+          "Pull the bight gently. Watch the turn move off the bight and onto the standing line.",
+          "Stop when you see a small loop in the standing line sitting on top of the wraps.",
+        ],
+        check: "There is a small loop in the standing line, lying on the wraps, with an X at its base. The bight is free and not inside that loop yet.",
+        checkBullets: [
+          "The loop is in the standing line, not in the bight.",
+          "The loop sits on top of the wraps.",
+          "You can see an X where the standing line crosses itself.",
+          "The bight is not through the loop yet.",
+        ],
+        speak: "One turn of the bight around the standing line. Pull the bight so the loop moves onto the standing line.",
       },
       {
-        title: "Around the standing pair",
-        body: "Take that bight around the standing pair (or around the whole collar, depending on the variation you learned) and back down through the same opening it came from.",
-        speak: "Around the standing pair, then back down through.",
+        title: "3 · Over the X, under the whole cuff",
+        body: "Pass the bight over the X at the base of the loop, then straight under all the wraps to the other side of the cuff. The bight goes under every strand of the cuff, not between them: on a post, lift the wraps with a finger to make room. The bight now comes out on the far side of the cuff from where it started.",
+        do: "Take the bight over the X, then under all the wraps, and out the other side.",
+        doBullets: [
+          "Pass the bight over the X at the bottom of the loop.",
+          "Push the bight under the wraps. All of them, not between them.",
+          "Pull the bight out on the other side of the cuff.",
+        ],
+        check: "The bight crossed over the X and is now on the far side of the cuff, having gone under every wrap.",
+        checkBullets: [
+          "The bight went over the X, not under it.",
+          "The bight went under all the wraps.",
+          "The bight is out on the other side.",
+        ],
+        speak: "Over the X. Under the whole cuff. Out the other side.",
       },
       {
-        title: "Dress and set",
-        body: "Dress the knot on the unoccupied practice column. Pull the standing pair gently and confirm that the practice loop does not constrict; this drill does not validate fit, placement, or use on a person.",
-        speak: "Dress the practice knot and confirm its structure without body loading.",
+        title: "4 · Back up through the loop, same direction as before",
+        body: "Bring the bight back to the loop and pass it up through the loop, entering from the same side it first went past — the same direction you took it over the X. This is what makes it not an ordinary bowline: the bight goes through the loop the same way twice rather than being reversed, so the loop can close on the bight without ever gripping the post. Pull a few centimetres of bight through so it cannot fall back out.",
+        do: "Pass the bight up through the loop in the same direction it went past it before, and pull some slack through.",
+        doBullets: [
+          "Bring the bight back to the loop.",
+          "Push it up through the loop, entering from the same side as before.",
+          "Pull enough bight through that it will not slip back.",
+        ],
+        check: "The bight is through the loop and the loop is starting to close around the bight, not around the post.",
+        checkBullets: [
+          "The bight is up through the loop.",
+          "It entered from the same side as the first pass.",
+          "The loop is closing on the bight, not on the post.",
+        ],
+        speak: "Back up through the loop, same direction as before.",
+      },
+      {
+        title: "5 · Set it, then pull every way",
+        body: "Pull the standing line. The loop snugs down onto the wraps and the knot sets. Now test the thing that matters: pull the bight, pull the standing line, pull both, pull in different directions. The two rings on the post must stay exactly the size you made them. If the rings get smaller under any pull, the knot is not right — untie it completely and go back to step two. Do not fix a cinching cuff by loosening it.",
+        do: "Pull the standing line to set the knot, then pull the bight, the standing line, and both, and watch the rings.",
+        doBullets: [
+          "Pull the standing line until the knot sits snug on the wraps.",
+          "Pull the bight. Watch the rings.",
+          "Pull the standing line hard. Watch the rings.",
+          "Pull both, and pull sideways. Watch the rings.",
+        ],
+        check: "The rings on the post did not get smaller under any pull. You could still slide a finger under them. If they closed at all, untie and restart from step two.",
+        checkBullets: [
+          "Rings stayed the same size every time.",
+          "A finger still slides under the rings.",
+          "If they shrank at all: untie fully and start step two again.",
+        ],
+        speak: "Pull the standing line. Pull the bight. Pull both. The rings must not shrink.",
+      },
+      {
+        title: "6 · Take it off — and learn the slipped finish",
+        body: "Untying: push slack from the standing line into the knot so the loop on top of the wraps opens, then pull the bight back down out of the loop, back under the wraps, and unwind. Practise this until it takes seconds. Now the honest limitation: this knot is very hard to undo while the standing line is under real tension, because the loop is clamped shut. So whenever the cuff will be attached to anything or pulled on, tie the slipped version. In step four, instead of pushing the whole bight up through the loop, push only a fold of the bight through, leaving the end of the bight hanging out below as a tail. Set and test it exactly the same way. To release, pull that tail: the fold comes out of the loop and the whole knot falls open in a second or two, even under tension. If a knot is not coming undone within about a minute, or she reports any symptom, stop untying and cut a wrap with the shears.",
+        do: "Untie the knot by opening the loop and backing the bight out. Then retie it slipped and release it by pulling the tail.",
+        doBullets: [
+          "Push slack from the standing line into the knot. The loop opens.",
+          "Pull the bight down out of the loop, then back out from under the wraps.",
+          "Unwind the two wraps. Post is bare.",
+          "Retie. At step four push only a fold of the bight through the loop, so a tail hangs below.",
+          "Set and test as in step five.",
+          "Pull the tail. The knot should fall open at once.",
+        ],
+        check: "You untied the plain version in seconds without tools. You tied the slipped version, it passed the pull test, and pulling the tail released it in one motion. You can say the cut rule from memory.",
+        checkBullets: [
+          "Plain version untied by hand in seconds.",
+          "Slipped version passed every pull.",
+          "Pulling the tail released it in one motion.",
+          "You know where the shears are and when to use them.",
+        ],
+        speak: "Open the loop and back the bight out. For anything under tension, tie it slipped so one pull on the tail releases it.",
       },
     ],
     mistakes: [
       {
-        title: "Catching only the standing pair when the full collar was intended",
-        body: "This variant's extra security over a plain bowline comes from the return bight enclosing the whole collar — folded end and standing pair together — not the standing pair on its own. If you set out to drill the full-collar version but the bight only catches the standing pair as it passes through, the knot quietly turns into an ordinary bowline's nipping loop: capsize-prone under repeated slack-and-load cycles, with nothing different to see by eye once it's dressed. Know which variation you're practicing before you dress it, and check that the bight actually closed around everything that variation calls for, not just part of it.",
+        title: "Loop formed the wrong way round",
+        body: "The loop in the standing line has a handedness. Formed one way, the bight passing through it locks and the cuff stays open; formed the mirror way, the finished knot looks nearly identical, holds under a gentle pull, and then capsizes or cinches when pulled harder or from a new direction. Making a full turn of the bight around the standing line and transferring it, rather than twisting a loop into the standing line by hand, is what keeps the handedness right. If the pull test in step five fails, this is the first thing to suspect.",
       },
       {
-        title: "Collar twisted before the bight goes through",
-        body: "The folded end and the standing pair need to sit side by side and parallel around the practice column. If the first wrap crosses itself instead, the collar carries a hidden twist, and threading that bight through a twisted collar traps that twist inside the finished knot, so it dresses lumpy and one turn ends up doing the work while the other stays slack.",
+        title: "Bight goes between the wraps instead of under all of them",
+        body: "In step three the bight must pass under every strand of the cuff. Slip it between the two wraps and you have locked one ring and left the other free to travel; the cuff looks finished and then one ring rides up or closes on its own. Lift the whole band with a finger and check the bight came out beneath all of it.",
       },
       {
-        title: "Return bight comes back through the wrong gap",
-        body: "The working bight has to return down through the same opening it went up through. Feeding it through a neighboring gap in the collar instead produces something that resembles the knot from across the room but isn't the same interlock, and it can walk apart with ordinary handling on the practice column.",
+        title: "Second pass through the loop reversed",
+        body: "The bight enters the loop in step four from the same side it went over the X in step three. Reverse it and you have built a close relative of an ordinary bowline's nipping loop, which is capsize-prone when the rope is loaded and unloaded repeatedly. It passes a single gentle pull and fails a real one, which is why step five pulls in every direction.",
       },
       {
-        title: "Tail left too short after dressing",
-        body: "The extra collar wrap in this variant eats more rope than a plain bowline does, so a tail length that feels routine on a standard bowline can be too short here. A short tail has room to draw back through the knot as you dress and re-dress it during drilling, and you won't notice until it's already gone.",
+        title: "Wraps crossed or twisted under the knot",
+        body: "The two wraps should sit side by side as two flat rings. If the second wrap crosses the first, or a strand of the doubled rope twists over its partner, the knot sets on a ridge instead of a band. On a post that only looks untidy; on a limb it turns two broad bands into one narrow line of pressure. Undo and lay the wraps again rather than pulling them straight.",
       },
       {
-        title: "Treating a clean practice loop as clearance for a person",
-        body: "The full-collar wrap dresses into a visibly bulkier, tighter-looking loop than a plain bowline's, and on a smooth practice column that can read as reassuringly 'more secure.' That impression is about watching a column, not about a body: it says nothing about consent, positioning, active monitoring, or how quickly the rope comes off a person. This drill is craft practice; moving to a person is a separate step with its own instruction, not something this loop earns on its own by looking tidy.",
+        title: "Loosening a cinching cuff instead of retying it",
+        body: "If the rings shrink under the pull test, the structure is wrong, and easing the tension only hides that until the next pull. Untie completely and start again from step two. On a person, a cuff that closed under a test pull comes off first and gets discussed afterwards.",
+      },
+      {
+        title: "Tying the plain version on a cuff that will be pulled on",
+        body: "The plain Somerville locks harder the more the standing line is loaded, and a loop clamped shut under tension does not open with fingers. That is fine on a decorative cuff nobody pulls on. For anything attached to another rope or an anchor, tie the slipped finish from step six so release is one pull on the tail, and keep the shears in reach as the backup for the day the tail is buried or your hands are shaking.",
+      },
+      {
+        title: "Treating a clean practice knot as clearance for a person",
+        body: "A tidy knot on a post says nothing about consent, placement on the limb, how snug the wraps are on skin, monitoring, or how fast it comes off a real arm. The guided single-column lesson covers those; this drill is the hand movements only.",
       },
     ],
     watch: [
-      "If the practice loop cinches, untie and restart; do not troubleshoot a body cuff while it is under tension.",
-      "A prop drill cannot establish safe body placement, pressure, duration, or release competence.",
+      "If the rings shrink under any pull, untie completely and restart from step two. Never troubleshoot a cinching cuff on a limb under tension.",
+      "The plain knot is very hard to untie while the standing line is under tension. Tie it slipped for anything that will be pulled on, and keep the shears in reach.",
+      "A post drill cannot establish safe placement, pressure, duration, or how the release goes on a person.",
     ],
+    release: {
+      untie: [
+        "Take all tension off the standing line.",
+        "Push slack from the standing line into the knot so the loop on top of the wraps opens.",
+        "Pull the bight down out of the loop.",
+        "Pull the bight back out from under the wraps.",
+        "Unwind the wraps, keeping hold of the rope so it does not drop or drag across skin.",
+        "Slipped version: pull the tail. The fold comes out of the loop and the knot falls open in one motion.",
+      ],
+      cut: "This knot is nearly impossible to open by hand while the standing line is loaded, and a loaded cuff is usually the one that needs to come off fast. Tie it slipped whenever it will be pulled on. If the tail is buried, the knot has jammed, or she reports any symptom and it is not open within about a minute, cut one wrap of the cuff with the safety shears, away from the knot, blade flat between rope and skin.",
+    },
   },
   {
     slug: "larks-head",
@@ -106,6 +225,16 @@ const CORE_KNOTS: KnotSource[] = [
       "This hitch cinches and is not taught here as a body cuff or harness start.",
       "Use only an unoccupied practice object in this app; seek hands-on instruction for body application.",
     ],
+    release: {
+      untie: [
+        "Take all pull off both running ends.",
+        "Push the two running ends back toward the bight so the bight loosens on the object.",
+        "Widen the bight with a finger and slide it off the object.",
+        "Pull the rope clear.",
+      ],
+      cut:
+        "A lark's head cinches: any pull on the running ends tightens the bight on whatever it is around, and the tighter it has been pulled the harder the bight is to open. That is exactly why this app keeps it off bodies. If you ever meet one on a limb that will not loosen, do not pull the ends looking for slack — that closes it further. Cut one leg of the bight with the safety shears, blade flat between rope and skin, and slide it off.",
+    },
   },
   {
     slug: "double-half-hitch",
@@ -153,6 +282,17 @@ const CORE_KNOTS: KnotSource[] = [
       "Opposite-direction hitches slip. Same direction, stacked.",
       "Do not use this app entry to select or validate a lock for a loaded system.",
     ],
+    release: {
+      untie: [
+        "Take the load off the standing part.",
+        "Push the working end back toward the hitches so both loops go slack.",
+        "Open the outer hitch with a fingertip and back the working end out of it.",
+        "Do the same with the inner hitch.",
+        "Unwind whatever the hitches were locking.",
+      ],
+      cut:
+        "Two same-direction half hitches set under a hard pull compact into a tight little bundle that fingers slide off. The more it has been loaded, the slower it opens. On a practice bundle that is a nuisance; on a person it is a reason to cut. If the hitches will not open in about a minute, or she reports any symptom, cut the wrap the hitches are sitting on with the safety shears, not the hitches themselves — a wrap is a single flat band you can get a blunt blade under.",
+    },
   },
   {
     slug: "wrap-cinch",
@@ -222,6 +362,16 @@ const CORE_KNOTS: KnotSource[] = [
       "Do not derive a body-placement rule from this diagram or from anatomical landmarks.",
       "Learn body application, monitoring, and rapid release from a qualified in-person instructor.",
     ],
+    release: {
+      untie: [
+        "Take all pull off the standing end.",
+        "Push the cinch line back the way it came so it stops biting into the wraps.",
+        "Lift the cinch off the band with a finger.",
+        "Unwind the wraps one at a time, keeping hold of the rope.",
+      ],
+      cut:
+        "A cinch concentrates the pull of every wrap under it onto one line, so a cinch that has been loaded is the tightest point in the whole structure and the slowest to release by hand. Never try to loosen a cinch on a body by pulling on it. If the cinch is jammed, or she reports numbness, tingling, weakness or pain, cut a wrap — not the cinch — with the safety shears, on the side of the band away from the cinch, blade flat between rope and skin. One cut frees the whole band.",
+    },
   },
   {
     slug: "square",
@@ -269,6 +419,15 @@ const CORE_KNOTS: KnotSource[] = [
       "Visual flatness does not establish security, compatibility, or load capacity.",
       "Do not use this entry to choose, back up, or validate any loaded or person-bearing connection.",
     ],
+    release: {
+      untie: [
+        "Hold the knot and push both standing parts toward it so it goes slack.",
+        "Pull one bight straight back through the other; the knot capsizes and falls apart.",
+        "Separate the two ends.",
+      ],
+      cut:
+        "A square knot is trivial to untie unloaded: pushing one end into the knot capsizes it. Pulled hard, it jams flat and becomes a fingernail job. It is never on a body in this app, so the cut rule here is the general one: if any knot anywhere on a person is not open in about a minute, or she reports any symptom, cut a wrap with the safety shears rather than keep picking at a knot.",
+    },
   },
   {
     slug: "reverse-tension",
@@ -386,6 +545,16 @@ const CORE_KNOTS: KnotSource[] = [
       "If the practice fold slips, reset the unoccupied drill. This entry does not validate a body harness or loaded use.",
       "A reverse tension holds by friction alone, so it can creep when the direction of pull changes. Seeing one hold in a drill says nothing about how it behaves under a pull it has not met.",
     ],
+    release: {
+      untie: [
+        "Take the pull off the working pair.",
+        "Lift the folded working pair up off the wrap it is pressing on.",
+        "Unfold it back the way it came.",
+        "Pull the working pair back out from under the wrap.",
+      ],
+      cut:
+        "A reverse tension is not a knot and releases the moment tension comes off it, which is one of the reasons harnesses are built from them: a whole pattern can be unwound from the last fold back to the first in a minute or two. The slow part of releasing a harness is the sheer amount of rope. If she needs out faster than you can unwind, or reports any symptom, cut one band of the harness with the safety shears and pull the rest through — one cut through a wrap slackens every fold that depended on it.",
+    },
   },
   {
     slug: "sheet-bend",
@@ -457,6 +626,16 @@ const CORE_KNOTS: KnotSource[] = [
       },
     ],
     watch: ["Do not use this app entry to select or validate a load-bearing join."],
+    release: {
+      untie: [
+        "Take the load off both ropes.",
+        "Push the tucked working end back toward the bight so its crossing loosens.",
+        "Lift the tuck out from under its own strand.",
+        "Pull the second rope back out of the bight.",
+      ],
+      cut:
+        "Unloaded, a sheet bend opens with a thumbnail; loaded hard it work-hardens into the bight and has to be fought apart. It joins ropes, so it should never be the thing between rope and skin. If a join of any kind is jammed and the rope on the other side of it is on a person who needs out, do not fight the join — cut the wrap on the body side with the safety shears and deal with the join later.",
+    },
   },
   {
     slug: "munter",
@@ -496,6 +675,14 @@ const CORE_KNOTS: KnotSource[] = [
       },
     ],
     watch: ["A remote description or image cannot validate a lowering system."],
+    release: {
+      untie: [
+        "This app does not teach the Munter hitch, so it does not teach releasing one.",
+        "Lowering and release of any loaded hitch are learned hands-on from a qualified instructor.",
+      ],
+      cut:
+        "Recognition only. If a person is ever suspended or loaded on a system you cannot release, get them down or supported first — you cannot cut a loaded line without dropping what it holds. This is the reason this app does not teach loaded rope.",
+    },
   },
   {
     slug: "surgeon",
@@ -565,6 +752,16 @@ const CORE_KNOTS: KnotSource[] = [
       },
     ],
     watch: ["Still not a suspension lock."],
+    release: {
+      untie: [
+        "Push both standing parts toward the knot so it goes slack.",
+        "Open the single second throw first.",
+        "Unwind the doubled first throw.",
+        "Separate the ends.",
+      ],
+      cut:
+        "The doubled first throw is more friction, which is the point of the knot and also what makes it slower to open than a square knot once it has been pulled tight. It is an unoccupied craft knot here. The general rule stands: any knot on a person that will not open in about a minute, or any symptom, means cutting a wrap with the safety shears.",
+    },
   },
   {
     slug: "half-hitch",
@@ -607,6 +804,16 @@ const CORE_KNOTS: KnotSource[] = [
       "A hitch that looks familiar can still move or release unpredictably.",
       "Do not use this recognition entry to select or build a loaded lock or body-restraint component.",
     ],
+    release: {
+      untie: [
+        "Take the pull off the standing part.",
+        "Push the working end back toward the hitch so the loop opens.",
+        "Lift the loop off the standing part with a fingertip.",
+        "Pull the working end clear.",
+      ],
+      cut:
+        "A single half hitch releases as soon as the standing part is slack. Stacked hitches that have been loaded are another matter — see the double half hitch. Whatever the hitch is locking, the cut goes through a wrap with the safety shears, not through the hitch: a wrap is a single band a blunt blade slides under, a hitch is packed strands next to skin.",
+    },
   },
   {
     slug: "portuguese-bowline",
@@ -648,6 +855,14 @@ const CORE_KNOTS: KnotSource[] = [
     watch: [
       "A visually similar loop does not establish correct construction, fit, or safe body use.",
     ],
+    release: {
+      untie: [
+        "This app shows the Portuguese bowline for recognition only and does not teach untying it.",
+        "Release of any two-loop knot on a body is learned hands-on with a qualified instructor.",
+      ],
+      cut:
+        "Recognition only. The general rule still applies to anything on a person: if it is not off in about a minute, or she reports any symptom, cut a wrap with blunt-nosed safety shears rather than keep working at a knot near skin.",
+    },
   },
   {
     slug: "figure-eight",
@@ -689,6 +904,14 @@ const CORE_KNOTS: KnotSource[] = [
     watch: [
       "Visual similarity cannot validate the knot, rope, connector, anchor, or complete system.",
     ],
+    release: {
+      untie: [
+        "This app names the figure eight on a bight for recognition only and does not teach untying it.",
+        "Release of any loaded loop is learned hands-on with a qualified instructor, and never while it carries a person.",
+      ],
+      cut:
+        "Recognition only. A loaded figure eight jams hard and must be unloaded before it will open. Do not cut a line that is holding weight; get the load supported first. This app does not teach loaded rope.",
+    },
   },
 ];
 

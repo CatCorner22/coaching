@@ -101,6 +101,22 @@ export type Knot = {
   /** Real, specific ways this goes wrong, and what actually causes it — the same bar `Tie.mistakes` sets. */
   mistakes: { title: string; body: string }[];
   watch: string[];
+  /**
+   * How the knot comes off, and when to stop untying and cut. Every knot has
+   * one: a knot the reader can tie but not reliably remove is the one that
+   * ends up being cut off a numb limb in a hurry.
+   */
+  release: KnotRelease;
+};
+
+export type KnotRelease = {
+  /** Ordered, literal untie sequence — one action per line. */
+  untie: string[];
+  /**
+   * What makes this particular knot slow or impossible to untie, and the
+   * cut decision that follows. Always ends by pointing at `CUT_RULE`.
+   */
+  cut: string;
 };
 
 /** What a catalog file actually authors: everything on `Knot` except the derived `usedIn`. */
