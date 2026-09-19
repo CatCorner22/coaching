@@ -325,14 +325,19 @@ test("only verified pre-reservation admission denials reopen a batch", () => {
 test("the availability probe answers only this app's own signed-in caller", () => {
   // It reports whether this deployment has a database and a provider, which is
   // nobody else's business — but authMiddleware rejects everyone in the
-  // shipped accounts-off-with-a-database mode, so it guards directly.
+  // shipped accounts-off-with-a-database mode, so it guards directly and only
+  // borrows the bearer forwarding so a signed-in live preview is recognised.
   const availability = read("src/lib/ai/availability.ts");
   assert.match(availability, /assertSameSiteRequest\(\);/);
+  assert.match(availability, /\.middleware\(\[bearerMiddleware\]\)/);
   assert.match(
     availability,
-    /if \(authConfigured && !\(await getSessionUser\(\)\)\) throw new UnauthorizedError\(\);/,
+    /if \(authConfigured && !\(await getSessionUser\(context\.bearerToken\)\)\) \{\s*throw new UnauthorizedError\(\);/,
   );
-  assert.doesNotMatch(availability, /\.middleware\(/);
+  assert.doesNotMatch(availability, /\[authMiddleware\]/);
+  const middleware = read("src/lib/auth/middleware.ts");
+  assert.match(middleware, /export const bearerMiddleware = createMiddleware\(\{ type: "function" \}\)\.client\(/);
+  assert.match(middleware, /export const authMiddleware = createMiddleware\(\{ type: "function" \}\)\s*\.middleware\(\[bearerMiddleware\]\)/);
 });
 
 test("a step's own limit gates Studio, not only the lesson page", () => {

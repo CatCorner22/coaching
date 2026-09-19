@@ -313,3 +313,29 @@ test("a safeword called out in a longer sentence is still heard", async () => {
     h.restore();
   }
 });
+
+test("a multi-word safeword said once is not a repeat", async () => {
+  const h = harness();
+  try {
+    const { listenForWords } = await import("./listen.ts");
+    const hits: string[] = [];
+    listenForWords(["banana split"], (word) => hits.push(word));
+    await h.flush();
+    const rec = FakeRecognition.instances[0]!;
+
+    // Its two component words are not two utterances of the safeword.
+    rec.speak("is banana split on it");
+    await h.flush();
+    assert.deepEqual(hits, [], "a single mention inside filler must stay quiet");
+
+    for (const utterance of ["banana split banana split", "ok banana split stop"]) {
+      hits.length = 0;
+      h.advance(3_000);
+      rec.speak(utterance);
+      await h.flush();
+      assert.deepEqual(hits, ["banana split"], `"${utterance}" must be heard`);
+    }
+  } finally {
+    h.restore();
+  }
+});

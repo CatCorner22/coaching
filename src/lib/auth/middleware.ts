@@ -1,6 +1,21 @@
 import { createMiddleware } from "@tanstack/react-start";
 
 /**
+ * Forwards the live-preview bearer token to the server without deciding who
+ * may call. For server functions that check the session themselves because
+ * `authMiddleware`'s accounts-off-with-a-database rejection does not fit them.
+ */
+export const bearerMiddleware = createMiddleware({ type: "function" }).client(
+  async ({ next }) => {
+    // Live preview (partitioned iframe): the session rides a bearer token, not a
+    // cookie, so forward it to the server. Null when deployed (cookie auth), so
+    // this is a no-op there.
+    const { getBearerToken } = await import("./client");
+    return next({ sendContext: { bearerToken: getBearerToken() ?? undefined } });
+  },
+);
+
+/**
  * Auth middleware for server functions — the standard way to get the caller's
  * verified user id. When deployed the session cookie is same-origin and rides
  * along automatically. In the live preview the client also forwards the bearer
@@ -26,13 +41,7 @@ import { createMiddleware } from "@tanstack/react-start";
  * per-user data and scope every query by `context.userId`.
  */
 export const authMiddleware = createMiddleware({ type: "function" })
-  .client(async ({ next }) => {
-    // Live preview (partitioned iframe): the session rides a bearer token, not a
-    // cookie, so forward it to the server. Null when deployed (cookie auth), so
-    // this is a no-op there.
-    const { getBearerToken } = await import("./client");
-    return next({ sendContext: { bearerToken: getBearerToken() ?? undefined } });
-  })
+  .middleware([bearerMiddleware])
   .server(async ({ next, context }) => {
     // ONLY import `*.server` modules here. This file is dual client/server
     // (bearer hook on the client). A plain `./isolation` path was renamed to

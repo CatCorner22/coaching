@@ -98,8 +98,11 @@ export function listenForWords(
         needleTokens.includes(token) || safewordTokens.has(token) || CALLOUT_WORDS.has(token),
     );
     if (!onlyCallLanguage) return false;
-    const repeated = tokens.filter((token) => needleTokens.includes(token)).length > 1;
-    return repeated || tokens.some((token) => CALLOUT_INTENT.has(token));
+    let occurrences = 0;
+    for (let i = 0; i + needleTokens.length <= tokens.length; i++) {
+      if (needleTokens.every((token, offset) => tokens[i + offset] === token)) occurrences++;
+    }
+    return occurrences > 1 || tokens.some((token) => CALLOUT_INTENT.has(token));
   };
   rec.onresult = (ev: unknown) => {
     // Browsers can flush a final result after stop(). Without this, taking the
