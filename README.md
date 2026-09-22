@@ -122,14 +122,17 @@ One-time:
 
 Each session:
 
+Use your own hostname from step 4 in place of `laptop.tail1234.ts.net`; the
+first variable adds it to the dev server's Host allowlist.
+
 ```sh
-npm run dev
-# with optional cloud Analyze:
-XAI_API_KEY=... ALLOW_DEV_AI=true BETTER_AUTH_URL=https://laptop.tail1234.ts.net npm run dev
+__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=laptop.tail1234.ts.net npm run dev
+# with optional cloud Analyze (after verifying team-wide ZDR in the xAI console, see Deployment requirements):
+__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=laptop.tail1234.ts.net XAI_API_KEY=... XAI_REQUIRE_ZERO_DATA_RETENTION=true ALLOW_DEV_AI=true BETTER_AUTH_URL=https://laptop.tail1234.ts.net npm run dev
 ```
 
-`BETTER_AUTH_URL` here only tells the AI origin check to trust the Tailscale
-address; it does not enable sign-in in development. On the phones, with
+`BETTER_AUTH_URL` here lets the AI origin check trust the Tailscale address; it
+does not enable sign-in in development. On the phones, with
 Tailscale connected, open the `https://…ts.net` address, allow the camera, and
 "Add to Home Screen". Each device keeps its own local data (negotiation,
 journal, session), so run a scene from one device. The first certificate fetch
