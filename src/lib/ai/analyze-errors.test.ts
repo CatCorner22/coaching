@@ -32,7 +32,13 @@ test("the server's own sentence is kept, with only the next step appended", () =
 
 test("fallback copy exists when the server sent no sentence", () => {
   assert.match(
-    analyzeErrorMessage({ ...base, error: "", code: "AI_RATE_LIMITED", status: 429, retryAfterMs: 30_000 }),
+    analyzeErrorMessage({
+      ...base,
+      error: "",
+      code: "AI_RATE_LIMITED",
+      status: 429,
+      retryAfterMs: 30_000,
+    }),
     /wait about 30s/,
   );
   assert.match(
@@ -53,6 +59,19 @@ test("fallback copy exists when the server sent no sentence", () => {
   );
 });
 
+test("capture reset failures are actionable and never reopen the batch", () => {
+  const result = analyzeErrorMessage({
+    ...base,
+    error: "Analysis could not start and the capture could not be reset — take a fresh capture.",
+    code: "AI_PROVIDER_UNAVAILABLE",
+    status: 503,
+    providerAttempted: false,
+    retryableBeforeProvider: false,
+  });
+  assert.match(result, /capture could not be reset/i);
+  assert.match(result, /take a fresh capture/i);
+});
+
 test("an unverified ZDR response never claims nothing was sent or invites a re-tap", () => {
   // Media was dispatched; only the response was discarded, and the one-use
   // batch stays closed. "Nothing was saved — tap Analyze again" got both
@@ -70,9 +89,8 @@ test("an unverified ZDR response never claims nothing was sent or invites a re-t
 });
 
 test("a validator failure is reported as pre-dispatch, and its marker never reaches the reader", async () => {
-  const { analyzeThrownBeforeDispatch, analyzeThrownMessage, PRE_DISPATCH_MARKER } = await import(
-    "./analyze-errors.ts"
-  );
+  const { analyzeThrownBeforeDispatch, analyzeThrownMessage, PRE_DISPATCH_MARKER } =
+    await import("./analyze-errors.ts");
   // The validator runs before the handler, so nothing was reserved and the
   // one-use batch can be reopened — but the failure arrives as a thrown error
   // with no server verdict, so the marker is the only way to know that.

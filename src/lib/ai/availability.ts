@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { grokProviderConfigured } from "./grok";
-import { isTrustedAppOrigin } from "./origin";
+import { availabilityOriginDecision } from "./availability-origin";
 import { assertSameSiteRequest } from "@/lib/auth/isolation.server";
 import { bearerMiddleware } from "@/lib/auth/middleware";
 import { authConfigured, getSessionUser, UnauthorizedError } from "@/lib/auth/verify.server";
@@ -42,18 +42,16 @@ export const aiVisionAvailability = createServerFn({ method: "GET" })
     // Postgres and PGLite drivers into this module's graph.
     const dbSource = selectDatabaseSource(process.env.DATABASE_URL, viteDevServer);
     if (dbSource === "unconfigured") return { configured: false, reason: "no_database" };
-    if (!authConfigured) return { configured: false, reason: "auth_required" };
+    const devAiEnabled = viteDevServer && process.env.ALLOW_DEV_AI?.trim().toLowerCase() === "true";
+    if (!authConfigured && !devAiEnabled) return { configured: false, reason: "auth_required" };
     const request = getRequest();
-    const origin = request?.headers.get("origin");
     if (
-      !origin ||
-      !isTrustedAppOrigin(origin, {
+      availabilityOriginDecision(request?.headers, {
         configuredOrigin: process.env.BETTER_AUTH_URL,
-        allowLoopback: viteDevServer,
+        viteDevServer,
         devHost: request?.headers.get("host"),
-        allowPreviewHosts:
-          viteDevServer || Boolean(process.env.GROK_PREVIEW_CLIENT_SECRET?.trim()),
-      })
+        allowPreviewHosts: viteDevServer || Boolean(process.env.GROK_PREVIEW_CLIENT_SECRET?.trim()),
+      }) !== "ok"
     ) {
       return { configured: false, reason: "origin_not_trusted" };
     }

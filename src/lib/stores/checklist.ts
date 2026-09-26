@@ -39,8 +39,7 @@ export const useChecklist = create<ChecklistState>()(
   persist(
     (set) => ({
       done: {},
-      setDone: (id, checked) =>
-        set((state) => ({ done: { ...state.done, [id]: checked } })),
+      setDone: (id, checked) => set((state) => ({ done: { ...state.done, [id]: checked } })),
       // Explicit falses, not an empty map: the cross-tab merge unions ticks, so
       // a cleared checklist has to say each item is unticked to travel.
       reset: () => set({ done: Object.fromEntries(ITEM_IDS.map((id) => [id, false])) }),
@@ -49,14 +48,16 @@ export const useChecklist = create<ChecklistState>()(
       name: "knotty-checklist",
       storage: safeJsonStorage<ChecklistState>(),
       version: 1,
-      // Ticks are unioned rather than replaced: a stale tab used to erase the
-      // other tab's pre-scene ticks, and the loss only showed up on reload.
+      // Persisted values represent the latest storage snapshot, including
+      // explicit falses from another tab.
       merge: (persisted, current) => {
-        const stored = normalizeChecklistDone((persisted as { done?: unknown } | null)?.done);
-        const done = Object.fromEntries(
-          ITEM_IDS.map((id) => [id, current.done[id] === true || stored[id] === true]),
-        ) as Partial<Record<ChecklistItemId, boolean>>;
-        return { ...current, done };
+        return {
+          ...current,
+          done: {
+            ...current.done,
+            ...normalizeChecklistDone((persisted as { done?: unknown } | null)?.done),
+          },
+        };
       },
     },
   ),

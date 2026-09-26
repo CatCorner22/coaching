@@ -78,10 +78,16 @@ export function vaultErrorMessage(error: unknown): string {
   return "The backup could not be read.";
 }
 
-type SubtleHost = { subtle?: SubtleCrypto; getRandomValues?: <T extends ArrayBufferView>(a: T) => T };
+type SubtleHost = {
+  subtle?: SubtleCrypto;
+  getRandomValues?: <T extends ArrayBufferView>(a: T) => T;
+};
 
 function requireCrypto(host: SubtleHost | undefined): Required<SubtleHost> {
-  if (typeof host?.subtle?.importKey !== "function" || typeof host?.getRandomValues !== "function") {
+  if (
+    typeof host?.subtle?.importKey !== "function" ||
+    typeof host?.getRandomValues !== "function"
+  ) {
     throw new VaultError("unavailable", "WebCrypto is not available in this context.");
   }
   return host as Required<SubtleHost>;
@@ -118,10 +124,10 @@ function fromBase64(value: string): Uint8Array {
  * offline guess into a cheap one. Tampering with it now fails decryption
  * outright.
  */
-function headerBytes(vault: Pick<EncryptedVault, "format" | "v" | "kdf" | "iterations">): Uint8Array {
-  return new TextEncoder().encode(
-    `${vault.format}|${vault.v}|${vault.kdf}|${vault.iterations}`,
-  );
+function headerBytes(
+  vault: Pick<EncryptedVault, "format" | "v" | "kdf" | "iterations">,
+): Uint8Array {
+  return new TextEncoder().encode(`${vault.format}|${vault.v}|${vault.kdf}|${vault.iterations}`);
 }
 
 async function deriveKey(
@@ -129,10 +135,11 @@ async function deriveKey(
   passphrase: string,
   salt: Uint8Array,
   iterations: number,
+  normalize = true,
 ): Promise<CryptoKey> {
   const material = await crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(passphrase.normalize("NFKC")),
+    new TextEncoder().encode(normalize ? passphrase.normalize("NFKC") : passphrase),
     "PBKDF2",
     false,
     ["deriveKey"],
@@ -241,10 +248,9 @@ export async function decryptVault(
   // wrong passphrase, sending people hunting for a passphrase that was right.
   const iv = fromBase64(vault.iv);
   const ciphertext = fromBase64(vault.ciphertext);
-  const key = await deriveKey(crypto, passphrase, fromBase64(vault.salt), vault.iterations);
-  let plaintext: ArrayBuffer;
-  try {
-    plaintext = await crypto.subtle.decrypt(
+  const salt = fromBase64(vault.salt);
+  const decryptWithKey = async (key: CryptoKey): Promise<ArrayBuffer> =>
+    crypto.subtle.decrypt(
       {
         name: "AES-GCM",
         iv: iv as unknown as BufferSource,
@@ -253,10 +259,26 @@ export async function decryptVault(
       key,
       ciphertext as unknown as BufferSource,
     );
+  let plaintext: ArrayBuffer;
+  try {
+    plaintext = await decryptWithKey(await deriveKey(crypto, passphrase, salt, vault.iterations));
   } catch {
-    // AES-GCM cannot tell a wrong key from an altered file: both are a failed
-    // authentication tag, and the message says so rather than picking one.
-    throw new VaultError("wrong_passphrase", "Authentication failed.");
+    // Early exports derived directly from the passphrase bytes. Keep the
+    // normalized path canonical for new files, but accept those exports when
+    // normalization actually changes the user's input.
+    if (passphrase.normalize("NFKC") === passphrase) {
+      throw new VaultError("wrong_passphrase", "Authentication failed.");
+    }
+    try {
+      plaintext = await decryptWithKey(
+        await deriveKey(crypto, passphrase, salt, vault.iterations, false),
+      );
+    } catch {
+      // AES-GCM cannot tell a wrong key from an altered file: both are a
+      // failed authentication tag, and the message says so rather than
+      // picking one.
+      throw new VaultError("wrong_passphrase", "Authentication failed.");
+    }
   }
   return new TextDecoder().decode(plaintext);
 }

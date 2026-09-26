@@ -14,13 +14,16 @@ test("learn progress survives a persisted map of the wrong shape", () => {
 });
 
 test("checklist only adopts known ids with boolean values", () => {
-  assert.deepEqual(normalizeChecklistDone({ shears: true, exit: false, bogus: true, water: "yes" }), {
-    shears: true,
-    exit: false,
-  });
+  assert.deepEqual(
+    normalizeChecklistDone({ shears: true, exit: false, bogus: true, water: "yes" }),
+    {
+      shears: true,
+      exit: false,
+    },
+  );
 });
 
-test("checklist storage merge never lets a stale false clear a current tick", async () => {
+test("checklist storage merge lets persisted explicit false clear a current tick", async () => {
   const { useChecklist } = await import("./checklist.ts");
   const options = (
     useChecklist as typeof useChecklist & {
@@ -32,11 +35,10 @@ test("checklist storage merge never lets a stale false clear a current tick", as
     }
   ).persist.getOptions();
   assert.ok(options.merge);
-  const merged = options.merge(
-    { done: { consent: false, shears: true } },
-    { done: { consent: true, shears: false } } as never,
-  ) as { done: Record<string, boolean> };
-  assert.equal(merged.done.consent, true);
+  const merged = options.merge({ done: { consent: false, shears: true } }, {
+    done: { consent: true, shears: false },
+  } as never) as { done: Record<string, boolean> };
+  assert.equal(merged.done.consent, false);
   assert.equal(merged.done.shears, true);
 });
 
@@ -68,7 +70,12 @@ test("rehydrate unions storage with entries that only exist in this tab", () => 
 
 test("a fresh tombstone is not the first thing the cap evicts", () => {
   const existingRemoved = Array.from({ length: 200 }, (_, i) => `old-${i}`);
-  const merged = mergeJournalEntriesById([], [{ id: "keepme", at: 1 }], ["keepme"], existingRemoved);
+  const merged = mergeJournalEntriesById(
+    [],
+    [{ id: "keepme", at: 1 }],
+    ["keepme"],
+    existingRemoved,
+  );
   assert.equal(merged?.entries.length, 0);
   assert.ok(merged?.removedIds.includes("keepme"));
 });
@@ -150,12 +157,8 @@ test("one key saving does not clear another key's storage warning", async () => 
 });
 
 test("unreadable persisted data is preserved for export and clears after recovery", async () => {
-  const {
-    persistFailureFor,
-    resetPersistFailure,
-    safeJsonStorage,
-    onPersistStatus,
-  } = await import("./persist.ts");
+  const { persistFailureFor, resetPersistFailure, safeJsonStorage, onPersistStatus } =
+    await import("./persist.ts");
   resetPersistFailure();
   const backing = new Map<string, string>([["test-unreadable", "{not json"]]);
   const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");

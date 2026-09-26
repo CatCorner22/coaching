@@ -44,6 +44,54 @@ test("passphrase normalization makes canonically equivalent forms interchangeabl
   assert.equal(await decryptVault(vault, decomposed), PLAINTEXT);
 });
 
+test("decrypt accepts legacy exports derived from raw passphrase bytes", async () => {
+  const passphrase = "ﬂower rope";
+  const iterations = 100_000;
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const material = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(passphrase),
+    "PBKDF2",
+    false,
+    ["deriveKey"],
+  );
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
+    material,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt"],
+  );
+  const header = {
+    format: VAULT_FORMAT,
+    v: 1,
+    kdf: "PBKDF2-SHA256" as const,
+    iterations,
+  };
+  const headerBytes = new TextEncoder().encode(
+    `${header.format}|${header.v}|${header.kdf}|${header.iterations}`,
+  );
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv, additionalData: headerBytes },
+    key,
+    new TextEncoder().encode(PLAINTEXT),
+  );
+  const encode = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
+  assert.equal(
+    await decryptVault(
+      {
+        ...header,
+        salt: encode(salt),
+        iv: encode(iv),
+        ciphertext: encode(new Uint8Array(ciphertext)),
+      },
+      passphrase,
+    ),
+    PLAINTEXT,
+  );
+});
+
 test("a wrong passphrase fails closed rather than returning garbage", async () => {
   const vault = await encryptVault(PLAINTEXT, SECRET);
   for (const wrong of ["", "wrong", SECRET + " ", SECRET.toUpperCase(), " " + SECRET]) {
@@ -95,7 +143,17 @@ test("altering the file anywhere fails decryption", async () => {
 test("a non-vault file is rejected as malformed, not as a wrong passphrase", () => {
   // The distinction is the whole point: "wrong passphrase" on a holiday photo
   // sends someone hunting for a passphrase that never existed.
-  for (const bad of ["", "not json", "[]", "null", "42", '{"format":"something-else"}', {}, [], null]) {
+  for (const bad of [
+    "",
+    "not json",
+    "[]",
+    "null",
+    "42",
+    '{"format":"something-else"}',
+    {},
+    [],
+    null,
+  ]) {
     assert.throws(
       () => parseVault(bad),
       (e) => e instanceof VaultError && e.kind === "malformed",
@@ -104,7 +162,15 @@ test("a non-vault file is rejected as malformed, not as a wrong passphrase", () 
   }
   // Structurally a vault, but missing a field.
   assert.throws(
-    () => parseVault({ format: VAULT_FORMAT, v: 1, kdf: "PBKDF2-SHA256", iterations: 600_000, salt: "a", iv: "b" }),
+    () =>
+      parseVault({
+        format: VAULT_FORMAT,
+        v: 1,
+        kdf: "PBKDF2-SHA256",
+        iterations: 600_000,
+        salt: "a",
+        iv: "b",
+      }),
     (e) => e instanceof VaultError && e.kind === "malformed",
   );
 });
@@ -144,9 +210,9 @@ test("a context without WebCrypto says so instead of failing obscurely", async (
   // default parameter — i.e. the real one — so it cannot express this case.
   const noCrypto = [
     {},
-    { getRandomValues: <T,>(a: T) => a },
+    { getRandomValues: <T>(a: T) => a },
     { subtle: {} as SubtleCrypto },
-    { subtle: {} as SubtleCrypto, getRandomValues: <T,>(a: T) => a },
+    { subtle: {} as SubtleCrypto, getRandomValues: <T>(a: T) => a },
   ];
   for (const host of noCrypto) {
     await assert.rejects(
@@ -155,7 +221,20 @@ test("a context without WebCrypto says so instead of failing obscurely", async (
       JSON.stringify(Object.keys(host)),
     );
     await assert.rejects(
-      () => decryptVault({ format: VAULT_FORMAT, v: 1, kdf: "PBKDF2-SHA256", iterations: VAULT_ITERATIONS, salt: "AAAA", iv: "AAAA", ciphertext: "AAAA" }, SECRET, host),
+      () =>
+        decryptVault(
+          {
+            format: VAULT_FORMAT,
+            v: 1,
+            kdf: "PBKDF2-SHA256",
+            iterations: VAULT_ITERATIONS,
+            salt: "AAAA",
+            iv: "AAAA",
+            ciphertext: "AAAA",
+          },
+          SECRET,
+          host,
+        ),
       (e) => e instanceof VaultError && e.kind === "unavailable",
     );
   }
@@ -166,7 +245,13 @@ test("a context without WebCrypto says so instead of failing obscurely", async (
 });
 
 test("every failure has wording that tells the reader what to do", () => {
-  const kinds = ["malformed", "unsupported", "wrong_passphrase", "unavailable", "empty_passphrase"] as const;
+  const kinds = [
+    "malformed",
+    "unsupported",
+    "wrong_passphrase",
+    "unavailable",
+    "empty_passphrase",
+  ] as const;
   const seen = new Set<string>();
   for (const kind of kinds) {
     const message = vaultErrorMessage(new VaultError(kind, "internal"));
@@ -197,7 +282,15 @@ test("a backup carries tombstones so deletions are not undone by a restore", () 
 });
 
 test("a payload that is not a backup is null rather than a partial restore", () => {
-  for (const bad of ["", "not json", "[]", "null", '{"format":"other"}', '{"format":"knotty-journal","v":9,"entries":[]}', '{"format":"knotty-journal","v":1}']) {
+  for (const bad of [
+    "",
+    "not json",
+    "[]",
+    "null",
+    '{"format":"other"}',
+    '{"format":"knotty-journal","v":9,"entries":[]}',
+    '{"format":"knotty-journal","v":1}',
+  ]) {
     assert.equal(parseJournalBackup(bad), null, bad);
   }
 });
@@ -230,14 +323,17 @@ test("an import reports what it actually changed, and never resurrects a deletio
 
   // A file that records a local entry as deleted removes it, and the summary
   // says so instead of reporting only what it added.
-  assert.deepEqual(summarizeImport([{ id: "new" }], [{ id: "new" }], [{ id: "shared" }], [], ["shared"]), {
-    added: 1,
-    alreadyPresent: 0,
-    skippedDeleted: 0,
-    notKept: 0,
-    displaced: 0,
-    deletedByFile: 1,
-  });
+  assert.deepEqual(
+    summarizeImport([{ id: "new" }], [{ id: "new" }], [{ id: "shared" }], [], ["shared"]),
+    {
+      added: 1,
+      alreadyPresent: 0,
+      skippedDeleted: 0,
+      notKept: 0,
+      displaced: 0,
+      deletedByFile: 1,
+    },
+  );
 });
 
 test("the import report reflects the cap: dropped imports and displaced entries are named", () => {

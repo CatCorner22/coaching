@@ -97,12 +97,7 @@ function StudioPage() {
     policyRef.current = derivedPolicy;
   }
   const negotiationPolicy = policyRef.current;
-  const {
-    operationalLimits,
-    negotiationKey,
-    mediaBlocked,
-    voiceBlocked,
-  } = negotiationPolicy;
+  const { operationalLimits, negotiationKey, mediaBlocked, voiceBlocked } = negotiationPolicy;
   const captureContextKey = `${tieSlug ?? ""}|${furnitureSlug ?? ""}|${negotiationKey}`;
   const [capture, setCapture] = useState<CaptureResult | null>(null);
   const [report, setReport] = useState<CoachReport | null>(null);
@@ -711,7 +706,8 @@ function StudioPage() {
               variant="outline"
               size="sm"
               onClick={() => {
-                startSessionIfNeeded();
+                if (startedAt === null) startSessionIfNeeded();
+                else startSession();
                 useSession.getState().checked();
               }}
             >
@@ -799,7 +795,9 @@ function StudioPage() {
                 {t.minutes[1] === 0
                   ? " — instructor route"
                   : negotiationPolicy.isTieBlocked(t.slug)
-                    ? ` — waits for yes on: ${missingTieLimits(t.slug, items).map((row) => row.label).join(", ")}`
+                    ? ` — waits for yes on: ${missingTieLimits(t.slug, items)
+                        .map((row) => row.label)
+                        .join(", ")}`
                     : ""}
               </option>
             ))}
@@ -1068,7 +1066,8 @@ function StudioPage() {
                 currentReportSaved
               }
               onClick={() => {
-                if (!contextBoundReport || !contextBoundObservationReport || !reportRevision) return;
+                if (!contextBoundReport || !contextBoundObservationReport || !reportRevision)
+                  return;
                 const snapshot = useSession.getState();
                 if (savedEntryId) removeEntry(savedEntryId);
                 const entryId = addEntry({

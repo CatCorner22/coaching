@@ -245,53 +245,52 @@ export const analyzeRope = createServerFn({ method: "POST" })
 // Split out of the validator so every throw inside can be tagged as
 // happening before any reservation or dispatch.
 function validateAnalyzeInput(input: unknown) {
-    // A ZodError serializes its whole issue array as the thrown message, and
-    // the Studio prints thrown messages verbatim: a single mistyped field used
-    // to render as a kilobyte of JSON in the error banner.
-    const validated = analyzeInputSchema.safeParse(input);
-    if (!validated.success) {
-      throw new AnalyzeRequestError(
-        "This capture could not be submitted: the request did not match what the server expects. Discard the batch and capture again.",
-      );
-    }
-    const parsed = validated.data;
-    for (const image of parsed.images) {
-      if (!isCameraDataUrl(image))
-        throw new Error("Stills must be camera captures, not remote URLs");
-    }
-    if (parsed.frameLabels && parsed.frameLabels.length !== parsed.images.length) {
-      throw new Error("Each selected still needs one frame label");
-    }
-    const consentAgeMs = Date.now() - parsed.consent.confirmedAt;
-    if (consentAgeMs < -5 * 60_000 || consentAgeMs > 60 * 60_000) {
-      throw new Error("Media permissions must be reconfirmed for this batch");
-    }
-    // The attestation must be the one this deployment's scope setting asks
-    // for. A stale client built against a different scope — or a widened
-    // hand-rolled request — fails closed here rather than being silently
-    // reinterpreted.
-    verifyBatchConsentScope(parsed.consent.scope);
-    const tieSlug = parsed.tieSlug?.slice(0, 60);
-    return {
-      images: parsed.images.slice(0, 3),
-      // Relabel the selected images by bounded batch position. Source clip
-      // labels can be sparse and are not a trusted chronology declaration.
-      frameLabels: parsed.images.map((_, index) => `F${String(index + 1).padStart(2, "0")}`),
-      // The module's contract: the hard-no list is never silently shortened.
-      // Both bounds match the schema — the old 80/24 pair was a leftover of a
-      // bare-24 cap and dropped entries (and tail text) with nothing to say so.
-      hardNos: (parsed.hardNos ?? [])
-        .map((value) => sanitizeQuestion(value, MAX_HARD_NO_LENGTH))
-        .filter(Boolean)
-        .slice(0, MAX_HARD_NOS),
-      deterministic: sanitizeDet(parsed.deterministic),
-      stepIndex: Number.isFinite(parsed.stepIndex) ? Math.round(parsed.stepIndex as number) : 0,
-      elapsedSec: Math.max(0, Math.min(8 * 3600, Number(parsed.elapsedSec) || 0)),
-      tieSlug: tieSlug && getTie(tieSlug) ? tieSlug : undefined,
-      triage: parsed.triage,
-      media: parsed.media,
-      consent: parsed.consent,
-    };
+  // A ZodError serializes its whole issue array as the thrown message, and
+  // the Studio prints thrown messages verbatim: a single mistyped field used
+  // to render as a kilobyte of JSON in the error banner.
+  const validated = analyzeInputSchema.safeParse(input);
+  if (!validated.success) {
+    throw new AnalyzeRequestError(
+      "This capture could not be submitted: the request did not match what the server expects. Discard the batch and capture again.",
+    );
+  }
+  const parsed = validated.data;
+  for (const image of parsed.images) {
+    if (!isCameraDataUrl(image)) throw new Error("Stills must be camera captures, not remote URLs");
+  }
+  if (parsed.frameLabels && parsed.frameLabels.length !== parsed.images.length) {
+    throw new Error("Each selected still needs one frame label");
+  }
+  const consentAgeMs = Date.now() - parsed.consent.confirmedAt;
+  if (consentAgeMs < -5 * 60_000 || consentAgeMs > 60 * 60_000) {
+    throw new Error("Media permissions must be reconfirmed for this batch");
+  }
+  // The attestation must be the one this deployment's scope setting asks
+  // for. A stale client built against a different scope — or a widened
+  // hand-rolled request — fails closed here rather than being silently
+  // reinterpreted.
+  verifyBatchConsentScope(parsed.consent.scope);
+  const tieSlug = parsed.tieSlug?.slice(0, 60);
+  return {
+    images: parsed.images.slice(0, 3),
+    // Relabel the selected images by bounded batch position. Source clip
+    // labels can be sparse and are not a trusted chronology declaration.
+    frameLabels: parsed.images.map((_, index) => `F${String(index + 1).padStart(2, "0")}`),
+    // The module's contract: the hard-no list is never silently shortened.
+    // Both bounds match the schema — the old 80/24 pair was a leftover of a
+    // bare-24 cap and dropped entries (and tail text) with nothing to say so.
+    hardNos: (parsed.hardNos ?? [])
+      .map((value) => sanitizeQuestion(value, MAX_HARD_NO_LENGTH))
+      .filter(Boolean)
+      .slice(0, MAX_HARD_NOS),
+    deterministic: sanitizeDet(parsed.deterministic),
+    stepIndex: Number.isFinite(parsed.stepIndex) ? Math.round(parsed.stepIndex as number) : 0,
+    elapsedSec: Math.max(0, Math.min(8 * 3600, Number(parsed.elapsedSec) || 0)),
+    tieSlug: tieSlug && getTie(tieSlug) ? tieSlug : undefined,
+    triage: parsed.triage,
+    media: parsed.media,
+    consent: parsed.consent,
+  };
 }
 
 class AnalyzeRequestError extends Error {
@@ -417,19 +416,21 @@ async function runAnalyzeRequest(
       });
 
       if (!grok.ok && grok.providerAttempted === false) {
+        let releaseConfirmed = false;
         if (reservationId && grok.retryableBeforeProvider) {
-          await releaseMediaBatch(
-            authorization.userId,
-            data.consent.batchId,
-            reservationId,
-          ).catch((error) => {
+          try {
+            await releaseMediaBatch(authorization.userId, data.consent.batchId, reservationId);
+            releaseConfirmed = true;
+          } catch (error) {
             console.error("[analyze] unable to release preflight reservation", error);
-          });
+          }
         }
+        const releaseError = reservationId && grok.retryableBeforeProvider && !releaseConfirmed;
         return {
           ok: false,
-          error:
-            grok.privacyFailure === "preflight"
+          error: releaseError
+            ? "Analysis could not start and the capture could not be reset — take a fresh capture."
+            : grok.privacyFailure === "preflight"
               ? "No media was sent to xAI. This batch's non-sensitive zero-data-retention preflight failed, so the one-use batch was closed. Discard it and confirm a new batch after the deployment's xAI team settings are corrected."
               : "No media was sent to xAI. The provider became unavailable after this one-use batch was reserved. Discard it and confirm a new batch after the deployment is corrected.",
           providerAttempted: false,
@@ -438,7 +439,7 @@ async function runAnalyzeRequest(
               ? "AI_PRIVACY_UNAVAILABLE"
               : "AI_PROVIDER_UNAVAILABLE",
           status: 503,
-          retryableBeforeProvider: grok.retryableBeforeProvider === true,
+          retryableBeforeProvider: releaseConfirmed,
         };
       }
       if (!grok.ok && grok.transportFailure) {
