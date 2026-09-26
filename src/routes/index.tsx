@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MiniTie } from "@/components/rope-figure";
 import { SEQUENCES, TIES, kbStats } from "@/lib/kb";
+import { MORE } from "@/lib/nav";
 import { tieShape, tieShapeLabel, tieThumbnailStep } from "@/lib/kb/tie-factories";
 
 export const Route = createFileRoute("/")({ component: Home });
@@ -52,12 +53,19 @@ function Home() {
           <dl className="mt-10 grid grid-cols-3 gap-4 text-sm">
             <Stat n={stats.ties} l="ties" />
             <Stat n={stats.knots} l="knots" />
-            <Stat n={stats.articles} l="essays" />
+            <Stat n={92} l="articles" />
           </dl>
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-5xl gap-3 px-5 py-10 md:grid-cols-3">
+      <section className="mx-auto max-w-5xl px-5 py-10">
+        <h2 className="mb-4 font-display text-3xl">Start here</h2>
+        <Link to="/learn" hash="start" className="block rounded-lg border border-accent/30 bg-accent/5 p-5 hover:border-accent">
+          <p className="font-display text-2xl">Learn the foundations</p>
+          <p className="mt-2 text-sm text-muted">A short path through knots, cuffs, and a first karada.</p>
+        </Link>
+      </section>
+      <section className="mx-auto grid max-w-5xl gap-3 px-5 pb-10 md:grid-cols-3">
         <Card
           icon={<Camera className="size-4" />}
           title="Studio Analyze"
@@ -68,36 +76,23 @@ function Home() {
           title="Just the two of you"
           body="One sign-in, one checkbox, then the whole studio is yours — negotiate, plan, check in, and play at your pace."
         />
-        <Card
-          icon={<BookOpen className="size-4" />}
-          title="Learn & practice"
-          body="Guided ties, Nyx demonstrations, foundations, and emergency cards — everything in plain English."
-        />
+        <Link to="/learn" hash="start" className="rounded-lg border border-border bg-surface p-4 transition-colors hover:border-border-strong">
+          <BookOpen className="size-4 text-accent" aria-hidden />
+          <p className="font-display text-2xl">Learn & practice</p>
+          <p className="mt-2 text-sm text-muted">Guided ties, foundations, and emergency cards in plain English.</p>
+        </Link>
       </section>
 
       <section className="mx-auto max-w-5xl px-5 pb-8">
         <h2 className="mb-4 font-display text-3xl">Tools</h2>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          {[
-            { to: "/checklist" as const, t: "Pre-scene", d: "Ten sweet checks before rope" },
-            { to: "/checkin" as const, t: "Check-in", d: "Ask how they're feeling" },
-            { to: "/dungeon" as const, t: "Equipment", d: "Gear and boundaries" },
-            { to: "/negotiate" as const, t: "Negotiate", d: "Yes / maybe / no" },
-            { to: "/nerves" as const, t: "Symptoms", d: "When something feels off" },
-            { to: "/calc" as const, t: "Rope calc", d: "Lengths for tonight" },
-            { to: "/aftercare" as const, t: "Aftercare", d: "Stay close afterward" },
-            { to: "/emergency" as const, t: "Emergency", d: "Release and call for help" },
-            { to: "/settings" as const, t: "Settings", d: "Names, safewords, sync" },
-            { to: "/knots" as const, t: "Knots", d: "Foundations on a prop" },
-            { to: "/journal" as const, t: "Journal", d: "Private notes" },
-          ].map((x) => (
+          {MORE.map((x) => (
             <Link
               key={x.to}
               to={x.to}
               className="rounded-lg border border-border bg-surface p-4 hover:border-border-strong"
             >
-              <p className="font-display text-2xl">{x.t}</p>
-              <p className="mt-1 text-xs text-muted">{x.d}</p>
+              <p className="font-display text-2xl">{x.label}</p>
             </Link>
           ))}
         </div>
@@ -107,7 +102,7 @@ function Home() {
         <div className="mb-4 flex items-end justify-between">
           <h2 className="font-display text-3xl">Tonight</h2>
           <Link to="/plan" className="text-sm text-muted hover:text-fg">
-            Scene planner
+            Plan
           </Link>
         </div>
         <div className="grid gap-3 md:grid-cols-3">
@@ -127,12 +122,7 @@ function Home() {
       </section>
 
       <section className="mx-auto max-w-5xl px-5 pb-16">
-        <div className="mb-4 flex items-end justify-between">
-          <h2 className="font-display text-3xl">Start here</h2>
-          <Link to="/library" className="inline-flex items-center gap-1 text-sm text-muted hover:text-fg">
-            All ties
-          </Link>
-        </div>
+        <div className="mb-4 flex items-end justify-between"><h2 className="font-display text-3xl">Featured ties</h2><Link to="/library" className="inline-flex items-center gap-1 text-sm text-muted hover:text-fg">All ties</Link></div>
         <div className="grid min-w-0 gap-3 sm:grid-cols-2">
           {featured.map((t) => (
             <Link

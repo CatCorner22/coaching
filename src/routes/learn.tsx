@@ -7,6 +7,7 @@ import { RopeFigure } from "@/components/rope-figure";
 import {
   FOUNDATION_KNOT_SLUGS,
   FOUNDATION_TIE_SLUGS,
+  BEGINNER_PATH,
   getAcademyKnot,
   getAcademyTie,
   getKnot,
@@ -26,6 +27,7 @@ export const Route = createFileRoute("/learn")({ component: LearnPage });
 function LearnPage() {
   const knots = FOUNDATION_KNOT_SLUGS.map((slug) => getAcademyKnot(slug)).filter((knot) => knot !== undefined);
   const ties = FOUNDATION_TIE_SLUGS.map((slug) => getAcademyTie(slug)).filter((tie) => tie !== undefined);
+  const firstKnot = getAcademyKnot("somerville-bowline");
   // Counted, not asserted. This card used to read "On an empty dress form" over
   // every tie lesson, which stopped being true the moment the catalog started
   // teaching some of them in full.
@@ -66,6 +68,27 @@ function LearnPage() {
       </div>
 
       <div className="mt-8 space-y-6">
+        <section id="start" className="scroll-mt-6 rounded-lg border border-accent/25 bg-accent/5 p-5 sm:p-6">
+          <div className="flex items-center gap-2">
+            <Sparkles className="size-5 text-accent" aria-hidden />
+            <h2 className="font-display text-2xl">Start here</h2>
+          </div>
+          <p className="mt-2 text-base text-muted">
+            Start with Somerville Bowline: {firstKnot?.steps.length ?? 0} short steps, then follow the numbered path.
+          </p>
+          <h3 className="mt-5 font-display text-xl">Beginner path</h3>
+          <ol className="mt-4 space-y-2">
+            {BEGINNER_PATH.map((item) => (
+              <li key={item.sessions} className="rounded-lg border border-border bg-surface p-3">
+                <Link to={item.to} params={{ slug: item.slug }} className="font-medium text-accent hover:underline">
+                  <span className="mr-2 text-xs uppercase tracking-wide text-subtle">{item.sessions}</span>
+                  {item.title}
+                </Link>
+                {item.note && <p className="mt-1 text-sm text-muted">{item.note}</p>}
+              </li>
+            ))}
+          </ol>
+        </section>
         <HowToLearn />
         <section className="rounded-lg border border-accent/25 bg-accent/5 p-5 sm:p-6">
           <h2 className="font-display text-2xl">New to rope or struggle with fast videos?</h2>
@@ -92,68 +115,10 @@ function LearnPage() {
       </div>
 
       <section className="mt-12">
-        <h2 className="font-display text-2xl">Meet {NYX_SHIBARI.name}</h2>
-        <p className="mt-2 max-w-2xl text-base leading-relaxed text-muted">
-          {NYX_SHIBARI.fullName} is our fictional demonstration model — {NYX_SHIBARI.ageLabel},{" "}
-          {NYX_SHIBARI.look.split(".")[0].toLowerCase()}. She appears on taught lessons with step-matched stills.
-        </p>
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {NYX_SHIBARI_POSES.map((pose) => (
-            <NyxModelPanel key={pose} pose={pose} compact />
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-12">
-        <h2 className="font-display text-2xl">{NYX_SHIBARI.name} nude body studies</h2>
-        <p className="mt-2 max-w-2xl text-base leading-relaxed text-muted">
-          Forty photo slots plus twenty-eight illustrated fallbacks. Generate real photo nudes with{" "}
-          <code className="text-xs">npm run generate:nyx-nudes</code> (see Settings for details) — they replace the
-          drawings automatically. Eight appear on every taught lesson step.
-        </p>
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {nyxPhotoGalleryPoses().map((pose) => (
-            <NyxNudePanel key={pose} pose={pose} compact />
-          ))}
-        </div>
-        <p className="mt-6 text-sm font-medium text-muted">Illustrated fallback set ({NYX_NUDE_POSES.length})</p>
-        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {NYX_NUDE_POSES.map((pose) => (
-            <NyxNudePanel key={pose} pose={pose} compact />
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-12">
-        <div className="flex items-center gap-2">
-          <Sparkles className="size-5 text-accent" aria-hidden />
-          <h2 className="font-display text-2xl">Start here</h2>
-        </div>
-        <p className="mt-2 text-base text-muted">If you are new, begin with this knot. Four short steps.</p>
-        <Link
-          to="/knot/$slug"
-          params={{ slug: "somerville-bowline" }}
-          className="academy-feature mt-4 flex min-w-0 flex-col overflow-hidden rounded-xl border border-accent/25 bg-surface transition-colors hover:border-accent/50 sm:flex-row"
-        >
-          <div className="min-w-0 flex-1 p-5 sm:p-6">
-            <Badge className="border-accent/30 bg-accent/10 text-accent">Best first lesson</Badge>
-            <h3 className="mt-3 font-display text-2xl">Somerville Bowline</h3>
-            <p className="mt-2 text-base leading-relaxed text-muted">
-              {getAcademyKnot("somerville-bowline")?.goal}
-            </p>
-            <p className="mt-4 text-sm font-medium text-accent">Open lesson →</p>
-          </div>
-          <div className="h-44 w-full shrink-0 border-t border-border bg-elevated p-3 sm:h-auto sm:w-56 sm:border-t-0 sm:border-l">
-            <KnotFigure diagramId="somerville-bowline-0" className="h-full w-full" />
-          </div>
-        </Link>
-      </section>
-
-      <section className="mt-12">
-        <h2 className="font-display text-2xl">Knot lessons</h2>
+        <h2 className="font-display text-2xl">Foundation six (in order)</h2>
         <p className="mt-2 text-base text-muted">Use a chair leg, pipe, or post. Check each box before you go on.</p>
         <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
-          {FOUNDATION_KNOT_SLUGS.map((slug) => {
+          {FOUNDATION_KNOT_SLUGS.map((slug, index) => {
             const knot = getKnot(slug);
             const academy = getAcademyKnot(slug);
             if (!knot || !academy) return null;
@@ -168,7 +133,7 @@ function LearnPage() {
                   <KnotFigure diagramId={`${slug}-0`} className="h-full w-full" animate={false} />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate font-display text-lg">{knot.name}</p>
+                  <p className="truncate font-display text-lg">{index + 1}. {knot.name}</p>
                   <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted">{academy.goal}</p>
                   <p className="mt-2 text-sm text-subtle">
                     {knot.steps.length} step{knot.steps.length === 1 ? "" : "s"}
@@ -181,13 +146,13 @@ function LearnPage() {
       </section>
 
       <section className="mt-12">
-        <h2 className="font-display text-2xl">Tie lessons</h2>
+        <h2 className="font-display text-2xl">Sessions 1–10</h2>
         <p className="mt-2 text-base text-muted">
           Some of these are pattern drills for an empty prop. Some are taught in full and may go on a consenting adult
           once the limit is agreed. Some this app only names. Every card says which.
         </p>
         <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
-          {FOUNDATION_TIE_SLUGS.map((slug) => {
+          {FOUNDATION_TIE_SLUGS.filter((slug) => ["single-column", "double-column", "karada"].includes(slug)).map((slug) => {
             const tie = getTie(slug);
             const academy = getAcademyTie(slug);
             if (!tie || !academy) return null;
@@ -235,6 +200,52 @@ function LearnPage() {
           })}
         </div>
       </section>
+      <section className="mt-12">
+        <h2 className="font-display text-2xl">After session 10</h2>
+        <p className="mt-2 text-base text-muted">Move on only after the fundamentals are comfortable and release is practiced.</p>
+        <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
+          {FOUNDATION_TIE_SLUGS.filter((slug) => !["single-column", "double-column", "karada"].includes(slug)).map((slug) => {
+            const tie = getTie(slug);
+            if (!tie) return null;
+            return <Link key={slug} to="/tie/$slug" params={{ slug }} className="rounded-lg border border-border bg-surface p-4 hover:border-border-strong"><p className="font-display text-xl">{tie.name}</p><p className="mt-1 text-sm text-muted">{tie.summary}</p></Link>;
+          })}
+        </div>
+      </section>
+      <details className="mt-12 rounded-lg border border-border p-4">
+        <summary className="cursor-pointer font-display text-2xl">Reference photos (Nyx)</summary>
+        <p className="mt-2 text-sm text-muted">Optional reference images for study; the written steps and limits remain authoritative.</p>
+        <section className="mt-8">
+          <h2 className="font-display text-2xl">Meet {NYX_SHIBARI.name}</h2>
+          <p className="mt-2 max-w-2xl text-base leading-relaxed text-muted">
+            {NYX_SHIBARI.fullName} is our fictional demonstration model — {NYX_SHIBARI.ageLabel},{" "}
+            {NYX_SHIBARI.look.split(".")[0].toLowerCase()}. She appears on taught lessons with step-matched stills.
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {NYX_SHIBARI_POSES.map((pose) => (
+              <NyxModelPanel key={pose} pose={pose} compact />
+            ))}
+          </div>
+        </section>
+        <section className="mt-8">
+          <h2 className="font-display text-2xl">{NYX_SHIBARI.name} nude body studies</h2>
+          <p className="mt-2 max-w-2xl text-base leading-relaxed text-muted">
+            Forty photo slots plus twenty-eight illustrated fallbacks. Generate real photo nudes with{" "}
+            <code className="text-xs">npm run generate:nyx-nudes</code> (see Settings for details) — they replace the
+            drawings automatically. Eight appear on every taught lesson step.
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {nyxPhotoGalleryPoses().map((pose) => (
+              <NyxNudePanel key={pose} pose={pose} compact />
+            ))}
+          </div>
+          <p className="mt-6 text-sm font-medium text-muted">Illustrated fallback set ({NYX_NUDE_POSES.length})</p>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {NYX_NUDE_POSES.map((pose) => (
+              <NyxNudePanel key={pose} pose={pose} compact />
+            ))}
+          </div>
+        </section>
+      </details>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   ARTICLES,
+  articleMinutes,
   isKnowledgeQueryUsable,
   knowledgeAnswer,
   knowledgeDisposition,
@@ -41,7 +42,7 @@ function KnowledgePage() {
   return (
     <div className="mx-auto max-w-3xl px-5 py-10">
       <p className="text-xs uppercase tracking-[0.22em] text-muted">Guide</p>
-      <h1 className="mt-2 font-display text-4xl">Knowledge</h1>
+      <h1 className="mt-2 font-display text-4xl">Guide</h1>
       <p className="mt-3 text-sm text-muted">
         Consent, risk recognition, privacy, and aftercare. Search in your words; results point to
         curated local entries without generating individualized rope instructions. Evidence status
@@ -57,8 +58,8 @@ function KnowledgePage() {
             }
           }}
           maxLength={600}
-          placeholder="Radial nerve, aftercare, crotch rope…"
-          aria-label="Search the knowledge base"
+          placeholder="Try: karada, TK, shears, where do I start"
+          aria-label="guide"
           className="h-11 flex-1 rounded-md border border-border bg-elevated px-3 text-sm"
         />
         <Button onClick={ask} disabled={!usableQuery}>
@@ -114,27 +115,43 @@ function KnowledgePage() {
           equipment, or emergency release.
         </p>
       )}
-      {!actionFirst && sections.map((sec) => (
-        <section key={sec} className="mt-10">
-          <h2 className="font-display text-2xl capitalize">{sec}</h2>
+      {!actionFirst && !usableQuery && (
+        <section className="mt-10">
+          <h2 className="font-display text-2xl">Start here</h2>
+          <div className="mt-3 space-y-2">
+            {["first-ten-sessions", "getting-rope-off", "the-check-that-works", "negotiation", "aftercare", "circulation"].map((slug, index) => {
+              const article = ARTICLES.find((item) => item.slug === slug);
+              if (!article) return null;
+              return (
+                <details key={slug} open={index === 0} className="rounded-lg border border-border bg-surface p-4">
+                  <summary className="cursor-pointer font-display text-xl">{article.title}</summary>
+                  <p className="mt-2 text-sm text-muted">{article.summary}</p>
+                  <Link to="/article/$slug" params={{ slug }} className="mt-2 inline-flex text-sm text-accent">
+                    Read ~{articleMinutes(article)} min →
+                  </Link>
+                </details>
+              );
+            })}
+          </div>
+        </section>
+      )}
+      {!actionFirst && !usableQuery && sections.map((sec) => (
+        <details key={sec} className="mt-10 rounded-lg border border-border p-4">
+          <summary className="cursor-pointer font-display text-2xl capitalize">
+            {sec} ({ARTICLES.filter((a) => a.section === sec).length})
+          </summary>
           <ul className="mt-3 space-y-2">
             {ARTICLES.filter((a) => a.section === sec).map((a) => (
               <li key={a.slug}>
-                <Link
-                  to="/article/$slug"
-                  params={{ slug: a.slug }}
-                  className="block rounded-lg border border-border bg-surface p-4 hover:border-border-strong"
-                >
+                <Link to="/article/$slug" params={{ slug: a.slug }} className="block rounded-lg border border-border bg-surface p-4 hover:border-border-strong">
                   <p className="font-display text-2xl">{a.title}</p>
                   <p className="mt-1 text-sm text-muted">{a.summary}</p>
-                  <p className="mt-2 text-[11px] uppercase tracking-wide text-subtle">
-                    {a.minutes} min reading estimate
-                  </p>
+                  <p className="mt-2 text-[11px] uppercase tracking-wide text-subtle">~{articleMinutes(a)} min read</p>
                 </Link>
               </li>
             ))}
           </ul>
-        </section>
+        </details>
       ))}
     </div>
   );
@@ -166,6 +183,14 @@ function HitLink({ hit }: { hit: SearchHit }) {
     return (
       <Link to="/article/$slug" params={{ slug: hit.slug }} className={className}>
         {label}
+      </Link>
+    );
+  }
+  if (hit.kind === "tool") {
+    return (
+      <Link to={hit.href as never} className={className}>
+        <span className="mr-2 rounded-full border border-accent/30 px-2 py-0.5 text-[10px] uppercase tracking-wide text-accent">Tool</span>
+        {hit.title}
       </Link>
     );
   }
