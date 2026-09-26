@@ -196,7 +196,7 @@ export function listenForWords(
   try {
     rec.start();
   } catch {
-    report("error", "Voice needs a network connection — use the buttons.");
+    report("error", "Voice could not start — use the buttons.");
   }
   return () => {
     disposed = true;
