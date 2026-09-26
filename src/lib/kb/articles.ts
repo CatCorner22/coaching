@@ -1,4 +1,5 @@
 import type { Article } from "./types";
+import { EMERGENCY_CALL_FIRST } from "@/lib/emergency-card";
 import { MORE_ARTICLES } from "./more-articles";
 import { EXPANSION_ARTICLES } from "./expansion-articles";
 import { BDSM_ARTICLES } from "./bdsm-articles";
@@ -142,12 +143,12 @@ const CORE_ARTICLES: Article[] = [
       { type: "h", text: "Symptoms are stop signals, not anatomy tests" },
       {
         type: "p",
-        text: "New numbness, tingling, burning, electric sensations, weakness, loss of movement, loss of coordination, severe or escalating pain, swelling, or a marked temperature or color change all require prompt release. A symptom pattern cannot identify the structure involved, and a normal-looking limb does not clear the tie.",
+        text: "New numbness, tingling, burning, electric sensations, weakness, loss of movement, loss of coordination, severe or escalating pain, swelling, or a marked temperature or colour change all require prompt release. A symptom pattern cannot identify the structure involved, and a normal-looking limb does not clear the tie.",
       },
       { type: "h", text: "What an atlas can and cannot do" },
       {
         type: "p",
-        text: "Names such as radial, ulnar, median, fibular, femoral, and pudendal are vocabulary for an instructor or clinician conversation. A diagram, body landmark, finger-width rule, color check, pulse check, photograph, or movement test cannot define safe placement, pressure, or duration. Learn person-specific placement and release skills hands-on from a qualified, consent-centered instructor.",
+        text: "Names such as radial, ulnar, median, fibular, femoral, and pudendal are vocabulary for an instructor or clinician conversation. A diagram, body landmark, finger-width rule, colour check, pulse check, photograph, or movement test cannot define safe placement, pressure, or duration. Learn person-specific placement and release skills hands-on from a qualified, consent-centered instructor.",
       },
       {
         type: "callout",
@@ -169,7 +170,7 @@ const CORE_ARTICLES: Article[] = [
         items: [
           "Ask about new or changing sensation, movement, strength, pain, swelling, and temperature.",
           "Compare with the person's own baseline only to notice change, never to approve continuation.",
-          "Release for numbness, tingling, weakness, loss of movement, severe or escalating pain, or a marked color or temperature change.",
+          "Release for numbness, tingling, weakness, loss of movement, severe or escalating pain, or a marked colour or temperature change.",
           "Do not use nail-bed timing, pulse checks, finger-width rules, photographs, or forced movement as clearance.",
           "Persistent or worsening symptoms after release need prompt medical assessment.",
         ],
@@ -190,7 +191,7 @@ const CORE_ARTICLES: Article[] = [
     section: "risk",
     minutes: 5,
     summary: "Shears, cutting order, fainting, panic. Rehearse this once while nobody is tied.",
-    related: ["safewords", "circulation"],
+    related: ["safewords", "circulation", "getting-rope-off"],
     blocks: [
       {
         type: "p",
@@ -199,8 +200,8 @@ const CORE_ARTICLES: Article[] = [
       {
         type: "ul",
         items: [
-          "There is no universal cutting order; stabilize against a fall and use the release method you have practiced for the actual configuration.",
-          "Call emergency services immediately for unresponsiveness, abnormal breathing, severe confusion, collapse, or another emergency sign.",
+          "Order: breathing first, then whatever is holding weight, then the limb with symptoms. Cut a wrap, not the knot.",
+          EMERGENCY_CALL_FIRST,
           "Stop and release for panic, a stop signal, loss of communication, or uncertainty.",
           "Keep sharp edges directed away from the body and follow your hands-on training and dispatcher instructions.",
         ],
@@ -235,7 +236,7 @@ const CORE_ARTICLES: Article[] = [
     section: "aftercare",
     minutes: 6,
     summary: "Some people report delayed emotional or physical changes after an intense scene; the cause should not be assumed.",
-    related: ["aftercare", "subspace"],
+    related: ["aftercare", "subspace", "top-drop"],
     blocks: [
       {
         type: "p",
@@ -386,7 +387,7 @@ const CORE_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "Jute, hemp, cotton, and synthetics differ in feel, stretch, friction, maintenance, and failure behavior. A fiber label, diameter, appearance, or familiar knot does not establish condition or suitability for restraint or person-bearing use. Keep app-guided practice ground-level and non-loaded, inspect before each use, and obtain hands-on guidance for body application.",
+        text: "Jute, hemp, cotton, and synthetics differ in feel, stretch, friction, maintenance, and failure behaviour. A fibre label, diameter, appearance, or familiar knot does not establish condition or suitability for restraint or person-bearing use. Keep app-guided practice ground-level and non-loaded, inspect before each use, and obtain hands-on guidance for body application.",
       },
       {
         type: "ul",
@@ -394,7 +395,7 @@ const CORE_ARTICLES: Article[] = [
           "Choose practice material using the maker's documented purpose, care, and retirement guidance; a common label or dimension is not a safety rating.",
           "Do not heat, oil, wash, or otherwise condition rope from generic app instructions. Follow the specific manufacturer's instructions and fire-safety warnings.",
           "Retire cut, melted, contaminated, damaged, or uncertain material from body use; do not rely on appearance alone.",
-          "Skin reacts to the fiber itself, not only to pressure. Natural fibers shed fine dust and carry processing oils; some people itch, redden, or come up in a rash from jute or hemp and are fine with cotton, and a first exposure that went well does not settle the second. Anyone with sensitive skin, eczema, or a known fiber or latex sensitivity should know the material before it is on them.",
+          "Skin reacts to the fibre itself, not only to pressure. Natural fibres shed fine dust and carry processing oils; some people itch, redden, or come up in a rash from jute or hemp and are fine with cotton, and a first exposure that went well does not settle the second. Anyone with sensitive skin, eczema, or a known fibre or latex sensitivity should know the material before it is on them.",
           "Friction is the other half of what rope does to skin. A fast pass or a rope dragged under load abrades regardless of how well the tie is tensioned, and broken skin changes what is safe to do next — it is an open wound, not a mark.",
         ],
       },
@@ -580,7 +581,7 @@ const CORE_ARTICLES: Article[] = [
     minutes: 6,
     summary:
       "A swing, pole, cross, table, or bench is not a verified person-bearing rope system, and a camera cannot establish that it is one.",
-    related: ["hard-limits", "emergency-stop"],
+    related: ["hard-limits", "emergency-stop", "furniture"],
     blocks: [
       { type: "h", text: "What an equipment label cannot prove" },
       {

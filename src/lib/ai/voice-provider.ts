@@ -1,14 +1,16 @@
-import {
-  verifyGrokZeroDataRetentionForRequest,
-  zeroDataRetentionRequired,
-} from "./grok";
+import { verifyGrokZeroDataRetentionForRequest, zeroDataRetentionRequired } from "./grok";
 
 const TTS_TIMEOUT_MS = 15_000;
 const MAX_TTS_BYTES = 1024 * 1024;
 
 export type VoiceProviderResult =
   | { ok: true; mime: string; b64: string }
-  | { ok: false; error: string };
+  | {
+      ok: false;
+      error: string;
+      reason?: "zdr_missing" | "http_error" | "rate_limited" | "timeout" | "network";
+      retryAfterMs?: number;
+    };
 
 /** Send one reviewed line only after a same-key, per-call ZDR preflight. */
 export async function requestGrokVoice(options: {
@@ -21,8 +23,17 @@ export async function requestGrokVoice(options: {
   if (!apiKey || !zeroDataRetentionRequired()) {
     return { ok: false, error: "Voice is not available" };
   }
-  if (!(await verifyGrokZeroDataRetentionForRequest(apiKey, options.signal))) {
-    return { ok: false, error: "Voice privacy preflight failed" };
+  const preflight = await verifyGrokZeroDataRetentionForRequest(apiKey, options.signal);
+  if (!preflight.ok) {
+    return {
+      ok: false,
+      error:
+        preflight.reason === "zdr_missing"
+          ? "No voice was sent to xAI. Zero data retention could not be confirmed."
+          : "Cloud voice is temporarily unavailable.",
+      reason: preflight.reason,
+      ...(preflight.retryAfterMs === undefined ? {} : { retryAfterMs: preflight.retryAfterMs }),
+    };
   }
   if (!zeroDataRetentionRequired() || options.signal?.aborted) {
     return { ok: false, error: "Voice privacy preflight failed" };

@@ -257,7 +257,8 @@ jobs:
             exit 1
           fi
 
-          npm run check:auth
+          npm run check:auth -- --expect false
+          VITE_AUTH_ENABLED=true npm run check:auth -- --expect true
 
       - name: Smoke-test the configuration a fresh clone actually gets
         shell: bash

@@ -93,8 +93,15 @@ test("route registration and the preview bridge keep heavy knowledge and schema 
 test("studio burst waits for distinct frames, matches digital zoom, and does not double-fire Space", () => {
   const camera = read("src/components/camera-capture.tsx");
   assert.match(camera, /waitForNextVideoFrame\(v\)/);
-  assert.match(camera, /processMediaFrame\(v, 1600, 240, 0\.82, null, digitalZoom, CAPTURE_PREVIEW_ASPECT\)/);
-  const timer = between(camera, "async function snapWithOptionalTimer()", "async function changeZoom");
+  assert.match(
+    camera,
+    /processMediaFrame\(v, 1600, 240, 0\.82, null, digitalZoom, CAPTURE_PREVIEW_ASPECT\)/,
+  );
+  const timer = between(
+    camera,
+    "async function snapWithOptionalTimer()",
+    "async function changeZoom",
+  );
   assert.match(timer, /request !== cameraRequestRef\.current/);
   assert.match(timer, /setBusyState\(true\)/);
   const zoom = between(camera, "async function changeZoom", "snapWithOptionalTimerRef.current");
@@ -209,7 +216,7 @@ test("Studio requires yes for negotiated actions and blocks every voice path", (
   assert.match(studio, /if \(!studioVoice\) stopCoachVoice\(\)/);
   assert.match(studio, /voice=\{studioVoice\}/);
   assert.match(studio, /voice=\{studioVoice && !micArmed\}/);
-  assert.match(studio, /disabled=\{stopped \|\| !studioVoice \|\| stepBlocked\}/);
+  assert.match(studio, /disabled=\{stopped \|\| stepBlocked\}/);
   assert.match(studio, /disabled=\{cameraGateReason !== "enabled"\}/);
   assert.match(studio, /Export report/);
   assert.match(consentGate, /Step inside/);
@@ -284,6 +291,10 @@ test("only verified pre-reservation admission denials reopen a batch", () => {
   );
   assert.match(
     privacy,
+    /unable to release preflight reservation[\s\S]*?Analysis could not start and the capture could not be reset — take a fresh capture\.[\s\S]*?retryableBeforeProvider: releaseConfirmed/,
+  );
+  assert.match(
+    privacy,
     /privacyFailure === "response"[\s\S]*?providerAttempted: true[\s\S]*?AI_PRIVACY_RESPONSE_UNVERIFIED[\s\S]*?retryableBeforeProvider: false/,
   );
   const rateLimit = between(
@@ -308,10 +319,7 @@ test("only verified pre-reservation admission denials reopen a batch", () => {
   // with one proven exception. The request validator runs before the handler,
   // and therefore before any reservation or dispatch, so the server tags its
   // messages and only that tag may reopen the batch.
-  assert.match(
-    caught,
-    /if \(analyzeThrownBeforeDispatch\(cause\)\) setAnalysisConsumed\(false\)/,
-  );
+  assert.match(caught, /if \(analyzeThrownBeforeDispatch\(cause\)\) setAnalysisConsumed\(false\)/);
   assert.doesNotMatch(
     caught.replace(/if \(analyzeThrownBeforeDispatch\(cause\)\) setAnalysisConsumed\(false\);/, ""),
     /setAnalysisConsumed\(false\)/,
@@ -319,7 +327,10 @@ test("only verified pre-reservation admission denials reopen a batch", () => {
   // The tag is applied where it is provable: the validator, and nowhere else.
   const validator = between(analyze, ".validator((input: unknown) => {", ".handler(async");
   assert.match(validator, /PRE_DISPATCH_MARKER/);
-  assert.equal(analyze.slice(analyze.indexOf(".handler(async")).includes("PRE_DISPATCH_MARKER"), false);
+  assert.equal(
+    analyze.slice(analyze.indexOf(".handler(async")).includes("PRE_DISPATCH_MARKER"),
+    false,
+  );
 });
 
 test("the availability probe answers only this app's own signed-in caller", () => {
@@ -336,8 +347,14 @@ test("the availability probe answers only this app's own signed-in caller", () =
   );
   assert.doesNotMatch(availability, /\[authMiddleware\]/);
   const middleware = read("src/lib/auth/middleware.ts");
-  assert.match(middleware, /export const bearerMiddleware = createMiddleware\(\{ type: "function" \}\)\.client\(/);
-  assert.match(middleware, /export const authMiddleware = createMiddleware\(\{ type: "function" \}\)\s*\.middleware\(\[bearerMiddleware\]\)/);
+  assert.match(
+    middleware,
+    /export const bearerMiddleware = createMiddleware\(\{ type: "function" \}\)\.client\(/,
+  );
+  assert.match(
+    middleware,
+    /export const authMiddleware = createMiddleware\(\{ type: "function" \}\)\s*\.middleware\(\[bearerMiddleware\]\)/,
+  );
 });
 
 test("a step's own limit gates Studio, not only the lesson page", () => {
@@ -352,7 +369,7 @@ test("a step's own limit gates Studio, not only the lesson page", () => {
   );
   // Not shown, not spoken automatically, and not speakable on demand.
   assert.match(studio, /if \(stopped \|\| stepBlocked\) return;/);
-  assert.match(studio, /disabled=\{stopped \|\| !studioVoice \|\| stepBlocked\}/);
+  assert.match(studio, /disabled=\{stopped \|\| stepBlocked\}/);
   assert.match(studio, /\{stepBlocked \?/);
 });
 
@@ -373,7 +390,7 @@ test("instructor-only entries cannot route into Studio", () => {
   // literal token blocked that improvement rather than protecting the invariant.
   assert.match(
     studio,
-    /negotiationReady &&[\s\S]{0,120}?requestedTie(?: != null)? &&[\s\S]*?requestedTie\.minutes\[1\] > 0 &&[\s\S]*?!negotiationPolicy\.isTieBlocked\(search\.tie\)/,
+    /const requestedTieAllowed =[\s\S]*?requestedTie\.minutes\[1\] > 0[\s\S]*?!negotiationPolicy\.isTieBlocked\(search\.tie\)/,
   );
   // A ?step= deep link must be gated by that same computed permission. Without
   // it a blocked or instructor-only tie could still have its step index set
@@ -479,7 +496,10 @@ test("the backgrounding hint tracks a real in-flight import, not any past one", 
   assert.match(camera, /const hadMediaOperation = mediaOperationActiveRef\.current;/);
   assert.doesNotMatch(camera, /hadMediaOperation = mediaOperationRef\.current !== null/);
   // Set when an operation starts, cleared when it settles and at every abort.
-  assert.match(camera, /mediaOperationRef\.current = controller;\s*\n\s*mediaOperationActiveRef\.current = true;/);
+  assert.match(
+    camera,
+    /mediaOperationRef\.current = controller;\s*\n\s*mediaOperationActiveRef\.current = true;/,
+  );
   const aborts = camera.match(/mediaOperationRef\.current\?\.abort\(\);/g) ?? [];
   const clears = camera.match(/mediaOperationActiveRef\.current = false;/g) ?? [];
   assert.ok(
@@ -559,10 +579,7 @@ test("a cross-tab policy change cannot erase an active stop or a completed repor
   // re-ran the report effect and replaced a completed model report with the
   // local "not requested" one after the batch was already consumed.
   assert.match(studio, /const policyRef = useRef\(derivedPolicy\);/);
-  assert.match(
-    studio,
-    /policyRef\.current\.negotiationKey !== derivedPolicy\.negotiationKey/,
-  );
+  assert.match(studio, /policyRef\.current\.negotiationKey !== derivedPolicy\.negotiationKey/);
   assert.match(studio, /const negotiationPolicy = policyRef\.current;/);
 });
 
@@ -631,7 +648,10 @@ test("the media upload scope is an operator setting with a conservative default"
   const search = read("src/lib/kb/search.ts");
   // Only the nudity term list is gated on the scope. Sexual activity, and the
   // age and consent guards, must not consult it at all.
-  assert.match(search, /const explicitMedia = sexualActivityMedia \|\| \(nudityMedia && !allowsAdultNudity\(scope\)\)/);
+  assert.match(
+    search,
+    /const explicitMedia = sexualActivityMedia \|\| \(nudityMedia && !allowsAdultNudity\(scope\)\)/,
+  );
   const ageGuard = between(search, "const ambiguousAgeMedia =", "const explicitScanText");
   assert.doesNotMatch(ageGuard, /scope|allowsAdultNudity/);
   const consentGuard = between(search, "const secretOrCoercedRecording =", "const mediaContext");
@@ -764,14 +784,23 @@ test("hard-no lines share one bound end to end; the stop banner names every reas
   // own "<uuid>: <label>" lines (stranding one-use batches) and silently
   // dropped entries past 24 of a possible 64.
   assert.match(studio, /`\$\{item\.id\}: \$\{item\.label\}`\.slice\(0, MAX_HARD_NO_LENGTH\)/);
-  assert.match(analyze, /z\.array\(z\.string\(\)\.max\(MAX_HARD_NO_LENGTH\)\)\.max\(MAX_HARD_NOS\)/);
+  assert.match(
+    analyze,
+    /z\.array\(z\.string\(\)\.max\(MAX_HARD_NO_LENGTH\)\)\.max\(MAX_HARD_NOS\)/,
+  );
   assert.match(analyze, /sanitizeQuestion\(value, MAX_HARD_NO_LENGTH\)/);
   assert.match(analyze, /\.slice\(0, MAX_HARD_NOS\)/);
   assert.doesNotMatch(analyze, /\.slice\(0, 24\)/);
 
   // A triage, observation, or check-in stop must not read "Stopped manually"
   // at exactly the moment the reason matters.
-  for (const reason of ["observation", "medical-emergency", "medical", "checkin-concern", "consent"]) {
+  for (const reason of [
+    "observation",
+    "medical-emergency",
+    "medical",
+    "checkin-concern",
+    "consent",
+  ]) {
     assert.match(studio, new RegExp(`stopReason === "${reason}"`), `banner must map ${reason}`);
   }
 });
@@ -784,18 +813,30 @@ test("the banned-output scrub guards model text, not reviewed catalog narration"
   // server's exact-string allowlist stays the control for cloud TTS.
   const play = read("src/lib/voice/play.ts");
   assert.match(play, /options\?: \{ reviewed\?: boolean \}/);
-  assert.match(play, /const key = !reviewed && textIsBanned\(text\) \? scrubBannedAnswer\(text\) : text\.trim\(\);/);
+  assert.match(
+    play,
+    /const key = !reviewed && textIsBanned\(text\) \? scrubBannedAnswer\(text\) : text\.trim\(\);/,
+  );
 
   // Catalog narration call sites declare provenance; the model-report paths
   // (coach panel, studio report speak) deliberately do not.
   const voiceHook = read("src/components/learn/use-academy-voice.ts");
   assert.equal((voiceHook.match(/\{ reviewed: true \}/g) ?? []).length, 3);
-  assert.match(read("src/routes/tie.$slug.tsx"), /playCoachVoice\(s\.speak, cloudVoice, \{ reviewed: true \}\)/);
-  assert.match(read("src/routes/knot.$slug.tsx"), /playCoachVoice\(s\.speak, cloudVoice, \{ reviewed: true \}\)/);
+  assert.match(
+    read("src/routes/tie.$slug.tsx"),
+    /playCoachVoice\(s\.speak, cloudVoice, \{ reviewed: true \}\)/,
+  );
+  assert.match(
+    read("src/routes/knot.$slug.tsx"),
+    /playCoachVoice\(s\.speak, cloudVoice, \{ reviewed: true \}\)/,
+  );
   const coachPanel = read("src/components/coach-panel.tsx");
   assert.doesNotMatch(coachPanel, /reviewed: true/);
   const studio = read("src/routes/studio.tsx");
-  assert.doesNotMatch(studio, /playCoachVoice\(res\.report\.final\.speak, true, \{ reviewed: true \}\)/);
+  assert.doesNotMatch(
+    studio,
+    /playCoachVoice\(res\.report\.final\.speak, true, \{ reviewed: true \}\)/,
+  );
 
   // Server side: the allowlist is the sole gate — no scrub ahead of it that
   // could mangle a reviewed line out of the set — and the input slice admits
@@ -808,11 +849,22 @@ test("the banned-output scrub guards model text, not reviewed catalog narration"
   // The lesson pages and the allowlist compose narration through the same
   // builders, so they cannot drift apart.
   const reviewed = read("src/lib/voice/reviewed.server.ts");
-  for (const builder of ["tieStepVoiceInput", "knotStepVoiceInput", "buildAcademyVoiceScript", "buildAcademyVoiceSegments"]) {
+  for (const builder of [
+    "tieStepVoiceInput",
+    "knotStepVoiceInput",
+    "buildAcademyVoiceScript",
+    "buildAcademyVoiceSegments",
+  ]) {
     assert.match(reviewed, new RegExp(builder), `allowlist must use ${builder}`);
   }
-  assert.match(read("src/routes/tie.$slug.tsx"), /tieStepVoiceInput\(s, step, tie\.steps\.length\)/);
-  assert.match(read("src/routes/knot.$slug.tsx"), /knotStepVoiceInput\(s, step, knot\.steps\.length\)/);
+  assert.match(
+    read("src/routes/tie.$slug.tsx"),
+    /tieStepVoiceInput\(s, step, tie\.steps\.length\)/,
+  );
+  assert.match(
+    read("src/routes/knot.$slug.tsx"),
+    /knotStepVoiceInput\(s, step, knot\.steps\.length\)/,
+  );
 });
 
 test("every persisted store has crash-safe storage and consent survives stale tabs", () => {
@@ -825,7 +877,10 @@ test("every persisted store has crash-safe storage and consent survives stale ta
   // The consent-bearing settings flags move as one stamped unit through a
   // write-merge, like negotiation ranks and journal entries already do.
   const settings = read("src/lib/stores/settings.ts");
-  assert.match(settings, /storage: settingsConsentMergingStorage<SettingsState>\("knotty-settings"\)/);
+  assert.match(
+    settings,
+    /storage: settingsConsentMergingStorage<SettingsState>\("knotty-settings"\)/,
+  );
   assert.match(settings, /consentStamp: nextConsentStamp\(s\)/);
   const persist = read("src/lib/stores/persist.ts");
   assert.match(persist, /export function settingsConsentMergingStorage/);
@@ -885,10 +940,16 @@ test("review round: narration keys on lesson identity, shared voice loads surviv
   // Lesson navigation at the same step index must restart narration — the
   // route component is reused, so a bare stepIndex key missed it.
   assert.match(voice, /\}, \[enabled, narrationKey, cloudVoice\]\);/);
-  assert.match(voice, /`\$\{lessonKey\}:\$\{input\.stepIndex\}\/\$\{input\.totalSteps\}:\$\{input\.title\}`/);
+  assert.match(
+    voice,
+    /`\$\{lessonKey\}:\$\{input\.stepIndex\}\/\$\{input\.totalSteps\}:\$\{input\.title\}`/,
+  );
   // The slug must actually reach the hook: one-step instructor routes share
   // an identical step title, so a content-only key missed lesson changes.
-  assert.match(read("src/components/learn/academy-coach-panel.tsx"), /lessonKey=\{tieSlug \?\? knotSlug \?\? ""\}/);
+  assert.match(
+    read("src/components/learn/academy-coach-panel.tsx"),
+    /lessonKey=\{tieSlug \?\? knotSlug \?\? ""\}/,
+  );
 
   // A shared in-flight voice load is judged by cache lifetime, not by its
   // creator's playback generation — two simultaneous auto-reads no longer

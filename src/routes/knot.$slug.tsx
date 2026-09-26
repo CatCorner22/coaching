@@ -13,7 +13,7 @@ import {
   emptyStepConfirm,
   type StepConfirm,
 } from "@/components/learn";
-import { getAcademyKnot, isFoundationKnot } from "@/lib/kb";
+import { getAcademyKnot, getTie, isFoundationKnot } from "@/lib/kb";
 import { CUT_RULE, OBJECT_RELEASE_RULE, RECOGNITION_RELEASE_RULE } from "@/lib/kb/release";
 import { nyxPoseForKnotStep } from "@/lib/learn/nyx-model";
 import { knotStepVoiceInput } from "@/lib/learn/voice-script";
@@ -68,7 +68,7 @@ function KnotPage() {
   return (
     <AcademyShell
       backTo={foundation ? "/learn" : "/knots"}
-      backLabel={foundation ? "Knotty Academy" : "All knots"}
+      backLabel={foundation ? "Learn" : "Knots"}
       eyebrow={knot.jp}
       title={knot.name}
       subtitle={
@@ -111,7 +111,7 @@ function KnotPage() {
                   params={{ slug: tieSlug }}
                   className="rounded-full border border-border px-3 py-1 text-sm text-muted hover:text-fg"
                 >
-                  {tieSlug.replace(/-/g, " ")}
+                  {getTie(tieSlug)?.name ?? tieSlug}
                 </Link>
               ))}
             </div>

@@ -9,12 +9,12 @@ export const Route = createFileRoute("/checklist")({ component: ChecklistPage })
 const ITEMS = [
   { id: "adults", label: "We're both 18+ and chose this together tonight." },
   { id: "consent", label: "We said yes out loud to what we're doing — maybe still means not tonight." },
-  { id: "safewords", label: "Our stop words work, even when hands are busy." },
+  { id: "safewords", label: "Our safewords work, even when hands are busy." },
   { id: "shears", label: "Trauma shears are right here, not in another room." },
   { id: "water", label: "Water and something cozy are within reach." },
   { id: "furniture", label: "The bed or frame is stable — nothing load-bearing we didn't mean to use." },
   { id: "machine", label: "Any toy or machine is off until we want it, with an easy stop." },
-  { id: "camera", label: "We're happy to use the camera and Analyze if we feel like it." },
+  { id: "camera", label: "We're happy to use the camera and Studio Analyze if we feel like it." },
   { id: "clock", label: "Reminders are just nudges to check in — not a timer that overrides us." },
   { id: "exit", label: "We know how to untie fast if either of us needs out." },
 ] as const;
@@ -22,7 +22,7 @@ const ITEMS = [
 function ChecklistPage() {
   const done = useChecklist((s) => s.done);
   const setDone = useChecklist((s) => s.setDone);
-  const shears = useKit((s) => s.shears);
+  const entered = useKit((s) => s.entered);
   const eights = useKit((s) => s.eights);
   const safeword = useSettings((s) => s.safeword);
   const ready = ITEMS.every((i) => done[i.id]);
@@ -32,8 +32,8 @@ function ChecklistPage() {
       <p className="text-xs uppercase tracking-[0.22em] text-muted">Before rope</p>
       <h1 className="mt-2 font-display text-4xl">Pre-scene</h1>
       <p className="mt-3 text-sm text-muted">
-        Ten sweet checks before you begin. Your stop word is <strong className="text-fg">{safeword}</strong>.
-        Your kit lists {eights} × 8m lengths{shears ? " and trauma shears" : ""}.
+        Ten sweet checks before you begin. Your safeword is <strong className="text-fg">{safeword}</strong>.
+        {entered ? `Your kit lists ${eights} × 8m lengths.` : "Enter your rope counts on Rope calc."}
       </p>
       <ul className="mt-8 space-y-3">
         {ITEMS.map((item) => (

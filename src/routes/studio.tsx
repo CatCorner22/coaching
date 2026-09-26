@@ -26,7 +26,9 @@ import { useSession } from "@/lib/stores/session";
 import { useSettings } from "@/lib/stores/settings";
 import {
   buildStudioNegotiationPolicy,
+  missingFurnitureLimits,
   missingStepLimits,
+  missingTieLimits,
   policyRestrictionIncreased,
   studioPolicySignature,
 } from "@/lib/studio/negotiation";
@@ -75,6 +77,7 @@ function StudioPage() {
   const startSession = useSession((s) => s.start);
   const resetSession = useSession((s) => s.reset);
   const stopped = useSession((s) => s.stopped);
+  const startedAt = useSession((s) => s.startedAt);
   const stopReason = useSession((s) => s.stopReason);
   const yellowAt = useSession((s) => s.yellowAt);
   const stepIndex = useSession((s) => s.stepIndex);
@@ -94,13 +97,8 @@ function StudioPage() {
     policyRef.current = derivedPolicy;
   }
   const negotiationPolicy = policyRef.current;
-  const {
-    operationalLimits,
-    negotiationKey,
-    mediaBlocked,
-    voiceBlocked,
-  } = negotiationPolicy;
-  const captureContextKey = `${tieSlug ?? ""}|${stepIndex}|${furnitureSlug ?? ""}|${negotiationKey}`;
+  const { operationalLimits, negotiationKey, mediaBlocked, voiceBlocked } = negotiationPolicy;
+  const captureContextKey = `${tieSlug ?? ""}|${furnitureSlug ?? ""}|${negotiationKey}`;
   const [capture, setCapture] = useState<CaptureResult | null>(null);
   const [report, setReport] = useState<CoachReport | null>(null);
   const [observationReport, setObservationReport] = useState<ObservationReport | null>(null);
@@ -128,6 +126,8 @@ function StudioPage() {
   const instructorOnlyTie = tie?.minutes[1] === 0;
   const tieBlocked = negotiationPolicy.isTieBlocked(tieSlug);
   const furnitureBlocked = negotiationPolicy.isFurnitureBlocked(furnitureSlug);
+  const missingTie = missingTieLimits(tieSlug, items);
+  const missingFurniture = missingFurnitureLimits(furnitureSlug, items);
   const studioVoice = settings.voice && !voiceBlocked;
   const currentStep = tie?.steps[stepIndex];
   // A step can carry its own limit on top of its tie's — karada's optional pass
@@ -242,11 +242,15 @@ function StudioPage() {
     if (!studioVoice) stopCoachVoice();
   }, [studioVoice]);
 
+  const appliedDeepLinkRef = useRef<string | null>(null);
   useEffect(() => {
+    if (!negotiationReady) return;
+    const tuple = `${search.tie ?? ""}|${search.step ?? ""}`;
+    if (appliedDeepLinkRef.current === tuple) return;
+    appliedDeepLinkRef.current = tuple;
     if (search.tie) {
       const requestedTie = getTie(search.tie);
       const requestedTieAllowed =
-        negotiationReady &&
         requestedTie != null &&
         requestedTie.minutes[1] > 0 &&
         !negotiationPolicy.isTieBlocked(search.tie);
@@ -260,19 +264,17 @@ function StudioPage() {
         setStep(search.step);
       }
     }
-    if (!useSession.getState().startedAt) startSession();
+  }, [negotiationPolicy, negotiationReady, search.tie, search.step, setTie, setStep]);
+
+  useEffect(() => {
     useSession.getState().tick(Date.now());
     const id = window.setInterval(() => useSession.getState().tick(Date.now()), 1000);
     return () => window.clearInterval(id);
-  }, [
-    negotiationPolicy,
-    negotiationReady,
-    search.tie,
-    search.step,
-    setTie,
-    setStep,
-    startSession,
-  ]);
+  }, []);
+
+  const startSessionIfNeeded = useCallback(() => {
+    if (!useSession.getState().startedAt) startSession();
+  }, [startSession]);
 
   const stopAlertRef = useRef<HTMLDivElement>(null);
 
@@ -612,10 +614,16 @@ function StudioPage() {
             this once you have actually checked in.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => useSession.getState().clearYellow()}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                useSession.getState().clearYellow();
+                useSession.getState().checked();
+              }}
+            >
               Checked in
             </Button>
-            <Button variant="danger" onClick={() => stopSession("safeword")}>
+            <Button variant="danger" onClick={() => stopSession("safeword-button")}>
               Stop the scene
             </Button>
           </div>
@@ -682,21 +690,28 @@ function StudioPage() {
           <p className="text-xs uppercase tracking-[0.22em] text-muted">Studio</p>
           <h1 className="mt-1 font-display text-4xl">Camera & analyze</h1>
         </div>
-        <div className="flex items-center gap-3 text-sm">
+        <div className="flex min-w-0 flex-wrap items-center gap-3 text-sm">
           <Badge variant="danger">{settings.safeword}</Badge>
-          <SessionClock limitSec={settings.circulationMins * 60} />
-          {/* The clock starts the moment the page opens, so time spent reading
-              or laying out rope was already on it when the tie began. */}
+          <div className="flex flex-col items-center">
+            <SessionClock limitSec={settings.circulationMins * 60} />
+            {startedAt !== null && (
+              <p className="text-xs text-subtle">
+                Clock started{" "}
+                {new Date(startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </p>
+            )}
+          </div>
           {!stopped && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
-                startSession();
+                if (startedAt === null) startSessionIfNeeded();
+                else startSession();
                 useSession.getState().checked();
               }}
             >
-              Restart clock
+              {startedAt === null ? "Start clock" : "Restart clock"}
             </Button>
           )}
           {/* Same session, same store — this only strips the chrome so the
@@ -780,7 +795,9 @@ function StudioPage() {
                 {t.minutes[1] === 0
                   ? " — instructor route"
                   : negotiationPolicy.isTieBlocked(t.slug)
-                    ? " — not approved"
+                    ? ` — waits for yes on: ${missingTieLimits(t.slug, items)
+                        .map((row) => row.label)
+                        .join(", ")}`
                     : ""}
               </option>
             ))}
@@ -809,10 +826,23 @@ function StudioPage() {
                 disabled={negotiationPolicy.isFurnitureBlocked(d.slug)}
               >
                 {d.name}
-                {negotiationPolicy.isFurnitureBlocked(d.slug) ? " — not approved" : ""}
+                {negotiationPolicy.isFurnitureBlocked(d.slug)
+                  ? ` — waits for yes on: ${missingFurnitureLimits(d.slug, items)
+                      .map((row) => row.label)
+                      .join(", ")}`
+                  : ""}
               </option>
             ))}
           </select>
+          <p className="mt-2 text-xs text-muted">
+            Set limits on{" "}
+            <Link to="/negotiate" className="underline underline-offset-2">
+              Negotiate
+            </Link>
+            {missingTie.length > 0 || missingFurniture.length > 0
+              ? " to enable blocked options."
+              : "."}
+          </p>
           {tie && (
             <div className="mt-3">
               <div className="flex flex-wrap items-center gap-2">
@@ -825,6 +855,7 @@ function StudioPage() {
                   disabled={stopped || pending || stepIndex === 0}
                   onClick={() => {
                     if (useSession.getState().stopped || pending) return;
+                    startSessionIfNeeded();
                     setStep(stepIndex - 1);
                   }}
                 >
@@ -836,6 +867,7 @@ function StudioPage() {
                   disabled={stopped || pending || stepIndex >= tie.steps.length - 1}
                   onClick={() => {
                     if (useSession.getState().stopped || pending) return;
+                    startSessionIfNeeded();
                     setStep(stepIndex + 1);
                   }}
                 >
@@ -844,9 +876,9 @@ function StudioPage() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  disabled={stopped || !studioVoice || stepBlocked}
+                  disabled={stopped || stepBlocked}
                   onClick={() => {
-                    if (useSession.getState().stopped || !studioVoice || stepBlocked) return;
+                    if (useSession.getState().stopped || stepBlocked) return;
                     micArmedRef.current = false;
                     setMicArmed(false);
                     setMicStatus("idle");
@@ -854,9 +886,15 @@ function StudioPage() {
                     if (line) void playCoachVoice(line, studioVoice);
                   }}
                 >
-                  {voiceBlocked ? "Speak step — not approved" : "Speak step"}
+                  {stopped ? "Speak step — stopped" : "Speak step"}
                 </Button>
               </div>
+              {!stopped && !studioVoice && (
+                <p className="mt-2 text-xs text-muted">
+                  Browser voice is ready; enable cloud voice in Settings only if you want cloud
+                  narration.
+                </p>
+              )}
               {stepBlocked ? (
                 <div className="mt-2 rounded-lg border border-warn/40 bg-warn/10 px-3 py-3 text-sm">
                   <p className="font-medium text-fg">This step needs its own yes.</p>
@@ -909,6 +947,8 @@ function StudioPage() {
               key={captureContextKey}
               onCapture={acceptCapture}
               onDiscard={discardCapture}
+              onOpen={startSessionIfNeeded}
+              cloudConfigured={cloudVision?.configured === true}
               disabled={cameraGateReason !== "enabled"}
             />
           </div>
@@ -949,7 +989,11 @@ function StudioPage() {
             <p className="text-xs text-muted">
               {cloudVision.reason === "no_database"
                 ? "This deployment has no database, so a batch cannot be reserved and nothing can be sent for cloud analysis. Stills stay on this device and you get the local read only."
-                : "Cloud analysis is switched off for this app, so stills stay on this device and you get the local read only."}
+                : cloudVision.reason === "origin_not_trusted"
+                  ? "Cloud Analyze is not allowed from this address"
+                  : cloudVision.reason === "auth_required"
+                    ? "Cloud Analyze requires sign-in in this deployment"
+                    : "Cloud analysis is switched off for this app, so stills stay on this device and you get the local read only."}
             </p>
           )}
           <div className="flex flex-wrap gap-2">
@@ -966,6 +1010,7 @@ function StudioPage() {
                   !captureMatchesContext ||
                   pending ||
                   stopped ||
+                  (cloudVision !== null && !cloudVision.configured) ||
                   analysisConsumed
                 }
               >
@@ -982,7 +1027,7 @@ function StudioPage() {
             <Button
               variant="danger"
               aria-label={`Stop the session now (safeword: ${settings.safeword})`}
-              onClick={() => stopSession("safeword")}
+              onClick={() => stopSession("safeword-button")}
             >
               {settings.safeword}
             </Button>
@@ -1021,7 +1066,8 @@ function StudioPage() {
                 currentReportSaved
               }
               onClick={() => {
-                if (!contextBoundReport || !contextBoundObservationReport || !reportRevision) return;
+                if (!contextBoundReport || !contextBoundObservationReport || !reportRevision)
+                  return;
                 const snapshot = useSession.getState();
                 if (savedEntryId) removeEntry(savedEntryId);
                 const entryId = addEntry({

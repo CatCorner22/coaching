@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  GROK_ZDR_ERROR,
   GROK_ZDR_RESPONSE_ERROR,
   grokChat,
   grokProviderConfigured,
@@ -288,9 +287,20 @@ test("every media call requires a successful exact ZDR preflight before any sele
         ],
       });
       assert.equal(result.ok, false, scenario);
-      assert.equal(result.error, GROK_ZDR_ERROR, scenario);
+      const expectedError =
+        scenario === "missing" ||
+        scenario === "false" ||
+        scenario === "uppercase" ||
+        scenario === "list"
+          ? "No media was sent to xAI. Zero data retention could not be confirmed."
+          : "No media was sent to xAI. The provider is temporarily unavailable; try again later.";
+      assert.equal(result.error, expectedError, scenario);
       assert.equal(result.providerAttempted, false, scenario);
-      assert.equal(result.privacyFailure, "preflight", scenario);
+      assert.equal(
+        result.privacyFailure,
+        ["missing", "false", "uppercase", "list"].includes(scenario) ? "preflight" : undefined,
+        scenario,
+      );
       assert.equal(calls, 1, scenario);
       assert.doesNotMatch(body, /data:image/u, scenario);
       assert.match(body, /Return OK\./u, scenario);

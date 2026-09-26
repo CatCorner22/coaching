@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import {
   EMERGENCY_CALL_BODY,
   EMERGENCY_CALL_HEADLINE,
@@ -10,6 +11,17 @@ import {
 export const Route = createFileRoute("/emergency")({ component: EmergencyPage });
 
 function EmergencyPage() {
+  const [online, setOnline] = useState(true);
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
   return (
     <div className="mx-auto max-w-xl px-5 py-10">
       <p className="text-xs uppercase tracking-[0.22em] text-danger-text">{EMERGENCY_KICKER}</p>
@@ -34,18 +46,26 @@ function EmergencyPage() {
       {/* Comfortable targets, not bare 20px text links: this page gets used
           one-handed and under stress. */}
       <div className="mt-8 flex flex-wrap gap-3 text-sm">
-        <Link
-          to="/checkin"
-          className="inline-flex min-h-11 items-center text-fg underline underline-offset-4"
-        >
-          Log a direct check-in
-        </Link>
-        <Link
-          to="/"
-          className="inline-flex min-h-11 items-center text-muted underline underline-offset-4"
-        >
-          Back to Knotty
-        </Link>
+        {online ? (
+          <>
+            <Link
+              to="/checkin"
+              className="inline-flex min-h-11 items-center text-fg underline underline-offset-4"
+            >
+              Log a direct check-in
+            </Link>
+            <Link
+              to="/"
+              className="inline-flex min-h-11 items-center text-muted underline underline-offset-4"
+            >
+              Back to Knotty
+            </Link>
+          </>
+        ) : (
+          <p className="text-sm text-warn" role="status">
+            Offline — this card is available; other pages need a connection.
+          </p>
+        )}
       </div>
     </div>
   );

@@ -77,7 +77,7 @@ export const LEARNING_PEDAGOGY_ARTICLES: Article[] = [
       { type: "h", text: "Rope is a tool, not magic" },
       {
         type: "p",
-        text: "A rope is twisted or braided strands of fiber. It has two ends and a middle. Nothing about rope makes it hold by itself — it holds because of how you wrap it, where you tie it, and the physics of knots. When you understand that, the knots become clear.",
+        text: "A rope is twisted or braided strands of fibre. It has two ends and a middle. Nothing about rope makes it hold by itself — it holds because of how you wrap it, where you tie it, and the physics of knots. When you understand that, the knots become clear.",
       },
       {
         type: "h",
@@ -304,7 +304,7 @@ export const LEARNING_PEDAGOGY_ARTICLES: Article[] = [
       { type: "h", text: "Start with these six, learn them one at a time" },
       {
         type: "p",
-        text: "The six foundation knots in this app are not random. Each one teaches a core principle, and mastering them will let you read the mechanics behind dozens of other knots. What none of them does is make anything safe: a correctly tied knot is a correctly tied knot, nothing more.",
+        text: "The six foundation knots in this app are not random. Each one teaches a core principle, and mastering them will let you read the mechanics behind dozens of other knots. None of them makes anything safe: a correctly tied knot is a correctly tied knot, nothing more.",
       },
       {
         type: "h",

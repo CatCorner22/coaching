@@ -300,53 +300,63 @@ try {
       name: "Analyze selected stills once",
       exact: true,
     });
-    const [analysisResponse] = await Promise.all([
-      page.waitForResponse(
-        (response) =>
-          response.request().method() === "POST" && response.url().includes("/_serverFn/"),
-        { timeout: 15_000 },
-      ),
-      analyzeButton.click(),
-    ]);
-    const analysisBody = (await analysisResponse.text().catch(() => "<unreadable>")).slice(
-      0,
-      2_000,
-    );
-    try {
-      await page
-        .getByRole("alert")
-        .filter({ hasText: "No media was sent to xAI. The service is not available" })
-        .waitFor({ state: "visible", timeout: 5_000 });
-    } catch (cause) {
-      const providerFailurePng = checkedOutputPath(
-        `${stem}.${viewport.name}.provider-failure${extension}`,
-        ["/workspace"],
-      );
-      await page.screenshot({ path: providerFailurePng, type: "png", fullPage: true });
-      const diagnostic = await page.evaluate(() => ({
-        alerts: [...document.querySelectorAll("[role='alert']")]
-          .filter((element) => element.getClientRects().length > 0)
-          .map((element) => element.textContent?.replace(/\s+/g, " ").trim()),
-        statuses: [...document.querySelectorAll("[role='status']")]
-          .filter((element) => element.getClientRects().length > 0)
-          .map((element) => element.textContent?.replace(/\s+/g, " ").trim()),
-        analyzeButtons: [...document.querySelectorAll("button")]
-          .filter((element) => /analy/i.test(element.textContent ?? ""))
-          .map((element) => ({ text: element.textContent, disabled: element.disabled })),
-      }));
-      throw new Error(
-        `${viewport.name}: provider failure did not surface: ${JSON.stringify({ response: { status: analysisResponse.status(), url: analysisResponse.url(), body: analysisBody }, diagnostic, evidence: providerFailurePng })}; ${String(cause?.message ?? cause)}`,
-      );
-    }
+    let analysisSkipped = false;
     if (!(await analyzeButton.isEnabled())) {
-      throw new Error(`${viewport.name}: verified pre-provider failure did not reopen the batch`);
-    }
-    if (!(await committed.isVisible())) {
-      throw new Error(
-        `${viewport.name}: verified pre-provider failure discarded the committed batch`,
+      analysisSkipped = true;
+      await page
+        .getByText("Local read is ready below; cloud categories are off for this app", {
+          exact: true,
+        })
+        .waitFor({ state: "visible", timeout: 5_000 });
+    } else {
+      const [analysisResponse] = await Promise.all([
+        page.waitForResponse(
+          (response) =>
+            response.request().method() === "POST" && response.url().includes("/_serverFn/"),
+          { timeout: 15_000 },
+        ),
+        analyzeButton.click(),
+      ]);
+      const analysisBody = (await analysisResponse.text().catch(() => "<unreadable>")).slice(
+        0,
+        2_000,
       );
+      try {
+        await page
+          .getByRole("alert")
+          .filter({ hasText: "No media was sent to xAI. The service is not available" })
+          .waitFor({ state: "visible", timeout: 5_000 });
+      } catch (cause) {
+        const providerFailurePng = checkedOutputPath(
+          `${stem}.${viewport.name}.provider-failure${extension}`,
+          ["/workspace"],
+        );
+        await page.screenshot({ path: providerFailurePng, type: "png", fullPage: true });
+        const diagnostic = await page.evaluate(() => ({
+          alerts: [...document.querySelectorAll("[role='alert']")]
+            .filter((element) => element.getClientRects().length > 0)
+            .map((element) => element.textContent?.replace(/\s+/g, " ").trim()),
+          statuses: [...document.querySelectorAll("[role='status']")]
+            .filter((element) => element.getClientRects().length > 0)
+            .map((element) => element.textContent?.replace(/\s+/g, " ").trim()),
+          analyzeButtons: [...document.querySelectorAll("button")]
+            .filter((element) => /analy/i.test(element.textContent ?? ""))
+            .map((element) => ({ text: element.textContent, disabled: element.disabled })),
+        }));
+        throw new Error(
+          `${viewport.name}: provider failure did not surface: ${JSON.stringify({ response: { status: analysisResponse.status(), url: analysisResponse.url(), body: analysisBody }, diagnostic, evidence: providerFailurePng })}; ${String(cause?.message ?? cause)}`,
+        );
+      }
+      if (!(await analyzeButton.isEnabled())) {
+        throw new Error(`${viewport.name}: verified pre-provider failure did not reopen the batch`);
+      }
+      if (!(await committed.isVisible())) {
+        throw new Error(
+          `${viewport.name}: verified pre-provider failure discarded the committed batch`,
+        );
+      }
+      await waitForNeutralLocalReport("verified pre-provider failure");
     }
-    await waitForNeutralLocalReport("verified pre-provider failure");
 
     await page
       .getByRole("button", { name: "Start a new capture", exact: true })
@@ -423,6 +433,7 @@ try {
       status: response.status(),
       cameraCalls: calls,
       syntheticCapture,
+      analysisSkipped,
       focusStayed,
       horizontalOverflow,
       screenshot: viewport.screenshot,

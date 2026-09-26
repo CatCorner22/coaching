@@ -117,16 +117,21 @@ type Guide = "equipment" | "context" | "detail" | "label";
 export const CameraCapture = memo(function CameraCapture({
   onCapture,
   onDiscard,
+  onOpen,
+  cloudConfigured = true,
   disabled = false,
 }: {
   onCapture: (c: CaptureResult) => void;
   onDiscard: () => void;
+  onOpen?: () => void;
+  cloudConfigured?: boolean;
   disabled?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const clipRef = useRef<ClipHandle | null>(null);
   const recordTimerRef = useRef<number | null>(null);
+  const muteTimerRef = useRef<number | null>(null);
   const recordStartedAtRef = useRef<number | null>(null);
   const cameraRequestRef = useRef(0);
   const cameraOpenRef = useRef<AbortController | null>(null);
@@ -150,6 +155,7 @@ export const CameraCapture = memo(function CameraCapture({
   const [facing, setFacing] = useState<"user" | "environment">("environment");
   const [busy, setBusy] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [muted, setMuted] = useState(false);
   const [torch, setTorchOn] = useState(false);
   const [hasTorch, setHasTorch] = useState(false);
   const [guide, setGuide] = useState<Guide>("equipment");
@@ -334,6 +340,7 @@ export const CameraCapture = memo(function CameraCapture({
       videoRef.current.srcObject = null;
     }
     setRecording(false);
+    setMuted(false);
     setLive(false);
     setTorchOn(false);
     setHasTorch(false);
@@ -448,9 +455,8 @@ export const CameraCapture = memo(function CameraCapture({
     }
     if (!hasCurrentBatchPermissions()) return;
     setError(null);
+    onOpen?.();
     stopLive();
-    setVideoFrames([]);
-    setSelectedFrames([]);
     const request = ++cameraRequestRef.current;
     const cameraController = new AbortController();
     cameraOpenRef.current = cameraController;
@@ -494,12 +500,35 @@ export const CameraCapture = memo(function CameraCapture({
       const track = stream.getVideoTracks()[0];
       const closeInterruptedCamera = () => {
         if (streamRef.current === stream) {
-          setError("Camera access was interrupted. Reconfirm the view before reopening.");
+          setError("The camera stopped. Tap Open live camera to start it again.");
           stopLive();
         }
       };
+      const onMute = () => {
+        if (streamRef.current !== stream) return;
+        setMuted(true);
+        setHint("Camera paused by the device…");
+        if (muteTimerRef.current !== null) window.clearTimeout(muteTimerRef.current);
+        muteTimerRef.current = window.setTimeout(() => {
+          muteTimerRef.current = null;
+          if (streamRef.current === stream && (track?.muted || track?.readyState !== "live")) {
+            closeInterruptedCamera();
+          }
+        }, 4000);
+      };
+      const onUnmute = () => {
+        if (muteTimerRef.current !== null) {
+          window.clearTimeout(muteTimerRef.current);
+          muteTimerRef.current = null;
+        }
+        if (streamRef.current === stream) {
+          setMuted(false);
+          setHint(null);
+        }
+      };
       track?.addEventListener("ended", closeInterruptedCamera, { once: true });
-      track?.addEventListener("mute", closeInterruptedCamera, { once: true });
+      track?.addEventListener("mute", onMute);
+      track?.addEventListener("unmute", onUnmute);
     } catch (cause) {
       openedStream?.getTracks().forEach((track) => track.stop());
       if (streamRef.current === openedStream) {
@@ -530,10 +559,15 @@ export const CameraCapture = memo(function CameraCapture({
     mediaOperationIdRef.current += 1;
     torchRequestRef.current += 1;
     clearRecordTimer();
+    if (muteTimerRef.current !== null) {
+      window.clearTimeout(muteTimerRef.current);
+      muteTimerRef.current = null;
+    }
     clipRef.current?.cancel();
     clipRef.current = null;
     recordStartedAtRef.current = null;
     setRecording(false);
+    setMuted(false);
     const stream = streamRef.current;
     streamRef.current = null;
     stream?.getTracks().forEach((t) => t.stop());
@@ -1265,6 +1299,11 @@ export const CameraCapture = memo(function CameraCapture({
           {hint}
         </p>
       )}
+      {!cloudConfigured && (
+        <p className="text-xs text-muted">
+          Local read is ready below; cloud categories are off for this app
+        </p>
+      )}
       {error && (
         <p className="text-sm text-danger-text" role="alert">
           {error}
@@ -1306,15 +1345,14 @@ export const CameraCapture = memo(function CameraCapture({
             <Button
               className="flex-1"
               onClick={() => void commitSelectedVideoFrames()}
-              disabled={
-                !selectedFrames.length || busy || recording || disabled || !permissionsReady
-              }
+              disabled={!selectedFrames.length || busy || recording || disabled || !permissionsReady || muted}
             >
               Use selected stills
             </Button>
             <Button
               variant="outline"
               onClick={() => setSelectedFrames(bestFrameIndices(videoFrames.map((frame) => frame.quality), 3))}
+              disabled={muted}
             >
               Best 3
             </Button>
@@ -1324,6 +1362,7 @@ export const CameraCapture = memo(function CameraCapture({
                 setVideoFrames([]);
                 setSelectedFrames([]);
               }}
+              disabled={muted}
             >
               Discard clip
             </Button>
@@ -1382,7 +1421,15 @@ export const CameraCapture = memo(function CameraCapture({
             <Button
               className="flex-1"
               onClick={() => void snapWithOptionalTimer()}
-              disabled={busy || recording || batchCommitted || disabled || !permissionsReady || countdown !== null}
+              disabled={
+                busy ||
+                recording ||
+                muted ||
+                batchCommitted ||
+                disabled ||
+                !permissionsReady ||
+                countdown !== null
+              }
             >
               {countdown !== null ? `Capturing in ${countdown}` : "Burst stills"}
             </Button>
@@ -1393,6 +1440,7 @@ export const CameraCapture = memo(function CameraCapture({
               disabled={
                 busy ||
                 batchCommitted ||
+                muted ||
                 disabled ||
                 countdown !== null ||
                 (!permissionsReady && !recording)

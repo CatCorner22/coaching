@@ -14,10 +14,45 @@ test("learn progress survives a persisted map of the wrong shape", () => {
 });
 
 test("checklist only adopts known ids with boolean values", () => {
-  assert.deepEqual(normalizeChecklistDone({ shears: true, exit: false, bogus: true, water: "yes" }), {
-    shears: true,
-    exit: false,
-  });
+  assert.deepEqual(
+    normalizeChecklistDone({ shears: true, exit: false, bogus: true, water: "yes" }),
+    {
+      shears: true,
+      exit: false,
+    },
+  );
+});
+
+test("checklist storage merge lets persisted explicit false clear a current tick", async () => {
+  const { useChecklist } = await import("./checklist.ts");
+  const options = (
+    useChecklist as typeof useChecklist & {
+      persist: {
+        getOptions: () => {
+          merge?: (persisted: unknown, current: unknown) => unknown;
+        };
+      };
+    }
+  ).persist.getOptions();
+  assert.ok(options.merge);
+  const merged = options.merge({ done: { consent: false, shears: true } }, {
+    done: { consent: true, shears: false },
+  } as never) as { done: Record<string, boolean> };
+  assert.equal(merged.done.consent, false);
+  assert.equal(merged.done.shears, true);
+});
+
+test("kit counts default to zero and mark the count entry as complete", async () => {
+  const { useKit } = await import("./kit.ts");
+  useKit.setState({ eights: 0, fours: 0, entered: false, shears: true });
+  assert.equal(useKit.getState().entered, false);
+  assert.equal(useKit.getState().eights, 0);
+  assert.equal(useKit.getState().fours, 0);
+  useKit.getState().setEights(3);
+  assert.equal(useKit.getState().entered, true);
+  assert.equal(useKit.getState().eights, 3);
+  useKit.getState().setFours(1);
+  assert.equal(useKit.getState().fours, 1);
 });
 
 test("rehydrate unions storage with entries that only exist in this tab", () => {
@@ -35,7 +70,12 @@ test("rehydrate unions storage with entries that only exist in this tab", () => 
 
 test("a fresh tombstone is not the first thing the cap evicts", () => {
   const existingRemoved = Array.from({ length: 200 }, (_, i) => `old-${i}`);
-  const merged = mergeJournalEntriesById([], [{ id: "keepme", at: 1 }], ["keepme"], existingRemoved);
+  const merged = mergeJournalEntriesById(
+    [],
+    [{ id: "keepme", at: 1 }],
+    ["keepme"],
+    existingRemoved,
+  );
   assert.equal(merged?.entries.length, 0);
   assert.ok(merged?.removedIds.includes("keepme"));
 });
@@ -110,6 +150,44 @@ test("one key saving does not clear another key's storage warning", async () => 
     assert.equal(persistFailureFor("knotty-negotiate"), null);
     assert.equal(getPersistFailure(), null);
   } finally {
+    if (original) Object.defineProperty(globalThis, "localStorage", original);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+    resetPersistFailure();
+  }
+});
+
+test("unreadable persisted data is preserved for export and clears after recovery", async () => {
+  const { persistFailureFor, resetPersistFailure, safeJsonStorage, onPersistStatus } =
+    await import("./persist.ts");
+  resetPersistFailure();
+  const backing = new Map<string, string>([["test-unreadable", "{not json"]]);
+  const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const warnings: unknown[] = [];
+  const statuses: unknown[] = [];
+  const originalWarn = console.warn;
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (name: string) => backing.get(name) ?? null,
+      setItem: (name: string, value: string) => backing.set(name, value),
+      removeItem: (name: string) => void backing.delete(name),
+    },
+  });
+  console.warn = (...args: unknown[]) => warnings.push(args);
+  const off = onPersistStatus((failure) => statuses.push(failure));
+  try {
+    const storage = safeJsonStorage<Record<string, unknown>>();
+    assert.equal(storage.getItem("test-unreadable"), null);
+    assert.equal(backing.get("test-unreadable.corrupt"), "{not json");
+    assert.equal(backing.has("test-unreadable"), false);
+    assert.equal(persistFailureFor("test-unreadable")?.reason, "unreadable");
+    assert.equal(warnings.length, 1);
+    storage.setItem("test-unreadable", { state: {} } as never);
+    assert.equal(persistFailureFor("test-unreadable"), null);
+    assert.equal(statuses.at(-1), null);
+  } finally {
+    off();
+    console.warn = originalWarn;
     if (original) Object.defineProperty(globalThis, "localStorage", original);
     else Reflect.deleteProperty(globalThis, "localStorage");
     resetPersistFailure();

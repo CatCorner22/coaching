@@ -67,15 +67,21 @@ export function AcademyObservePanel({
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const clipRef = useRef<ClipHandle | null>(null);
-  const prevFrameRef = useRef<Uint8ClampedArray | undefined>(undefined);
+  const prevFrameRef = useRef<Uint8ClampedArray | null>(null);
   const cameraRequestRef = useRef(0);
   const cameraOpenRef = useRef<AbortController | null>(null);
   const recordTimeoutRef = useRef<number | null>(null);
+  const muteTimerRef = useRef<number | null>(null);
+  useEffect(() => {
+    setFeedback(null);
+    prevFrameRef.current = null;
+  }, [stepIndex, tie?.slug]);
 
   const [cameraOn, setCameraOn] = useState(false);
   const [facing, setFacing] = useState<"environment" | "user">("environment");
   const [busy, setBusy] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [muted, setMuted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<AcademyFeedback | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -89,6 +95,10 @@ export function AcademyObservePanel({
       window.clearTimeout(recordTimeoutRef.current);
       recordTimeoutRef.current = null;
     }
+    if (muteTimerRef.current !== null) {
+      window.clearTimeout(muteTimerRef.current);
+      muteTimerRef.current = null;
+    }
     clipRef.current?.cancel();
     clipRef.current = null;
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -96,6 +106,7 @@ export function AcademyObservePanel({
     if (videoRef.current) videoRef.current.srcObject = null;
     setCameraOn(false);
     setRecording(false);
+    setMuted(false);
     setBusy(false);
   }, []);
 
@@ -168,10 +179,33 @@ export function AcademyObservePanel({
         const lost = () => {
           if (streamRef.current !== stream) return;
           stopCamera();
-          setError("Camera access was interrupted. Start the camera again.");
+          setError("The camera stopped. Tap Start camera…");
         };
-        track.addEventListener("ended", lost);
-        track.addEventListener("mute", lost);
+        const onMute = () => {
+          if (streamRef.current !== stream) return;
+          setMuted(true);
+          setError("Camera paused by the device…");
+          if (muteTimerRef.current !== null) window.clearTimeout(muteTimerRef.current);
+          muteTimerRef.current = window.setTimeout(() => {
+            muteTimerRef.current = null;
+            if (streamRef.current === stream && (track.muted || track.readyState !== "live")) {
+              lost();
+            }
+          }, 4000);
+        };
+        const onUnmute = () => {
+          if (muteTimerRef.current !== null) {
+            window.clearTimeout(muteTimerRef.current);
+            muteTimerRef.current = null;
+          }
+          if (streamRef.current === stream) {
+            setMuted(false);
+            setError(null);
+          }
+        };
+        track.addEventListener("ended", lost, { once: true });
+        track.addEventListener("mute", onMute);
+        track.addEventListener("unmute", onUnmute);
       }
       setFacing(nextFacing);
       setCameraOn(true);
@@ -211,7 +245,7 @@ export function AcademyObservePanel({
     try {
       const { jpeg, imageData } = await processMediaFrame(v, 768, 240, 0.74);
       setPreview(jpeg);
-      const obs = observeFrame(imageData, prevFrameRef.current);
+      const obs = observeFrame(imageData, prevFrameRef.current ?? undefined);
       prevFrameRef.current = imageData.data;
       const det = buildDeterministic([obs]);
       const fb = buildAcademyFeedback({
@@ -363,10 +397,10 @@ export function AcademyObservePanel({
               </Button>
             ) : (
               <>
-                <Button size="lg" disabled={busy} onClick={() => void captureAndAnalyze()}>
+                <Button size="lg" disabled={busy || muted} onClick={() => void captureAndAnalyze()}>
                   Snap &amp; hint
                 </Button>
-                <Button size="lg" variant="secondary" disabled={busy} onClick={recordClip}>
+                <Button size="lg" variant="secondary" disabled={busy || muted} onClick={recordClip}>
                   <Video className="size-4" aria-hidden />
                   {recording ? "Recording…" : "Record 3s"}
                 </Button>
@@ -387,7 +421,7 @@ export function AcademyObservePanel({
               </>
             )}
             {clipUrl && (
-              <Button size="lg" variant="outline" disabled={busy} onClick={() => void analyzeClip()}>
+              <Button size="lg" variant="outline" disabled={busy || muted} onClick={() => void analyzeClip()}>
                 Analyze clip
               </Button>
             )}

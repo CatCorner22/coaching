@@ -16,6 +16,8 @@ export type EmergencyStep = {
 
 export const EMERGENCY_TITLE = "Release now";
 export const EMERGENCY_KICKER = "Stop";
+export const EMERGENCY_CALL_FIRST =
+  "Call emergency services now (put the phone on speaker), then release only what is affecting breathing or circulation while you wait — do not spend minutes tidily removing rope.";
 
 export const EMERGENCY_STEPS: readonly EmergencyStep[] = [
   {

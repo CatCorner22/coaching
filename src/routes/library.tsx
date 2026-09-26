@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { tieShape, tieShapeLabel, tieThumbnailStep } from "@/lib/kb/tie-factories";
 import { MiniTie } from "@/components/rope-figure";
-import { TIES, type Level } from "@/lib/kb";
+import { TIES, getTie, type Level, tieMatches } from "@/lib/kb";
 
 export const Route = createFileRoute("/library")({ component: LibraryPage });
 
@@ -13,13 +13,10 @@ function LibraryPage() {
   const [q, setQ] = useState("");
   const [level, setLevel] = useState<Level | "all">("all");
   const list = useMemo(() => {
-    const terms = q.toLowerCase().trim();
     return TIES.filter((t) => {
       if (level !== "all" && t.level !== level) return false;
-      if (!terms) return true;
-      const hay = `${t.name} ${t.summary} ${t.intent.join(" ")} ${t.position}`.toLowerCase();
-      return hay.includes(terms);
-    });
+      return !q.trim() || tieMatches(t, q);
+    }).sort((a, b) => Number(b.prereqs.length > 0) - Number(a.prereqs.length > 0) || a.name.localeCompare(b.name));
   }, [q, level]);
   return (
     <div className="mx-auto max-w-5xl px-5 py-10">
@@ -54,45 +51,70 @@ function LibraryPage() {
           </button>
         ))}
       </div>
-      {LEVELS.filter((lv) => level === "all" || level === lv).map((lv) => {
-        const group = list.filter((t) => t.level === lv);
+      {(["guided", "practice"] as const).map((shape) => {
+        const group = list.filter((t) => tieShape(t) === shape);
         if (!group.length) return null;
         return (
-          <section key={lv} className="mt-10">
-            <h2 className="font-display text-2xl capitalize">{lv}</h2>
+          <section key={shape} className="mt-10">
+            <h2 className="font-display text-2xl">{shape === "guided" ? "Taught step by step" : "Practice on a prop"}</h2>
             <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
               {group.map((t) => (
-                <Link
+                <div
                   key={t.slug}
-                  to="/tie/$slug"
-                  params={{ slug: t.slug }}
-                  className="flex min-w-0 max-w-full gap-4 overflow-hidden rounded-lg border border-border bg-surface p-3 hover:border-border-strong"
+                  className="min-w-0 max-w-full overflow-hidden rounded-lg border border-border bg-surface p-3 hover:border-border-strong"
                 >
-                  <MiniTie
-                    wraps={tieThumbnailStep(t.steps)?.wraps ?? []}
-                    pose={tieThumbnailStep(t.steps)?.expected.pose}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-display text-2xl leading-none">{t.name}</span>
-                      {/* The taught ties are the reason someone opens this page,
-                          and they were previously indistinguishable from a prop
-                          drill: both simply showed a duration. */}
-                      <Badge variant={tieShape(t) === "guided" ? "accent" : "default"}>
-                        {tieShapeLabel(tieShape(t))}
-                      </Badge>
-                      {t.minutes[1] > 0 && (
-                        <Badge>{`${t.minutes[0]}–${t.minutes[1]}m`}</Badge>
-                      )}
+                  <Link to="/tie/$slug" params={{ slug: t.slug }} className="flex min-w-0 max-w-full gap-4">
+                    <MiniTie
+                      wraps={tieThumbnailStep(t.steps)?.wraps ?? []}
+                      pose={tieThumbnailStep(t.steps)?.expected.pose}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-display text-2xl leading-none">{t.name}</span>
+                        <Badge variant={tieShape(t) === "guided" ? "accent" : "default"}>
+                          {tieShapeLabel(tieShape(t))}
+                        </Badge>
+                        <Badge>{t.level}</Badge>
+                        {t.minutes[1] > 0 && <Badge>{`${t.minutes[0]}–${t.minutes[1]}m`}</Badge>}
+                      </div>
+                      <p className="mt-2 line-clamp-3 text-sm text-muted">{t.summary}</p>
                     </div>
-                    <p className="mt-2 line-clamp-3 text-sm text-muted">{t.summary}</p>
-                  </div>
-                </Link>
+                  </Link>
+                  {t.prereqs.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {t.prereqs.map((slug) => {
+                        const prerequisite = getTie(slug);
+                        return (
+                          <Link key={slug} to="/tie/$slug" params={{ slug }} className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted">
+                            Learn first: {prerequisite?.name ?? slug}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           </section>
         );
       })}
+      {(() => {
+        const group = list.filter((t) => tieShape(t) === "instructor");
+        if (!group.length) return null;
+        return (
+          <details className="mt-10" open={Boolean(q.trim())}>
+            <summary className="cursor-pointer font-display text-2xl">Instructor route — vocabulary only ({group.length})</summary>
+            <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
+              {group.map((t) => (
+                <Link key={t.slug} to="/tie/$slug" params={{ slug: t.slug }} className="rounded-lg border border-border bg-surface p-4">
+                  <div className="flex flex-wrap items-center gap-2"><span className="font-display text-xl">{t.name}</span><Badge>{t.level}</Badge><Badge variant="warn">Instructor route</Badge></div>
+                  <p className="mt-2 text-sm text-muted">{t.summary}</p>
+                </Link>
+              ))}
+            </div>
+          </details>
+        );
+      })()}
       {list.length === 0 && <p className="mt-10 text-sm text-muted">No ties match that filter.</p>}
     </div>
   );

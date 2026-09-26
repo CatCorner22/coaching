@@ -354,7 +354,7 @@ test("journal entries survive a cross-tab write, and deleted ones stay deleted",
   const capped = mergeJournalEntriesById(many, many, [], []);
   assert.equal(capped?.entries.length, 80);
   const manyRemoved = Array.from({ length: 400 }, (_, i) => `r${i}`);
-  assert.equal(mergeJournalEntriesById([], [], manyRemoved, [])?.removedIds.length, 200);
+  assert.equal(mergeJournalEntriesById([], [], manyRemoved, [])?.removedIds.length, 400);
 
   // Malformed input is left alone rather than throwing.
   assert.equal(mergeJournalEntriesById(null, [], [], []), null);

@@ -61,7 +61,7 @@ function SettingsPage() {
           <p className="mt-2 text-xs leading-relaxed text-muted">{uploadScopeSummary(uploadScope)}</p>
           <p className="mt-2 text-xs leading-relaxed text-subtle">
             {uploadScopeSettingsDescription(uploadScope)} This is an operator setting configured at
-            deploy time (`VITE_MEDIA_UPLOAD_SCOPE`), not a per-batch choice.
+            deploy time (<code>VITE_MEDIA_UPLOAD_SCOPE</code>), not a per-batch choice.
           </p>
         </section>
         <Field label="Your name / title" value={s.riggerName} onChange={(v) => s.set({ riggerName: v })} />
@@ -97,7 +97,7 @@ function SettingsPage() {
           value={s.greenWord}
           onChange={(v) => s.set({ greenWord: v })}
           rejection={safewordRejection}
-          hint="Same rule as Red."
+          hint="Shown for reference only — the app does not listen for green. It is a check-in reply, not permission to escalate."
         />
         <label className="block text-sm">
           <span className="text-xs uppercase tracking-wide text-subtle">Direct-check reminder (minutes; not a safety interval)</span>

@@ -8,7 +8,7 @@ export const GEAR: GearItem[] = [
     summary: "A common practice length for unoccupied, ground-level, non-loaded rope-handling drills.",
     notes: [
       "Start with the least material needed for an unoccupied handling drill",
-      "Natural fiber can shed; inspect for damage rather than assuming shedding is harmless",
+      "Natural fibre can shed; inspect for damage rather than assuming shedding is harmless",
       "Follow the maker's care instructions and retire damaged or uncertain rope from body use",
     ],
   },
@@ -23,7 +23,7 @@ export const GEAR: GearItem[] = [
     slug: "hemp",
     name: "Hemp 6mm",
     kind: "rope",
-    summary: "A natural-fiber rope with different handling and maintenance characteristics from jute.",
+    summary: "A natural-fibre rope with different handling and maintenance characteristics from jute.",
     notes: ["Material labels and appearance do not establish condition, strength, or suitability for loading a person."],
   },
   {
@@ -91,7 +91,7 @@ export const GEAR: GearItem[] = [
     notes: [
       "No finger-width rule establishes safe pressure; published references disagree, and none of them measures what injures a nerve",
       "Both directions fail: too tight compresses, and too loose slides under load onto the narrow wrist where those nerves lie shallow",
-      "Prefer fast, practiced release; if it locks, the key stays in arm's reach for the whole scene",
+      "Prefer fast, practised release; if it locks, the key stays in arm's reach for the whole scene",
     ],
   },
   {

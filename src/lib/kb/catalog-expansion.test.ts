@@ -581,7 +581,7 @@ test("knot-foundations agrees with the knot catalog", () => {
 test("karada lists the knot its steps actually use", () => {
   const karada = getTie("karada");
   assert.ok(karada);
-  assert.deepEqual(karada.knots, ["overhand-on-bight"]);
+  assert.deepEqual(karada.knots, ["overhand-on-bight", "square"]);
 });
 
 test("the formerly skeletal core articles now teach something", () => {

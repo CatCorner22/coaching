@@ -46,14 +46,17 @@ export const speakCoach = createServerFn({ method: "POST" })
       // the documented typed result never reached the client, which then had
       // an unhandled rejection instead of a clean fall back to browser speech.
       if (cause instanceof RateLimitError) {
-        return { ok: false, error: "Cloud voice quota reached; using browser speech." };
+        return { ok: false, error: "Cloud voice unavailable right now — using browser voice." };
       }
       throw cause;
     }
-    return requestGrokVoice({
+    const result = await requestGrokVoice({
       apiKey: process.env.XAI_API_KEY,
       text: data.text,
       voiceId: COACH_CLOUD_VOICE_ID,
       signal: authorization.signal,
     });
+    return result.ok
+      ? result
+      : { ...result, error: "Cloud voice unavailable right now — using browser voice." };
   });

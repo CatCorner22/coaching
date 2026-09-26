@@ -316,6 +316,7 @@ export type GuidedInput = Pick<
   | "nerves"
   | "intent"
   | "steps"
+  | "related"
   | "mistakes"
   | "variations"
 > & {
@@ -336,6 +337,119 @@ export type GuidedInput = Pick<
   aftercare?: string;
 };
 
+const GUIDED_BULLETS: Record<string, { rigger: string[]; check: string[] }[]> = {
+  "single-column": [
+    {
+      rigger: ["Find the safety shears blind.", "Cut scrap rope once.", "Rehearse the release path."],
+      check: ["Both people can find and use the shears from the agreed position."],
+    },
+    {
+      rigger: ["Find the rope midpoint.", "Work with the rope doubled.", "Shake out every twist."],
+      check: ["The rope is doubled, untwisted, and long enough for the limb."],
+    },
+    {
+      rigger: ["Choose the fleshy limb middle.", "Name the placement and reason.", "Keep joints and vulnerable spots clear."],
+      check: ["The chosen spot is fleshy, away from joints, and agreed."],
+    },
+    {
+      rigger: ["Hold the bight against the limb.", "Lay two wraps side by side.", "Leave the wraps visibly loose."],
+      check: ["Two flat, slack wraps leave the bight accessible."],
+    },
+    {
+      rigger: ["Draw the wraps in slowly.", "Keep both wraps flat and beside each other.", "Ask for one specific sensation word."],
+      check: ["The wraps stay put, still move slightly, and feel even."],
+    },
+    {
+      rigger: ["Make the standing-line loop.", "Pass the bight over X and under all wraps.", "Bring the bight back through the loop."],
+      check: ["The knot sits outside the wraps, not against skin."],
+    },
+    {
+      rigger: ["Pull the standing part steadily.", "Test several directions.", "Untie and redo any shrinking cuff."],
+      check: ["Firm pulls do not reduce the cuff size."],
+    },
+    {
+      rigger: ["Flatten every twist.", "Keep the wraps and joints clear.", "Move the limb and inspect again."],
+      check: ["The wraps stay flat and behave the same during movement."],
+    },
+    {
+      rigger: ["Set an actual timer.", "Ask a specific sensation question.", "Remove the rope for any warning sign."],
+      check: ["A timer runs and a specific question receives a real answer."],
+    },
+    {
+      rigger: ["Take tension off the standing rope.", "Undo the knot and unwrap.", "Check movement now and tomorrow."],
+      check: ["The rope is off, movement is checked, and tomorrow's check is agreed."],
+    },
+  ],
+  "double-column": [
+    {
+      rigger: ["Find the safety shears blind.", "Cut scrap rope once.", "Rehearse the release path."],
+      check: ["Both people can find and use the shears from the agreed position."],
+    },
+    {
+      rigger: ["Position both limbs parallel.", "Leave a visible gap.", "Check both shoulders feel comfortable."],
+      check: ["The limbs are parallel, separated, and comfortable."],
+    },
+    {
+      rigger: ["Wrap both limbs twice.", "Keep both wraps flat.", "Leave the wraps visibly slack."],
+      check: ["Two flat, slack wraps preserve the gap."],
+    },
+    {
+      rigger: ["Pass rope through the limb gap.", "Keep the cinch from sliding sideways.", "Ask about both limbs."],
+      check: ["The cinch holds both columns without unequal pressure."],
+    },
+    {
+      rigger: ["Tie the same non-cinching knot.", "Pull the standing part firmly.", "Redo any shrinking column."],
+      check: ["Firm pulling does not shrink either column."],
+    },
+    {
+      rigger: ["Set an actual timer.", "Ask about each limb separately.", "Record two distinct answers."],
+      check: ["A timer runs and each limb receives its own answer."],
+    },
+    {
+      rigger: ["Take the rope off.", "Move and describe both limbs.", "Agree to check again tomorrow."],
+      check: ["Both limbs are checked after removal and tomorrow's check is agreed."],
+    },
+  ],
+  karada: [
+    {
+      rigger: ["Find the safety shears blind.", "Cut scrap rope once.", "Rehearse the release path."],
+      check: ["Both people can find and use the shears from the agreed position."],
+    },
+    {
+      rigger: ["Fold the rope over the shoulders.", "Keep the rope doubled.", "Leave working length in front."],
+      check: ["The doubled rope hangs from the shoulders with working length forward."],
+    },
+    {
+      rigger: ["Place the first knot low.", "Keep the upper loop clear of the throat.", "Check head movement."],
+      check: ["The knot sits at or below the breastbone with throat clearance."],
+    },
+    {
+      rigger: ["Build an even knot chain.", "Keep the rope untwisted.", "Avoid every flagged spot."],
+      check: ["An even chain runs from breastbone to hips without twists."],
+    },
+    {
+      rigger: ["Anchor the chain at the waist.", "Confirm unrestricted breathing.", "Keep rope below the ribs."],
+      check: ["The waist wrap holds and breathing remains entirely normal."],
+    },
+    {
+      rigger: ["Ask separately before passing between the legs.", "Skip this step without a clear yes.", "Keep any pass visibly loose."],
+      check: ["The step is skipped or separately agreed, loose, and symptom-free."],
+    },
+    {
+      rigger: ["Pass each end through a gap.", "Form even diamonds.", "Keep the chain centered and throat clear."],
+      check: ["The diamonds are even and nothing has migrated upward."],
+    },
+    {
+      rigger: ["Tie off the ends.", "Have her stand, sit, lie, and reach.", "Check breathing after every position."],
+      check: ["The pattern stays put and breathing remains unchanged in every position."],
+    },
+    {
+      rigger: ["Take the rope off.", "Inspect skin under the knot line.", "Check that marks are fading."],
+      check: ["The rope is off and the skin check shows only fading marks."],
+    },
+  ],
+};
+
 /**
  * A foundational structure, taught in full, that may go on a person.
  *
@@ -352,6 +466,23 @@ export function guidedPractice(input: GuidedInput): Tie {
     ...(input.slug === "single-column" ? [] : [CUT_STOP]),
     ...(input.stop ?? []),
   ];
+  const steps =
+    ["single-column", "double-column", "karada"].includes(input.slug)
+      ? input.steps.map((step) => {
+          const takingOff = /taking it off|release|off\b/i.test(step.title);
+          const bulletIndex = input.steps.indexOf(step);
+          const bullets = GUIDED_BULLETS[input.slug]?.[bulletIndex];
+          return {
+            ...step,
+            riggerBullets:
+              bullets?.rigger ??
+              (takingOff
+                ? ["Untie now.", "If stuck ~1 minute, symptoms, or safeword: cut a wrap.", "Check the rope is off."]
+                : ["Follow the agreed path.", "Check the placement.", "Confirm the person can communicate."]),
+            checkBullets: bullets?.check ?? ["Confirm the stated condition is visible."],
+          };
+        })
+      : input.steps;
   return {
     slug: input.slug,
     name: input.name,
@@ -362,13 +493,14 @@ export function guidedPractice(input: GuidedInput): Tie {
     ropes: input.ropes,
     position: "floor",
     prereqs: input.prereqs ?? [],
+    related: input.related ?? [],
     knots: input.knots,
     nerves: input.nerves,
     intent: [...input.intent, "guided-practice"],
     goal: input.goal,
     why: input.why,
     stop: [...new Set(stop)],
-    steps: input.steps,
+    steps,
     mistakes: [
       ...input.mistakes,
       {

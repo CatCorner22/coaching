@@ -14,7 +14,7 @@
  *   node --experimental-strip-types --import ./scripts/register-ts.mjs \
  *     scripts/build-offline-emergency.mjs [--check]
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isMainModule } from "./with-app-env.mjs";
@@ -146,8 +146,15 @@ function main() {
     console.log(`[offline-emergency] ${OUTPUT_REL_PATH} is up to date`);
     return;
   }
+  const current = existsSync(target) ? readFileSync(target, "utf8") : null;
   writeFileSync(target, next);
-  console.log(`[offline-emergency] wrote ${OUTPUT_REL_PATH}`);
+  if (current !== next) {
+    console.log(
+      `[offline-emergency] regenerated ${OUTPUT_REL_PATH} (was stale — commit it)`,
+    );
+  } else {
+    console.log(`[offline-emergency] ${OUTPUT_REL_PATH} unchanged`);
+  }
 }
 
 // Reuses the shared symlink-safe entry check: a raw argv comparison makes a

@@ -3,10 +3,19 @@ export function toBullets(text: string): string[] {
   const trimmed = text.trim();
   if (!trimmed) return [];
   const parts = trimmed
-    .split(/(?<=[.!?])\s+|\s*;\s*/)
+    .split(/(?<=[.!?])\s+/)
     .map((s) => s.trim())
     .filter(Boolean);
-  return parts.length > 0 ? parts : [trimmed];
+  const merged: string[] = [];
+  for (const part of parts) {
+    const startsAnAction = /^(?:do|then|next|check|look|confirm|keep|hold|release|cut|say|ask|watch)\b/iu.test(part);
+    if (merged.length > 0 && part.split(/\s+/).length < 5 && !startsAnAction) {
+      merged[merged.length - 1] = `${merged[merged.length - 1]} ${part}`;
+    } else {
+      merged.push(part);
+    }
+  }
+  return merged.length > 0 ? merged : [trimmed];
 }
 
 export function bulletsOrFallback(explicit: string[] | undefined, fallback: string): string[] {

@@ -1,4 +1,5 @@
 import type { Article } from "./types";
+import { EMERGENCY_CALL_FIRST } from "@/lib/emergency-card";
 
 /**
  * The explanatory layer under the step-by-step ties.
@@ -260,7 +261,7 @@ export const TECHNIQUE_ARTICLES: Article[] = [
       },
       {
         type: "warn",
-        text: "If someone is unresponsive, not breathing normally, or has a suspected head or spinal injury, call emergency services first, then release only what is affecting breathing or circulation. Do not spend minutes tidily removing rope before making the call.",
+        text: EMERGENCY_CALL_FIRST,
       },
     ],
   },

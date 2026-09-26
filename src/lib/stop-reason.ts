@@ -13,6 +13,8 @@ export function stopReasonLabel(reason: string | undefined): string {
   switch (reason) {
     case "safeword":
       return "Safeword heard";
+    case "safeword-button":
+      return "Safeword called";
     case "coach":
     case "observation":
       return "Stopped by an observation flag";

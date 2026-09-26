@@ -66,7 +66,7 @@ const TIE_LIMIT_IDS: Readonly<Record<string, readonly string[]>> = {
   "hogtie-suspended": ["suspension", "predicament"],
 };
 
-const FURNITURE_LIMIT_IDS: Readonly<Record<string, readonly string[]>> = {
+export const FURNITURE_LIMIT_IDS: Readonly<Record<string, readonly string[]>> = {
   "massage-table": ["bench"],
   "sex-bench": ["bench"],
   "st-andrews-cross": ["cross"],
@@ -105,6 +105,18 @@ export function missingTieLimits(
   items: readonly NegItem[],
 ): { id: string; label: string }[] {
   const required = tieLimitIds(slug);
+  if (required.length === 0) return [];
+  const byId = new Map(normalizeNegotiationItems(items).map((item) => [item.id, item]));
+  return required
+    .filter((id) => byId.get(id)?.rank !== "yes")
+    .map((id) => ({ id, label: byId.get(id)?.label ?? id }));
+}
+
+export function missingFurnitureLimits(
+  slug: string | undefined,
+  items: readonly NegItem[],
+): { id: string; label: string }[] {
+  const required = slug ? (FURNITURE_LIMIT_IDS[slug] ?? []) : [];
   if (required.length === 0) return [];
   const byId = new Map(normalizeNegotiationItems(items).map((item) => [item.id, item]));
   return required

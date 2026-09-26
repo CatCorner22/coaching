@@ -27,6 +27,7 @@ import {
 } from "@/lib/kb";
 import { tieShape, tieShapeBlurb, tieShapeLabel } from "@/lib/kb/tie-factories";
 import { missingStepLimits, missingTieLimits } from "@/lib/studio/negotiation";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { coachVoiceLabel } from "@/lib/voice/coach-profile";
 import { useLearnProgress } from "@/lib/stores/learn-progress";
 import { useNegotiate } from "@/lib/stores/negotiate";
@@ -49,6 +50,7 @@ function TiePage() {
   const setLast = useLearnProgress((s) => s.setLast);
   const [step, setStep] = useState(0);
   const [confirm, setConfirm] = useState<StepConfirm>(emptyStepConfirm);
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
 
   useEffect(() => {
     setConfirm(emptyStepConfirm());
@@ -75,8 +77,9 @@ function TiePage() {
     );
   }
 
-  const s = tie.steps[step]!;
-  const wraps = tie.steps.slice(0, step + 1).flatMap((x) => x.wraps);
+  const renderStep = Math.min(step, tie.steps.length - 1);
+  const s = tie.steps[renderStep]!;
+  const wraps = tie.steps.slice(0, renderStep + 1).flatMap((x) => x.wraps);
   const instructor = isInstructorRoute(tie);
   const foundation = isFoundationTie(slug);
   // Which of the three catalog shapes this entry is — a prop drill, a tie
@@ -131,7 +134,7 @@ function TiePage() {
       media={s.media}
       tie={tie}
       tieSlug={slug}
-      stepIndex={step}
+      stepIndex={renderStep}
       expectedBands={s.expected.wrapBands}
       tieContext={{
         pose: s.expected.pose,
@@ -185,12 +188,28 @@ function TiePage() {
       sidebar={
         <div className="hidden space-y-4 lg:block">
           <BeforeYouStart propOnly={shape !== "guided"} />
-          {coachPanel}
+          {isDesktop && coachPanel}
           {instructor && <InstructorPrepCard tieName={tie.name} />}
         </div>
       }
     >
       <section className="rounded-lg border border-border bg-surface px-4 py-4 sm:px-5">
+        {tie.prereqs.length > 0 && (
+          <p className="mb-3 text-sm text-muted">
+            Learn first:{" "}
+            {tie.prereqs.map((prereq, index) => {
+              const prerequisite = getAcademyTie(prereq);
+              return (
+                <span key={prereq}>
+                  {index > 0 && ", "}
+                  <Link to="/tie/$slug" params={{ slug: prereq }} className="text-accent hover:underline">
+                    {prerequisite?.name ?? prereq}
+                  </Link>
+                </span>
+              );
+            })}
+          </p>
+        )}
         {/* Says up front what the reader may actually do with this entry,
             rather than leaving it to be inferred from a duration badge. */}
         <p className="text-base leading-relaxed text-fg">{tieShapeBlurb(shape)}</p>
@@ -203,7 +222,7 @@ function TiePage() {
 
       <BeforeYouStart propOnly={shape !== "guided"} className="lg:hidden" />
 
-      <div className="lg:hidden">{coachPanel}</div>
+      {!isDesktop && coachPanel}
 
       <div className="rounded-lg border border-warn/30 bg-warn/10 px-4 py-3 text-base leading-relaxed text-warn">
         <p>
@@ -244,11 +263,11 @@ function TiePage() {
       )}
 
       {limitsAgreed && <>
-          <StepProgress step={step} total={tie.steps.length} />
+          <StepProgress step={renderStep} total={tie.steps.length} />
 
           <StepFilmstrip
             steps={tie.steps}
-            active={step}
+            active={renderStep}
             onSelect={(i) =>
               // Jumping back to review is free; jumping forward must not
               // bypass the Do/Check acknowledgement the Next button enforces
@@ -284,7 +303,7 @@ function TiePage() {
             </section>
           ) : (
           <StepCard
-            index={step}
+            index={renderStep}
             total={tie.steps.length}
             title={s.title}
             stepGoal={s.goal}
@@ -315,7 +334,7 @@ function TiePage() {
           </aside>
 
           <StepNav
-            step={step}
+            step={renderStep}
             total={tie.steps.length}
             onBack={() => setStep((n) => n - 1)}
             onNext={goNext}

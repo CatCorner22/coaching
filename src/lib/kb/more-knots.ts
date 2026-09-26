@@ -260,7 +260,7 @@ export const MORE_KNOTS: KnotSource[] = [
           "Pull a bight partway along the rope's length",
           "Tie a slipped half-hitch loop or fixed loop knot around it",
           "Snug it down so it stands open unsupported",
-          "Leave enough working end beyond it to reach the anchor and back, plus several extra feet for hauling and tying the two half hitches",
+          "Leave a metre or two extra beyond the anchor path for hauling and tying the two half hitches",
         ],
         check:
           "Let go of the rope entirely and look at the loop on its own: it should stand open, keeping its round shape without your fingers pinching it closed. If it wants to flatten or slip open the moment you release it, retie it.",
@@ -323,7 +323,7 @@ export const MORE_KNOTS: KnotSource[] = [
       },
       {
         title: "Tying the mid-line loop too close to either end",
-        body: "The loop's position along the rope sets how much rope is left to work with on either side of it — tie it too near the end you started from, and after running the working end out to the anchor and back up through the loop, there won't be enough tail left to haul any real distance, let alone tie the two half hitches at the finish. Before you commit to the loop's position, picture the whole path the rope has to travel — out to the anchor and back through the loop — and leave several extra feet of working end past the loop for the haul and the lock-off.",
+        body: "The loop's position along the rope sets how much rope is left to work with on either side of it — tie it too near the end you started from, and after running the working end out to the anchor and back up through the loop, there won't be enough tail left to haul any real distance, let alone tie the two half hitches at the finish. Before you commit to the loop's position, picture the whole path the rope has to travel — out to the anchor and back through the loop — and leave an extra metre of working end past the loop for the haul and the lock-off.",
       },
     ],
     watch: ["Mechanical advantage can create high force before the operator recognizes it."],

@@ -116,10 +116,23 @@ export function checkDeployAuthConfig(processEnv = process.env) {
 async function main(argv) {
   const devUrlFlag = argv.indexOf("--dev-url");
   const devUrl = devUrlFlag === -1 ? DEFAULT_DEV_URL : argv[devUrlFlag + 1];
+  const expectFlag = argv.indexOf("--expect");
+  const expected = expectFlag === -1 ? null : argv[expectFlag + 1] === "true";
   const result = compareAuthInvariant({
     devAuthEnabled: await probeDevAuthEnabled(devUrl),
     buildAuthEnabled: buildAuthEnabled(),
   });
+  if (expectFlag !== -1) {
+    const actual = buildAuthEnabled();
+    if (actual !== expected) {
+      console.error(
+        `[auth-invariant] expected build sign-in ${expected ? "on" : "off"}, got ${actual ? "on" : "off"}`,
+      );
+      process.exit(1);
+    }
+    console.log(`[auth-invariant] expected build sign-in ${expected ? "on" : "off"} confirmed`);
+    process.exit(0);
+  }
   if (result.status === "ok") {
     console.log(result.message);
     process.exit(0);

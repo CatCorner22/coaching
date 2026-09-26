@@ -142,6 +142,32 @@ test("a recognizer that fails immediately still stops instead of restart-stormin
   }
 });
 
+test("repeated network errors stop listening without a restart storm", async () => {
+  const h = harness();
+  try {
+    const { listenForWords } = await import("./listen.ts");
+    const statuses: Array<{ status: string; message?: string }> = [];
+    listenForWords(["red"], () => undefined, (status, message) => statuses.push({ status, message }));
+    await h.flush();
+    const rec = FakeRecognition.instances[0]!;
+
+    for (let cycle = 0; cycle < 50; cycle++) {
+      rec.onerror?.({ error: "network" });
+      rec.endFromSilence();
+      h.advance(5_000);
+      await h.flush();
+    }
+
+    assert.ok(rec.starts <= 4, `network failures caused ${rec.starts} starts`);
+    assert.deepEqual(statuses.at(-1), {
+      status: "error",
+      message: "Voice needs a network connection — use the buttons.",
+    });
+  } finally {
+    h.restore();
+  }
+});
+
 test("safeword matching is bounded to whole words and debounced", async () => {
   const h = harness();
   try {
@@ -212,7 +238,7 @@ test("safewords still match when the recognizer punctuates them differently", as
     await h.flush();
     const rec = FakeRecognition.instances[0]!;
 
-    rec.speak("she said dont");
+    rec.speak("DONT");
     await h.flush();
     assert.deepEqual(hits, ["don't"], "an unpunctuated transcript must still match");
 
@@ -242,6 +268,14 @@ test("a safeword mentioned inside a sentence does not stop the scene", async () 
       "her marks are going red",
       "is that red or just pressure",
       "the red one is softer than the jute",
+      "red rope",
+      "the red rope",
+      "pass the red",
+      "red one please",
+      "is that red",
+      "more red",
+      "yellow rope",
+      "the yellow one",
     ]) {
       rec.speak(sentence);
       await h.flush();

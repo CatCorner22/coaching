@@ -20,11 +20,14 @@
  * `process.env`, which is why the merge has to happen before Vite starts.
  */
 import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
 import { readFileSync, realpathSync } from "node:fs";
 import { constants as osConstants } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkDeployAuthConfig } from "./check-auth-invariant.mjs";
+
+const require = createRequire(import.meta.url);
 
 export const APP_ENV_REL_PATH = ".grok/app-env.json";
 
@@ -218,13 +221,25 @@ function main(argv) {
       process.exit(1);
     }
   }
-  const child = spawn(command, args, { stdio: "inherit", env });
+  let executable = command;
+  let childArgs = args;
+  if (command === "vite") {
+    try {
+      executable = process.execPath;
+      const vitePackageRoot = dirname(require.resolve("vite/package.json"));
+      childArgs = [join(vitePackageRoot, "bin", "vite.js"), ...args];
+    } catch (error) {
+      console.error("[with-app-env] failed Vite binary lookup:", error?.message || error);
+      process.exit(127);
+    }
+  }
+  const child = spawn(executable, childArgs, { stdio: "inherit", env });
   // The dev server is long-running and is stopped by signalling this wrapper.
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
     process.on(signal, () => child.kill(signal));
   }
   child.on("error", (err) => {
-    console.error(`[with-app-env] failed to run ${command}:`, err?.message || err);
+    console.error(`[with-app-env] failed to run ${command} (binary lookup may have failed):`, err?.message || err);
     process.exit(127);
   });
   child.on("exit", (code, signal) => {

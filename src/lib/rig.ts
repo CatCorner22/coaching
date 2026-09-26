@@ -1,3 +1,6 @@
+import { MAX_CHECK_MINUTES, MIN_CHECK_MINUTES } from "./stores/settings";
+export { MAX_CHECK_MINUTES, MIN_CHECK_MINUTES } from "./stores/settings";
+
 /**
  * Glanceable-scene helpers for Rig Mode.
  *
@@ -12,8 +15,6 @@
  */
 
 /** Interval bounds, mirroring what the settings screen accepts. */
-export const MIN_CHECK_MINUTES = 1;
-export const MAX_CHECK_MINUTES = 60;
 export const DEFAULT_CHECK_MINUTES = 4;
 
 export type CadencePhase =

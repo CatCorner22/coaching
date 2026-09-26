@@ -564,6 +564,7 @@ function observationsFor(
   // unknown abstentions it adds so every emitted category stays evidenced.
   return matches.map((match) => {
     const band = consequenceBandForReport(match.canonical_id);
+    const bandLabel = consequenceBandLabel(band);
     return {
       frame_id: match.frame_id,
       visible_fact: visibleFactFor(match.canonical_id),
@@ -573,10 +574,23 @@ function observationsFor(
         !quality.usable_for_requested_conclusion || match.canonical_id === "unknown_object"
           ? "abstain"
           : "low",
-      why_it_matters: `${band} is a consequence floor, not a probability estimate or safety clearance.`,
+      why_it_matters: `${bandLabel} is a consequence floor, not a probability estimate or safety clearance.`,
       action_id: actionForBand(band),
     };
   });
+}
+
+function consequenceBandLabel(band: ConsequenceBand): string {
+  switch (band) {
+    case "C1_lower_consequence_learning":
+      return "Lower consequence — learning only";
+    case "C2_elevated":
+      return "Elevated consequence";
+    case "C3_high_consequence_instructor_only":
+      return "High consequence — qualified instructor only";
+    case "C4_stop_or_decline":
+      return "Stop or decline";
+  }
 }
 
 function visibleFactFor(id: CanonicalId): string {
