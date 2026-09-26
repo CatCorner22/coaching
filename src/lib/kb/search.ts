@@ -1027,10 +1027,6 @@ export function matchesQuery(fields: string[], q: string): boolean {
 }
 
 export function tieMatches(tie: (typeof TIES)[number], q: string): boolean {
-  const phrase = normalized(q, true).replace(/\s+/gu, " ").trim();
-  if (phrase === "hog tie") {
-    return tie.slug === "hogtie-floor" || tie.slug === "hogtie-suspended";
-  }
   return matchesQuery(
     [tie.name, tie.jp, tie.slug, tie.summary, tie.nerves.join(" "), tie.intent.join(" "), SEARCH_ALIASES[`tie:${tie.slug}`] ?? ""],
     q,
@@ -1261,7 +1257,6 @@ export function searchKnowledge(query: string, limit = 12): SearchHit[] {
     for (const hit of hits) {
       if (
         (hit.kind === "knot" && hit.slug === "somerville-bowline") ||
-        (hit.kind === "tie" && hit.slug === "first-ten-sessions") ||
         (hit.kind === "article" && hit.slug === "first-ten-sessions") ||
         (hit.kind === "tool" && hit.slug === "learn")
       ) {
