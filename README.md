@@ -132,7 +132,9 @@ __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=laptop.tail1234.ts.net XAI_API_KEY=... XA
 ```
 
 `BETTER_AUTH_URL` here lets the AI origin check trust the Tailscale address; it
-does not enable sign-in in development. On the phones, with
+does not enable sign-in in development: everyone on the tailnet shares the
+development identity, so this setup is only for a tailnet whose every device
+you would hand your API key to. On the phones, with
 Tailscale connected, open the `https://…ts.net` address, allow the camera, and
 "Add to Home Screen". Each device keeps its own local data (negotiation,
 journal, session), so run a scene from one device. The first certificate fetch
