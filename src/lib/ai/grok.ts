@@ -5,6 +5,14 @@ const PRIVACY_PREFLIGHT_TIMEOUT_MS = 10_000;
 export const GROK_ZDR_ERROR = "xAI did not confirm zero data retention";
 export const GROK_ZDR_RESPONSE_ERROR =
   "xAI media response did not provide verifiable zero data retention confirmation";
+export type GrokZdrPreflight =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: "zdr_missing" | "http_error" | "rate_limited" | "timeout" | "network";
+      status?: number;
+      retryAfterMs?: number;
+    };
 
 export type GrokJsonSchemaFormat = {
   type: "json_schema";
@@ -64,6 +72,7 @@ export async function grokChat(opts: {
       transportFailure?: "aborted" | "timeout" | "network";
       /** Provider-declared wait, parsed from Retry-After on a 429. */
       retryAfterMs?: number;
+      retryableBeforeProvider?: boolean;
     }
 > {
   // One immutable credential snapshot is used for the fixed text-only probe
@@ -77,16 +86,22 @@ export async function grokChat(opts: {
       providerAttempted: false,
     };
   }
-  if (!(await verifyGrokZeroDataRetentionForRequest(apiKey, opts.signal))) {
-    // Operator-visible: a flipped console setting fails every analysis with
-    // the same user-facing line; the log is the only place to see why.
-    console.error("[grok] ZDR preflight failed — provider did not confirm zero data retention");
+  const preflight = await verifyGrokZeroDataRetentionForRequest(apiKey, opts.signal);
+  if (!preflight.ok) {
+    console.error("[grok] ZDR preflight failed", preflight.reason);
+    const privacy = preflight.reason === "zdr_missing";
     return {
       ok: false,
-      error: GROK_ZDR_ERROR,
-      status: 503,
+      error: privacy
+        ? "No media was sent to xAI. Zero data retention could not be confirmed."
+        : preflight.reason === "rate_limited"
+          ? "No media was sent to xAI. xAI request capacity is full; try again later."
+          : "No media was sent to xAI. The provider is temporarily unavailable; try again later.",
+      status: preflight.status ?? (privacy ? 503 : 502),
       providerAttempted: false,
-      privacyFailure: "preflight",
+      ...(privacy ? { privacyFailure: "preflight" as const } : {}),
+      ...(preflight.retryAfterMs === undefined ? {} : { retryAfterMs: preflight.retryAfterMs }),
+      retryableBeforeProvider: true,
     };
   }
   if (!zeroDataRetentionRequired() || opts.signal?.aborted) {
@@ -117,23 +132,47 @@ export async function grokChat(opts: {
   const controller = new AbortController();
   const stopRelaying = relayAbort(opts.signal, controller);
   const timeout = setTimeout(() => controller.abort(), 45_000);
-  let mediaDispatched = false;
-  let responseReceived = false;
-  let zeroDataRetentionConfirmed = false;
   try {
-    mediaDispatched = true;
-    const res = await fetch("https://api.x.ai/v1/chat/completions", {
-      method: "POST",
-      cache: "no-store",
-      redirect: "error",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: requestBody,
-      signal: controller.signal,
-    });
-    responseReceived = true;
+    let res: Response;
+    try {
+      res = await fetch("https://api.x.ai/v1/chat/completions", {
+        method: "POST",
+        cache: "no-store",
+        redirect: "error",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: requestBody,
+        signal: controller.signal,
+      });
+    } catch {
+      const transportFailure = opts.signal?.aborted
+        ? ("aborted" as const)
+        : controller.signal.aborted
+          ? ("timeout" as const)
+          : ("network" as const);
+      if (transportFailure === "network") {
+        return {
+          ok: false,
+          error: GROK_ZDR_RESPONSE_ERROR,
+          status: 502,
+          providerAttempted: true,
+          privacyFailure: "response",
+        };
+      }
+      return {
+        ok: false,
+        error:
+          transportFailure === "aborted"
+            ? "xAI request cancelled"
+            : transportFailure === "timeout"
+              ? "xAI request timed out"
+              : "xAI response failed",
+        providerAttempted: true,
+        transportFailure,
+      };
+    }
     if (!responseConfirmsZeroDataRetention(res)) {
       await res.body?.cancel().catch(() => undefined);
       console.error("[grok] response did not confirm zero data retention — result discarded");
@@ -145,7 +184,6 @@ export async function grokChat(opts: {
         privacyFailure: "response",
       };
     }
-    zeroDataRetentionConfirmed = true;
     if (!res.ok) {
       let refused = false;
       try {
@@ -177,7 +215,12 @@ export async function grokChat(opts: {
       await res.body?.cancel().catch(() => undefined);
       return { ok: false, error: "xAI response was too large", providerAttempted: true };
     }
-    const raw = await readTextBounded(res, MAX_GROK_RESPONSE_BYTES);
+    let raw: string;
+    try {
+      raw = await readTextBounded(res, MAX_GROK_RESPONSE_BYTES);
+    } catch {
+      return { ok: false, error: "xAI response failed", providerAttempted: true };
+    }
     let body: {
       choices?: {
         message?: { content?: string | null; refusal?: string | null };
@@ -187,6 +230,9 @@ export async function grokChat(opts: {
     try {
       body = JSON.parse(raw) as typeof body;
     } catch {
+      return { ok: false, error: "xAI returned invalid JSON", providerAttempted: true };
+    }
+    if (!body || typeof body !== "object") {
       return { ok: false, error: "xAI returned invalid JSON", providerAttempted: true };
     }
     const choice = body.choices?.[0];
@@ -217,38 +263,6 @@ export async function grokChat(opts: {
     const text = choice.message?.content ?? "";
     if (!text.trim()) return { ok: false, error: "empty", providerAttempted: true };
     return { ok: true, text, providerAttempted: true };
-  } catch {
-    // Our own cancellations — the caller's abort and this function's deadline —
-    // are not evidence about the provider's privacy posture, and reporting them
-    // as one sent the reader to the xAI console over a closed tab. Every other
-    // post-dispatch failure still fails closed: media left the machine and
-    // nothing confirmed zero data retention.
-    const cancelledByUs = opts.signal?.aborted || (controller.signal.aborted && !responseReceived);
-    if (mediaDispatched && !zeroDataRetentionConfirmed && !cancelledByUs) {
-      return {
-        ok: false,
-        error: GROK_ZDR_RESPONSE_ERROR,
-        status: 502,
-        providerAttempted: true,
-        privacyFailure: "response",
-      };
-    }
-    const transportFailure = opts.signal?.aborted
-      ? ("aborted" as const)
-      : controller.signal.aborted
-        ? ("timeout" as const)
-        : ("network" as const);
-    return {
-      ok: false,
-      error:
-        transportFailure === "aborted"
-          ? "xAI request cancelled"
-          : transportFailure === "timeout"
-            ? "xAI request timed out"
-            : "xAI response failed",
-      providerAttempted: mediaDispatched,
-      ...(mediaDispatched ? { transportFailure } : {}),
-    };
   } finally {
     stopRelaying();
     clearTimeout(timeout);
@@ -259,7 +273,7 @@ export async function grokChat(opts: {
 export async function verifyGrokZeroDataRetentionForRequest(
   apiKey: string,
   sourceSignal?: AbortSignal,
-): Promise<boolean> {
+): Promise<GrokZdrPreflight> {
   const controller = new AbortController();
   const stopRelaying = relayAbort(sourceSignal, controller);
   const timeout = setTimeout(() => controller.abort(), PRIVACY_PREFLIGHT_TIMEOUT_MS);
@@ -280,11 +294,25 @@ export async function verifyGrokZeroDataRetentionForRequest(
       }),
       signal: controller.signal,
     });
-    const verified = response.ok && responseConfirmsZeroDataRetention(response);
+    if (response.status === 429) {
+      await response.body?.cancel().catch(() => undefined);
+      return { ok: false, reason: "rate_limited", status: 429, ...retryAfterFrom(response) };
+    }
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
+      return { ok: false, reason: "http_error", status: response.status };
+    }
+    if (!responseConfirmsZeroDataRetention(response)) {
+      await response.body?.cancel().catch(() => undefined);
+      return { ok: false, reason: "zdr_missing", status: response.status };
+    }
     await response.body?.cancel().catch(() => undefined);
-    return verified;
+    return { ok: true };
   } catch {
-    return false;
+    return {
+      ok: false,
+      reason: sourceSignal?.aborted ? "network" : controller.signal.aborted ? "timeout" : "network",
+    };
   } finally {
     stopRelaying();
     clearTimeout(timeout);

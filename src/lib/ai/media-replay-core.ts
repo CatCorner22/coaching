@@ -70,7 +70,7 @@ export async function consumeDurableMediaBatchOnce(
   sql: MediaBatchSql,
   options: DurableMediaBatchOptions,
   charge: () => void,
-): Promise<void> {
+): Promise<string> {
   const subjectHash = options.subjectHash.trim();
   const batchId = options.batchId.trim();
   const reservationId = options.reservationId.trim();
@@ -111,6 +111,14 @@ export async function consumeDurableMediaBatchOnce(
   // Keep cleanup separate from the upsert: sibling data-modifying CTEs that
   // touch the same row have undefined execution order in PostgreSQL.
   await sql.query(CLEANUP_SQL, [reservationId]).catch(() => undefined);
+  return reservationId;
+}
+
+export async function releaseDurableMediaBatch(
+  sql: MediaBatchSql,
+  options: Pick<DurableMediaBatchOptions, "subjectHash" | "batchId" | "reservationId">,
+): Promise<void> {
+  await sql.query(RELEASE_SQL, [options.subjectHash, options.batchId, options.reservationId]);
 }
 
 /**

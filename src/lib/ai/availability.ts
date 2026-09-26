@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { grokProviderConfigured } from "./grok";
+import { isTrustedAppOrigin } from "./origin";
 import { assertSameSiteRequest } from "@/lib/auth/isolation.server";
 import { bearerMiddleware } from "@/lib/auth/middleware";
 import { authConfigured, getSessionUser, UnauthorizedError } from "@/lib/auth/verify.server";
@@ -8,7 +10,7 @@ import { selectDatabaseSource, viteDevServer } from "@/lib/runtime-mode";
 export type AiVisionAvailability = {
   configured: boolean;
   /** Why cloud analysis is off, in words the couple can act on. */
-  reason: "ok" | "no_provider" | "no_database";
+  reason: "ok" | "no_provider" | "no_database" | "auth_required" | "origin_not_trusted";
 };
 
 /**
@@ -40,6 +42,21 @@ export const aiVisionAvailability = createServerFn({ method: "GET" })
     // Postgres and PGLite drivers into this module's graph.
     const dbSource = selectDatabaseSource(process.env.DATABASE_URL, viteDevServer);
     if (dbSource === "unconfigured") return { configured: false, reason: "no_database" };
+    if (!authConfigured) return { configured: false, reason: "auth_required" };
+    const request = getRequest();
+    const origin = request?.headers.get("origin");
+    if (
+      !origin ||
+      !isTrustedAppOrigin(origin, {
+        configuredOrigin: process.env.BETTER_AUTH_URL,
+        allowLoopback: viteDevServer,
+        devHost: request?.headers.get("host"),
+        allowPreviewHosts:
+          viteDevServer || Boolean(process.env.GROK_PREVIEW_CLIENT_SECRET?.trim()),
+      })
+    ) {
+      return { configured: false, reason: "origin_not_trusted" };
+    }
     if (!grokProviderConfigured()) return { configured: false, reason: "no_provider" };
     return { configured: true, reason: "ok" };
   });

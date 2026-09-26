@@ -347,9 +347,10 @@ async function runAnalyzeRequest(
 
     if (triage === "none") {
       const { consumeAiBudget } = await import("./rate-limit.server");
-      const { consumeMediaBatch } = await import("./media-replay.server");
+      const { consumeMediaBatch, releaseMediaBatch } = await import("./media-replay.server");
+      let reservationId: string | null = null;
       try {
-        await consumeMediaBatch(authorization.userId, data.consent.batchId, () => {
+        reservationId = await consumeMediaBatch(authorization.userId, data.consent.batchId, () => {
           consumeAiBudget("vision", 8, 10 * 60_000, authorization.userId);
         });
       } catch (error) {
@@ -416,6 +417,15 @@ async function runAnalyzeRequest(
       });
 
       if (!grok.ok && grok.providerAttempted === false) {
+        if (reservationId && grok.retryableBeforeProvider) {
+          await releaseMediaBatch(
+            authorization.userId,
+            data.consent.batchId,
+            reservationId,
+          ).catch((error) => {
+            console.error("[analyze] unable to release preflight reservation", error);
+          });
+        }
         return {
           ok: false,
           error:
@@ -428,7 +438,7 @@ async function runAnalyzeRequest(
               ? "AI_PRIVACY_UNAVAILABLE"
               : "AI_PROVIDER_UNAVAILABLE",
           status: 503,
-          retryableBeforeProvider: false,
+          retryableBeforeProvider: grok.retryableBeforeProvider === true,
         };
       }
       if (!grok.ok && grok.transportFailure) {
