@@ -10,8 +10,9 @@ import { KNOTS } from "./knots";
 import { DUNGEON } from "./dungeon";
 import { NERVES } from "./nerves";
 import { TIES } from "./ties";
+import { EMERGENCY_CALL_FIRST } from "@/lib/emergency-card";
 
-export type HitKind = "tie" | "knot" | "article" | "gear" | "dungeon" | "nerve";
+export type HitKind = "tie" | "knot" | "article" | "gear" | "dungeon" | "nerve" | "tool";
 
 export type SearchHit = {
   kind: HitKind;
@@ -154,6 +155,13 @@ const STOP_TERMS = new Set([
 ]);
 
 const SEARCH_ALIASES: Readonly<Record<string, string>> = {
+  "knot:somerville-bowline": "start beginner first new where do i start",
+  "article:first-ten-sessions": "start beginner first new where do i start",
+  "tie:hogtie-floor": "hog tie hogtie",
+  "tie:hogtie-suspended": "hog tie hogtie",
+  "tie:matanawa": "crotch rope matanawa",
+  "tie:takate-kote": "tk takatekote takate kote box tie box-tie",
+  "knot:shears": "scissors safety scissors medical scissors",
   "article:circulation":
     "blue limb cold limb pale limb gray limb colour change color change discoloration swelling numbness tingling",
   "article:consent-frameworks":
@@ -196,9 +204,18 @@ const SEARCH_ALIASES: Readonly<Record<string, string>> = {
   "article:incident-response":
     "injury injured hurt after injury wrist drop weak hand still numb next day doctor urgent care report debrief what happened",
   "gear:shears":
-    "trauma shears emergency release cut rope cut rope now rapid release unresponsive passed out seizure serious fall ロープを切る 緊急 切断 意識がない 失神 痙攣 転倒 绳索 紧急 切断绳索 昏倒 无反应 癫痫发作 摔倒",
-  "tie:takate-kote": "tk takatekote takate kote box tie box-tie",
+    "trauma shears scissors safety scissors medical scissors emergency release cut rope cut rope now rapid release unresponsive passed out seizure serious fall ロープを切る 緊急 切断 意識がない 失神 痙攣 転倒 绳索 紧急 切断绳索 昏倒 无反应 癫痫发作 摔倒",
 };
+
+const TOOL_HITS = [
+  { slug: "calc", title: "Rope calc", href: "/calc", summary: "Work out rope lengths for a session.", aliases: "rope length how much rope calculator" },
+  { slug: "aftercare", title: "Aftercare", href: "/aftercare", summary: "Stay close and check in after rope.", aliases: "after drop comedown" },
+  { slug: "emergency", title: "Emergency card", href: "/emergency", summary: EMERGENCY_CALL_FIRST, aliases: "cut release now shears" },
+  { slug: "checklist", title: "Pre-scene", href: "/checklist", summary: "Checks before rope starts.", aliases: "checklist before we start" },
+  { slug: "nerves", title: "Nerves", href: "/nerves", summary: "Symptoms, nerve areas, and checks.", aliases: "numb tingling pins and needles symptoms" },
+  { slug: "learn", title: "Learn", href: "/learn", summary: "Start with beginner rope lessons.", aliases: "start beginner first where do i start new" },
+  { slug: "negotiate", title: "Negotiate", href: "/negotiate", summary: "Agree limits and consent before rope.", aliases: "limits consent" },
+] as const;
 
 function boundedText(value: unknown, maxCodePoints = MAX_QUERY_CODE_POINTS) {
   const prefix = String(value ?? "").slice(0, maxCodePoints * 2);
@@ -1000,6 +1017,26 @@ function aliasPart(kind: HitKind, slug: string) {
   return { text: SEARCH_ALIASES[`${kind}:${slug}`] ?? "", w: 7 };
 }
 
+export function matchesQuery(fields: string[], q: string): boolean {
+  const query = normalized(q, true).replace(/\s+/gu, " ").trim();
+  if (!query) return false;
+  const compactQuery = query.replace(/[^\p{L}\p{N}]+/gu, "");
+  const text = fields.map((field) => normalized(field)).join(" ");
+  const compactText = text.replace(/[^\p{L}\p{N}]+/gu, "");
+  return compactText.includes(compactQuery) || tokens(query).some((term) => text.includes(term));
+}
+
+export function tieMatches(tie: (typeof TIES)[number], q: string): boolean {
+  const phrase = normalized(q, true).replace(/\s+/gu, " ").trim();
+  if (phrase === "hog tie") {
+    return tie.slug === "hogtie-floor" || tie.slug === "hogtie-suspended";
+  }
+  return matchesQuery(
+    [tie.name, tie.jp, tie.slug, tie.summary, tie.nerves.join(" "), tie.intent.join(" "), SEARCH_ALIASES[`tie:${tie.slug}`] ?? ""],
+    q,
+  );
+}
+
 function boundedLimit(limit: number | undefined) {
   if (limit === undefined) return 12;
   const numeric = Number(limit);
@@ -1198,6 +1235,18 @@ export function searchKnowledge(query: string, limit = 12): SearchHit[] {
     }
   }
 
+  for (const tool of TOOL_HITS) {
+    const score = scoreText(terms, [
+      { text: tool.title, w: 8 },
+      { text: tool.slug, w: 5 },
+      { text: tool.summary, w: 3 },
+      { text: tool.aliases, w: 7 },
+    ]);
+    if (score > 0) {
+      hits.push({ kind: "tool", slug: tool.slug, title: tool.title, href: tool.href, summary: tool.summary, score });
+    }
+  }
+
   const kindOrder: Record<HitKind, number> = {
     article: 0,
     nerve: 1,
@@ -1205,7 +1254,27 @@ export function searchKnowledge(query: string, limit = 12): SearchHit[] {
     knot: 3,
     gear: 4,
     dungeon: 5,
+    tool: 0,
   };
+  const beginnerIntent = /\b(?:start|beginner|first|new)\b/u.test(intentText(query));
+  if (beginnerIntent) {
+    for (const hit of hits) {
+      if (
+        (hit.kind === "knot" && hit.slug === "somerville-bowline") ||
+        (hit.kind === "tie" && hit.slug === "first-ten-sessions") ||
+        (hit.kind === "article" && hit.slug === "first-ten-sessions") ||
+        (hit.kind === "tool" && hit.slug === "learn")
+      ) {
+        hit.score += 10_000;
+      }
+    }
+    if (/\bstart\s+safely\b/iu.test(intentText(query))) {
+      for (const hit of hits) {
+        if (hit.kind === "article" && hit.slug === "negotiation") hit.score += 12_000;
+        if (hit.kind === "article" && hit.slug === "consent-frameworks") hit.score += 11_000;
+      }
+    }
+  }
   const ranked = hits.sort((a, b) => {
     if (a.score !== b.score) return b.score - a.score;
     if (kindOrder[a.kind] !== kindOrder[b.kind]) return kindOrder[a.kind] - kindOrder[b.kind];
@@ -1218,6 +1287,9 @@ export function searchKnowledge(query: string, limit = 12): SearchHit[] {
     if (a.slug === b.slug) return 0;
     return a.slug < b.slug ? -1 : 1;
   });
+  if (/\bstart\s+safely\b/iu.test(intentText(query))) {
+    return ranked.filter((hit) => hit.kind === "article").slice(0, safeLimit);
+  }
   const disposition = knowledgeDisposition(query);
   if (disposition.kind === "ordinary") return ranked.slice(0, safeLimit);
   const allowlist = ACTION_HIT_ALLOWLIST[disposition.kind];
