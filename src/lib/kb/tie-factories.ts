@@ -428,7 +428,7 @@ const GUIDED_BULLETS: Record<string, { rigger: string[]; check: string[] }[]> = 
       check: ["An even chain runs from breastbone to hips without twists."],
     },
     {
-      rigger: ["Anchor the chain at the waist.", "Check a full breath.", "Keep rope below the ribs."],
+      rigger: ["Anchor the chain at the waist.", "Confirm unrestricted breathing.", "Keep rope below the ribs."],
       check: ["The waist wrap holds and breathing remains entirely normal."],
     },
     {
