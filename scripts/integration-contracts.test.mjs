@@ -209,7 +209,7 @@ test("Studio requires yes for negotiated actions and blocks every voice path", (
   assert.match(studio, /if \(!studioVoice\) stopCoachVoice\(\)/);
   assert.match(studio, /voice=\{studioVoice\}/);
   assert.match(studio, /voice=\{studioVoice && !micArmed\}/);
-  assert.match(studio, /disabled=\{stopped \|\| !studioVoice \|\| stepBlocked\}/);
+  assert.match(studio, /disabled=\{stopped \|\| stepBlocked\}/);
   assert.match(studio, /disabled=\{cameraGateReason !== "enabled"\}/);
   assert.match(studio, /Export report/);
   assert.match(consentGate, /Step inside/);
@@ -352,7 +352,7 @@ test("a step's own limit gates Studio, not only the lesson page", () => {
   );
   // Not shown, not spoken automatically, and not speakable on demand.
   assert.match(studio, /if \(stopped \|\| stepBlocked\) return;/);
-  assert.match(studio, /disabled=\{stopped \|\| !studioVoice \|\| stepBlocked\}/);
+  assert.match(studio, /disabled=\{stopped \|\| stepBlocked\}/);
   assert.match(studio, /\{stepBlocked \?/);
 });
 
@@ -373,7 +373,7 @@ test("instructor-only entries cannot route into Studio", () => {
   // literal token blocked that improvement rather than protecting the invariant.
   assert.match(
     studio,
-    /negotiationReady &&[\s\S]{0,120}?requestedTie(?: != null)? &&[\s\S]*?requestedTie\.minutes\[1\] > 0 &&[\s\S]*?!negotiationPolicy\.isTieBlocked\(search\.tie\)/,
+    /const requestedTieAllowed =[\s\S]*?requestedTie\.minutes\[1\] > 0[\s\S]*?!negotiationPolicy\.isTieBlocked\(search\.tie\)/,
   );
   // A ?step= deep link must be gated by that same computed permission. Without
   // it a blocked or instructor-only tie could still have its step index set

@@ -35,9 +35,9 @@ test("emergency call action never assumes a US emergency number", () => {
     assert.match(files[path], /Call your local emergency-services number now/i, path);
     assert.match(files[path], /deliberately reads no saved account\s+data/i, path);
   }
-  // The route itself still reads nothing and runs nothing: no storage, no
-  // effects, no dialer link on the one page that must work when nothing else does.
-  assert.doesNotMatch(files["src/routes/emergency.tsx"], /local-data|localStorage|useEffect|tel:/);
+  // The route itself still reads no storage or account data. It may observe
+  // connectivity so it can hide links that cannot work offline.
+  assert.doesNotMatch(files["src/routes/emergency.tsx"], /local-data|localStorage|tel:/);
   assert.doesNotMatch(files["src/lib/emergency-card.ts"], /local-data|localStorage|useEffect|tel:/);
 });
 
