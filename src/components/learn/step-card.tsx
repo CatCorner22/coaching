@@ -81,6 +81,15 @@ export function StepCard({
           tone="do"
           requireConfirm={requireConfirm}
         />
+        {(doBullets?.length || checkBullets?.length) && (
+          <details className="rounded-lg border border-border/40 px-4 py-3">
+            <summary className="cursor-pointer text-sm font-medium text-muted">Why</summary>
+            <div className="mt-3 space-y-3 text-sm leading-relaxed text-muted">
+              <p>{doText}</p>
+              <p>{checkText}</p>
+            </div>
+          </details>
+        )}
 
         <InstructionBlock
           num={2}
