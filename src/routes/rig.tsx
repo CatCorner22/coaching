@@ -302,7 +302,14 @@ function RigPage() {
           <p className="text-sm text-warn">
             {settings.yellowWord} called — change something, keep talking.
           </p>
-          <Button size="sm" variant="outline" onClick={clearYellow}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              clearYellow();
+              checked();
+            }}
+          >
             Checked in
           </Button>
         </div>
@@ -380,7 +387,7 @@ function RigPage() {
           size="lg"
           variant="danger"
           className="h-20 text-lg"
-          onClick={() => stop("safeword")}
+          onClick={() => stop("safeword-button")}
         >
           {settings.safeword}
         </Button>

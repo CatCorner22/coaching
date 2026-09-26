@@ -11,8 +11,11 @@ function CalcPage() {
   const plan = usePlanner((s) => s.slugs);
   const eights = useKit((s) => s.eights);
   const fours = useKit((s) => s.fours);
+  const entered = useKit((s) => s.entered);
+  const shears = useKit((s) => s.shears);
   const setEights = useKit((s) => s.setEights);
   const setFours = useKit((s) => s.setFours);
+  const setShears = useKit((s) => s.setShears);
   const [extra, setExtra] = useState<string[]>([]);
   const result = useMemo(() => metersFor([...plan, ...extra]), [plan, extra]);
   const coverage = kitCoverage(result, eights, fours);
@@ -25,6 +28,11 @@ function CalcPage() {
         Lengths from the library, plus 15% waste for tails and a second staff. Jute is sold in
         eights for a reason.
       </p>
+      {!entered && (
+        <p className="mt-3 rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn">
+          Enter your rope counts on Rope calc
+        </p>
+      )}
       <p className="mt-6 font-display text-5xl tabular-nums">
         {result.nothingEstimable ? "No estimate" : `${result.totalWithWaste}m`}
       </p>
@@ -81,6 +89,10 @@ function CalcPage() {
           />
         </label>
       </div>
+      <label className="mt-4 flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={shears} onChange={(event) => setShears(event.target.checked)} />
+        Trauma shears are in the kit
+      </label>
       <ul className="mt-6 space-y-1 text-sm">
         {/* Keyed by position, not slug: the same tie can legitimately appear
             twice in one plan. */}

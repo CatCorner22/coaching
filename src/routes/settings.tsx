@@ -61,7 +61,7 @@ function SettingsPage() {
           <p className="mt-2 text-xs leading-relaxed text-muted">{uploadScopeSummary(uploadScope)}</p>
           <p className="mt-2 text-xs leading-relaxed text-subtle">
             {uploadScopeSettingsDescription(uploadScope)} This is an operator setting configured at
-            deploy time (`VITE_MEDIA_UPLOAD_SCOPE`), not a per-batch choice.
+            deploy time (<code>VITE_MEDIA_UPLOAD_SCOPE</code>), not a per-batch choice.
           </p>
         </section>
         <Field label="Your name / title" value={s.riggerName} onChange={(v) => s.set({ riggerName: v })} />

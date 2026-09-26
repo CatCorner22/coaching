@@ -17,7 +17,7 @@ function Home() {
     <div>
       <section className="relative isolate overflow-hidden">
         <div className="absolute inset-0 bg-bg" aria-hidden>
-            <svg viewBox="0 0 400 300" className="absolute -right-8 top-8 h-[120%] w-auto max-w-[70%] text-rope/25" aria-hidden>
+            <svg viewBox="0 0 400 300" className="hidden md:block absolute -right-8 top-8 h-[120%] w-auto max-w-[70%] text-rope/25" aria-hidden>
             <path
               d="M80 150 C80 70 160 70 200 150 C240 230 320 230 320 150 C320 70 240 70 200 150 C160 230 80 230 80 150"
               fill="none"

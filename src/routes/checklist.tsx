@@ -22,7 +22,7 @@ const ITEMS = [
 function ChecklistPage() {
   const done = useChecklist((s) => s.done);
   const setDone = useChecklist((s) => s.setDone);
-  const shears = useKit((s) => s.shears);
+  const entered = useKit((s) => s.entered);
   const eights = useKit((s) => s.eights);
   const safeword = useSettings((s) => s.safeword);
   const ready = ITEMS.every((i) => done[i.id]);
@@ -33,7 +33,7 @@ function ChecklistPage() {
       <h1 className="mt-2 font-display text-4xl">Pre-scene</h1>
       <p className="mt-3 text-sm text-muted">
         Ten sweet checks before you begin. Your stop word is <strong className="text-fg">{safeword}</strong>.
-        Your kit lists {eights} × 8m lengths{shears ? " and trauma shears" : ""}.
+        {entered ? `Your kit lists ${eights} × 8m lengths.` : "Enter your rope counts on Rope calc."}
       </p>
       <ul className="mt-8 space-y-3">
         {ITEMS.map((item) => (
