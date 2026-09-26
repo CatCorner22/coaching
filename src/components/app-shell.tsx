@@ -84,19 +84,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // unsaved-changes banner, which has to appear on every screen.
   if (pathname === "/rig") {
     return (
-      <ConsentGate>
-        <div className="min-h-dvh bg-bg text-fg">
-          <div className="px-4 pt-4">
-            <PersistFailureBanner />
+      <>
+        <PersistFailureBanner />
+        <ConsentGate>
+          <div className="min-h-dvh bg-bg text-fg">
+            {children}
           </div>
-          {children}
-        </div>
-      </ConsentGate>
+        </ConsentGate>
+      </>
     );
   }
   return (
-    <ConsentGate>
-      <div className="min-h-dvh overflow-x-hidden bg-bg text-fg">
+    <>
+      <PersistFailureBanner />
+      <ConsentGate>
+        <div className="min-h-dvh overflow-x-hidden bg-bg text-fg">
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-elevated focus:px-3 focus:py-2 focus:text-sm focus:text-fg"
@@ -192,7 +194,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-label={routeTitle(pathname)}
             className="pb-24 outline-none md:pb-10"
           >
-            <PersistFailureBanner />
             {children}
           </main>
         </div>
@@ -267,8 +268,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             More
           </button>
         </nav>
-      </div>
-    </ConsentGate>
+        </div>
+      </ConsentGate>
+    </>
   );
 }
 
@@ -292,11 +294,13 @@ function PersistFailureBanner() {
       className="mx-auto mb-4 max-w-5xl rounded-lg border border-danger/50 bg-danger/10 px-4 py-3 text-sm leading-relaxed text-fg"
     >
       <strong className="text-danger-text">Changes are not being saved.</strong>{" "}
-      {persistFailure.reason === "quota"
+      {persistFailure.reason === "unreadable"
+        ? `Saved data for ${persistFailure.key} could not be read. Export what is on screen.`
+        : persistFailure.reason === "quota"
         ? "This device is out of storage for this app, so the last change stayed in this tab only."
         : "This browser is blocking storage for this app, so the last change stayed in this tab only."}{" "}
-      Anything you set — including limits and consent — will revert when the page reloads. Treat
-      what is on screen as unsaved until this clears.
+      Saved data may revert when you switch away and back or reload. Treat what is on screen as
+      unsaved until this clears.
     </div>
   );
 }

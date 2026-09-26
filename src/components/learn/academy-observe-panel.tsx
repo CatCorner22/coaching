@@ -67,10 +67,15 @@ export function AcademyObservePanel({
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const clipRef = useRef<ClipHandle | null>(null);
-  const prevFrameRef = useRef<Uint8ClampedArray | undefined>(undefined);
+  const prevFrameRef = useRef<Uint8ClampedArray | null>(null);
   const cameraRequestRef = useRef(0);
   const cameraOpenRef = useRef<AbortController | null>(null);
   const recordTimeoutRef = useRef<number | null>(null);
+  const muteTimerRef = useRef<number | null>(null);
+  useEffect(() => {
+    setFeedback(null);
+    prevFrameRef.current = null;
+  }, [stepIndex, tie?.slug]);
 
   const [cameraOn, setCameraOn] = useState(false);
   const [facing, setFacing] = useState<"environment" | "user">("environment");
@@ -88,6 +93,10 @@ export function AcademyObservePanel({
     if (recordTimeoutRef.current !== null) {
       window.clearTimeout(recordTimeoutRef.current);
       recordTimeoutRef.current = null;
+    }
+    if (muteTimerRef.current !== null) {
+      window.clearTimeout(muteTimerRef.current);
+      muteTimerRef.current = null;
     }
     clipRef.current?.cancel();
     clipRef.current = null;
@@ -168,10 +177,27 @@ export function AcademyObservePanel({
         const lost = () => {
           if (streamRef.current !== stream) return;
           stopCamera();
-          setError("Camera access was interrupted. Start the camera again.");
+          setError("The camera stopped. Tap Start camera…");
         };
-        track.addEventListener("ended", lost);
-        track.addEventListener("mute", lost);
+        const onMute = () => {
+          if (streamRef.current !== stream) return;
+          setError("Camera paused by the device…");
+          if (muteTimerRef.current !== null) window.clearTimeout(muteTimerRef.current);
+          muteTimerRef.current = window.setTimeout(() => {
+            muteTimerRef.current = null;
+            if (streamRef.current === stream && track.readyState !== "live") lost();
+          }, 4000);
+        };
+        const onUnmute = () => {
+          if (muteTimerRef.current !== null) {
+            window.clearTimeout(muteTimerRef.current);
+            muteTimerRef.current = null;
+          }
+          if (streamRef.current === stream) setError(null);
+        };
+        track.addEventListener("ended", lost, { once: true });
+        track.addEventListener("mute", onMute);
+        track.addEventListener("unmute", onUnmute);
       }
       setFacing(nextFacing);
       setCameraOn(true);
@@ -211,7 +237,7 @@ export function AcademyObservePanel({
     try {
       const { jpeg, imageData } = await processMediaFrame(v, 768, 240, 0.74);
       setPreview(jpeg);
-      const obs = observeFrame(imageData, prevFrameRef.current);
+      const obs = observeFrame(imageData, prevFrameRef.current ?? undefined);
       prevFrameRef.current = imageData.data;
       const det = buildDeterministic([obs]);
       const fb = buildAcademyFeedback({

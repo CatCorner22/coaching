@@ -158,6 +158,8 @@ export function JournalBackupPanel() {
         id={passphraseId}
         type={reveal ? "text" : "password"}
         autoComplete="off"
+        autoCapitalize="none"
+        autoCorrect="off"
         spellCheck={false}
         className="mt-1 h-11 w-full rounded-md border border-border bg-elevated px-3 text-sm"
         placeholder="Four unrelated words work well"
@@ -184,20 +186,30 @@ export function JournalBackupPanel() {
             id={confirmId}
             type="password"
             autoComplete="off"
+            autoCapitalize="none"
+            autoCorrect="off"
             spellCheck={false}
             className="mt-1 h-11 w-full rounded-md border border-border bg-elevated px-3 text-sm"
             placeholder="Type it again"
             value={confirmation}
             onChange={(e) => setConfirmation(e.target.value)}
           />
-          {passphrase !== "" && confirmation !== "" && confirmation !== passphrase && (
+          {passphrase !== "" && confirmation === "" && (
+            <p className="mt-2 text-xs text-warn" role="status">
+              Type the passphrase again to enable export
+            </p>
+          )}
+          {hasSomethingToExport &&
+            passphrase !== "" &&
+            confirmation !== "" &&
+            confirmation !== passphrase && (
             <p className="mt-2 text-xs text-warn" role="status">
               The two passphrases do not match. A mistyped passphrase makes a file nobody can open.
             </p>
           )}
         </>
       )}
-      {warning && (
+      {warning && hasSomethingToExport && (
         <p className="mt-2 text-xs text-warn" role="status">
           {warning}
         </p>
@@ -221,7 +233,7 @@ export function JournalBackupPanel() {
         <input
           ref={fileRef}
           type="file"
-          accept=".knotty,application/json"
+          accept=".knotty,.json,application/json,application/octet-stream"
           className="sr-only"
           tabIndex={-1}
           onChange={(e) => {

@@ -51,13 +51,13 @@ export const useChecklist = create<ChecklistState>()(
       version: 1,
       // Ticks are unioned rather than replaced: a stale tab used to erase the
       // other tab's pre-scene ticks, and the loss only showed up on reload.
-      merge: (persisted, current) => ({
-        ...current,
-        done: {
-          ...current.done,
-          ...normalizeChecklistDone((persisted as { done?: unknown } | null)?.done),
-        },
-      }),
+      merge: (persisted, current) => {
+        const stored = normalizeChecklistDone((persisted as { done?: unknown } | null)?.done);
+        const done = Object.fromEntries(
+          ITEM_IDS.map((id) => [id, current.done[id] === true || stored[id] === true]),
+        ) as Partial<Record<ChecklistItemId, boolean>>;
+        return { ...current, done };
+      },
     },
   ),
 );

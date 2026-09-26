@@ -36,6 +36,13 @@ test("metres alone do not cover a plan that needs 8m staffs", () => {
   assert.equal(manyShortStaffs.enough, false);
 });
 
+test("reuses the same 8m staff across a single-column, karada, single-column plan", () => {
+  const estimate = metersFor(["single-column", "karada", "single-column"]);
+  const coverage = kitCoverage(estimate, 3, 1);
+  assert.equal(coverage.eightsShort, 0);
+  assert.equal(coverage.enough, true);
+});
+
 test("an unlisted tie is counted but flagged rather than folded in silently", () => {
   const estimate = metersFor(["not-a-real-tie"]);
   assert.deepEqual(estimate.unknownSlugs, ["not-a-real-tie"]);

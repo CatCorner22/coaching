@@ -16,7 +16,7 @@ type SyncStateStorage = {
  * that means a limit the couple revoked comes back as they left it, which is
  * the one class of silence this app cannot afford.
  */
-export type PersistFailure = { key: string; reason: "quota" | "blocked" };
+export type PersistFailure = { key: string; reason: "quota" | "blocked" | "unreadable" };
 
 /**
  * Outstanding failures, per storage key. Recovery is per key: a settings write
@@ -47,7 +47,11 @@ function reportPersistFailure(key: string, error: unknown) {
   const name = (error as { name?: string })?.name ?? "";
   const failure: PersistFailure = {
     key,
-    reason: /quota|QuotaExceeded|NS_ERROR_DOM_QUOTA/i.test(name) ? "quota" : "blocked",
+    reason: /unreadable/i.test(name)
+      ? "unreadable"
+      : /quota|QuotaExceeded|NS_ERROR_DOM_QUOTA/i.test(name)
+        ? "quota"
+        : "blocked",
   };
   // Re-insert so this key sorts last: the banner names the newest problem.
   outstandingFailures.delete(key);
@@ -169,6 +173,9 @@ export function safeJsonStorage<State>(): PersistStorage<State> {
           JSON.parse(value);
           return value;
         } catch {
+          storage.setItem(`${name}.corrupt`, value);
+          console.warn(`[persist] unreadable saved data for ${name}`);
+          reportPersistFailure(name, { name: "UnreadableStorage" });
           storage.removeItem(name);
           return null;
         }
@@ -420,7 +427,7 @@ export function nextNegotiationStamp(stamps: readonly unknown[]): number {
 type IdentifiedEntry = { id?: unknown };
 
 const JOURNAL_ENTRY_CAP = 80;
-const JOURNAL_TOMBSTONE_CAP = 200;
+const JOURNAL_TOMBSTONE_CAP = 2000;
 
 /**
  * Union journal entries across tabs, honouring deletions from either side.
@@ -599,10 +606,12 @@ export function syncPersistedAcrossTabs(name: string, rehydrate: () => void): vo
   });
   // A backgrounded or frozen tab never receives the `storage` event, so coming
   // back to it would otherwise show a policy that was revoked while it slept.
-  window.addEventListener("focus", reread);
+  window.addEventListener("focus", () => {
+    if (persistFailureFor(name) === null) reread();
+  });
   if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") reread();
+      if (document.visibilityState === "visible" && persistFailureFor(name) === null) reread();
     });
   }
 }

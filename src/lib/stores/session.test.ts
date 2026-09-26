@@ -178,17 +178,32 @@ test("a write that storage refused is retried, not cached as saved", async () =>
 
 test("a stale tab cannot erase a stop another tab called", async () => {
   const { mergeSessionSafety } = await import("./session.ts");
-  const stopped = { stopped: true, stopReason: "safeword", stoppedAt: 5_000, startedAt: 1_000 };
+  const stopped = {
+    stopped: true,
+    stopReason: "safeword",
+    stoppedAt: Date.now() - 5_000,
+    startedAt: Date.now() - 13 * 60 * 60_000,
+  };
 
   // The stale tab is still ticking a running session and writes the whole blob.
-  const stale = { stopped: false, stopReason: undefined, stoppedAt: null, startedAt: 1_000 };
+  const stale = {
+    stopped: false,
+    stopReason: undefined,
+    stoppedAt: null,
+    startedAt: stopped.startedAt,
+  };
   const merged = mergeSessionSafety(stale, stopped);
   assert.equal(merged.stopped, true);
   assert.equal(merged.stopReason, "safeword");
-  assert.equal(merged.stoppedAt, 5_000);
+  assert.equal(merged.stoppedAt, stopped.stoppedAt);
 
   // A session that provably began after the stop is a restart, and clears it.
-  const restarted = { stopped: false, stopReason: undefined, stoppedAt: null, startedAt: 9_000 };
+  const restarted = {
+    stopped: false,
+    stopReason: undefined,
+    stoppedAt: null,
+    startedAt: Date.now(),
+  };
   assert.equal(mergeSessionSafety(restarted, stopped).stopped, false);
 
   // A tab holding the same stop writes its own payload untouched.
@@ -196,4 +211,21 @@ test("a stale tab cannot erase a stop another tab called", async () => {
 
   // Nothing stored, nothing to protect.
   assert.equal(mergeSessionSafety(stale, null), stale);
+});
+
+test("a stopped session outside the safety window is cleared", async () => {
+  const { mergeSessionSafety } = await import("./session.ts");
+  const stale = {
+    startedAt: Date.now() - 13 * 60 * 60_000,
+    stopped: true,
+    stopReason: "safeword",
+    stoppedAt: Date.now() - 13 * 60 * 60_000,
+  };
+  const merged = mergeSessionSafety(
+    { startedAt: Date.now(), stopped: false, stoppedAt: null, stopReason: undefined },
+    stale,
+  );
+  assert.equal(merged.stopped, false);
+  assert.equal(merged.stoppedAt, null);
+  assert.equal(merged.stopReason, undefined);
 });

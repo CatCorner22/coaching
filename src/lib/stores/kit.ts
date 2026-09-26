@@ -5,6 +5,7 @@ import { safeJsonStorage, syncPersistedAcrossTabs } from "./persist";
 type Kit = {
   eights: number;
   fours: number;
+  entered: boolean;
   shears: boolean;
   setEights: (n: number) => void;
   setFours: (n: number) => void;
@@ -38,11 +39,12 @@ export function clampCount(n: unknown, fallback: number) {
 export const useKit = create<Kit>()(
   persist(
     (set) => ({
-      eights: 6,
-      fours: 2,
+      eights: 0,
+      fours: 0,
+      entered: false,
       shears: true,
-      setEights: (n) => set({ eights: clampRopeCount(n, 0) }),
-      setFours: (n) => set({ fours: clampRopeCount(n, 0) }),
+      setEights: (n) => set({ eights: clampRopeCount(n, 0), entered: true }),
+      setFours: (n) => set({ fours: clampRopeCount(n, 0), entered: true }),
       setShears: (v) => set({ shears: Boolean(v) }),
     }),
     {
@@ -56,6 +58,10 @@ export const useKit = create<Kit>()(
           ...current,
           eights: clampRopeCount(p.eights, current.eights),
           fours: clampRopeCount(p.fours, current.fours),
+          entered:
+            typeof p.entered === "boolean"
+              ? p.entered
+              : p.eights !== undefined || p.fours !== undefined,
           shears: typeof p.shears === "boolean" ? p.shears : current.shears,
         };
       },

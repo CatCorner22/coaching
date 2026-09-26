@@ -27,6 +27,9 @@ export type Settings = {
   consentStamp: number;
 };
 
+export const MIN_CHECK_MINUTES = 2;
+export const MAX_CHECK_MINUTES = 12;
+
 const defaults: Settings = {
   consentVersion: 0,
   consented: false,
@@ -116,8 +119,8 @@ export function normalizePersistedSettings(persisted: unknown, current: Settings
     listen: consented && p.listen === true,
     consentStamp: Math.max(0, Number(p.consentStamp) || 0),
     circulationMins: Math.min(
-      12,
-      Math.max(2, Number(p.circulationMins) || current.circulationMins),
+      MAX_CHECK_MINUTES,
+      Math.max(MIN_CHECK_MINUTES, Number(p.circulationMins) || current.circulationMins),
     ),
   };
 }
@@ -142,7 +145,10 @@ export const useSettings = create<SettingsState>()(
           greenWord: p.greenWord !== undefined ? clampWord(p.greenWord, s.greenWord) : s.greenWord,
           circulationMins:
             p.circulationMins !== undefined
-              ? Math.min(12, Math.max(2, Number(p.circulationMins) || s.circulationMins))
+              ? Math.min(
+                  MAX_CHECK_MINUTES,
+                  Math.max(MIN_CHECK_MINUTES, Number(p.circulationMins) || s.circulationMins),
+                )
               : s.circulationMins,
           consentStamp:
             p.voice !== undefined || p.listen !== undefined

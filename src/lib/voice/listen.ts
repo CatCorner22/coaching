@@ -20,7 +20,10 @@ type Rec = {
 export function listenForWords(
   words: string[],
   onHit: (word: string) => void,
-  onStatus?: (status: "starting" | "active" | "idle" | "error" | "unsupported") => void,
+  onStatus?: (
+    status: "starting" | "active" | "idle" | "error" | "unsupported",
+    message?: string,
+  ) => void,
 ): () => void {
   const SR =
     (window as unknown as { SpeechRecognition?: new () => Rec; webkitSpeechRecognition?: new () => Rec })
@@ -34,14 +37,19 @@ export function listenForWords(
   let disposed = false;
   let fatal = false;
   let restartAttempts = 0;
+  let consecutiveNetworkErrors = 0;
+  let lastErrorCode: string | undefined;
   let restartTimer: number | null = null;
   let sessionStartedAt = 0;
   // A recognizer that ran for a meaningful stretch before ending was working.
   // Below this, repeated end-immediately cycles are a real fault and should
   // consume the retry budget.
   const HEALTHY_SESSION_MS = 1_000;
-  const report = (status: "starting" | "active" | "idle" | "error" | "unsupported") => {
-    if (!disposed) onStatus?.(status);
+  const report = (
+    status: "starting" | "active" | "idle" | "error" | "unsupported",
+    message?: string,
+  ) => {
+    if (!disposed) onStatus?.(status, message);
   };
   rec.continuous = true;
   rec.interimResults = false;
@@ -63,9 +71,7 @@ export function listenForWords(
       .replace(/['’]/gu, "")
       .replace(/[-–—]/gu, " ")
       .replace(/\s+/gu, " ");
-  const UTTERANCE_SLACK_WORDS = 2;
   const wordsIn = (value: string): string[] => value.match(/[a-z0-9]+/gu) ?? [];
-  const wordCount = (value: string) => wordsIn(value).length;
   // Two words of room is too tight for how a safeword is actually called under
   // stress — "red stop now please" and "wait wait red red red stop" are both
   // real calls and both were silently discarded. So a longer utterance still
@@ -83,7 +89,7 @@ export function listenForWords(
   // entirely of allowlisted words, so a longer utterance also has to carry
   // stop intent — one of these words, or the safeword said more than once.
   const CALLOUT_INTENT = new Set([
-    "call", "calling", "cut", "done", "enough", "off", "out", "safeword", "stop", "stopping",
+    "call", "calling", "cut", "done", "enough", "off", "ok", "out", "please", "safeword", "stop", "stopping",
   ]);
   // Past this a transcript is a paragraph of scene talk, not a call, whatever
   // it is made of.
@@ -110,6 +116,7 @@ export function listenForWords(
     // the user had just disarmed.
     if (disposed) return;
     restartAttempts = 0;
+    consecutiveNetworkErrors = 0;
     const e = ev as {
       resultIndex: number;
       results: ArrayLike<{ 0: { transcript: string }; isFinal?: boolean }>;
@@ -122,11 +129,7 @@ export function listenForWords(
         if (!needle) continue;
         const re = new RegExp(`(?:^|[^a-z0-9])${needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:[^a-z0-9]|$)`);
         if (!re.test(t)) continue;
-        if (
-          wordCount(t) > wordCount(needle) + UTTERANCE_SLACK_WORDS &&
-          !isCallOut(t, needle, words)
-        )
-          continue;
+        if (wordsIn(t).join(" ") !== wordsIn(needle).join(" ") && !isCallOut(t, needle, words)) continue;
         if ((last.get(w) ?? 0) + 2500 > now) continue;
         last.set(w, now);
         onHit(w);
@@ -158,9 +161,16 @@ export function listenForWords(
   };
   rec.onerror = (event: unknown) => {
     const code = (event as { error?: string }).error;
+    lastErrorCode = code;
     if (code === "not-allowed" || code === "service-not-allowed") {
       fatal = true;
       report("error");
+    } else if (code === "network") {
+      consecutiveNetworkErrors += 1;
+      if (consecutiveNetworkErrors >= 3) {
+        fatal = true;
+        report("error", "Voice needs a network connection — use the buttons.");
+      }
     }
   };
   rec.onend = () => {
@@ -171,9 +181,14 @@ export function listenForWords(
     // it and the listener stopped for the rest of the scene, having reported
     // nothing louder than "idle". Session duration is what actually separates
     // the two cases.
-    if (sessionStartedAt > 0 && Date.now() - sessionStartedAt >= HEALTHY_SESSION_MS) {
+    if (
+      !lastErrorCode &&
+      sessionStartedAt > 0 &&
+      Date.now() - sessionStartedAt >= HEALTHY_SESSION_MS
+    ) {
       restartAttempts = 0;
     }
+    lastErrorCode = undefined;
     sessionStartedAt = 0;
     scheduleRestart();
   };
@@ -181,7 +196,7 @@ export function listenForWords(
   try {
     rec.start();
   } catch {
-    report("error");
+    report("error", "Voice needs a network connection — use the buttons.");
   }
   return () => {
     disposed = true;

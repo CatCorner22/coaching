@@ -102,7 +102,11 @@ export function kitCoverage(
 ): KitCoverage {
   const meters = eightsOwned * STAFF_METERS + foursOwned * 4;
   const metersShort = Math.max(0, round1(estimate.totalWithWaste - meters));
-  const eightsShort = Math.max(0, estimate.eights - eightsOwned);
+  const eightsNeeded = estimate.rows.reduce(
+    (n, row) => n + row.ropes.filter((rope) => rope.lengthM >= STAFF_METERS).reduce((m, rope) => m + rope.count, 0),
+    0,
+  );
+  const eightsShort = Math.max(0, eightsNeeded - eightsOwned);
   return { meters, metersShort, eightsShort, enough: metersShort === 0 && eightsShort === 0 };
 }
 

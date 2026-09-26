@@ -132,7 +132,7 @@ async function deriveKey(
 ): Promise<CryptoKey> {
   const material = await crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(passphrase),
+    new TextEncoder().encode(passphrase.normalize("NFKC")),
     "PBKDF2",
     false,
     ["deriveKey"],

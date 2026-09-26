@@ -90,6 +90,9 @@ export function mergeSessionSafety(
   existing: Partial<PersistedSession> | null,
 ): Partial<PersistedSession> {
   if (!existing?.stopped) return incoming;
+  if (!withinSessionWindow(existing)) {
+    return { ...incoming, stopped: false, stoppedAt: null, stopReason: undefined };
+  }
   const stoppedAt = numberOr(existing.stoppedAt, 0) ?? 0;
   // This tab already knows about a stop at least as new: nothing to restore.
   if (incoming.stopped === true && (numberOr(incoming.stoppedAt, 0) ?? 0) >= stoppedAt) {
@@ -229,7 +232,7 @@ export const useSession = create<SessionState>()(
         if (next === elapsed) return;
         set({ elapsed: next });
       },
-      checked: () => set({ lastCheckAt: Date.now() }),
+      checked: () => set({ lastCheckAt: Date.now(), yellowAt: null }),
       stop: (reason) =>
         set({ stopped: true, stopReason: reason, stoppedAt: Date.now(), yellowAt: null }),
       flagYellow: () => {

@@ -37,6 +37,13 @@ test("a vault round-trips and reveals nothing without the passphrase", async () 
   assert.equal(await decryptVault(onDisk, SECRET), PLAINTEXT);
 });
 
+test("passphrase normalization makes canonically equivalent forms interchangeable", async () => {
+  const composed = "café rope";
+  const decomposed = "cafe\u0301 rope";
+  const vault = await encryptVault(PLAINTEXT, composed);
+  assert.equal(await decryptVault(vault, decomposed), PLAINTEXT);
+});
+
 test("a wrong passphrase fails closed rather than returning garbage", async () => {
   const vault = await encryptVault(PLAINTEXT, SECRET);
   for (const wrong of ["", "wrong", SECRET + " ", SECRET.toUpperCase(), " " + SECRET]) {
