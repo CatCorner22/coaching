@@ -25,6 +25,32 @@ export function isPrivateNetworkHostname(hostname: string): boolean {
   return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
 }
 
+/** Dev-mode AI may be used from loopback/LAN, the Grok sandbox, or the one origin the operator configured. */
+export function isTrustedDevelopmentOrigin(
+  origin: string,
+  configuredOrigin?: string | null,
+): boolean {
+  let parsedOrigin: URL;
+  try {
+    parsedOrigin = new URL(origin);
+  } catch {
+    return false;
+  }
+  if (parsedOrigin.protocol !== "http:" && parsedOrigin.protocol !== "https:") return false;
+
+  const hostname = parsedOrigin.hostname;
+  if (isPrivateNetworkHostname(hostname) || hostname.toLowerCase().endsWith(".grok-sandbox.com")) {
+    return true;
+  }
+
+  if (!configuredOrigin?.trim()) return false;
+  try {
+    return parsedOrigin.origin === new URL(configuredOrigin).origin;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Wildcard host match. The leading dot matters: matching a bare suffix would
  * accept `evilgrok-sandbox.com` for the pattern `*.grok-sandbox.com`.

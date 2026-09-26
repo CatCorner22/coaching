@@ -1,5 +1,5 @@
 import { getRequest } from "@tanstack/react-start/server";
-import { isPrivateNetworkHostname, isTrustedAppOrigin } from "./origin";
+import { isTrustedAppOrigin, isTrustedDevelopmentOrigin } from "./origin";
 import { DEV_USER_ID, UnauthorizedError, requireUserId } from "@/lib/auth/verify.server";
 import { viteDevServer } from "@/lib/runtime-mode";
 
@@ -11,14 +11,6 @@ export class AiRequestDeniedError extends Error {
     super(message);
     this.name = "AiRequestDeniedError";
   }
-}
-
-function trustedDevelopmentHost(hostname: string): boolean {
-  const host = hostname.toLowerCase();
-  // The LAN address counts: `npm run dev` binds 0.0.0.0:8080 precisely so the
-  // phone in the room can load it, and refusing that origin denied every
-  // analysis on the device the couple actually uses.
-  return isPrivateNetworkHostname(host) || host.endsWith(".grok-sandbox.com");
 }
 
 /** Authenticate cost-bearing endpoints and reject cross-site browser calls. */
@@ -67,7 +59,7 @@ export async function authorizeAiRequest(verifiedUserId?: string): Promise<{ use
     }
     // Judged on the Origin the browser sent, which the checks above have already
     // matched against configuration, rather than on the request's own Host.
-    if (!trustedDevelopmentHost(new URL(origin).hostname)) {
+    if (!isTrustedDevelopmentOrigin(origin, process.env.BETTER_AUTH_URL)) {
       throw new AiRequestDeniedError("Development AI is limited to loopback and trusted preview hosts");
     }
   }

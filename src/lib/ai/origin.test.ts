@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { isTrustedAppOrigin, matchesHostPattern } from "./origin.ts";
+import { isTrustedAppOrigin, isTrustedDevelopmentOrigin, matchesHostPattern } from "./origin.ts";
 
 test("AI request origins are checked against configuration, not against the request itself", () => {
   // The old check compared the browser Origin to new URL(request.url).origin,
@@ -100,4 +100,24 @@ test("the dev server trusts the LAN address it binds, and only in development", 
     isTrustedAppOrigin("http://11.0.0.1:8080", { allowLoopback: true, devHost: "11.0.0.1:8080" }),
     false,
   );
+});
+
+test("development AI trusts the configured Tailscale origin", () => {
+  assert.equal(
+    isTrustedDevelopmentOrigin(
+      "https://laptop.tail1234.ts.net",
+      "https://laptop.tail1234.ts.net",
+    ),
+    true,
+  );
+  assert.equal(isTrustedDevelopmentOrigin("https://laptop.tail1234.ts.net"), false);
+  assert.equal(
+    isTrustedDevelopmentOrigin(
+      "https://evil.tail1234.ts.net",
+      "https://laptop.tail1234.ts.net",
+    ),
+    false,
+  );
+  assert.equal(isTrustedDevelopmentOrigin("http://192.168.1.23:8080"), true);
+  assert.equal(isTrustedDevelopmentOrigin("http://localhost:8080"), true);
 });

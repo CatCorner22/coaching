@@ -106,6 +106,41 @@ from a protected release job against the intended environment before promoting
 the already-verified artifact; never expose a production database URL to an
 untrusted pull-request or preview build.
 
+## Private use from phones (Tailscale)
+
+The camera only opens in a secure context, so a phone cannot use it against
+`http://<laptop-ip>:8080`. The simplest private route is the dev server on a
+laptop behind Tailscale, which gives every device on your tailnet a trusted
+HTTPS address without exposing anything to the internet.
+
+One-time:
+
+1. Install Tailscale on the laptop and each phone; sign all of them in to the same account.
+2. In the Tailscale admin console under DNS, enable **MagicDNS** and **HTTPS Certificates**.
+3. On the laptop, from the repo: `npm ci --ignore-scripts`.
+4. `tailscale serve --bg --https=443 http://localhost:8080` — it prints the address, e.g. `https://laptop.tail1234.ts.net`. The rule survives reboots; `tailscale serve status` shows it and `tailscale serve reset` removes it. Never use `tailscale funnel`, which is public.
+
+Each session:
+
+Use your own hostname from step 4 in place of `laptop.tail1234.ts.net`; the
+first variable adds it to the dev server's Host allowlist.
+
+```sh
+__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=laptop.tail1234.ts.net npm run dev
+# with optional cloud Analyze (after verifying team-wide ZDR in the xAI console, see Deployment requirements):
+__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=laptop.tail1234.ts.net XAI_API_KEY=... XAI_REQUIRE_ZERO_DATA_RETENTION=true ALLOW_DEV_AI=true BETTER_AUTH_URL=https://laptop.tail1234.ts.net npm run dev
+```
+
+`BETTER_AUTH_URL` here lets the AI origin check trust the Tailscale address; it
+does not enable sign-in in development: everyone on the tailnet shares the
+development identity, so this setup is only for a tailnet whose every device
+you would hand your API key to. On the phones, with
+Tailscale connected, open the `https://…ts.net` address, allow the camera, and
+"Add to Home Screen". Each device keeps its own local data (negotiation,
+journal, session), so run a scene from one device. The first certificate fetch
+can take about thirty seconds; reload once if the phone reports a certificate
+error.
+
 ## Deployment requirements
 
 - Serve production over HTTPS. Live camera APIs are unavailable in an insecure context; `localhost` is the development exception.
