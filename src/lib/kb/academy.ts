@@ -16,11 +16,57 @@ export const FOUNDATION_KNOT_SLUGS = [
 
 export const FOUNDATION_TIE_SLUGS = [
   "single-column",
+  "double-column",
   "karada",
   "shinju",
   "tasuki",
   "hip-harness",
   "chair",
+] as const;
+
+export const BEGINNER_PATH = [
+  {
+    sessions: "1–2",
+    title: "Somerville Bowline and Single Column on a chair leg",
+    to: "/knot/$slug",
+    slug: "somerville-bowline",
+    note: "Plus a shears drill: cut a scrap wrap once.",
+  },
+  {
+    sessions: "3–4",
+    title: "One forearm cuff",
+    to: "/tie/$slug",
+    slug: "single-column",
+    note: "Single Column on a person, one wrist, off within a minute.",
+  },
+  {
+    sessions: "5–6",
+    title: "Two cuffs",
+    to: "/tie/$slug",
+    slug: "single-column",
+    note: "Same tie, both wrists, check both hands.",
+  },
+  {
+    sessions: "7–8",
+    title: "Double Column in front",
+    to: "/tie/$slug",
+    slug: "double-column",
+    note: "",
+  },
+  {
+    sessions: "9–10",
+    title: "Karada",
+    to: "/tie/$slug",
+    slug: "karada",
+    note: "Waist-length version first.",
+  },
+  {
+    sessions: "Then",
+    title: "Your First Ten Sessions — the full plan",
+    to: "/article/$slug",
+    slug: "first-ten-sessions",
+    note: "",
+  },
 ] as const;
 
 // Derived, never hand-listed. These were written when single-column and karada
@@ -601,6 +647,9 @@ export function getAcademyTie(slug: string): Tie | undefined {
   // drills author a per-drill goal beside their steps, and unconditionally
   // deriving one from `why` here silently replaced every one of them.
   if (!academy) return { ...base, goal: base.goal ?? base.why.split(".")[0] + "." };
+  if (tieShape(base) === "instructor") {
+    return { ...base, goal: base.goal ?? base.why.split(".")[0] + "." };
+  }
 
   // TIE_ACADEMY enriches; it does not replace. It was written when every tie in
   // the catalog carried exactly one step, so replacing `base.steps` with it was
@@ -612,7 +661,7 @@ export function getAcademyTie(slug: string): Tie | undefined {
   //
   // So the richer source wins, and the academy table supplies the parts it is
   // actually for: the goal line, and per-step media where a step has none.
-  const catalogWins = base.steps.length > academy.steps.length;
+  const catalogWins = tieShape(base) === "instructor" || base.steps.length > academy.steps.length;
   const source = catalogWins ? base.steps : academy.steps;
   const steps = source.map((step, i) => {
     const cumulative = source.slice(0, i + 1).flatMap((x) => x.wraps);

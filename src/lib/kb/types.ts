@@ -67,6 +67,7 @@ export type Tie = {
   ropes: { lengthM: number; count: number }[];
   position: "floor" | "chair" | "partial" | "theory";
   prereqs: string[];
+  related?: string[];
   knots: string[];
   nerves: string[];
   intent: string[];

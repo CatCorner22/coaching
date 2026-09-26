@@ -51,6 +51,7 @@ export const GUIDED_TIES: Tie[] = [
     knots: ["somerville-bowline"],
     nerves: ["ulnar", "radial", "median"],
     intent: ["foundation", "craft", "limb"],
+    related: ["first-ten-sessions"],
     goal: "Tie a cuff on one limb that will not tighten when the rope is pulled, and be able to take it off fast.",
     why: "Every other tie in the vocabulary is single columns and double columns joined together, so this is not a beginner tie you graduate from — it is the thing you will still be doing in ten years. The whole skill is one idea: a cuff that stays the size you made it, no matter which direction the rope is pulled afterwards. A cuff that closes when pulled is the single most common way beginners injure someone, and the difference between the two is entirely in how the rope turns at the end.",
     stop: [
@@ -222,6 +223,7 @@ export const GUIDED_TIES: Tie[] = [
     nerves: ["ulnar", "radial", "median"],
     intent: ["foundation", "craft", "limb"],
     prereqs: ["single-column"],
+    related: ["first-ten-sessions"],
     goal: "Hold two limbs side by side with a cinch between them, so neither column closes, and take it off fast.",
     why: "A single column holds one limb; a double column holds two together, which is the first thing in this catalog that genuinely restrains rather than decorates. The extra idea is the cinch: a turn of rope passed between the two limbs and pulled snug, which stops the wraps sliding into a single closing loop. Without a cinch, two limbs in one set of wraps is not a double column at all — it is a noose with two things in it, and it closes on both of them at once.",
     stop: [
@@ -351,10 +353,11 @@ export const GUIDED_TIES: Tie[] = [
     // series of overhand knots in the doubled rope — overhands on a bight.
     // The previously declared lark's head, square knot and reverse tension
     // appear nowhere in the sequence.
-    knots: ["overhand-on-bight"],
-    nerves: [],
+    knots: ["overhand-on-bight", "square"],
+    nerves: ["pudendal"],
     intent: ["decorative", "craft", "torso"],
     prereqs: ["single-column"],
+    related: ["first-ten-sessions"],
     goal: "Lay an even diamond harness over a torso that hangs from the shoulders, restrains nothing, and comes off fast.",
     why: "A karada is the answer to \"I want rope on her but I do not want to restrain her yet\". It is a row of knots down the front joined into diamonds, worn like a garment: her arms stay free, she can stand, walk, sit and lie down in it, and nothing about it depends on tension. That combination makes it the standard first body tie almost everywhere, because it lets you practise the two things that actually take time to learn — even spacing and comfortable tension over a torso — with the restraint question removed entirely.",
     stop: [
@@ -434,7 +437,7 @@ export const GUIDED_TIES: Tie[] = [
       {
         title: "4 · Anchor at the waist",
         rigger:
-          "Take the two ends around her waist, cross them at the back, and bring them forward again. This anchors the bottom of the chain so the whole pattern stays where you put it. Snug rather than tight — you are stopping it sliding, not holding anything in place. This is also the natural stopping point for the waist-length version: tie off here and you have a complete tie.",
+          "Take the two ends around her waist, one each side, and cross them at the small of her back. Leave them at the back — they do not come forward yet. Snug rather than tight: this stops the chain sliding, it is not holding anything in place. This is also the natural stopping point for the waist-length version: tie the two ends off at the back with a square knot, tuck the tails, and you have a complete tie.",
         bottom:
           "Take a deep breath in and let it out fully while he sets this. If the waist wrap is right, both are unremarkable. If a full breath feels restricted at all, say so — the rope is too tight or it is sitting too high on the ribs, and both are fixed by loosening rather than by getting used to it.",
         check:
@@ -446,7 +449,7 @@ export const GUIDED_TIES: Tie[] = [
       {
         title: "5 · Optional — pass between the legs, if that has its own yes",
         rigger:
-          "The traditional pattern brings the rope down from the waist, between the legs, and up to the waist wrap at the back. Only do this if it has been agreed as its own separate thing: consent to rope on her torso is not consent to rope between her legs, and this app keeps them as two different negotiated limits for exactly that reason. If it is agreed, keep it deliberately loose — this passes over tissue with very little padding and a nerve that does not tolerate pressure well. Loose enough to be decorative, and no tension applied to it afterwards from any direction.",
+          "The traditional pattern takes the two ends from the back down between the legs and back up to the front, where they pass through the loop under the lowest knot and then return to the back. Only do this if it has been agreed as its own separate thing: consent to rope on her torso is not consent to rope between her legs, and this app keeps them as two different negotiated limits for exactly that reason. If it is agreed, keep it deliberately loose — this passes over tissue with very little padding and a nerve that does not tolerate pressure well. Loose enough to be decorative, and no tension applied to it afterwards from any direction. If it is skipped, the ends simply stay at the back and step 6 begins from there.",
         bottom:
           "This is yours to decline at this step even if you agreed to it an hour ago, and declining it does not undo the rest of the tie. If it goes on: report pressure, rubbing, numbness or any change in sensation immediately, and understand that this is the part of the pattern that most needs saying something about early rather than putting up with.",
         check:
@@ -457,9 +460,9 @@ export const GUIDED_TIES: Tie[] = [
         wraps: [{ kind: "stem", y1: 0.49, y2: 0.62 }],
       },
       {
-        title: "6 · Join the knots into diamonds",
+        title: "6 · Bring the ends forward through each gap to make diamonds",
         rigger:
-          "Now the part that makes it a karada. Take the rope up the back, split the two strands, and bring one round each side to the front, passing them through the loops beside each knot in the chain and back out. Each pass joins two adjacent knots into a diamond. Work down or up consistently and keep the tension the same on both sides, or the diamonds pull the chain off-centre and the whole thing sits crooked. This is fiddly, it takes a while, and it is the part worth taking your time over.",
+          "Now the part that makes it a karada. From the back, bring one end round each side of her body to the front at the height of the gap between the lowest two knots. Pass each end through that gap from opposite sides — left end through from the right, right end through from the left — so the two knots are pulled towards each other and the rope between them opens into a diamond. Take both ends back round to the back, cross them, and come forward again one gap higher. Repeat gap by gap up to the gap below the first knot. Keep the tension the same on both sides, or the diamonds pull the chain off-centre and the whole thing sits crooked. Nothing here goes above the first knot, and nothing goes near the throat.",
         bottom:
           "This step involves a lot of hands and a lot of concentration on his part, which is exactly when the person doing it stops watching your face. Speak up about anything at all — you have effectively become the monitoring system for a few minutes while he is absorbed in the pattern.",
         check:
@@ -471,7 +474,7 @@ export const GUIDED_TIES: Tie[] = [
       {
         title: "7 · Tie off, then have her move in it",
         rigger:
-          "Finish at the waist with a knot that will not work loose, and tuck the ends rather than leaving long tails to catch on things. Then ask her to stand, sit, lie down, reach up and turn round. A karada is a garment and its whole test is whether it stays put and stays comfortable through the movements of an ordinary evening. Watch particularly for anything travelling upward — that is the failure mode that matters, and movement is what reveals it.",
+          "Finish at the back with a square knot in the two ends, then tuck the tails rather than leaving long ends to catch on things. Then ask her to stand, sit, lie down, reach up and turn round. A karada is a garment and its whole test is whether it stays put and stays comfortable through the movements of an ordinary evening. Watch particularly for anything travelling upward — that is the failure mode that matters, and movement is what reveals it.",
         bottom:
           "Move properly rather than tentatively — reach for something on a high shelf, sit down and get up, lie on your side. Report anything that shifts, digs in, or changes when you move. Somewhere it rubs after twenty minutes of ordinary movement is worth knowing about before it becomes a burn.",
         check:

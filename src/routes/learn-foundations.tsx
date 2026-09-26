@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { BookOpen, Lightbulb, Users, Volume2 } from "lucide-react";
-import { getArticle } from "@/lib/kb";
+import { articleMinutes, getArticle } from "@/lib/kb";
 
 export const Route = createFileRoute("/learn-foundations")({
   component: LearnFoundationsPage,
@@ -12,6 +12,7 @@ function LearnFoundationsPage() {
   // `evidence-based-teaching` was written and then left off this list, so the
   // only entry that ranks the techniques was reachable through search alone.
   const pedagogyArticles = [
+    "first-ten-sessions",
     "learning-pacing",
     "learning-modalities",
     "rope-basics",
@@ -32,7 +33,7 @@ function LearnFoundationsPage() {
           <BookOpen className="size-8 text-accent" aria-hidden />
         </div>
         <div>
-          <p className="text-sm uppercase tracking-wide text-muted">Learning Foundations</p>
+          <p className="text-sm uppercase tracking-wide text-muted">Learn how to learn</p>
           <h1 className="mt-2 font-display text-4xl sm:text-5xl">Why the videos didn&rsquo;t work</h1>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted">
             There is a documented reason a fast, continuous tutorial teaches a complex manual skill badly, and it
@@ -79,7 +80,7 @@ function LearnFoundationsPage() {
                 <div className="min-w-0 flex-1">
                   <h3 className="font-display text-lg">{article.title}</h3>
                   <p className="mt-1 text-sm leading-relaxed text-muted">{article.summary}</p>
-                  <p className="mt-2 text-xs text-subtle">{article.minutes} minute read</p>
+                  <p className="mt-2 text-xs text-subtle">~{articleMinutes(article)} min read</p>
                 </div>
                 <p className="shrink-0 text-sm font-medium text-accent">Read →</p>
               </div>

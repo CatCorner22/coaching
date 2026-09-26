@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   ARTICLES,
+  articleMinutes,
   DUNGEON,
   DUNGEON_SCENES,
   GEAR,
@@ -21,7 +22,7 @@ import {
   searchKnowledge,
 } from "./index.ts";
 import { SAFETY_SOURCE_IDS, SAFETY_SOURCES, SOURCE_LEDGER_REVISION } from "./sources.ts";
-import { isSayableAloud } from "../learn/plain-language.ts";
+import { isSayableAloud, toBullets } from "../learn/plain-language.ts";
 import { buildAcademyVoiceScript, buildAcademyVoiceSegments } from "../learn/voice-script.ts";
 import { defaultKnotStepMedia, defaultTieStepMedia, FOUNDATION_DIAGRAM_IDS } from "./media-registry.ts";
 
@@ -1061,6 +1062,7 @@ test("academy foundation bundles resolve enriched content", async () => {
     isFoundationKnot,
     isFoundationTie,
   } = await import("./academy.ts");
+  const { tieShape } = await import("./tie-factories.ts");
 
   for (const slug of FOUNDATION_KNOT_SLUGS) {
     assert.ok(isFoundationKnot(slug), slug);
@@ -1078,11 +1080,13 @@ test("academy foundation bundles resolve enriched content", async () => {
     const tie = getAcademyTie(slug);
     assert.ok(tie?.goal, `${slug} missing goal`);
     assert.ok(tie.steps.length >= 1, `${slug} missing steps`);
-    assert.ok(tie.steps.every((s) => s.goal && s.check), `${slug} missing academy step fields`);
-    assert.ok(
-      tie.steps.every((s) => (s.riggerBullets?.length ?? 0) >= 1),
-      `${slug} missing easy-read bullet steps`,
-    );
+    if (tieShape(tie) !== "instructor") {
+      assert.ok(tie.steps.every((s) => s.goal && s.check), `${slug} missing academy step fields`);
+      assert.ok(
+        tie.steps.every((s) => (s.riggerBullets?.length ?? 0) >= 1),
+        `${slug} missing easy-read bullet steps`,
+      );
+    }
   }
 
   // Enrichment must never DISCARD catalog content. This asserted a literal 4,
@@ -1173,6 +1177,46 @@ test("academy enrichment never contradicts the catalog it enriches", async () =>
       `${tie.slug}: its goal describes a prop drill, but its steps go on a person`,
     );
   }
+});
+
+test("instructor academy routes preserve catalog steps", async () => {
+  const { getAcademyTie } = await import("./academy.ts");
+  const { tieShape } = await import("./tie-factories.ts");
+  for (const tie of TIES.filter((item) => tieShape(item) === "instructor")) {
+    const academy = getAcademyTie(tie.slug);
+    assert.ok(academy, tie.slug);
+    assert.deepEqual(academy.steps, tie.steps, `${tie.slug} academy steps replaced catalog steps`);
+    assert.ok(
+      academy.steps.every((step) => step.wraps.length === 0),
+      `${tie.slug} instructor route contains drawable wraps`,
+    );
+  }
+});
+
+test("article reading time is derived from rendered blocks", () => {
+  const article = (words: number) => ({
+    blocks: [{ type: "p" as const, text: Array.from({ length: words }, () => "word").join(" ") }],
+  });
+  assert.equal(articleMinutes(article(49)), 1);
+  assert.equal(articleMinutes(article(650)), 4);
+});
+
+test("search aliases and beginner intent surface the shared routes", () => {
+  assert.equal(searchKnowledge("hog tie", 1)[0]?.slug, "hogtie-floor");
+  assert.ok(searchKnowledge("crotch rope", 8).some((hit) => hit.slug === "matanawa"));
+  assert.ok(searchKnowledge("medical scissors", 8).some((hit) => hit.slug === "shears"));
+  assert.equal(searchKnowledge("rope calculator", 1)[0]?.kind, "tool");
+  const beginnerHits = searchKnowledge("where do I start", 3).map((hit) => hit.slug);
+  assert.ok(beginnerHits.includes("somerville-bowline"));
+  assert.ok(beginnerHits.includes("first-ten-sessions"));
+  assert.ok(beginnerHits.includes("learn"));
+});
+
+test("plain-language bullets preserve semicolons and merge short fragments", () => {
+  assert.deepEqual(toBullets("First action; keep the rope clear. Then check. Now."), [
+    "First action; keep the rope clear.",
+    "Then check. Now.",
+  ]);
 });
 
 test("the step acknowledgement is required by every tie taught in full", async () => {

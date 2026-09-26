@@ -8,6 +8,7 @@ export * from "./search";
 export * from "./nerves";
 export * from "./dungeon";
 export * from "./provenance";
+export * from "./article-minutes";
 
 import { ARTICLES } from "./articles";
 import { KNOTS } from "./knots";
