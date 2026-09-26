@@ -7,7 +7,7 @@ export const MORE_ARTICLES: Article[] = [
     section: "protocol",
     minutes: 5,
     summary: "Ask directly about sensation, movement, pain, swelling, temperature, breathing, speech, and alertness. A check can reveal concern, never prove safety.",
-    related: ["circulation", "safewords", "nerve-atlas"],
+    related: ["circulation", "safewords", "nerve-atlas", "the-check-that-works"],
     blocks: [
       { type: "h", text: "Direct questions; no automatic clearance" },
       {
@@ -33,7 +33,7 @@ export const MORE_ARTICLES: Article[] = [
   },
   {
     slug: "yellow-vs-red",
-    title: "Yellow Is Information",
+    title: "Safewords: what Yellow means",
     section: "consent",
     minutes: 4,
     summary: "Red stops the night. Yellow changes the night. Treating yellow like a nuisance is how people stop saying it.",
@@ -45,7 +45,7 @@ export const MORE_ARTICLES: Article[] = [
       },
       {
         type: "p",
-        text: "When anyone says red, stop the activity and release as safely and quickly as the situation permits. Prevent a fall, use release tools only within your training, and follow emergency-dispatcher instructions when needed; there is no universal cutting order.",
+        text: "When anyone says red, stop the activity and release as safely and quickly as the situation permits. Prevent a fall, use release tools only within your training, and follow emergency-dispatcher instructions when needed. There is no universal cutting order.",
       },
       {
         type: "warn",
@@ -68,7 +68,7 @@ export const MORE_ARTICLES: Article[] = [
           "Start with unoccupied equipment or rope laid on a surface.",
           "If a person must appear, keep the view non-identifying. What may be uploaded is a deployment setting, read from the analysis provider's policy by whoever configured this app: intimate wear is always within it, full nudity may or may not be, and sexual activity never is. The capture panel states the setting in force. None of it is a judgement about what you photograph or keep between consenting adults — the app cannot see any of that.",
           "Include enough ordinary context to avoid treating crop or overlap as contact or load.",
-          "Use neutral light; do not ask a camera to judge skin color or circulation.",
+          "Use neutral light; do not ask a camera to judge skin colour or circulation.",
           "For video, choose one to three labeled stills yourself; the clip is not uploaded.",
         ],
       },
@@ -79,7 +79,7 @@ export const MORE_ARTICLES: Article[] = [
       {
         type: "callout",
         title: "If xAI declines or the view is insufficient",
-        text: "Do not chase a more intimate image and do not treat local color/edge hints as validation. Use direct communication, lower-consequence unrestrained learning, or a qualified in-person instructor.",
+        text: "Do not chase a more intimate image and do not treat local colour/edge hints as validation. Use direct communication, lower-consequence unrestrained learning, or a qualified in-person instructor.",
       },
     ],
   },
@@ -97,7 +97,7 @@ export const MORE_ARTICLES: Article[] = [
       },
       {
         type: "p",
-        text: "Do not diagnose a mark from this app. Broken skin, blistering, severe or worsening pain, swelling, numbness, weakness, or a marked color or temperature change requires stopping; persistent or worsening symptoms need prompt medical assessment.",
+        text: "Do not diagnose a mark from this app. Broken skin, blistering, severe or worsening pain, swelling, numbness, weakness, or a marked colour or temperature change requires stopping; persistent or worsening symptoms need prompt medical assessment.",
       },
       {
         type: "warn",
@@ -107,7 +107,7 @@ export const MORE_ARTICLES: Article[] = [
   },
   {
     slug: "pole-and-rope",
-    title: "The Pole Is Scenery",
+    title: "Practise on a pole, not a person",
     section: "scene",
     minutes: 5,
     summary: "A dance pole is scenery and exercise equipment, not a verified rope anchor or person-bearing system.",

@@ -194,6 +194,22 @@ function TiePage() {
       }
     >
       <section className="rounded-lg border border-border bg-surface px-4 py-4 sm:px-5">
+        {tie.prereqs.length > 0 && (
+          <p className="mb-3 text-sm text-muted">
+            Learn first:{" "}
+            {tie.prereqs.map((prereq, index) => {
+              const prerequisite = getAcademyTie(prereq);
+              return (
+                <span key={prereq}>
+                  {index > 0 && ", "}
+                  <Link to="/tie/$slug" params={{ slug: prereq }} className="text-accent hover:underline">
+                    {prerequisite?.name ?? prereq}
+                  </Link>
+                </span>
+              );
+            })}
+          </p>
+        )}
         {/* Says up front what the reader may actually do with this entry,
             rather than leaving it to be inferred from a duration badge. */}
         <p className="text-base leading-relaxed text-fg">{tieShapeBlurb(shape)}</p>

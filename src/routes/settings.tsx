@@ -97,7 +97,7 @@ function SettingsPage() {
           value={s.greenWord}
           onChange={(v) => s.set({ greenWord: v })}
           rejection={safewordRejection}
-          hint="Same rule as Red."
+          hint="Shown for reference only — the app does not listen for green. It is a check-in reply, not permission to escalate."
         />
         <label className="block text-sm">
           <span className="text-xs uppercase tracking-wide text-subtle">Direct-check reminder (minutes; not a safety interval)</span>

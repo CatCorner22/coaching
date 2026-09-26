@@ -25,6 +25,11 @@ function SafetyPage() {
         <Callout title="Neurologic change" body="New numbness, weakness, altered sensation, or loss of movement means release now. Seek prompt assessment if it persists or worsens; do not diagnose a nerve from an image or symptom pattern." />
         <Callout title="Emergency" body="Call local emergency services for abnormal breathing, unresponsiveness, seizure, chest pain, a serious fall, stroke-like signs, major weakness, or concerning symptoms after neck pressure." />
       </div>
+      <div className="mt-6 flex flex-wrap gap-2">
+        <Link to="/emergency" className="rounded-md border border-danger/40 px-3 py-2 text-sm text-danger-text">Emergency card</Link>
+        <Link to="/nerves" className="rounded-md border border-border px-3 py-2 text-sm">Nerves</Link>
+        <Link to="/aftercare" className="rounded-md border border-border px-3 py-2 text-sm">Aftercare</Link>
+      </div>
       <ul className="mt-10 space-y-2">
         {picks.map((a) => (
           <li key={a.slug}>

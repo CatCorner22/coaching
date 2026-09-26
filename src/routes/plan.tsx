@@ -25,7 +25,7 @@ function PlanPage() {
   return (
     <div className="mx-auto max-w-2xl px-5 py-10">
       <p className="text-xs uppercase tracking-[0.22em] text-muted">Education</p>
-      <h1 className="mt-2 font-display text-4xl">Learning planner</h1>
+      <h1 className="mt-2 font-display text-4xl">Plan</h1>
       <p className="mt-3 text-sm text-muted">
         Build a short reading or unoccupied-practice plan. Instructor-route entries are for risk
         recognition and questions, not remote construction or a live-scene sequence.

@@ -9,7 +9,7 @@ function ArticlePage() {
   if (!article) {
     return (
       <div className="px-5 py-16 text-muted">
-        Missing essay. <Link to="/knowledge">Knowledge</Link>
+        Missing article. <Link to="/knowledge">Guide</Link>
       </div>
     );
   }
@@ -17,9 +17,14 @@ function ArticlePage() {
   const evidenceSources = articleEvidenceSources(article.slug);
   return (
     <article className="mx-auto max-w-2xl px-5 py-10">
-      <p className="text-xs uppercase tracking-[0.22em] text-muted">{article.section}</p>
+      <p className="text-xs uppercase tracking-[0.22em] text-muted">Full article · {article.section}</p>
       <h1 className="mt-2 font-display text-4xl">{article.title}</h1>
       <p className="mt-4 text-sm text-muted">{article.summary}</p>
+      {article.slug === "aftercare" && (
+        <Link to="/aftercare" className="mt-4 inline-flex text-sm text-accent underline">
+          Open the aftercare checklist
+        </Link>
+      )}
       <div className="mt-8 space-y-4">
         {article.blocks.map((b, i) => {
           if (b.type === "h")

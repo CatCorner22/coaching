@@ -1,4 +1,5 @@
 import type { Article } from "./types";
+import { EMERGENCY_CALL_FIRST } from "@/lib/emergency-card";
 
 /**
  * Knowledge expansion, audited 2026-08-22: breathing position risk, gags and
@@ -33,7 +34,7 @@ export const EXPANSION_ARTICLES: Article[] = [
       },
       {
         type: "warn",
-        text: "Abnormal breathing, unresponsiveness, or confusion is an emergency: release, support breathing position, and call emergency services now. This entry describes recognized patterns only; it cannot define a safe position or duration for any person.",
+        text: EMERGENCY_CALL_FIRST,
       },
     ],
   },
@@ -106,12 +107,12 @@ export const EXPANSION_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "Educational pattern, not a triage tool: restricted circulation tends to involve a whole hand or foot — coldness, heaviness, swelling, or an overall color change. Nerve compression more often affects a specific patch or a few fingers — tingling, numbness, burning, or weakness in one territory while the rest feels normal. Real symptoms overlap, and neither pattern is ever the 'acceptable' one.",
+        text: "Educational pattern, not a triage tool: restricted circulation tends to involve a whole hand or foot — coldness, heaviness, swelling, or an overall colour change. Nerve compression more often affects a specific patch or a few fingers — tingling, numbness, burning, or weakness in one territory while the rest feels normal. Real symptoms overlap, and neither pattern is ever the 'acceptable' one.",
       },
       {
         type: "ul",
         items: [
-          "Whole-limb cold, color change, or swelling: release now.",
+          "Whole-limb cold, colour change, or swelling: release now.",
           "Partial numbness, tingling, burning, or weakness — even one finger: release now.",
           "Do not test your way to continuing. Nail-bed timing, pulse hunting, forced movement, and photographs are not clearance and can delay release.",
           "After release, note what was felt, where, and roughly when it started and resolved. That description is what a clinician can actually use.",
@@ -172,8 +173,8 @@ export const EXPANSION_ARTICLES: Article[] = [
           "No finger-width or gap rule establishes safe pressure. Published references disagree — a fingertip, one finger, two fingers — precisely because none of them measures what actually injures a nerve. Treat any such number as a rough starting point you then monitor, never as a check that passed.",
           "Both directions fail. Too tight compresses: cuff injury to the nerves at the wrist is a documented pattern, and cuffs that can ratchet or slip tighter after they are applied are a recognized part of it. Too loose is not the safe side either — a cuff that slides under load concentrates its edge on the narrow wrist, which is exactly where those nerves lie shallow.",
           "Because both ends fail, the check that matters is the person, repeated: ask what they feel, and release for any change. A cuff that felt right at the start is not a cuff that is still right ten minutes later.",
-          "Prefer equipment with fast, practiced release: buckles you have actually operated under mild stress beat locks whose key has a single location. If it locks, the key stays in arm's reach of the scene.",
-          "The same signals as rope apply: tingling, numbness, coldness, color change, or weakness at any point means release now.",
+          "Prefer equipment with fast, practised release: buckles you have actually operated under mild stress beat locks whose key has a single location. If it locks, the key stays in arm's reach of the scene.",
+          "The same signals as rope apply: tingling, numbness, coldness, colour change, or weakness at any point means release now.",
           "A collar is symbolic equipment. Never attach a load, a downward line, or a pulling force to anything around a neck, and never leave a collared person attached to a fixed point unattended.",
         ],
       },
@@ -200,7 +201,7 @@ export const EXPANSION_ARTICLES: Article[] = [
         type: "ul",
         items: [
           "Keep solo work to unloaded pattern practice: hands free, nothing fixed to furniture or hardware, nothing near the neck, nothing over the mouth, and no positions you cannot simply stand up out of.",
-          "Keep a practiced cutting tool physically within reach of your restrained hand positions — reachable in the position you would actually be stuck in, not on a table across the room.",
+          "Keep a practised cutting tool physically within reach of your restrained hand positions — reachable in the position you would actually be stuck in, not on a table across the room.",
           "Escape mechanisms fail: ice releases jam, knots capsize out of reach, hands go numb and lose dexterity. Plan for the release you cannot operate.",
           "A phone that can call for help, reachable and usable in the restrained position, is a minimum — and still not a substitute for a present partner.",
           "Anything involving fixed attachment, load, neck, mouth, breath, or intoxication has no solo version. With a partner in the next room, agree on scheduled check-ins that trigger a look when missed.",
@@ -274,7 +275,7 @@ export const EXPANSION_ARTICLES: Article[] = [
       },
       {
         type: "p",
-        text: "Publishing is a separate decision from capturing, and it is the one that cannot be walked back. A picture that has been posted, sent, or shared has been copied by strangers, caches, and archives that will not honour a later change of mind. Consent to be photographed is not consent to be published, and consent to be published today is not consent that holds next year — which is why the person in the picture should be the one deciding each time, in specific terms, and should be able to withdraw the ongoing part of it even though the already-distributed part is gone.",
+        text: "Publishing is a separate decision from capturing, and it is the one that cannot be walked back. A picture that has been posted, sent, or shared has been copied by strangers, caches, and archives that will not honour a later change of mind. Consent to be photographed is not consent to be published, and consent to be published today is not consent that holds next year. The person in the picture should be the one deciding each time, in specific terms, and should be able to withdraw the ongoing part of it even though the already-distributed part is gone.",
       },
       {
         type: "warn",
@@ -351,15 +352,15 @@ export const EXPANSION_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "Before each use, run the full length slowly through your hands and eyes. You are feeling for change from last time: new fuzzing concentrated in one spot, a thin or soft segment, a lump or waist in the core, crunchy or brittle fiber, glazing, or a strand that has shifted. Natural fiber also announces trouble by smell — mustiness means moisture got in.",
+        text: "Before each use, run the full length slowly through your hands and eyes. You are feeling for change from last time: new fuzzing concentrated in one spot, a thin or soft segment, a lump or waist in the core, crunchy or brittle fibre, glazing, or a strand that has shifted. Natural fibre also announces trouble by smell — mustiness means moisture got in.",
       },
       {
         type: "ul",
         items: [
           "Retire or shorten rope with localized core damage: a soft flat segment, a popped or displaced strand, or a sharp kink that stays after tension.",
-          "Uniform light surface fuzz is normal wear on natural fiber; a concentrated fuzzy patch over one spot is a wear point to watch or cut out.",
-          "Dry rope thoroughly before storage; store coiled, dry, out of sunlight, and away from rodents and chemicals. Mildew and UV both weaken fiber invisibly.",
-          "Wash by material: synthetics tolerate machine washing in a bag; natural fiber prefers spot cleaning, and full washing changes its behavior and needs re-tensioned drying.",
+          "Uniform light surface fuzz is normal wear on natural fibre; a concentrated fuzzy patch over one spot is a wear point to watch or cut out.",
+          "Dry rope thoroughly before storage; store coiled, dry, out of sunlight, and away from rodents and chemicals. Mildew and UV both weaken fibre invisibly.",
+          "Wash by material: synthetics tolerate machine washing in a bag; natural fibre prefers spot cleaning, and full washing changes its behaviour and needs re-tensioned drying.",
           "Keep retired rope out of the active kit — cut it into short craft pieces or mark it unmistakably. An 'almost fine' rope in the bag will eventually be used.",
         ],
       },
@@ -380,7 +381,7 @@ export const EXPANSION_ARTICLES: Article[] = [
     blocks: [
       {
         type: "p",
-        text: "When a scene produces a suspected injury — numbness that stays, weakness, a hand that will not lift, unusual pain, or anything that scares either of you — the sequence is simple: stop and release, care for the person, decide the level of medical response, and write down what happened while memory is fresh. Shame is the enemy of all four steps.",
+        text: "When a scene produces a suspected injury — numbness that stays, weakness, a hand that will not lift, unusual pain, or anything that scares either of you — stop and release, care for the person, decide the level of medical response, and write down what happened while memory is fresh. Shame is the enemy of all four steps.",
       },
       {
         type: "ul",
