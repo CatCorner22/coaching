@@ -992,7 +992,7 @@ function StudioPage() {
                 : cloudVision.reason === "origin_not_trusted"
                   ? "Cloud Analyze is not allowed from this address"
                   : cloudVision.reason === "auth_required"
-                    ? "Cloud Analyze requires sign-in in this deployment"
+                    ? "Cloud Analyze is off in this deployment because accounts are not enabled, so stills stay on this device and you get the local read only."
                     : "Cloud analysis is switched off for this app, so stills stay on this device and you get the local read only."}
             </p>
           )}

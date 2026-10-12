@@ -138,6 +138,7 @@ function NegotiatePage() {
       </label>
       <textarea
         id="negotiate-notes"
+        maxLength={600}
         className="mt-1 h-28 w-full rounded-md border border-border bg-elevated p-3 text-sm"
         placeholder="Notes, aftercare asks, who holds the shears…"
         value={notes}
