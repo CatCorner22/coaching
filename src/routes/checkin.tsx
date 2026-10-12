@@ -24,8 +24,14 @@ function CheckInPage() {
   const [note, setNote] = useState("");
   const choices = [sensation, movement, breathingSpeechAlertness, painSwellingTemperature, emergencySigns];
   const ready = consent !== "not_checked" && choices.every((choice) => choice !== "not_checked");
+  const [lastLogged, setLastLogged] = useState<{ concern: boolean; emergency: boolean } | null>(null);
   const concern = consent === "no" || choices.includes("concern");
   const emergency = emergencySigns === "concern";
+  // After a log the inputs reset, but the guidance for what was just logged
+  // must stay up until the user starts a new check-in.
+  const formBlank = consent === "not_checked" && choices.every((choice) => choice === "not_checked");
+  const showConcern = concern || (formBlank && lastLogged?.concern === true);
+  const showEmergency = emergency || (formBlank && lastLogged?.emergency === true);
 
   return (
     <div className="mx-auto max-w-xl px-5 py-10">
@@ -82,9 +88,9 @@ function CheckInPage() {
         onChange={(event) => setNote(event.target.value.slice(0, 240))}
       />
 
-      {concern && (
+      {showConcern && (
         <div className="mt-4 rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger-text" role="alert">
-          Release now and do not re-tie. {emergency
+          Release now and do not re-tie. {showEmergency
             ? "Call local emergency services and follow dispatcher instructions."
             : "Seek prompt medical assessment for persistent or worsening symptoms; use emergency services if an emergency sign develops."}
           {" "}A normal-looking image cannot rule out injury.
@@ -108,6 +114,7 @@ function CheckInPage() {
             });
             checked();
             if (concern) useSession.getState().stop(emergency ? "medical-emergency" : "checkin-concern");
+            setLastLogged({ concern, emergency });
             // Clear the form so the next check-in starts blank: a logged answer
             // left selected would pre-fill the next report, and nothing here
             // may default to normal.
@@ -125,7 +132,7 @@ function CheckInPage() {
         <Button asChild variant="outline">
           <Link to="/studio">Back to studio</Link>
         </Button>
-        {concern && (
+        {showConcern && (
           <Button asChild variant="danger">
             <Link to="/emergency">Emergency card</Link>
           </Button>
