@@ -96,7 +96,8 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
           />
           <span>
             We're both adults, we chose this together for tonight, and we're happy to use the camera
-            and Studio Analyze when we want.
+            and Studio Analyze when we want. Nobody is recorded in secret or under pressure, and
+            everyone in frame has agreed.
           </span>
         </label>
         <Button

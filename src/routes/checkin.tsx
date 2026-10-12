@@ -108,6 +108,16 @@ function CheckInPage() {
             });
             checked();
             if (concern) useSession.getState().stop(emergency ? "medical-emergency" : "checkin-concern");
+            // Clear the form so the next check-in starts blank: a logged answer
+            // left selected would pre-fill the next report, and nothing here
+            // may default to normal.
+            setConsent("not_checked");
+            setSensation("not_checked");
+            setMovement("not_checked");
+            setBreathingSpeechAlertness("not_checked");
+            setPainSwellingTemperature("not_checked");
+            setEmergencySigns("not_checked");
+            setNote("");
           }}
         >
           {!ready ? "Complete every direct check" : concern ? "Log and halt" : "Log direct check"}
