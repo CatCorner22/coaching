@@ -27,6 +27,8 @@ export const MORE = [
   // Second for the same reason Emergency is first: both are scene-time
   // destinations, and everything below here is read before or after.
   { to: "/rig", label: "Rig mode" },
+  { to: "/boundaries", label: "Boundaries" },
+  { to: "/conversation", label: "Conversation guide" },
   { to: "/learn-foundations", label: "Learn how to learn" },
   { to: "/checklist", label: "Pre-scene" },
   { to: "/checkin", label: "Check-in" },

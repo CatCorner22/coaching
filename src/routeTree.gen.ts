@@ -11,9 +11,11 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AftercareRouteImport } from './routes/aftercare'
+import { Route as BoundariesRouteImport } from './routes/boundaries'
 import { Route as CalcRouteImport } from './routes/calc'
 import { Route as CheckinRouteImport } from './routes/checkin'
 import { Route as ChecklistRouteImport } from './routes/checklist'
+import { Route as ConversationRouteImport } from './routes/conversation'
 import { Route as DungeonRouteImport } from './routes/dungeon'
 import { Route as EmergencyRouteImport } from './routes/emergency'
 import { Route as GearRouteImport } from './routes/gear'
@@ -46,6 +48,11 @@ const AftercareRoute = AftercareRouteImport.update({
   path: '/aftercare',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BoundariesRoute = BoundariesRouteImport.update({
+  id: '/boundaries',
+  path: '/boundaries',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CalcRoute = CalcRouteImport.update({
   id: '/calc',
   path: '/calc',
@@ -59,6 +66,11 @@ const CheckinRoute = CheckinRouteImport.update({
 const ChecklistRoute = ChecklistRouteImport.update({
   id: '/checklist',
   path: '/checklist',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConversationRoute = ConversationRouteImport.update({
+  id: '/conversation',
+  path: '/conversation',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DungeonRoute = DungeonRouteImport.update({
@@ -170,9 +182,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/aftercare': typeof AftercareRoute
+  '/boundaries': typeof BoundariesRoute
   '/calc': typeof CalcRoute
   '/checkin': typeof CheckinRoute
   '/checklist': typeof ChecklistRoute
+  '/conversation': typeof ConversationRoute
   '/dungeon': typeof DungeonRoute
   '/emergency': typeof EmergencyRoute
   '/gear': typeof GearRoute
@@ -198,9 +212,11 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/aftercare': typeof AftercareRoute
+  '/boundaries': typeof BoundariesRoute
   '/calc': typeof CalcRoute
   '/checkin': typeof CheckinRoute
   '/checklist': typeof ChecklistRoute
+  '/conversation': typeof ConversationRoute
   '/dungeon': typeof DungeonRoute
   '/emergency': typeof EmergencyRoute
   '/gear': typeof GearRoute
@@ -227,9 +243,11 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/aftercare': typeof AftercareRoute
+  '/boundaries': typeof BoundariesRoute
   '/calc': typeof CalcRoute
   '/checkin': typeof CheckinRoute
   '/checklist': typeof ChecklistRoute
+  '/conversation': typeof ConversationRoute
   '/dungeon': typeof DungeonRoute
   '/emergency': typeof EmergencyRoute
   '/gear': typeof GearRoute
@@ -257,9 +275,11 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/aftercare'
+    | '/boundaries'
     | '/calc'
     | '/checkin'
     | '/checklist'
+    | '/conversation'
     | '/dungeon'
     | '/emergency'
     | '/gear'
@@ -285,9 +305,11 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/aftercare'
+    | '/boundaries'
     | '/calc'
     | '/checkin'
     | '/checklist'
+    | '/conversation'
     | '/dungeon'
     | '/emergency'
     | '/gear'
@@ -313,9 +335,11 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/aftercare'
+    | '/boundaries'
     | '/calc'
     | '/checkin'
     | '/checklist'
+    | '/conversation'
     | '/dungeon'
     | '/emergency'
     | '/gear'
@@ -342,9 +366,11 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AftercareRoute: typeof AftercareRoute
+  BoundariesRoute: typeof BoundariesRoute
   CalcRoute: typeof CalcRoute
   CheckinRoute: typeof CheckinRoute
   ChecklistRoute: typeof ChecklistRoute
+  ConversationRoute: typeof ConversationRoute
   DungeonRoute: typeof DungeonRoute
   EmergencyRoute: typeof EmergencyRoute
   GearRoute: typeof GearRoute
@@ -384,6 +410,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AftercareRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/boundaries': {
+      id: '/boundaries'
+      path: '/boundaries'
+      fullPath: '/boundaries'
+      preLoaderRoute: typeof BoundariesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/calc': {
       id: '/calc'
       path: '/calc'
@@ -403,6 +436,13 @@ declare module '@tanstack/react-router' {
       path: '/checklist'
       fullPath: '/checklist'
       preLoaderRoute: typeof ChecklistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/conversation': {
+      id: '/conversation'
+      path: '/conversation'
+      fullPath: '/conversation'
+      preLoaderRoute: typeof ConversationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dungeon': {
@@ -558,9 +598,11 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AftercareRoute: AftercareRoute,
+  BoundariesRoute: BoundariesRoute,
   CalcRoute: CalcRoute,
   CheckinRoute: CheckinRoute,
   ChecklistRoute: ChecklistRoute,
+  ConversationRoute: ConversationRoute,
   DungeonRoute: DungeonRoute,
   EmergencyRoute: EmergencyRoute,
   GearRoute: GearRoute,

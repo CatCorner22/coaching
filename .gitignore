@@ -10,6 +10,7 @@ tmp/
 *.log
 .env
 .env.*
+password.txt
 .DS_Store
 coverage/
 
