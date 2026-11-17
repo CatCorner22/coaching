@@ -21,7 +21,8 @@ export function checkSiteLock(authorization, user, password) {
   if (!authorization || !authorization.startsWith("Basic ")) return "locked";
   let decoded;
   try {
-    decoded = atob(authorization.slice(6).trim());
+    const bytes = Uint8Array.from(atob(authorization.slice(6).trim()), (character) => character.charCodeAt(0));
+    decoded = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   } catch {
     return "locked";
   }
