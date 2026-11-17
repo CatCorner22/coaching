@@ -193,3 +193,43 @@ test("unreadable persisted data is preserved for export and clears after recover
     resetPersistFailure();
   }
 });
+
+test("boundaries reports quota and blocked writes, then clears its own warning after recovery", async () => {
+  const { persistFailureFor, resetPersistFailure, onPersistStatus } = await import("./persist.ts");
+  const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const backing = new Map<string, string>();
+  let failure: string | null = "QuotaExceededError";
+  const statuses: unknown[] = [];
+  resetPersistFailure();
+  const off = onPersistStatus((status) => statuses.push(status));
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => backing.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        if (failure) throw new DOMException("cannot save", failure);
+        backing.set(key, value);
+      },
+      removeItem: (key: string) => backing.delete(key),
+    },
+  });
+  try {
+    const { useBoundaries } = await import("./boundaries.ts");
+    useBoundaries.getState().setName("a", "Unsaved");
+    assert.equal(useBoundaries.getState().names.a, "Unsaved");
+    assert.equal(persistFailureFor("knotty-boundaries")?.reason, "quota");
+    failure = "SecurityError";
+    useBoundaries.getState().setNote("a", "health", "Still unsaved");
+    assert.equal(persistFailureFor("knotty-boundaries")?.reason, "blocked");
+    failure = null;
+    useBoundaries.getState().setName("a", "Saved");
+    assert.equal(persistFailureFor("knotty-boundaries"), null);
+    assert.equal(statuses.at(-1), null);
+    assert.equal(JSON.parse(backing.get("knotty-boundaries")!).state.names.a, "Saved");
+  } finally {
+    off();
+    if (original) Object.defineProperty(globalThis, "localStorage", original);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+    resetPersistFailure();
+  }
+});

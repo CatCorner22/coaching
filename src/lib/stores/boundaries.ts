@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Rank } from "./negotiate";
+import { safeJsonStorage } from "./persist";
 
 export type Side = "a" | "b";
 type State = {
@@ -30,6 +31,6 @@ export const useBoundaries = create<State>()(
         }),
       clearSide: (side) => set({ answers: { ...get().answers, [side]: {} } }),
     }),
-    { name: "knotty-boundaries" },
+    { name: "knotty-boundaries", storage: safeJsonStorage<State>() },
   ),
 );
