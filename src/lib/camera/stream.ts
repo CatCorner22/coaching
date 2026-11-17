@@ -104,7 +104,7 @@ async function inspectCameraPermission(
 
 export async function openRopeCamera(
   facing: Facing,
-  options: { signal?: AbortSignal; timeoutMs?: number } = {},
+  options: { signal?: AbortSignal; timeoutMs?: number; deviceId?: string } = {},
 ): Promise<MediaStream> {
   if (cameraSecureContextState() === "insecure") {
     throw new Error("Live camera requires HTTPS or localhost. Open this app in a secure context.");
@@ -112,7 +112,13 @@ export async function openRopeCamera(
   if (!hasLiveCameraApi()) {
     throw new Error("Live camera is not supported in this browser.");
   }
-  const tries: MediaStreamConstraints[] = [
+  const tries: MediaStreamConstraints[] = options.deviceId ? [
+    {
+      audio: false,
+      video: { deviceId: { exact: options.deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+    },
+    { audio: false, video: { deviceId: { exact: options.deviceId } } },
+  ] : [
     {
       audio: false,
       video: {
@@ -145,6 +151,14 @@ export async function openRopeCamera(
     }
   }
   throw last instanceof Error ? last : new Error("Camera unavailable");
+}
+
+export async function listCameraDevices(): Promise<MediaDeviceInfo[]> {
+  try {
+    return (await navigator.mediaDevices.enumerateDevices()).filter((device) => device.kind === "videoinput");
+  } catch {
+    return [];
+  }
 }
 
 function acquireUserMedia(
@@ -249,7 +263,7 @@ function cameraAbortError(message: string): Error {
 function isTerminalCameraOpenFailure(error: unknown): boolean {
   if (!error || typeof error !== "object" || !("name" in error)) return false;
   const name = (error as { name?: unknown }).name;
-  return name === "AbortError" || name === "TimeoutError";
+  return name === "AbortError" || name === "TimeoutError" || name === "NotReadableError";
 }
 
 function isPermissionFailure(error: unknown): boolean {
