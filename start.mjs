@@ -40,6 +40,13 @@ export function nodeEnvironment(env, executable = process.execPath) {
   return { ...env, [key]: `${dirname(executable)}${delimiter}${env[key] || ""}` };
 }
 
+export function previewEnvironment(env) {
+  return {
+    ...env,
+    __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: [env.__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS, ".ts.net"].filter(Boolean).join(","),
+  };
+}
+
 const ENV = nodeEnvironment(process.env);
 const NPM = process.platform === "win32" ? `"${join(dirname(process.execPath), "npm.cmd")}"` : "npm";
 
@@ -153,7 +160,7 @@ async function main() {
   const password = resolvePassword();
   const user = (process.env.SITE_USER || "us").trim() || "us";
 
-  const env = { ...ENV, SITE_PASSWORD: password, SITE_USER: user };
+  const env = previewEnvironment({ ...ENV, SITE_PASSWORD: password, SITE_USER: user });
   const child = spawn(NPM, ["run", "preview", "--", "--host", "0.0.0.0", "--port", String(PORT)], {
     cwd: ROOT,
     stdio: "inherit",

@@ -3,7 +3,27 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, unlinkSync } from "node:
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import test from "node:test";
-import { buildFingerprint, nodeEnvironment, waitForServer } from "../start.mjs";
+import { buildFingerprint, nodeEnvironment, previewEnvironment, waitForServer } from "../start.mjs";
+
+test("launcher preview allows Tailscale hosts without removing the site lock or existing hosts", async () => {
+  const inherited = { SITE_PASSWORD: "private", SITE_USER: "us", __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS: "existing.test" };
+  const env = previewEnvironment(inherited);
+  assert.equal(env.SITE_PASSWORD, "private");
+  assert.equal(env.SITE_USER, "us");
+  assert.equal(env.__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS, "existing.test,.ts.net");
+  assert.equal(inherited.__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS, "existing.test");
+  assert.equal(previewEnvironment({}).__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS, ".ts.net");
+  const original = process.env.__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS;
+  try {
+    process.env.__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS = env.__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS;
+    const { resolveConfig } = await import("vite");
+    const config = await resolveConfig({ configFile: false, server: { allowedHosts: [".replit.dev", ".repl.co"] } }, "serve", "production", "production", true);
+    assert.deepEqual(config.preview.allowedHosts, [".replit.dev", ".repl.co", "existing.test", ".ts.net"]);
+  } finally {
+    if (original === undefined) delete process.env.__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS;
+    else process.env.__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS = original;
+  }
+});
 
 test("the selected Node directory precedes the inherited path, preserving Windows Path casing", () => {
   const result = nodeEnvironment({ Path: "old", OTHER: "kept" }, join("selected", "node"));
