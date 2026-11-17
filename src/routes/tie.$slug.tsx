@@ -212,6 +212,14 @@ function TiePage() {
         )}
         {/* Says up front what the reader may actually do with this entry,
             rather than leaving it to be inferred from a duration badge. */}
+        {limitsAgreed && (
+          <a
+            href="#steps"
+            className="mb-4 flex min-h-12 items-center justify-center rounded-lg bg-accent px-4 text-base font-medium text-accent-fg lg:hidden"
+          >
+            Jump to step 1
+          </a>
+        )}
         <p className="text-base leading-relaxed text-fg">{tieShapeBlurb(shape)}</p>
         {/* The lesson subtitle displaced the summary on these pages; keep it. */}
         {dressFormPractice && <p className="mt-3 text-base leading-relaxed text-muted">{tie.summary}</p>}
@@ -256,6 +264,9 @@ function TiePage() {
             Open the negotiation page
             <span aria-hidden>→</span>
           </Link>
+          <Link to="/boundaries" className="mt-3 block text-sm text-accent underline">
+            Or fill in the boundaries checklist together
+          </Link>
           <p className="mt-3 text-sm leading-relaxed text-muted">
             The safety notes, stop conditions, and aftercare below stay readable either way.
           </p>
@@ -263,6 +274,7 @@ function TiePage() {
       )}
 
       {limitsAgreed && <>
+          <div id="steps" className="scroll-mt-20" aria-hidden />
           <StepProgress step={renderStep} total={tie.steps.length} />
 
           <StepFilmstrip

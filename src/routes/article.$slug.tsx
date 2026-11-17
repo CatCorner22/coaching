@@ -9,7 +9,7 @@ function ArticlePage() {
   if (!article) {
     return (
       <div className="px-5 py-16 text-muted">
-        Missing article. <Link to="/knowledge">Guide</Link>
+        Missing article. <Link to="/knowledge">Knowledge base</Link>
       </div>
     );
   }

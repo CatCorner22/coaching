@@ -193,3 +193,166 @@ test("unreadable persisted data is preserved for export and clears after recover
     resetPersistFailure();
   }
 });
+
+test("boundaries reports quota and blocked writes, then clears its own warning after recovery", async () => {
+  const { persistFailureFor, resetPersistFailure, onPersistStatus } = await import("./persist.ts");
+  const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const backing = new Map<string, string>();
+  let failure: string | null = "QuotaExceededError";
+  const statuses: unknown[] = [];
+  resetPersistFailure();
+  const off = onPersistStatus((status) => statuses.push(status));
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => backing.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        if (failure) throw new DOMException("cannot save", failure);
+        backing.set(key, value);
+      },
+      removeItem: (key: string) => backing.delete(key),
+    },
+  });
+  try {
+    const { useBoundaries } = await import("./boundaries.ts");
+    useBoundaries.getState().setName("a", "Unsaved");
+    assert.equal(useBoundaries.getState().names.a, "Unsaved");
+    assert.equal(persistFailureFor("knotty-boundaries")?.reason, "quota");
+    failure = "SecurityError";
+    useBoundaries.getState().setNote("a", "health", "Still unsaved");
+    assert.equal(persistFailureFor("knotty-boundaries")?.reason, "blocked");
+    failure = null;
+    useBoundaries.getState().setName("a", "Saved");
+    assert.equal(persistFailureFor("knotty-boundaries"), null);
+    assert.equal(statuses.at(-1), null);
+    assert.equal(JSON.parse(backing.get("knotty-boundaries")!).state.names.a, "Saved");
+  } finally {
+    off();
+    if (original) Object.defineProperty(globalThis, "localStorage", original);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+    resetPersistFailure();
+  }
+});
+
+async function boundaryTabs(run: (createStore: typeof import("./boundaries.ts").createBoundariesStore, backing: Map<string, string>) => void | Promise<void>) {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const backing = new Map<string, string>();
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => backing.get(key) ?? null,
+      setItem: (key: string, value: string) => backing.set(key, value),
+      removeItem: (key: string) => backing.delete(key),
+    },
+  });
+  try {
+    const { createBoundariesStore } = await import("./boundaries.ts");
+    await run(createBoundariesStore, backing);
+  } finally {
+    if (original) Object.defineProperty(globalThis, "localStorage", original);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+    const { resetPersistFailure } = await import("./persist.ts");
+    resetPersistFailure();
+  }
+}
+
+test("independent boundaries tabs keep both partners, per-answer edits and newer same-field edits", async () => {
+  await boundaryTabs((createStore) => {
+    const a = createStore();
+    const b = createStore();
+    a.getState().setAnswer("a", "rope", "yes");
+    b.getState().setAnswer("b", "rope", "maybe");
+    a.getState().setAnswer("a", "photos", "no");
+    b.getState().setAnswer("a", "rope", "no");
+    a.getState().setName("a", "Alice");
+    b.getState().setName("b", "Bob");
+    assert.deepEqual(createStore().getState().answers, { a: { rope: "no", photos: "no" }, b: { rope: "maybe" } });
+    assert.deepEqual(createStore().getState().names, { a: "Alice", b: "Bob" });
+  });
+});
+
+test("boundaries notes merge per field, including explicit empty notes and names", async () => {
+  await boundaryTabs((createStore) => {
+    const a = createStore();
+    const b = createStore();
+    a.getState().setNote("a", "health", "Health A");
+    b.getState().setNote("a", "aftercare", "Care A");
+    a.getState().setNote("b", "health", "Health B");
+    b.getState().setNote("b", "aftercare", "Care B");
+    a.getState().setNote("a", "health", "New health");
+    const stale = a.getState();
+    b.getState().setNote("a", "health", "");
+    b.getState().setName("a", "");
+    a.persist.getOptions().storage!.setItem("knotty-boundaries", { state: stale, version: 1 });
+    const saved = createStore().getState();
+    assert.deepEqual(saved.notes, { a: { health: "", aftercare: "Care A" }, b: { health: "Health B", aftercare: "Care B" } });
+    assert.equal(saved.names.a, "");
+  });
+});
+
+test("boundaries write-time merge preserves clears against stale snapshots and permits later answers", async () => {
+  await boundaryTabs((createStore, backing) => {
+    const a = createStore();
+    const b = createStore();
+    a.getState().setAnswer("a", "rope", "yes");
+    a.getState().setNote("a", "health", "Keep this note");
+    const stale = a.getState();
+    b.getState().clearSide("a");
+    a.persist.getOptions().storage!.setItem("knotty-boundaries", { state: stale, version: 1 });
+    a.getState().setAnswer("b", "photos", "no");
+    const saved = createStore().getState();
+    assert.deepEqual(saved.answers, { a: {}, b: { photos: "no" } });
+    assert.equal(saved.notes.a.health, "Keep this note");
+    assert.equal(JSON.parse(backing.get("knotty-boundaries")!).state.fields["a:answer:rope"].value, null);
+    b.getState().setAnswer("a", "rope", "maybe");
+    a.getState().clearSide("b");
+    assert.deepEqual(createStore().getState().answers, { a: { rope: "maybe" }, b: {} });
+    b.getState().clearSide("a");
+    assert.deepEqual(createStore().getState().answers, { a: {}, b: {} });
+  });
+});
+
+test("boundaries migrates unstamped snapshots without losing names, answers or notes", async () => {
+  await boundaryTabs((createStore, backing) => {
+    backing.set("knotty-boundaries", JSON.stringify({ version: 0, state: {
+      names: { a: "Alice", b: "Bob" }, answers: { a: { rope: "yes" }, b: { photos: "no" } },
+      notes: { a: { health: "Health", aftercare: "Care" }, b: { health: "", aftercare: "" } },
+    } }));
+    const a = createStore();
+    const b = createStore();
+    assert.equal(a.getState().names.a, "Alice");
+    assert.equal(a.getState().notes.a.health, "Health");
+    assert.equal(a.getState().answers.a.rope, "yes");
+    assert.equal(JSON.parse(backing.get("knotty-boundaries")!).version, 1);
+    b.getState().clearSide("a");
+    a.getState().setAnswer("b", "rope", "maybe");
+    assert.deepEqual(createStore().getState().answers, { a: {}, b: { photos: "no", rope: "maybe" } });
+  });
+});
+
+test("boundaries rehydrates independent tabs on matching storage events", async () => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "window");
+  const listeners: Array<(event: { key: string }) => void> = [];
+  Object.defineProperty(globalThis, "window", { configurable: true, value: {
+    addEventListener: (name: string, callback: (event: { key: string }) => void) => {
+      if (name === "storage") listeners.push(callback);
+    },
+  } });
+  try {
+    await boundaryTabs((createStore) => {
+      const a = createStore();
+      const b = createStore();
+      a.getState().setAnswer("a", "rope", "yes");
+      for (const listener of listeners) listener({ key: "unrelated" });
+      assert.equal(b.getState().answers.a.rope, undefined);
+      for (const listener of listeners) listener({ key: "knotty-boundaries" });
+      assert.equal(b.getState().answers.a.rope, "yes");
+      a.getState().clearSide("a");
+      for (const listener of listeners) listener({ key: "knotty-boundaries" });
+      assert.deepEqual(b.getState().answers.a, {});
+    });
+  } finally {
+    if (original) Object.defineProperty(globalThis, "window", original);
+    else Reflect.deleteProperty(globalThis, "window");
+  }
+});

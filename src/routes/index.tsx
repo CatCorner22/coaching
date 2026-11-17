@@ -53,16 +53,58 @@ function Home() {
           <dl className="mt-10 grid grid-cols-3 gap-4 text-sm">
             <Stat n={stats.ties} l="ties" />
             <Stat n={stats.knots} l="knots" />
-            <Stat n={92} l="articles" />
+            <Stat n={stats.articles} l="articles" />
           </dl>
         </div>
       </section>
 
+      <section className="mx-auto max-w-5xl px-5 py-10" aria-labelledby="learning-paths">
+        <h2 id="learning-paths" className="font-display text-3xl">New here? Start learning</h2>
+        <p className="mt-2 text-sm text-muted">Read together. Practise on an empty prop first. Stop for any concern.</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <Link to="/learn" hash="start" className="rounded-lg border border-border bg-surface p-5 hover:border-accent">
+            <h3 className="font-display text-2xl">Learn shibari</h3>
+            <p className="mt-2 text-sm text-muted">One path from rope handling and first knots to single column, double column and a decorative karada.</p>
+          </Link>
+          <Link to="/article/$slug" params={{ slug: "rope-materials" }} className="rounded-lg border border-border bg-surface p-5 hover:border-accent">
+            <h3 className="font-display text-2xl">Rope basics</h3>
+            <p className="mt-2 text-sm text-muted">Jute, hemp, cotton or synthetic? Start small. Compare sizes, care and release tools.</p>
+          </Link>
+          <Link to="/knowledge" className="rounded-lg border border-border bg-surface p-5 hover:border-accent">
+            <h3 className="font-display text-2xl">Knowledge base</h3>
+            <p className="mt-2 text-sm text-muted">Browse BDSM topics: consent, roles, sensation, risk, health and aftercare.</p>
+          </Link>
+        </div>
+      </section>
       <section className="mx-auto max-w-5xl px-5 py-10">
-        <h2 className="mb-4 font-display text-3xl">Start here</h2>
-        <Link to="/learn" hash="start" className="block rounded-lg border border-accent/30 bg-accent/5 p-5 hover:border-accent">
-          <p className="font-display text-2xl">Learn the foundations</p>
-          <p className="mt-2 text-sm text-muted">A short path through knots, cuffs, and a first karada.</p>
+        <h2 className="mb-1 font-display text-3xl">Start tonight</h2>
+        <p className="mb-4 text-sm text-muted">Five steps, in order. Tap each one.</p>
+        <ol className="grid gap-2 md:grid-cols-5">
+          {[
+            { to: "/conversation", t: "Talk", d: "Read the opening questions together." },
+            { to: "/boundaries", t: "Boundaries", d: "Each answers yes / maybe / no, then match." },
+            { to: "/checklist", t: "Pre-scene", d: "Shears, water, phone charged, room ready." },
+            { to: "/library", t: "Pick a tie", d: "Only shared yes ties unlock." },
+            { to: "/aftercare", t: "Aftercare", d: "Plan it now, do it after." },
+          ].map((step, n) => (
+            <li key={step.to}>
+              <Link
+                to={step.to}
+                className="flex min-h-16 items-start gap-3 rounded-lg border border-border bg-surface p-4 hover:border-accent"
+              >
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-semibold text-accent-fg">
+                  {n + 1}
+                </span>
+                <span>
+                  <span className="block font-display text-xl">{step.t}</span>
+                  <span className="block text-sm text-muted">{step.d}</span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ol>
+        <Link to="/learn" hash="start" className="mt-3 inline-block text-sm text-muted underline">
+          New to rope? Learn the foundations first
         </Link>
       </section>
       <section className="mx-auto grid max-w-5xl gap-3 px-5 pb-10 md:grid-cols-3">

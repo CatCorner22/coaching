@@ -84,6 +84,33 @@ An unrecognised value falls back to `non_explicit` rather than widening, so a ty
 
 ## Development
 
+### Run at home
+
+See [RUN_AT_HOME.md](RUN_AT_HOME.md) for the laptop launcher (`start.cmd` on
+Windows, `sh start.sh` on macOS/Linux). It installs dependencies, rebuilds after
+source changes, opens the browser, and serves the built app on port 8080.
+Windows can keep system Node 24: the launcher uses Node 22 on PATH or the private
+installation at `%LOCALAPPDATA%\node22\node.exe` (with `npm.cmd` alongside it).
+No database, sign-in, or xAI key is needed for the local-only features.
+
+The Boundaries checklist compares two partners' answers on the same device;
+the Conversation guide walks through limits, signals, check-ins and aftercare.
+They use browser-local storage, not account sync. Captures remain in page memory.
+Choose one device for a session. Settings' erase action includes boundaries.
+
+`SITE_PASSWORD` enables a Basic-auth site lock (`SITE_USER` defaults to `us`);
+the launcher generates a password in ignored `password.txt` when none is set.
+It protects server-handled pages and calls, **not static assets** served directly
+by the host/CDN. Basic auth over plain HTTP is not encrypted: use only a trusted
+network, and use HTTPS/Tailscale for phones, especially for live cameras. See the
+Tailscale section below. A public deployment still needs the separate production
+auth/DB prerequisites for cloud AI; the site password does not replace them.
+Real-device camera and permissions checks remain necessary; previous review
+notes are not evidence that every phone/browser combination works.
+Dependency updates do not remove all published advisories: review `npm audit`
+before exposing a deployment. Auth-off mode and a site password are not a
+substitute for maintaining the authentication stack.
+
 The project targets Node 22.
 
 The supported npm wrappers default standalone development to `VITE_AUTH_ENABLED=false`; production must explicitly set it to `true` and provide the configured identity service. Do not start Vite directly, because that bypasses the shared environment wrapper.

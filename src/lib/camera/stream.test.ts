@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   CLIP_DURATION_MS,
+  listCameraDevices,
   openRopeCamera,
   setTorch,
   startClip,
   torchAvailable,
 } from "./stream.ts";
 import { MAX_VIDEO_BYTES } from "../media.ts";
+import { cameraErrorMessage } from "./error-message.ts";
 
 // ---------------------------------------------------------------------------
 // Environment scaffolding. These tests exercise the real ladder, torch, and
@@ -153,6 +155,72 @@ test("openRopeCamera stops a stream that arrives after the caller aborted", asyn
     },
   );
   assert.equal(stream.track.stopped, true, "the orphaned stream's tracks must be stopped");
+});
+
+test("an explicitly selected camera stays selected when resolution constraints fail", async () => {
+  const seen: MediaStreamConstraints[] = [];
+  const stream = fakeStream();
+  const opened = await withCameraEnv(async (constraints) => {
+    seen.push(constraints);
+    if (seen.length === 1) throw new DOMException("720p only", "OverconstrainedError");
+    return stream;
+  }, () => openRopeCamera("environment", { deviceId: "integrated" }));
+  assert.equal(opened, stream);
+  assert.equal(seen.length, 2);
+  for (const constraints of seen) {
+    assert.deepEqual((constraints.video as MediaTrackConstraints).deviceId, { exact: "integrated" });
+    assert.equal((constraints.video as MediaTrackConstraints).facingMode, undefined);
+  }
+  assert.deepEqual(seen[1]!.video, { deviceId: { exact: "integrated" } });
+});
+
+test("an unavailable selected camera never silently opens a different camera", async () => {
+  const seen: MediaStreamConstraints[] = [];
+  await withCameraEnv(async (constraints) => {
+    seen.push(constraints);
+    throw new DOMException("unplugged", "NotFoundError");
+  }, async () => {
+    await assert.rejects(() => openRopeCamera("environment", { deviceId: "usb" }), /unplugged/);
+  });
+  assert.equal(seen.length, 2);
+  assert.ok(seen.every((constraints) => (constraints.video as MediaTrackConstraints).deviceId));
+});
+
+test("camera-in-use failures do not retry and keep actionable copy across realms", async () => {
+  let attempts = 0;
+  const error = Object.assign(new Error("Could not start video source"), { name: "NotReadableError" });
+  await withCameraEnv(async () => {
+    attempts++;
+    throw error;
+  }, async () => {
+    await assert.rejects(() => openRopeCamera("environment"), /Could not start/);
+  });
+  assert.equal(attempts, 1);
+  assert.match(cameraErrorMessage(error), /busy in another app.*Close it there and try again/);
+});
+
+test("camera failures explain denied permission, missing devices and unknown errors", () => {
+  assert.match(cameraErrorMessage(new DOMException("denied", "NotAllowedError")), /Allow camera permission/);
+  assert.match(cameraErrorMessage({ name: "SecurityError" }), /Allow camera permission/);
+  assert.match(cameraErrorMessage(new DOMException("missing", "NotFoundError")), /No compatible camera/);
+  assert.match(cameraErrorMessage({ name: "OverconstrainedError" }), /Choose a photo or video/);
+  assert.equal(cameraErrorMessage(new Error("preview failed")), "preview failed");
+  assert.equal(cameraErrorMessage(null), "Could not open the camera.");
+});
+
+test("camera enumeration is optional, filters audio, and tolerates errors and empty lists", async () => {
+  await withCameraEnv(async () => fakeStream(), async () => {
+    assert.deepEqual(await listCameraDevices(), []);
+    const devices = navigator.mediaDevices;
+    const integrated = { kind: "videoinput", deviceId: "integrated", label: "Integrated Camera" };
+    const usb = { kind: "videoinput", deviceId: "usb", label: "USB Camera" };
+    Object.assign(devices, { enumerateDevices: async () => [integrated, { kind: "audioinput" }, usb] });
+    assert.deepEqual(await listCameraDevices(), [integrated, usb]);
+    Object.assign(devices, { enumerateDevices: async () => [] });
+    assert.deepEqual(await listCameraDevices(), []);
+    Object.assign(devices, { enumerateDevices: async () => { throw new Error("enumeration blocked"); } });
+    assert.deepEqual(await listCameraDevices(), []);
+  });
 });
 
 // ---------------------------------------------------------------------------

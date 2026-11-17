@@ -11,7 +11,7 @@ export const NAV = [
   { to: "/learn", label: "Learn", icon: GraduationCap },
   { to: "/library", label: "Library", icon: BookOpen },
   { to: "/studio", label: "Studio", icon: Camera },
-  { to: "/knowledge", label: "Guide", icon: Library },
+  { to: "/knowledge", label: "Knowledge base", icon: Library },
   { to: "/safety", label: "Safety", icon: Shield },
 ] as const;
 
@@ -27,6 +27,8 @@ export const MORE = [
   // Second for the same reason Emergency is first: both are scene-time
   // destinations, and everything below here is read before or after.
   { to: "/rig", label: "Rig mode" },
+  { to: "/boundaries", label: "Boundaries" },
+  { to: "/conversation", label: "Conversation guide" },
   { to: "/learn-foundations", label: "Learn how to learn" },
   { to: "/checklist", label: "Pre-scene" },
   { to: "/checkin", label: "Check-in" },

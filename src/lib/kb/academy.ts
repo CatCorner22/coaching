@@ -26,6 +26,27 @@ export const FOUNDATION_TIE_SLUGS = [
 
 export const BEGINNER_PATH = [
   {
+    sessions: "Prepare",
+    title: "Rope basics: choose a small starter kit",
+    to: "/article/$slug",
+    slug: "rope-materials",
+    note: "Compare fibres, lengths and care. Keep shears within reach.",
+  },
+  {
+    sessions: "Handle",
+    title: "Rope handling on an empty prop",
+    to: "/article/$slug",
+    slug: "rope-basics",
+    note: "Find the middle, manage the ends and lay strands flat. No person in the rope yet.",
+  },
+  {
+    sessions: "Release",
+    title: "Practise getting rope off",
+    to: "/article/$slug",
+    slug: "getting-rope-off",
+    note: "Rehearse removal before learning a knot. Read the stop signs together.",
+  },
+  {
     sessions: "1–2",
     title: "Somerville Bowline and Single Column on a chair leg",
     to: "/knot/$slug",
@@ -52,6 +73,20 @@ export const BEGINNER_PATH = [
     to: "/tie/$slug",
     slug: "double-column",
     note: "",
+  },
+  {
+    sessions: "Before the harness",
+    title: "Overhand on a Bight",
+    to: "/knot/$slug",
+    slug: "overhand-on-bight",
+    note: "Learn the karada's first knot on an empty prop.",
+  },
+  {
+    sessions: "Binding knot",
+    title: "Square Knot",
+    to: "/knot/$slug",
+    slug: "square",
+    note: "Learn its limits and removal on an empty prop. It is not a suspension knot.",
   },
   {
     sessions: "9–10",

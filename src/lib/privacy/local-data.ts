@@ -3,6 +3,7 @@ const LEGACY_EMERGENCY_NUMBER_KEY = "knotty-emergency-number";
 export const LOCAL_DATA_KEYS = [
   "knotty-settings",
   "knotty-negotiate",
+  "knotty-boundaries",
   "knotty-plan",
   "knotty-journal",
   // Lesson progress and the pre-scene checklist are personal data too: which

@@ -72,7 +72,7 @@ export const LEARNING_PEDAGOGY_ARTICLES: Article[] = [
     minutes: 8,
     summary:
       "Before a knot, there is rope. Learn what rope is, how to identify the working end, and how your hands should feel.",
-    related: ["learning-modalities", "knot-foundations"],
+    related: ["rope-materials", "reading-the-rope", "getting-rope-off", "knot-foundations"],
     blocks: [
       { type: "h", text: "Rope is a tool, not magic" },
       {
@@ -124,7 +124,7 @@ export const LEARNING_PEDAGOGY_ARTICLES: Article[] = [
       },
       {
         type: "p",
-        text: "Tie every knot in this app on a smooth post or chair leg, never on a person. This keeps the focus on the rope mechanics without the complication of watching whether someone is comfortable. Once you can tie it on a post every time without thinking, a person becomes a detail, not the whole challenge.",
+        text: "Use knot lessons on a smooth, empty prop, never on a person. Keep the prop stable and the rope unloaded. Prop practice teaches rope handling, not how to judge pressure or nerve risk on a body. Before any body tie, read its full lesson, agree specific limits and rehearse release. Seek qualified hands-on instruction; a checklist or camera cannot clear a tie.",
       },
     ],
   },

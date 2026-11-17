@@ -8,6 +8,7 @@ import {
   BURST_KEEP,
   CLIP_DURATION_MS,
   inspectCameraCapabilities,
+  listCameraDevices,
   openRopeCamera,
   playCameraPreview,
   setTorch,
@@ -153,6 +154,8 @@ export const CameraCapture = memo(function CameraCapture({
   disabledRef.current = disabled;
   const [live, setLive] = useState(false);
   const [facing, setFacing] = useState<"user" | "environment">("environment");
+  const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
+  const [cameraDeviceId, setCameraDeviceId] = useState("");
   const [busy, setBusy] = useState(false);
   const [recording, setRecording] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -447,7 +450,7 @@ export const CameraCapture = memo(function CameraCapture({
     }
   }
 
-  async function startLive(next: "user" | "environment" = facing) {
+  async function startLive(next: "user" | "environment" = facing, deviceId = cameraDeviceId) {
     if (disabledRef.current || batchCommitted) return;
     if (!Object.values(permissionsRef.current).every(Boolean)) {
       setError("Step inside from the home screen first, then open the camera.");
@@ -463,7 +466,7 @@ export const CameraCapture = memo(function CameraCapture({
     let openedStream: MediaStream | null = null;
     setBusyState(true);
     try {
-      const stream = await openRopeCamera(next, { signal: cameraController.signal });
+      const stream = await openRopeCamera(next, { signal: cameraController.signal, deviceId });
       openedStream = stream;
       if (!mountedRef.current || request !== cameraRequestRef.current) {
         stream.getTracks().forEach((track) => track.stop());
@@ -498,6 +501,10 @@ export const CameraCapture = memo(function CameraCapture({
       setZoomCaps(range);
       setZoom(range?.min ?? 1);
       const track = stream.getVideoTracks()[0];
+      setCameraDeviceId(track?.getSettings().deviceId ?? "");
+      void listCameraDevices().then((devices) => {
+        if (mountedRef.current && streamRef.current === stream) setCameraDevices(devices);
+      });
       const closeInterruptedCamera = () => {
         if (streamRef.current === stream) {
           setError("The camera stopped. Tap Open live camera to start it again.");
@@ -1223,6 +1230,23 @@ export const CameraCapture = memo(function CameraCapture({
           </div>
         )}
       </div>
+      {live && cameraDevices.length > 1 && (
+        <label className="block text-xs text-muted">
+          Camera device
+          <select
+            className="mt-1 block w-full rounded-md border border-border bg-elevated p-2 text-fg"
+            value={cameraDeviceId}
+            onChange={(event) => void startLive(facing, event.target.value)}
+            disabled={busy || recording || disabled || countdown !== null}
+          >
+            {cameraDevices.map((device, index) => (
+              <option key={device.deviceId} value={device.deviceId}>
+                {device.label || `Camera ${index + 1}`}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <div className="flex flex-wrap gap-1.5">
         {(["equipment", "context", "detail", "label"] as Guide[]).map((g) => (
           <button
@@ -1463,7 +1487,7 @@ export const CameraCapture = memo(function CameraCapture({
             <Button
               variant="secondary"
               size="icon"
-              onClick={() => void startLive(facing === "user" ? "environment" : "user")}
+              onClick={() => void startLive(facing === "user" ? "environment" : "user", "")}
               aria-label="Flip camera"
               disabled={busy || recording || disabled || countdown !== null}
             >

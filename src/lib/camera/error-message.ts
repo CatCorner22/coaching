@@ -6,7 +6,7 @@
  * request was interrupted by a new load request." by a rope coaching app.
  */
 export function cameraErrorMessage(cause: unknown): string {
-  if (typeof DOMException !== "undefined" && cause instanceof DOMException) {
+  if (cause && typeof cause === "object" && "name" in cause) {
     if (cause.name === "NotAllowedError" || cause.name === "SecurityError") {
       return "Camera access was blocked. Allow camera permission or choose a photo or video.";
     }
