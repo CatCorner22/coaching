@@ -382,13 +382,27 @@ const CORE_ARTICLES: Article[] = [
     title: "Rope Materials",
     section: "craft",
     minutes: 8,
-    summary: "Jute, hemp, cotton, synthetics. What they do to skin, knots, and drop.",
-    related: ["gear-care", "emergency-stop"],
+    summary: "Rope basics: compare jute, hemp, cotton and synthetics. Choose a small practice kit, then learn care and release.",
+    related: ["rope-basics", "gear-care", "rope-inspection-retirement", "getting-rope-off", "emergency-stop"],
     blocks: [
       {
         type: "p",
-        text: "Jute, hemp, cotton, and synthetics differ in feel, stretch, friction, maintenance, and failure behaviour. A fibre label, diameter, appearance, or familiar knot does not establish condition or suitability for restraint or person-bearing use. Keep app-guided practice ground-level and non-loaded, inspect before each use, and obtain hands-on guidance for body application.",
+        text: "Start with rope on an empty prop. Jute, hemp, cotton and synthetics handle differently. Soft rope can still injure nerves or restrict circulation. A fibre name or size is not a safety rating. Keep practice ground-level and non-loaded. Never use this shopping guide to choose suspension rope.",
       },
+      { type: "h", text: "Compare the fibres" },
+      { type: "ul", items: [
+        "Jute is a light natural fibre. Its grip helps wraps stay put. It can feel scratchy and shed fibres. It needs the maker's care routine.",
+        "Hemp is another grippy natural fibre. It often feels heavier than jute. Finish and construction change the feel. Do not assume all hemp handles alike.",
+        "Cotton feels soft and costs less in many shops. It can stretch and compress. Knots may jam. Use it for empty-prop handling drills here, not as proof of comfort or safety on a body.",
+        "Synthetic is a family, not one material. Nylon often stretches more than polyester. Some ropes are very slippery; knots may slip or jam. Check the exact fibre and construction. Avoid unknown utility cord for body use.",
+      ] },
+      { type: "h", text: "Lengths, diameter and how many to buy" },
+      { type: "p", text: "For empty-prop drills, start with one rope around 6 mm thick and 7–8 m long. This is a common practice size, not a fit rule or strength rating. A 4 m rope can make short knot drills easier to manage. Thin cord concentrates pressure; thicker rope does not remove nerve risk." },
+      { type: "p", text: "Do not buy a large set yet. Add a second matching 7–8 m rope only when a chosen lesson needs it. Read each tie's rope list before starting; bodies, props and rope construction change the length needed. Do not improvise joins or pull tighter to make a short rope reach." },
+      { type: "h", text: "Buy the release tool first" },
+      { type: "p", text: "Keep suitable safety shears within reach of both partners. Practise cutting a loose scrap of your actual rope away from skin. Check that the shears cut it. A knife is not a substitute. Rehearse ordinary removal too. Stop and remove rope at once for numbness, tingling, weakness, breathing trouble, pain or uncertainty. Normal warmth or colour does not rule out nerve injury." },
+      { type: "h", text: "Conditioning and care" },
+      { type: "p", text: "Buy ready-to-use rope with clear care instructions. Store it dry, away from heat, sun and contaminants. Inspect it before every use. Separate dirty rope from clean rope. Follow the maker's cleaning and drying method; natural fibres and synthetics need different care. Read Caring for Rope and Rope Inspection and Retirement below." },
       {
         type: "ul",
         items: [

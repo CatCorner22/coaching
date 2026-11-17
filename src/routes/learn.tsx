@@ -53,7 +53,7 @@ function LearnPage() {
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm uppercase tracking-wide text-muted">Knotty Academy</p>
-          <h1 className="mt-2 font-display text-4xl sm:text-5xl">Easy-read lessons</h1>
+          <h1 className="mt-2 font-display text-4xl sm:text-5xl">Learn shibari</h1>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted">
             Short steps. Plain words. Pictures on every step. {NYX_SHIBARI.name}, our demonstration
             model, appears on taught lessons alongside diagrams. Listen aloud or use the practice cam
@@ -74,7 +74,9 @@ function LearnPage() {
             <h2 className="font-display text-2xl">Start here</h2>
           </div>
           <p className="mt-2 text-base text-muted">
-            Start with Somerville Bowline: {firstKnot?.steps.length ?? 0} short steps, then follow the numbered path.
+            Follow this path in order: rope basics, handling, release, first knots, single column,
+            double column, then a decorative karada harness. The Somerville Bowline lesson has {firstKnot?.steps.length ?? 0} short steps.
+            Repeat any stage. Session numbers are a guide, not a deadline or proof of skill.
           </p>
           <h3 className="mt-5 font-display text-xl">Beginner path</h3>
           <ol className="mt-4 space-y-2">

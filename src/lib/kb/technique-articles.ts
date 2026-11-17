@@ -365,7 +365,7 @@ export const TECHNIQUE_ARTICLES: Article[] = [
       },
       {
         type: "p",
-        text: "Find the bight, work doubled, keep the working end managed. Tie the single column structure on a chair leg or a rolled towel, twenty times, until your hands do it without your attention. Do the shears drill: both of you, eyes closed, under two seconds. Cut a scrap of rope so you know the force. This sounds like homework and it is the reason session three goes well.",
+        text: "Find the bight, work doubled and manage the ends. Follow the Somerville Bowline knot lesson on an empty prop. Repeat both tying and removal without rushing. Keep your eyes open for the shears drill. Cut a loose scrap away from skin. Repetition is practice, not proof that a body tie is safe.",
       },
       {
         type: "h",
@@ -381,7 +381,7 @@ export const TECHNIQUE_ARTICLES: Article[] = [
       },
       {
         type: "p",
-        text: "One on each forearm. She can still move both arms; you are practising doing the same thing twice and asking about two limbs separately. Introduce the timer. Notice how much longer twenty minutes is than it feels.",
+        text: "Repeat the Single Column lesson before adding more. Keep cuffs separate and attached to nothing. Ask about each limb. Remove rope for any concern. A timer reminds you to check in; it never gives a safe duration. Do not extend a session to meet a target.",
       },
       {
         type: "h",
@@ -389,7 +389,7 @@ export const TECHNIQUE_ARTICLES: Article[] = [
       },
       {
         type: "p",
-        text: "The first thing that genuinely restrains. In front, not behind — she can see her hands, bring them to her face, and break a fall. Learn the cinch and learn to see it in the gap. Keep the durations short and the questions frequent, and expect to take it apart and redo it; that is the session working, not failing.",
+        text: "Follow the Double Column lesson with hands in front and both partners settled at ground level. Bound hands cannot reliably break a fall. Do not stand or walk in restraint. Rehearse release first. Ask often, and remove the rope for any concern. Normal colour and warmth cannot rule out nerve injury.",
       },
       {
         type: "h",
@@ -397,7 +397,7 @@ export const TECHNIQUE_ARTICLES: Article[] = [
       },
       {
         type: "p",
-        text: "Rope on a torso, nothing restrained, nothing loaded. This is the session that takes an hour and looks like the pictures. It is also where you find out whether your spacing is even, which no amount of limb work reveals.",
+        text: "Read the Overhand on a Bight and Square Knot lessons first. Then follow the decorative Karada lesson, including its release rehearsal and stop signs. Nothing hangs from it. Never use it to lift, pull or anchor a person. Leave optional steps out unless you both gave a specific yes. Stop before fatigue; no picture is a target to push through discomfort for.",
       },
       {
         type: "h",

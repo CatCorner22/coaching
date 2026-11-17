@@ -14,6 +14,15 @@ import { ARTICLES } from "./articles";
 import { KNOTS } from "./knots";
 import { TIES } from "./ties";
 
+export const KNOWLEDGE_TOPICS = [
+  { title: "Consent and safewords", slugs: ["negotiation", "safewords", "consent-frameworks"] },
+  { title: "Roles and power exchange", slugs: ["protocol-ds", "power-exchange-scope", "submissive-agency"] },
+  { title: "Impact and sensation", slugs: ["impact-risk-families", "sensation", "sensory-deprivation"] },
+  { title: "Aftercare and drop", slugs: ["aftercare", "drop", "top-drop", "scene-debrief"] },
+  { title: "Health and risk", slugs: ["medical-disclosure", "circulation-vs-nerve", "hard-limits", "suspension-reality"] },
+  { title: "Rope and equipment", slugs: ["rope-materials", "rope-basics", "gear-care"] },
+] as const;
+
 export const SEQUENCES = [
   {
     slug: "first-night",

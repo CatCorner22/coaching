@@ -11,7 +11,7 @@ export const NAV = [
   { to: "/learn", label: "Learn", icon: GraduationCap },
   { to: "/library", label: "Library", icon: BookOpen },
   { to: "/studio", label: "Studio", icon: Camera },
-  { to: "/knowledge", label: "Guide", icon: Library },
+  { to: "/knowledge", label: "Knowledge base", icon: Library },
   { to: "/safety", label: "Safety", icon: Shield },
 ] as const;
 

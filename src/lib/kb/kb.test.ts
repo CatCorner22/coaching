@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   ARTICLES,
+  BEGINNER_PATH,
+  KNOWLEDGE_TOPICS,
   articleMinutes,
   DUNGEON,
   DUNGEON_SCENES,
@@ -93,6 +95,50 @@ test("knot slugs are unique", () => {
 test("article slugs are unique", () => {
   const slugs = ARTICLES.map((a) => a.slug);
   assert.equal(new Set(slugs).size, slugs.length);
+});
+
+test("the beginner path resolves in order and never teaches an instructor-only tie", () => {
+  const slugs = BEGINNER_PATH.map((item) => item.slug) as readonly string[];
+  const sequence = ["rope-materials", "rope-basics", "getting-rope-off", "somerville-bowline", "single-column", "double-column", "overhand-on-bight", "square", "karada"];
+  let previous = -1;
+  for (const slug of sequence) {
+    const index = slugs.indexOf(slug);
+    assert.ok(index > previous, `${slug} is missing or out of order`);
+    previous = index;
+  }
+  for (const item of BEGINNER_PATH) {
+    if (item.to === "/tie/$slug") {
+      const tie = getTie(item.slug);
+      assert.ok(tie, item.slug);
+      assert.ok(tie.intent.includes("guided-practice"), item.slug);
+      assert.ok(tie.steps.length >= 6, item.slug);
+    } else if (item.to === "/knot/$slug") assert.ok(getKnot(item.slug), item.slug);
+    else assert.ok(ARTICLES.some((article) => article.slug === item.slug), item.slug);
+  }
+});
+
+test("rope basics covers a starter kit without prescribing conditioning or suspension", () => {
+  const article = ARTICLES.find((entry) => entry.slug === "rope-materials");
+  assert.ok(article);
+  const copy = JSON.stringify(article);
+  for (const topic of [/jute/i, /hemp/i, /cotton/i, /nylon/i, /polyester/i, /6 mm/, /7–8 m/, /second matching/, /shears/i, /Conditioning and care/, /maker/, /nerve injury/]) assert.match(copy, topic);
+  assert.match(copy, /Do not heat, oil, wash/);
+  assert.match(copy, /Never use this shopping guide to choose suspension rope/);
+});
+
+test("knowledge topic browsing reuses real articles and covers the requested basics", () => {
+  const slugs = KNOWLEDGE_TOPICS.flatMap((topic) => [...topic.slugs]);
+  for (const slug of slugs) assert.ok(ARTICLES.some((article) => article.slug === slug), slug);
+  for (const slug of ["negotiation", "safewords", "consent-frameworks", "protocol-ds", "impact-risk-families", "sensation", "aftercare", "drop", "medical-disclosure"]) assert.ok(slugs.includes(slug as typeof slugs[number]), slug);
+});
+
+test("the beginner plan avoids blind cutting, fall protection and duration assurances", () => {
+  const plan = JSON.stringify(ARTICLES.find((entry) => entry.slug === "first-ten-sessions"));
+  assert.match(plan, /Keep your eyes open for the shears drill/);
+  assert.match(plan, /Bound hands cannot reliably break a fall/);
+  assert.match(plan, /never gives a safe duration/);
+  const handling = JSON.stringify(ARTICLES.find((entry) => entry.slug === "rope-basics"));
+  assert.match(handling, /Prop practice teaches rope handling, not how to judge pressure or nerve risk/);
 });
 
 test("all routed catalog slugs are globally unique", () => {

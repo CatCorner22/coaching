@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   ARTICLES,
+  KNOWLEDGE_TOPICS,
   articleMinutes,
   isKnowledgeQueryUsable,
   knowledgeAnswer,
@@ -41,13 +42,32 @@ function KnowledgePage() {
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-10">
-      <p className="text-xs uppercase tracking-[0.22em] text-muted">Guide</p>
-      <h1 className="mt-2 font-display text-4xl">Guide</h1>
+      <p className="text-xs uppercase tracking-[0.22em] text-muted">BDSM knowledge base</p>
+      <h1 className="mt-2 font-display text-4xl">Knowledge base</h1>
       <p className="mt-3 text-sm text-muted">
         Consent, risk recognition, privacy, and aftercare. Search in your words; results point to
         curated local entries without generating individualized rope instructions. Evidence status
         and source anchors appear on each article.
       </p>
+      {!usableQuery && (
+        <section className="mt-6" aria-labelledby="browse-topics">
+          <h2 id="browse-topics" className="font-display text-2xl">Browse by topic</h2>
+          <p className="mt-2 text-sm text-muted">This app does not coach hard-limit or edge activities. Suspension needs qualified hands-on instruction.</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {KNOWLEDGE_TOPICS.map((topic) => (
+              <div key={topic.title} className="rounded-lg border border-border bg-surface p-4">
+                <h3 className="font-display text-xl">{topic.title}</h3>
+                <ul className="mt-2">
+                  {topic.slugs.map((slug) => {
+                    const article = ARTICLES.find((entry) => entry.slug === slug);
+                    return article ? <li key={slug}><Link to="/article/$slug" params={{ slug }} className="inline-flex min-h-11 items-center text-sm text-accent hover:underline">{article.title}</Link></li> : null;
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       <div className="mt-6 flex gap-2">
         <input
           value={q}
